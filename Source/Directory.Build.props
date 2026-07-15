@@ -1,0 +1,56 @@
+<Project>
+    <Import Project="$(MSBuildThisFileDirectory)../Directory.Build.props" />
+
+    <PropertyGroup>
+        <Version>1.0.0</Version>
+        <Copyright>Copyright Cratis</Copyright>
+        <Authors>all contributors</Authors>
+        <DebugType>portable</DebugType>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <RepositoryType>git</RepositoryType>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <RepositoryUrl>https://github.com/Cratis/Stage</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/Cratis/Stage</PackageProjectUrl>
+
+        <GenerateAssemblyTitleAttribute>true</GenerateAssemblyTitleAttribute>
+        <GenerateAssemblyDescriptionAttribute>true</GenerateAssemblyDescriptionAttribute>
+        <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+        <IsTestProject>false</IsTestProject>
+        <IsPackable>false</IsPackable>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(IsPackable)'=='true'">
+        <None Include="$(MSBuildThisFileDirectory)/../README.md" Pack="true" PackagePath="/" />
+    </ItemGroup>
+
+    <!--
+        Inline specs live beside the code they specify (when_*/, for_*/ and given/ folders).
+        Every project doubles as a test project in Debug; the spec files are stripped from Release builds.
+        A dedicated spec project opts out by setting <DedicatedSpecsProject>true</DedicatedSpecsProject>.
+    -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <IsTestProject>true</IsTestProject>
+
+        <!-- The test SDK generates an entry point; projects with top-level statements keep their own. -->
+        <NoWarn>$(NoWarn);CS7022</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(Configuration)' == 'Debug' AND '$(DedicatedSpecsProject)' != 'true'">
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="NSubstitute" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="Cratis.Specifications" />
+        <PackageReference Include="Cratis.Specifications.XUnit" />
+    </ItemGroup>
+</Project>
