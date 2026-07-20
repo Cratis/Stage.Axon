@@ -8,6 +8,7 @@
     <PackageVersion Include="Cratis" Version="20.54.3" />
     <PackageVersion Include="Cratis.Arc.MongoDB" Version="20.54.3" />
     <PackageVersion Include="Cratis.Chronicle.Contracts" Version="16.0.3" />
+    <PackageVersion Include="Cratis.Screenplay" Version="1.2.1" />
     <!-- Microsoft -->
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
     <!-- OpenAPI -->
