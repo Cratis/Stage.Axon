@@ -7,7 +7,7 @@
     <!-- Cratis -->
     <PackageVersion Include="Cratis" Version="20.66.0" />
     <PackageVersion Include="Cratis.Arc.MongoDB" Version="20.66.0" />
-    <PackageVersion Include="Cratis.Chronicle.Contracts" Version="16.10.0" />
+    <PackageVersion Include="Cratis.Chronicle.Contracts" Version="16.11.1" />
     <PackageVersion Include="Cratis.Screenplay" Version="1.6.4" />
     <!-- Microsoft -->
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.301" />
