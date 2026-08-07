@@ -5,9 +5,9 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Cratis -->
-    <PackageVersion Include="Cratis" Version="21.0.0" />
-    <PackageVersion Include="Cratis.Arc.MongoDB" Version="21.0.0" />
-    <PackageVersion Include="Cratis.Chronicle.Contracts" Version="16.17.0" />
+    <PackageVersion Include="Cratis" Version="21.0.2" />
+    <PackageVersion Include="Cratis.Arc.MongoDB" Version="21.0.2" />
+    <PackageVersion Include="Cratis.Chronicle.Contracts" Version="16.19.1" />
     <PackageVersion Include="Cratis.Screenplay" Version="1.8.0" />
     <PackageVersion Include="Cratis.Templates" Version="1.1.1" />
     <!-- Microsoft -->
