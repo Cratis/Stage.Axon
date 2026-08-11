@@ -39,6 +39,5 @@
         <PackageReference Include="StyleCop.Analyzers" PrivateAssets="All"/>
         <PackageReference Include="Roslynator.Analyzers" PrivateAssets="All"/>
         <PackageReference Include="Meziantou.Analyzer" PrivateAssets="All"/>
-        <PackageReference Include="Microsoft.Net.Compilers.Toolset" PrivateAssets="All"/>
     </ItemGroup>
 </Project>
