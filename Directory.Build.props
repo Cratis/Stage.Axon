@@ -7,6 +7,18 @@
 
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
+        <!--
+            Compare every packable assembly against the last released one and fail on a binary break.
+            The contract records are positional records, so adding a trailing optional parameter is source
+            compatible and binary breaking: it replaces the constructor and Deconstruct in the compiled
+            signature, and a consumer built against the older package fails at run time with a missing
+            method and no compiler error anywhere. Studio consumes these records, so a break there surfaces
+            as a runtime fault in the designer rather than an error here. Capability is therefore added as
+            an init property, and this makes the alternative an error in the pull request that causes it.
+        -->
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <PackageValidationBaselineVersion>2.0.0</PackageValidationBaselineVersion>
+
         <RunAnalyzersDuringBuild>True</RunAnalyzersDuringBuild>
         <RunAnalyzersDuringLiveAnalysis>True</RunAnalyzersDuringLiveAnalysis>
         <RunAnalyzers>True</RunAnalyzers>
