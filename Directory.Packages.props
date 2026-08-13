@@ -6,7 +6,9 @@
   <ItemGroup>
     <!-- Cratis -->
     <PackageVersion Include="Cratis" Version="21.13.0" />
+    <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="21.13.0" />
     <PackageVersion Include="Cratis.Arc.MongoDB" Version="21.13.0" />
+    <PackageVersion Include="Cratis.Arc.Testing" Version="21.13.0" />
     <PackageVersion Include="Cratis.Chronicle.Contracts" Version="16.28.0" />
     <PackageVersion Include="Cratis.Screenplay" Version="2.1.0" />
     <PackageVersion Include="Cratis.Templates" Version="1.1.1" />
