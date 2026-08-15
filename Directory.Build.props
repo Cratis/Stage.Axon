@@ -16,8 +16,17 @@
             as a runtime fault in the designer rather than an error here. Capability is therefore added as
             an init property, and this makes the alternative an error in the pull request that causes it.
         -->
-        <EnablePackageValidation>true</EnablePackageValidation>
-        <PackageValidationBaselineVersion>2.0.0</PackageValidationBaselineVersion>
+        <!--
+            Off for the 3.0.0 major only. Screenplay 3 renamed reactor to reaction, and taking it renamed
+            this repo's public surface with it - RenderedConstructs.Reactors became Reactions and
+            ReactorSliceRenderer became ReactionSliceRenderer. Validating a deliberate major against the
+            line it deliberately leaves has no answer to give, and the pack fails outright, which means no
+            release: v3.0.0 is tagged with nothing on NuGet because of exactly this.
+
+            Turn back on with the baseline at the first 3.x that publishes.
+        -->
+        <EnablePackageValidation>false</EnablePackageValidation>
+        <PackageValidationBaselineVersion>2.4.0</PackageValidationBaselineVersion>
 
         <RunAnalyzersDuringBuild>True</RunAnalyzersDuringBuild>
         <RunAnalyzersDuringLiveAnalysis>True</RunAnalyzersDuringLiveAnalysis>
