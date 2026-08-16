@@ -15,7 +15,8 @@
     <PackageVersion Include="Cratis.Chronicle" Version="16.30.1" />
     <PackageVersion Include="MongoDB.Driver" Version="3.11.0" />
     <PackageVersion Include="Cratis.Chronicle.Contracts" Version="16.30.1" />
-    <PackageVersion Include="Cratis.Scene.Model" Version="1.0.0" />
+    <PackageVersion Include="Cratis.Scene.Engine" Version="1.1.0" />
+    <PackageVersion Include="Cratis.Scene.Model" Version="1.1.0" />
     <PackageVersion Include="Cratis.Screenplay" Version="4.0.0" />
     <PackageVersion Include="Cratis.Templates" Version="1.1.1" />
     <!-- Microsoft -->
