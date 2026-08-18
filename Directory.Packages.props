@@ -21,6 +21,13 @@
     <PackageVersion Include="Cratis.Templates" Version="1.1.1" />
     <!-- Microsoft -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
+    <!--
+        Microsoft.CodeAnalysis.CSharp 5.9.0 declares a dependency on a prerelease of the analyzers that was never
+        published, so restore resolves the stable 5.9.0 and raises NU1603 - an error here, which stopped the whole
+        solution building. Referenced directly at the version restore already picks, so the dependency is satisfied
+        outright rather than substituted.
+    -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.400" />
     <PackageVersion Include="Microsoft.TemplateEngine.Abstractions" Version="10.0.400" />
     <PackageVersion Include="Microsoft.TemplateEngine.Edge" Version="10.0.400" />
