@@ -43,6 +43,8 @@
     <PackageVersion Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" Version="10.0.400" />
     <!-- OpenAPI -->
     <PackageVersion Include="Scalar.AspNetCore" Version="2.16.20" />
+    <!-- Reverse proxy for the Chronicle Workbench, which the bundled kernel serves on its own unpublished port. -->
+    <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <!-- OpenTelemetry -->
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
