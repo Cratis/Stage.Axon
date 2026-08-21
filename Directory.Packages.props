@@ -5,13 +5,13 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Cratis -->
-    <PackageVersion Include="Cratis" Version="21.19.4" />
-    <PackageVersion Include="Cratis.Arc" Version="21.19.4" />
-    <PackageVersion Include="Cratis.Arc.Chronicle" Version="21.19.4" />
-    <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="21.19.4" />
-    <PackageVersion Include="Cratis.Arc.MongoDB" Version="21.19.4" />
-    <PackageVersion Include="Cratis.Arc.Swagger" Version="21.19.4" />
-    <PackageVersion Include="Cratis.Arc.Testing" Version="21.19.4" />
+    <PackageVersion Include="Cratis" Version="22.0.0" />
+    <PackageVersion Include="Cratis.Arc" Version="22.0.0" />
+    <PackageVersion Include="Cratis.Arc.Chronicle" Version="22.0.0" />
+    <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="22.0.0" />
+    <PackageVersion Include="Cratis.Arc.MongoDB" Version="22.0.0" />
+    <PackageVersion Include="Cratis.Arc.Swagger" Version="22.0.0" />
+    <PackageVersion Include="Cratis.Arc.Testing" Version="22.0.0" />
     <!--
         The Chronicle client packages are pinned here AND referenced directly from Stage and Host - central package
         management only pins what a project references directly, so a version that arrives transitively through the
@@ -42,7 +42,7 @@
     <PackageVersion Include="Microsoft.TemplateEngine.Edge" Version="10.0.400" />
     <PackageVersion Include="Microsoft.TemplateEngine.Orchestrator.RunnableProjects" Version="10.0.400" />
     <!-- OpenAPI -->
-    <PackageVersion Include="Scalar.AspNetCore" Version="2.16.20" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.17.1" />
     <!-- Reverse proxy for the Chronicle Workbench, which the bundled kernel serves on its own unpublished port. -->
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
@@ -55,7 +55,7 @@
     <!-- Analysis -->
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" NoWarn="NU5104" />
     <PackageVersion Include="Roslynator.Analyzers" Version="4.16.1" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.173" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.177" />
     <!-- Testing & Specifications -->
     <PackageVersion Include="Cratis.Specifications" Version="4.0.0" />
     <PackageVersion Include="Cratis.Specifications.XUnit" Version="4.0.0" />
