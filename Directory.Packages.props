@@ -5,13 +5,13 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Cratis -->
-    <PackageVersion Include="Cratis" Version="22.0.1" />
-    <PackageVersion Include="Cratis.Arc" Version="22.0.1" />
-    <PackageVersion Include="Cratis.Arc.Chronicle" Version="22.0.1" />
-    <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="22.0.1" />
-    <PackageVersion Include="Cratis.Arc.MongoDB" Version="22.0.1" />
-    <PackageVersion Include="Cratis.Arc.Swagger" Version="22.0.1" />
-    <PackageVersion Include="Cratis.Arc.Testing" Version="22.0.1" />
+    <PackageVersion Include="Cratis" Version="22.1.0" />
+    <PackageVersion Include="Cratis.Arc" Version="22.1.0" />
+    <PackageVersion Include="Cratis.Arc.Chronicle" Version="22.1.0" />
+    <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="22.1.0" />
+    <PackageVersion Include="Cratis.Arc.MongoDB" Version="22.1.0" />
+    <PackageVersion Include="Cratis.Arc.Swagger" Version="22.1.0" />
+    <PackageVersion Include="Cratis.Arc.Testing" Version="22.1.0" />
     <!--
         The Chronicle client packages are pinned here AND referenced directly from Stage and Host - central package
         management only pins what a project references directly, so a version that arrives transitively through the
@@ -20,9 +20,9 @@
         TypeLoadException for the renamed EnsureEventStore contract. The Host Dockerfile's cratis/chronicle base
         image tag must track this version too, so the bundled kernel and the client never drift apart.
     -->
-    <PackageVersion Include="Cratis.Chronicle" Version="16.37.0" />
-    <PackageVersion Include="Cratis.Chronicle.AspNetCore" Version="16.37.0" />
-    <PackageVersion Include="Cratis.Chronicle.Contracts" Version="16.37.0" />
+    <PackageVersion Include="Cratis.Chronicle" Version="16.37.1" />
+    <PackageVersion Include="Cratis.Chronicle.AspNetCore" Version="16.37.1" />
+    <PackageVersion Include="Cratis.Chronicle.Contracts" Version="16.37.1" />
     <PackageVersion Include="MongoDB.Driver" Version="3.11.0" />
     <PackageVersion Include="Cratis.Scene.Engine" Version="2.0.0" />
     <PackageVersion Include="Cratis.Scene.Model" Version="2.0.0" />
