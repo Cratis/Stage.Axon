@@ -5,13 +5,13 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Cratis -->
-    <PackageVersion Include="Cratis" Version="22.1.0" />
-    <PackageVersion Include="Cratis.Arc" Version="22.1.0" />
-    <PackageVersion Include="Cratis.Arc.Chronicle" Version="22.1.0" />
-    <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="22.1.0" />
-    <PackageVersion Include="Cratis.Arc.MongoDB" Version="22.1.0" />
-    <PackageVersion Include="Cratis.Arc.Swagger" Version="22.1.0" />
-    <PackageVersion Include="Cratis.Arc.Testing" Version="22.1.0" />
+    <PackageVersion Include="Cratis" Version="22.3.0" />
+    <PackageVersion Include="Cratis.Arc" Version="22.3.0" />
+    <PackageVersion Include="Cratis.Arc.Chronicle" Version="22.3.0" />
+    <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="22.3.0" />
+    <PackageVersion Include="Cratis.Arc.MongoDB" Version="22.3.0" />
+    <PackageVersion Include="Cratis.Arc.Swagger" Version="22.3.0" />
+    <PackageVersion Include="Cratis.Arc.Testing" Version="22.3.0" />
     <!--
         The Chronicle client packages are pinned here AND referenced directly from Stage and Host - central package
         management only pins what a project references directly, so a version that arrives transitively through the
