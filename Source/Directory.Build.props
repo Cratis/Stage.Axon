@@ -11,6 +11,7 @@
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <RepositoryUrl>https://github.com/Cratis/Stage</RepositoryUrl>
         <PackageProjectUrl>https://github.com/Cratis/Stage</PackageProjectUrl>
+        <PackageTags>cratis;event-sourcing;event-modeling;cqrs;stage;code-generation;renderer</PackageTags>
 
         <GenerateAssemblyTitleAttribute>true</GenerateAssemblyTitleAttribute>
         <GenerateAssemblyDescriptionAttribute>true</GenerateAssemblyDescriptionAttribute>
