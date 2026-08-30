@@ -26,7 +26,9 @@
     <PackageVersion Include="MongoDB.Driver" Version="3.11.0" />
     <PackageVersion Include="Cratis.Scene.Engine" Version="2.0.0" />
     <PackageVersion Include="Cratis.Scene.Model" Version="2.0.0" />
-    <PackageVersion Include="Cratis.Screenplay" Version="4.6.0" />
+    <PackageVersion Include="Cratis.Screenplay" Version="4.10.0" />
+    <!-- Spec-only: freezes the released RegisterProject conformance corpus consumed by the Cratis renderer's planner fixtures. -->
+    <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.10.0" />
     <PackageVersion Include="Cratis.Templates" Version="1.1.1" />
     <!-- Microsoft -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
