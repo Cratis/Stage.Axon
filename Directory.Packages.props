@@ -29,7 +29,7 @@
     <PackageVersion Include="Cratis.Screenplay" Version="4.12.1" />
     <!-- Spec-only: freezes the released RegisterProject conformance corpus consumed by the Cratis renderer's planner fixtures. -->
     <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.12.1" />
-    <PackageVersion Include="Cratis.Templates" Version="1.1.1" />
+    <PackageVersion Include="Cratis.Templates" Version="1.2.0" />
     <!-- Microsoft -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <!--
