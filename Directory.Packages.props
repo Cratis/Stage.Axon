@@ -24,8 +24,8 @@
     <PackageVersion Include="Cratis.Chronicle.AspNetCore" Version="18.1.6" />
     <PackageVersion Include="Cratis.Chronicle.Contracts" Version="18.1.6" />
     <PackageVersion Include="MongoDB.Driver" Version="3.11.2" />
-    <PackageVersion Include="Cratis.Scene.Engine" Version="3.2.0" />
-    <PackageVersion Include="Cratis.Scene.Model" Version="3.2.0" />
+    <PackageVersion Include="Cratis.Scene.Engine" Version="3.3.1" />
+    <PackageVersion Include="Cratis.Scene.Model" Version="3.3.1" />
     <PackageVersion Include="Cratis.Screenplay" Version="4.12.1" />
     <!-- Spec-only: freezes the released RegisterProject conformance corpus consumed by the Cratis renderer's planner fixtures. -->
     <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.12.1" />
