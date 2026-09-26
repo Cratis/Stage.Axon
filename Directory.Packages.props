@@ -20,10 +20,10 @@
         TypeLoadException for the renamed EnsureEventStore contract. The Host Dockerfile's cratis/chronicle base
         image tag must track this version too, so the bundled kernel and the client never drift apart.
     -->
-    <PackageVersion Include="Cratis.Chronicle" Version="19.8.0" />
-    <PackageVersion Include="Cratis.Chronicle.AspNetCore" Version="19.8.0" />
-    <PackageVersion Include="Cratis.Chronicle.Contracts" Version="19.8.0" />
-    <PackageVersion Include="Cratis.Chronicle.Testing" Version="19.8.0" />
+    <PackageVersion Include="Cratis.Chronicle" Version="19.8.1" />
+    <PackageVersion Include="Cratis.Chronicle.AspNetCore" Version="19.8.1" />
+    <PackageVersion Include="Cratis.Chronicle.Contracts" Version="19.8.1" />
+    <PackageVersion Include="Cratis.Chronicle.Testing" Version="19.8.1" />
     <PackageVersion Include="MongoDB.Driver" Version="3.12.0" />
     <PackageVersion Include="Cratis.Scene.Engine" Version="4.2.0" />
     <PackageVersion Include="Cratis.Scene.Model" Version="4.2.0" />
