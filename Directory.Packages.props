@@ -2,6 +2,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageVersionOverrideEnabled>false</CentralPackageVersionOverrideEnabled>
+    <PureTransitionReferencePackVersion>10.0.12</PureTransitionReferencePackVersion>
   </PropertyGroup>
   <ItemGroup>
     <!-- Cratis -->
@@ -32,6 +33,8 @@
     <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.41.1" />
     <PackageVersion Include="Cratis.Templates" Version="1.7.0" />
     <!-- Microsoft -->
+    <!-- Audited reducer-binding references, embedded in the renderer for runtime-only hosts. -->
+    <PackageVersion Include="Microsoft.NETCore.App.Ref" Version="$(PureTransitionReferencePackVersion)" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.9.0" />
     <!--
