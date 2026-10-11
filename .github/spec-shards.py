@@ -147,18 +147,28 @@ def require_executed(path):
 
 
 def run_shard(shard):
+    # Run every project even after a failure, so one failing project does not hide failures in the others.
+    failures = []
     for project in shard["projects"]:
         name = Path(project).stem
         results = ROOT / "TestResults" / shard["name"] / name
         results.mkdir(parents=True, exist_ok=True)
         trx = results / "specs.trx"
         trx.unlink(missing_ok=True)  # A stale result must not satisfy an empty invocation.
-        subprocess.run(
+        completed = subprocess.run(
             ["dotnet", "test", project, "--no-build", "--configuration", "Debug",
              "--filter", shard["filter"], "--logger", "trx;LogFileName=specs.trx",
-             "--results-directory", str(results)], cwd=ROOT, check=True,
+             "--results-directory", str(results)], cwd=ROOT,
         )
-        require_executed(trx)
+        if completed.returncode != 0:
+            failures.append(f"{name}: dotnet test exited {completed.returncode}")
+            continue
+        try:
+            require_executed(trx)
+        except SystemExit as error:
+            failures.append(str(error))
+    if failures:
+        raise SystemExit("Spec shard failed:\n" + "\n".join(failures))
 
 
 def main():
