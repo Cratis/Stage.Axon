@@ -1,0 +1,65 @@
+module Workspaces
+  feature Tracking
+    slice StateView WorkItemDetails
+      readmodel WorkItemDetails
+        workItemId WorkItemId
+        title String
+        status WorkStatus
+
+      query GetWorkItem => WorkItemDetails optional
+        by workItemId WorkItemId
+
+      projection WorkItemDetails => WorkItemDetails
+        from WorkItemCreated
+          workItemId = $eventSourceId
+          title = title
+          status = status
+        from WorkItemRenamed
+          title = title
+        from WorkItemClosed
+          status = status
+
+      screen WorkItemDetails
+        template MasterDetail
+          list
+            data WorkItemSummary[] via query AllWorkItems
+            table WorkItemSummary
+              column title label "Title"
+              column status label "Status"
+              on row-click navigate to WorkItemDetails by workItemId
+          details
+            data WorkItemDetails via query GetWorkItem by workItemId
+            section summary
+              title "Details"
+              summary WorkItemDetails
+                field title label "Title"
+                field status label "Status"
+              action RenameWorkItem
+                label "Rename"
+              action "Close"
+                when item.status == "open" execute CloseWorkItem
+                  with workItemId from item.workItemId
+                otherwise hidden
+                navigate to WorkItemList
+            section comments
+              title "Comments"
+              data CommentView[] via query CommentsForWorkItem by workItemId
+              section hierarchy
+                table CommentView
+                  column text label "Comment"
+                section composer
+                  action AddComment
+
+      specification ShowingRenamedDetails
+        given WorkItemCreated
+          for "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          title = "Design master detail"
+          status = "open"
+        given WorkItemRenamed
+          for "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          title = "Implement master detail"
+        when query GetWorkItem
+          workItemId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        then result
+          title = "Implement master detail"
+          status = "open"

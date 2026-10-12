@@ -1,0 +1,36 @@
+concept WorkItemId : Uuid
+concept CommentId : Uuid
+concept WorkStatus : Enum
+  open
+  closed
+
+layout AppShell
+  topbar
+  navigation contributes Navigation
+  content
+
+  arrangement flow
+    column
+      topbar height 56
+      row gap 16
+        navigation width 240
+        content grow
+
+ui profile Desktop
+  target platform web
+  target size expanded
+  layout AppShell
+  packages
+    core
+    Cratis.Components
+    Acme.Charts
+
+behavior ConfirmClose
+  parameter command
+  parameter message
+
+  on click
+    confirm message
+      on success
+        execute command
+        notify info "Work item closed"

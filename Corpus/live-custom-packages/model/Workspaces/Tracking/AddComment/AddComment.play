@@ -1,0 +1,25 @@
+module Workspaces
+  feature Tracking
+    slice StateChange AddComment
+      command AddComment
+        commentId CommentId identifier
+        workItemId WorkItemId
+        text String
+        produces CommentAdded
+          for commentId
+          workItemId = workItemId
+          text = text
+
+      event CommentAdded
+        workItemId WorkItemId
+        text String
+
+      specification AddingAComment
+        when AddComment
+          commentId = "11111111-1111-1111-1111-111111111111"
+          workItemId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          text = "Needs compact layout"
+        then CommentAdded
+          for "11111111-1111-1111-1111-111111111111"
+          workItemId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          text = "Needs compact layout"
