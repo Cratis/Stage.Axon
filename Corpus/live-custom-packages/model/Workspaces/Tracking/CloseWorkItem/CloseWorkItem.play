@@ -1,0 +1,22 @@
+module Workspaces
+  feature Tracking
+    slice StateChange CloseWorkItem
+      command CloseWorkItem
+        workItemId WorkItemId identifier
+        produces WorkItemClosed
+          for workItemId
+          status = "closed"
+
+      event WorkItemClosed
+        status WorkStatus
+
+      specification ClosingAWorkItem
+        given WorkItemCreated
+          for "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          title = "Design master detail"
+          status = "open"
+        when CloseWorkItem
+          workItemId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        then WorkItemClosed
+          for "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          status = "closed"
