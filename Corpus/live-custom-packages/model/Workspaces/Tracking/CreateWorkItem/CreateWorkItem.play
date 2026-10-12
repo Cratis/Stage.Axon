@@ -1,0 +1,23 @@
+module Workspaces
+  feature Tracking
+    slice StateChange CreateWorkItem
+      command CreateWorkItem
+        workItemId WorkItemId identifier
+        title String
+        produces WorkItemCreated
+          for workItemId
+          title = title
+          status = "open"
+
+      event WorkItemCreated
+        title String
+        status WorkStatus
+
+      specification CreatingAWorkItem
+        when CreateWorkItem
+          workItemId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          title = "Design master detail"
+        then WorkItemCreated
+          for "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          title = "Design master detail"
+          status = "open"

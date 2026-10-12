@@ -1,0 +1,24 @@
+module Workspaces
+  feature Tracking
+    slice StateChange RenameWorkItem
+      command RenameWorkItem
+        workItemId WorkItemId identifier
+        title String
+        produces WorkItemRenamed
+          for workItemId
+          title = title
+
+      event WorkItemRenamed
+        title String
+
+      specification RenamingAWorkItem
+        given WorkItemCreated
+          for "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          title = "Design master detail"
+          status = "open"
+        when RenameWorkItem
+          workItemId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          title = "Implement master detail"
+        then WorkItemRenamed
+          for "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          title = "Implement master detail"

@@ -1,0 +1,39 @@
+module Workspaces
+  feature Tracking
+    slice StateView WorkItemComments
+      readmodel CommentView
+        commentId CommentId
+        workItemId WorkItemId
+        text String
+
+      query CommentsForWorkItem => observable CommentView[]
+        by workItemId WorkItemId
+
+      projection WorkItemComments => CommentView
+        from CommentAdded
+          commentId = $eventSourceId
+          workItemId = workItemId
+          text = text
+
+      screen CommentThread
+        data CommentView[] via query CommentsForWorkItem by workItemId
+        section thread
+          table CommentView
+            column text label "Comment"
+          on click
+            open dialog EditDialog
+              with workItemId from item.workItemId
+              on result
+                refresh CommentsForWorkItem
+
+      specification ShowingCommentsForAWorkItem
+        given CommentAdded
+          for "11111111-1111-1111-1111-111111111111"
+          workItemId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          text = "Needs compact layout"
+        when query CommentsForWorkItem
+          workItemId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        then result
+          commentId = "11111111-1111-1111-1111-111111111111"
+          workItemId = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          text = "Needs compact layout"

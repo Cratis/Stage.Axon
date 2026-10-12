@@ -1,0 +1,38 @@
+module Workspaces
+  screen template MasterDetail
+    fits slot content
+    list
+    details
+
+    arrangement flow
+      row gap 16
+        list width 320
+        details grow
+      when width compact
+        column
+          details
+          list
+
+  dialog template EditDialog
+    body
+    actions
+
+  form CreateWorkItemForm for CreateWorkItem
+    field workItemId
+    field title label "Title"
+
+    on submit navigate to WorkItemList by workItemId
+
+  form RenameWorkItemForm for RenameWorkItem
+    populate from item
+    field workItemId
+    field title label "New title"
+
+    on submit navigate to WorkItemDetails by workItemId
+
+  contribute to Navigation
+    navigate to WorkItemList
+    label "Overview"
+    order 5
+    icon home
+    presentation text
