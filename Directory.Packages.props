@@ -6,13 +6,13 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Cratis -->
-    <PackageVersion Include="Cratis" Version="22.78.0" />
-    <PackageVersion Include="Cratis.Arc" Version="22.78.0" />
-    <PackageVersion Include="Cratis.Arc.Chronicle" Version="22.78.0" />
-    <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="22.78.0" />
-    <PackageVersion Include="Cratis.Arc.MongoDB" Version="22.78.0" />
-    <PackageVersion Include="Cratis.Arc.Swagger" Version="22.78.0" />
-    <PackageVersion Include="Cratis.Arc.Testing" Version="22.78.0" />
+    <PackageVersion Include="Cratis" Version="22.83.0" />
+    <PackageVersion Include="Cratis.Arc" Version="22.83.0" />
+    <PackageVersion Include="Cratis.Arc.Chronicle" Version="22.83.0" />
+    <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="22.83.0" />
+    <PackageVersion Include="Cratis.Arc.MongoDB" Version="22.83.0" />
+    <PackageVersion Include="Cratis.Arc.Swagger" Version="22.83.0" />
+    <PackageVersion Include="Cratis.Arc.Testing" Version="22.83.0" />
     <!--
         The Chronicle client packages are pinned here AND referenced directly from Stage and Host - central package
         management only pins what a project references directly, so a version that arrives transitively through the
@@ -28,9 +28,9 @@
     <PackageVersion Include="MongoDB.Driver" Version="3.12.0" />
     <PackageVersion Include="Cratis.Scene.Engine" Version="4.22.1" />
     <PackageVersion Include="Cratis.Scene.Model" Version="4.22.1" />
-    <PackageVersion Include="Cratis.Screenplay" Version="4.146.0" />
+    <PackageVersion Include="Cratis.Screenplay" Version="4.147.1" />
     <!-- Spec-only: freezes the released RegisterProject conformance corpus consumed by the Cratis renderer's planner fixtures. -->
-    <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.146.0" />
+    <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.147.1" />
     <PackageVersion Include="Cratis.Templates" Version="1.7.3" />
     <!-- Microsoft -->
     <!-- Audited reducer-binding references, embedded in the renderer for runtime-only hosts. -->
