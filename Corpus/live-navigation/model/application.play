@@ -1,0 +1,85 @@
+concept OrderId : Uuid
+concept TicketId : Uuid
+
+layout AppShell
+  category application
+  topbar
+  navigation contributes Navigation
+  content
+  side
+
+  arrangement flow
+    column
+      topbar height 56
+      row gap 16
+        navigation width 240
+        content grow
+
+  navigation topbar
+    logo image "" title "Acme"
+    item sales title "Sales" target Sales
+    item support title "Support" target Support
+
+  navigation sidebar
+    item home title "Home" target Home
+
+ui profile Desktop
+  target platform web
+  target size expanded
+  layout AppShell
+  packages
+    core
+
+module Home
+  feature Welcome
+    slice StateView WelcomeInfo
+      readmodel WelcomeRow
+        id OrderId
+        text String
+      screen Welcome
+        title "Welcome"
+
+module Sales
+  navigation sidebar overrides
+    item orders title "Orders" target Sales.Orders
+    item customers title "Customers" target Sales.Customers
+
+  feature Orders
+    slice StateChange PlaceOrder
+      command PlaceOrder
+        orderId OrderId identifier
+        customer String
+        quantity Int
+        produces OrderPlaced
+          orderId = orderId
+          customer = customer
+          quantity = quantity
+      event OrderPlaced
+        orderId OrderId
+        customer String
+        quantity Int
+    slice StateView OrderList
+      readmodel OrderRow
+        orderId OrderId
+        customer String
+        quantity Int
+      screen List
+        title "Orders"
+        toolbar actions
+          button new title "New order" slice Sales.Orders.PlaceOrder emphasis primary icon plus
+  feature Customers
+    slice StateView CustomerList
+      readmodel CustomerRow
+        id OrderId
+        name String
+      screen CustomerScreen
+        title "Customers"
+
+module Support
+  feature Tickets
+    slice StateView TicketList
+      readmodel TicketRow
+        id TicketId
+        subject String
+      screen TicketScreen
+        title "Tickets"
