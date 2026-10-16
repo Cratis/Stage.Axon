@@ -1027,8 +1027,7 @@ module Crm
         openPipeline Amount
         dealCount    Int
 
-      query CurrentFigures => observable SalesFigures optional
-        by summaryId String
+      query CurrentFigures => observable SalesFigures[]
         authorize IsSalesRep
 
       projection SalesFiguresProjection => SalesFigures

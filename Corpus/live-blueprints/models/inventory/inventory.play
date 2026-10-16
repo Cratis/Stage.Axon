@@ -627,8 +627,7 @@ module Inventory
         itemCount   Int
         unitsOnHand Int
 
-      query CurrentFigures => observable InventoryFigures optional
-        by summaryId String
+      query CurrentFigures => observable InventoryFigures[]
         authorize IsWarehouseClerk
 
       projection InventoryFiguresProjection => InventoryFigures
