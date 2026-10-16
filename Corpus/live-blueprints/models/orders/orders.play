@@ -1,0 +1,318 @@
+
+// ============================================================
+// Orders - a sales team taking and fulfilling orders, from the Orders blueprint
+//
+// An order is placed, picked, shipped and delivered. The whole application
+// is built from Scene's `Cratis.Blueprint.Orders` package: every screen
+// fills one of its templates - the orders list, the order page, the
+// fulfilment board and the delivery calendar - and the navigation is
+// declared here with the same regions the designer shows. The demo data is
+// the blueprint's own pack.
+//
+// One sales person uses it, so every screen is drawn for that persona on
+// the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Orders
+// ============================================================
+
+domain Cratis.Orders
+
+concept OrderId     : Uuid
+concept OrderNumber : String
+concept CustomerName : String
+concept PersonName  : String
+concept Money       : Decimal
+
+concept OrderStatus : Enum
+  new = 0
+  picking = 1
+  shipped = 2
+  delivered = 3
+  cancelled = 4
+
+concept OrderChannel : Enum
+  web = 0
+  phone = 1
+  partner = 2
+
+policy IsSales
+  require role "Sales"
+
+persona Sales
+  description "Takes orders from customers, follows them through picking and shipping and tells customers when to expect them"
+  policy IsSales
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/orders.svg" title "Orders"
+    item orders title "Orders" target Orders
+  navigation sidebar
+    item orders title "Orders" icon shopping-cart target Orders.Orders
+    item fulfilment title "Fulfilment" icon columns target Orders.Fulfilment
+    item deliveries title "Deliveries" icon calendar target Orders.Deliveries
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Orders
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint orders-en
+
+module Orders
+  description "The orders customers place, the board they are fulfilled on and when they arrive"
+  authorize IsSales
+
+  feature Orders
+    description "What customers have ordered"
+
+    slice StateChange PlaceOrder
+      description "Places an order for a customer"
+
+      command PlaceOrder
+        orderId  OrderId identifier
+        number   OrderNumber
+        customer CustomerName
+        delivery Date
+        total    Money
+        channel  OrderChannel
+        status   OrderStatus
+
+        produces OrderPlaced
+          for orderId
+          number   = number
+          customer = customer
+          delivery = delivery
+          total    = total
+          channel  = channel
+          status   = status
+
+      event OrderPlaced
+        number   OrderNumber
+        customer CustomerName
+        delivery Date
+        total    Money
+        channel  OrderChannel
+        status   OrderStatus
+
+      screen QuickNewOrder
+        template blueprint Cratis.Blueprint.Orders OrdersQuickCreateOrder version "^1.0"
+          actions
+            action PlaceOrder
+
+      specification PlacingAnOrder
+        given caller
+          authenticated
+          role "Sales"
+        when PlaceOrder
+          orderId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          number   = "SO-1042"
+          customer = "Northwind Traders"
+          delivery = "2026-10-19"
+          total    = 1284.50
+          channel  = "web"
+          status   = "new"
+        then OrderPlaced
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          number   = "SO-1042"
+          customer = "Northwind Traders"
+          delivery = "2026-10-19"
+          total    = 1284.50
+          channel  = "web"
+          status   = "new"
+
+    slice StateView OrderList
+      description "Every order with its customer, delivery date, total and status"
+
+      readmodel Orders
+        orderId  OrderId
+        number   OrderNumber
+        customer CustomerName
+        delivery Date
+        total    Money
+        channel  OrderChannel
+
+      query AllOrders => observable Orders[]
+        authorize IsSales
+
+      query GetOrder => Orders optional
+        by orderId OrderId
+        authorize IsSales
+
+      projection OrdersProjection => Orders
+        from OrderPlaced
+          orderId = $eventSourceId
+          number = number
+          customer = customer
+          delivery = delivery
+          total = total
+          channel = channel
+
+      screen Orders
+        template blueprint Cratis.Blueprint.Orders OrdersList version "^1.0"
+
+      screen OrderRecord
+        template blueprint Cratis.Blueprint.Orders OrderPage version "^1.0"
+
+      specification ListingThePlacedOrder
+        given caller
+          authenticated
+          role "Sales"
+        given OrderPlaced
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          number   = "SO-1042"
+          customer = "Northwind Traders"
+          delivery = "2026-10-19"
+          total    = 1284.50
+          channel  = "web"
+          status   = "new"
+        then readmodel Orders
+          orderId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          number   = "SO-1042"
+          customer = "Northwind Traders"
+
+  feature Fulfilment
+    description "Orders in a column for each fulfilment step"
+
+    slice StateChange MoveOrder
+      description "Moves an order to its next fulfilment step"
+
+      command MoveOrder
+        orderId OrderId identifier
+        status  OrderStatus
+
+        produces OrderMoved
+          for orderId
+          status = status
+
+      event OrderMoved
+        status OrderStatus
+
+      screen MoveOrder
+        template blueprint Cratis.Blueprint.Orders OrdersFulfilmentBoard version "^1.0"
+          toolbar
+            action MoveOrder
+
+      specification MovingAnOrder
+        given caller
+          authenticated
+          role "Sales"
+        given OrderPlaced
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          number   = "SO-1042"
+          customer = "Northwind Traders"
+          delivery = "2026-10-19"
+          total    = 1284.50
+          channel  = "web"
+          status   = "new"
+        when MoveOrder
+          orderId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          status  = "shipped"
+        then OrderMoved
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          status = "shipped"
+
+    slice StateView FulfilmentBoard
+      description "Every open order as a card in the column of its step"
+
+      readmodel FulfilmentCards
+        orderId  OrderId
+        number   OrderNumber
+        customer CustomerName
+        status   OrderStatus
+
+      query AllFulfilmentCards => observable FulfilmentCards[]
+        authorize IsSales
+
+      projection FulfilmentCardsProjection => FulfilmentCards
+        from OrderPlaced
+          orderId = $eventSourceId
+          number = number
+          customer = customer
+          status = status
+        from OrderMoved
+          status = status
+
+      screen Fulfilment
+        template blueprint Cratis.Blueprint.Orders OrdersFulfilmentBoard version "^1.0"
+
+      specification ShowingTheOrderOnTheBoard
+        given caller
+          authenticated
+          role "Sales"
+        given OrderPlaced
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          number   = "SO-1042"
+          customer = "Northwind Traders"
+          delivery = "2026-10-19"
+          total    = 1284.50
+          channel  = "web"
+          status   = "new"
+        then readmodel FulfilmentCards
+          orderId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          number   = "SO-1042"
+
+  feature Deliveries
+    description "When each open order is due to arrive"
+
+    slice StateView DeliveryCalendar
+      description "Each open order as an event on the day it is due"
+
+      readmodel DeliveryEvents
+        orderId  OrderId
+        title    OrderNumber
+        customer CustomerName
+        delivery Date
+
+      query AllDeliveryEvents => observable DeliveryEvents[]
+        authorize IsSales
+
+      projection DeliveryEventsProjection => DeliveryEvents
+        from OrderPlaced
+          orderId = $eventSourceId
+          title = number
+          customer = customer
+          delivery = delivery
+
+      screen Deliveries
+        template blueprint Cratis.Blueprint.Orders OrdersDeliveryCalendar version "^1.0"
+
+      specification PlacingTheOrderOnTheCalendar
+        given caller
+          authenticated
+          role "Sales"
+        given OrderPlaced
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          number   = "SO-1042"
+          customer = "Northwind Traders"
+          delivery = "2026-10-19"
+          total    = 1284.50
+          channel  = "web"
+          status   = "new"
+        then readmodel DeliveryEvents
+          orderId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0101"
+          delivery = "2026-10-19"
