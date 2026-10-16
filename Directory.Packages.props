@@ -7,6 +7,7 @@
   <ItemGroup>
     <!-- Cratis -->
     <PackageVersion Include="Cratis" Version="22.104.0" />
+    <PackageVersion Include="Cratis.Fundamentals" Version="7.25.0" />
     <PackageVersion Include="Cratis.Arc" Version="22.104.0" />
     <PackageVersion Include="Cratis.Arc.Chronicle" Version="22.104.0" />
     <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="22.104.0" />
