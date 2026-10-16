@@ -5,7 +5,7 @@
 // they join. The whole application is built from Scene's
 // `Cratis.Blueprint.Hr` package: every screen fills one of its templates -
 // the directory of cards, the employee page, the org chart, the time-off
-// requests and balances, the onboarding list and checklist - and the
+// requests, the team calendar and balances, the onboarding list and checklist - and the
 // navigation is declared here with the same regions the designer shows.
 // The demo data is the blueprint's own Nordic pack.
 //
@@ -74,6 +74,7 @@ layout AppShell
     item org title "Org chart" icon sitemap target Hr.OrgChart
     item timeoff title "Time off" icon calendar target Hr.TimeOff
       item requests title "Requests" target Hr.TimeOff
+      item calendar title "Team calendar" target Hr.TimeOff.Calendar
       item balances title "Balances" target Hr.TimeOff.Balances
     item onboarding title "Onboarding" icon check target Hr.Onboarding
 
@@ -420,6 +421,53 @@ module Hr
         then readmodel TimeOffRequests
           requestId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
           employee  = "Silje Andersen"
+
+    feature Calendar
+      description "Who is away and when, on a calendar"
+
+      slice StateView TeamCalendar
+        description "Every approved or pending request as an event across the days it asks for"
+
+        readmodel TeamCalendarEvents
+          requestId TimeOffRequestId
+          person    PersonName
+          leaveType LeaveType
+          fromDate  Date
+          toDate    Date
+          status    RequestStatus
+
+        query AllTeamCalendarEvents => observable TeamCalendarEvents[]
+          authorize IsHrManager
+
+        projection TeamCalendarEventsProjection => TeamCalendarEvents
+          from TimeOffRequestRegistered
+            requestId = $eventSourceId
+            person = employee
+            leaveType = leaveType
+            fromDate = fromDate
+            toDate = toDate
+            status = status
+          from TimeOffDecided
+            status = status
+
+        screen TeamCalendar
+          template blueprint Cratis.Blueprint.Hr HrTeamCalendar version "^1.0"
+
+        specification ShowingARequestOnTheCalendar
+          given caller
+            authenticated
+            role "HrManager"
+          given TimeOffRequestRegistered
+            for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+            employee  = "Silje Andersen"
+            leaveType = "vacation"
+            fromDate  = "2026-10-26"
+            toDate    = "2026-10-30"
+            days      = 5
+            status    = "pending"
+          then readmodel TeamCalendarEvents
+            requestId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+            person    = "Silje Andersen"
 
     feature Balances
       description "What each person has taken and has left"
