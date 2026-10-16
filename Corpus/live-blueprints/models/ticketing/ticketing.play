@@ -1,0 +1,656 @@
+// ============================================================
+// Ticketing - a support team's help desk, from the Ticketing blueprint
+//
+// Customers write in, an agent assigns, answers, escalates or
+// merges, and a knowledge base answers the questions that come up
+// again. The whole application is built from Scene's
+// `Cratis.Blueprint.Ticketing` package: every screen fills one of its
+// templates - dashboard, queue, board, ticket page, forms, the public
+// portal form, the knowledge base and the dialogs - and the
+// application's navigation is declared here with the same regions
+// the designer shows. The demo data is the blueprint's own pack.
+//
+// One support agent uses it, so every screen is drawn for that
+// persona on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Ticketing
+// ============================================================
+
+domain Cratis.Ticketing
+
+concept TicketId  : Uuid
+concept CustomerId : Uuid
+concept ArticleId : Uuid
+
+concept Subject      : String
+concept PersonName   : String
+concept EmailAddress : String
+concept AgentName    : String
+concept Organisation : String
+concept Body         : String
+concept Note         : String
+concept TeamName     : String
+
+concept Priority : Enum
+  urgent = 0
+  high = 1
+  normal = 2
+  low = 3
+
+concept TicketStatus : Enum
+  new = 0
+  open = 1
+  pending = 2
+  resolved = 3
+
+concept Plan : Enum
+  free = 0
+  team = 1
+  business = 2
+  enterprise = 3
+
+policy IsAgent
+  require role "Agent"
+
+persona Agent
+  description "Works the queue: assigns, answers, escalates and merges tickets, and keeps the knowledge base current"
+  policy IsAgent
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/support.svg" title "Support"
+    item support title "Support" target Support
+  navigation sidebar
+    item dashboard title "Dashboard" icon home target Support.Dashboard
+    item queue title "Queue" icon inbox target Support.Queue
+      item list title "List" target Support.Queue
+      item board title "Board" target Support.Queue.Board
+    item mine title "My tickets" icon user target Support.Mine
+    item customers title "Customers" icon users target Support.Customers
+    item knowledge title "Knowledge base" icon book target Support.Knowledge
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Default
+    Cratis.Blueprint.Ticketing
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint ticketing-helpdesk
+
+module Support
+  description "Tickets, customers and the knowledge base that answers them"
+  authorize IsAgent
+
+  feature Queue
+    description "Every ticket, and the actions an agent takes on one"
+
+    slice StateChange OpenTicket
+      description "Opens a ticket for a customer, from the agent's form or the public portal"
+
+      command OpenTicket
+        ticketId  TicketId identifier
+        subject   Subject
+        requester PersonName
+        email     EmailAddress
+        priority  Priority
+        channel   String
+
+        produces TicketOpened
+          for ticketId
+          subject   = subject
+          requester = requester
+          email     = email
+          priority  = priority
+          channel   = channel
+
+      event TicketOpened
+        subject   Subject
+        requester PersonName
+        email     EmailAddress
+        priority  Priority
+        channel   String
+
+      screen NewTicket
+        template blueprint Cratis.Blueprint.Ticketing TicketCreateForm version "^1.0"
+          actions
+            action OpenTicket
+
+      screen QuickNewTicket
+        template blueprint Cratis.Blueprint.Ticketing TicketQuickCreate version "^1.0"
+
+      screen Portal
+        template blueprint Cratis.Blueprint.Ticketing TicketPortalForm version "^1.0"
+
+      specification OpeningATicket
+        given caller
+          authenticated
+          role "Agent"
+        when OpenTicket
+          ticketId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          subject   = "Cannot sign in after password reset"
+          requester = "Isla Morgan"
+          email     = "isla.morgan@example.co.uk"
+          priority  = "urgent"
+          channel   = "email"
+        then TicketOpened
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          subject   = "Cannot sign in after password reset"
+          requester = "Isla Morgan"
+          email     = "isla.morgan@example.co.uk"
+          priority  = "urgent"
+          channel   = "email"
+
+    slice StateChange AssignTicket
+      description "Hands a ticket to an agent, with a note they will see"
+
+      command AssignTicket
+        ticketId TicketId identifier
+        assignee AgentName
+        note     Note
+
+        produces TicketAssigned
+          for ticketId
+          assignee = assignee
+          note     = note
+
+      event TicketAssigned
+        assignee AgentName
+        note     Note
+
+      screen Assign
+        template blueprint Cratis.Blueprint.Ticketing AssignTicket version "^1.0"
+          actions
+            action AssignTicket
+
+      specification AssigningATicket
+        given caller
+          authenticated
+          role "Agent"
+        given TicketOpened
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          subject   = "Cannot sign in after password reset"
+          requester = "Isla Morgan"
+          email     = "isla.morgan@example.co.uk"
+          priority  = "urgent"
+          channel   = "email"
+        when AssignTicket
+          ticketId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          assignee = "Amelia Hart"
+          note     = "Please look at the sign-in log first"
+        then TicketAssigned
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          assignee = "Amelia Hart"
+          note     = "Please look at the sign-in log first"
+
+    slice StateChange ChangeTicketStatus
+      description "Says where a ticket stands, with a comment"
+
+      command ChangeTicketStatus
+        ticketId TicketId identifier
+        status   TicketStatus
+        comment  Note
+
+        produces TicketStatusChanged
+          for ticketId
+          status  = status
+          comment = comment
+
+      event TicketStatusChanged
+        status  TicketStatus
+        comment Note
+
+      screen ChangeStatus
+        template blueprint Cratis.Blueprint.Ticketing ChangeTicketStatus version "^1.0"
+          actions
+            action ChangeTicketStatus
+
+      screen MoveOnBoard
+        template blueprint Cratis.Blueprint.Ticketing TicketBoard version "^1.0"
+          toolbar
+            action ChangeTicketStatus
+
+      specification ChangingTheStatusOfATicket
+        given caller
+          authenticated
+          role "Agent"
+        given TicketOpened
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          subject   = "Cannot sign in after password reset"
+          requester = "Isla Morgan"
+          email     = "isla.morgan@example.co.uk"
+          priority  = "urgent"
+          channel   = "email"
+        when ChangeTicketStatus
+          ticketId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          status   = "open"
+          comment  = "Looking into it"
+        then TicketStatusChanged
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          status  = "open"
+          comment = "Looking into it"
+
+    slice StateChange EscalateTicket
+      description "Raises a ticket to another team, with the reason"
+
+      command EscalateTicket
+        ticketId TicketId identifier
+        team     TeamName
+        reason   Note
+
+        produces TicketEscalated
+          for ticketId
+          team   = team
+          reason = reason
+
+      event TicketEscalated
+        team   TeamName
+        reason Note
+
+      screen Escalate
+        template blueprint Cratis.Blueprint.Ticketing EscalateTicket version "^1.0"
+          actions
+            action EscalateTicket
+
+      specification EscalatingATicket
+        given caller
+          authenticated
+          role "Agent"
+        given TicketOpened
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          subject   = "Cannot sign in after password reset"
+          requester = "Isla Morgan"
+          email     = "isla.morgan@example.co.uk"
+          priority  = "urgent"
+          channel   = "email"
+        when EscalateTicket
+          ticketId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          team     = "Engineering"
+          reason   = "The cache may not have been flushed"
+        then TicketEscalated
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          team   = "Engineering"
+          reason = "The cache may not have been flushed"
+
+    slice StateChange MergeTickets
+      description "Folds a duplicate into another ticket"
+
+      command MergeTickets
+        ticketId TicketId identifier
+        into     TicketId
+
+        produces TicketsMerged
+          for ticketId
+          into = into
+
+      event TicketsMerged
+        into TicketId
+
+      screen Merge
+        template blueprint Cratis.Blueprint.Ticketing MergeTickets version "^1.0"
+          actions
+            action MergeTickets
+
+      specification MergingATicket
+        given caller
+          authenticated
+          role "Agent"
+        given TicketOpened
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          subject   = "Cannot sign in after password reset"
+          requester = "Isla Morgan"
+          email     = "isla.morgan@example.co.uk"
+          priority  = "urgent"
+          channel   = "email"
+        when MergeTickets
+          ticketId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          into     = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1002"
+        then TicketsMerged
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          into = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1002"
+
+    slice StateView TicketQueue
+      description "Every ticket, with its priority, status and assignee"
+
+      readmodel Tickets
+        ticketId  TicketId
+        subject   Subject
+        requester PersonName
+        email     EmailAddress
+        priority  Priority
+        channel   String
+        status    TicketStatus
+        assignee  AgentName
+        team      TeamName
+
+      query AllTickets => observable Tickets[]
+        authorize IsAgent
+
+      query GetTicket => Tickets optional
+        by ticketId TicketId
+        authorize IsAgent
+
+      projection TicketsProjection => Tickets
+        from TicketOpened
+          ticketId  = $eventSourceId
+          subject   = subject
+          requester = requester
+          email     = email
+          priority  = priority
+          channel   = channel
+          status    = "new"
+          assignee  = ""
+          team      = ""
+        from TicketAssigned
+          assignee = assignee
+        from TicketStatusChanged
+          status = status
+        from TicketEscalated
+          team = team
+        from TicketsMerged
+          status = "resolved"
+
+      screen Queue
+        template blueprint Cratis.Blueprint.Ticketing TicketQueue version "^1.0"
+
+      screen Ticket
+        template blueprint Cratis.Blueprint.Ticketing TicketPage version "^1.0"
+
+      screen MineTickets
+        template blueprint Cratis.Blueprint.Ticketing MyTickets version "^1.0"
+
+      specification ListingTheOpenedTicket
+        given caller
+          authenticated
+          role "Agent"
+        given TicketOpened
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          subject   = "Cannot sign in after password reset"
+          requester = "Isla Morgan"
+          email     = "isla.morgan@example.co.uk"
+          priority  = "urgent"
+          channel   = "email"
+        then readmodel Tickets
+          ticketId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          subject  = "Cannot sign in after password reset"
+
+    feature Board
+      description "The same tickets as cards in a column for each status"
+
+      slice StateView TicketBoard
+        description "Tickets by status"
+
+        readmodel BoardTickets
+          ticketId  TicketId
+          subject   Subject
+          requester PersonName
+          priority  Priority
+          status    TicketStatus
+          assignee  AgentName
+
+        query AllBoardTickets => observable BoardTickets[]
+          authorize IsAgent
+
+        projection BoardTicketsProjection => BoardTickets
+          from TicketOpened
+            ticketId  = $eventSourceId
+            subject   = subject
+            requester = requester
+            priority  = priority
+            status    = "new"
+            assignee  = ""
+          from TicketAssigned
+            assignee = assignee
+          from TicketStatusChanged
+            status = status
+
+        screen Board
+          template blueprint Cratis.Blueprint.Ticketing TicketBoard version "^1.0"
+
+        specification MovingATicketBetweenColumns
+          given caller
+            authenticated
+            role "Agent"
+          given TicketOpened
+            for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+            subject   = "Cannot sign in after password reset"
+            requester = "Isla Morgan"
+            email     = "isla.morgan@example.co.uk"
+            priority  = "urgent"
+            channel   = "email"
+          when append TicketStatusChanged
+            for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+            status  = "resolved"
+            comment = "Fixed"
+          then readmodel BoardTickets
+            ticketId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+            status   = "resolved"
+
+  feature Mine
+    description "The tickets assigned to the signed-in agent"
+
+  feature Customers
+    description "The people and organisations that write in"
+
+    slice StateChange AddCustomer
+      description "Adds a customer to the book"
+
+      command AddCustomer
+        customerId   CustomerId identifier
+        name         PersonName
+        organisation Organisation
+        email        EmailAddress
+        plan         Plan
+
+        produces CustomerAdded
+          for customerId
+          name         = name
+          organisation = organisation
+          email        = email
+          plan         = plan
+
+      event CustomerAdded
+        name         PersonName
+        organisation Organisation
+        email        EmailAddress
+        plan         Plan
+
+      screen QuickNewCustomer
+        template blueprint Cratis.Blueprint.Ticketing CustomerQuickCreate version "^1.0"
+          actions
+            action AddCustomer
+
+      specification AddingACustomer
+        given caller
+          authenticated
+          role "Agent"
+        when AddCustomer
+          customerId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1002"
+          name         = "Isla Morgan"
+          organisation = "Northgate Logistics"
+          email        = "isla.morgan@example.co.uk"
+          plan         = "business"
+        then CustomerAdded
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1002"
+          name         = "Isla Morgan"
+          organisation = "Northgate Logistics"
+          email        = "isla.morgan@example.co.uk"
+          plan         = "business"
+
+    slice StateView CustomerList
+      description "The people and organisations that write in"
+
+      readmodel Customers
+        customerId   CustomerId
+        name         PersonName
+        organisation Organisation
+        email        EmailAddress
+        plan         Plan
+
+      query AllCustomers => observable Customers[]
+        authorize IsAgent
+
+      projection CustomersProjection => Customers
+        from CustomerAdded
+          customerId   = $eventSourceId
+          name         = name
+          organisation = organisation
+          email        = email
+          plan         = plan
+
+      screen Customers
+        template blueprint Cratis.Blueprint.Ticketing CustomerList version "^1.0"
+
+      specification ListingTheAddedCustomer
+        given caller
+          authenticated
+          role "Agent"
+        given CustomerAdded
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1002"
+          name         = "Isla Morgan"
+          organisation = "Northgate Logistics"
+          email        = "isla.morgan@example.co.uk"
+          plan         = "business"
+        then readmodel Customers
+          customerId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1002"
+          name       = "Isla Morgan"
+
+  feature Knowledge
+    description "Articles that answer the questions that come up again"
+
+    slice StateChange PublishArticle
+      description "Publishes an article in a category"
+
+      command PublishArticle
+        articleId ArticleId identifier
+        title     Subject
+        category  String
+        body      Body
+
+        produces ArticlePublished
+          for articleId
+          title    = title
+          category = category
+          body     = body
+
+      event ArticlePublished
+        title    Subject
+        category String
+        body     Body
+
+      screen NewArticle
+        template blueprint Cratis.Blueprint.Ticketing TicketCreateForm version "^1.0"
+          actions
+            action PublishArticle
+
+      specification PublishingAnArticle
+        given caller
+          authenticated
+          role "Agent"
+        when PublishArticle
+          articleId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1003"
+          title     = "Reset a password"
+          category  = "Accounts"
+          body      = "Choose Forgot password on the sign-in page"
+        then ArticlePublished
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1003"
+          title    = "Reset a password"
+          category = "Accounts"
+          body     = "Choose Forgot password on the sign-in page"
+
+    slice StateView KnowledgeBase
+      description "Categories and articles, searchable"
+
+      readmodel Articles
+        articleId ArticleId
+        title     Subject
+        category  String
+        body      Body
+
+      query AllArticles => observable Articles[]
+        authorize IsAgent
+
+      projection ArticlesProjection => Articles
+        from ArticlePublished
+          articleId = $eventSourceId
+          title     = title
+          category  = category
+          body      = body
+
+      screen Articles
+        template blueprint Cratis.Blueprint.Ticketing KnowledgeBase version "^1.0"
+
+      specification ListingThePublishedArticle
+        given caller
+          authenticated
+          role "Agent"
+        given ArticlePublished
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1003"
+          title    = "Reset a password"
+          category = "Accounts"
+          body     = "Choose Forgot password on the sign-in page"
+        then readmodel Articles
+          articleId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1003"
+          title     = "Reset a password"
+
+  feature Dashboard
+    description "How the queue is doing right now"
+
+    slice StateView SupportDashboard
+      description "How many tickets are open and how many are waiting"
+
+      readmodel SupportFigures
+        summaryId   String
+        openTickets Int
+
+      query CurrentFigures => observable SupportFigures optional
+        by summaryId String
+        authorize IsAgent
+
+      projection SupportFiguresProjection => SupportFigures
+        from TicketOpened
+          key "global"
+          summaryId = "global"
+          increment openTickets
+
+      screen Dashboard
+        template blueprint Cratis.Blueprint.Ticketing SupportDashboard version "^1.0"
+
+      specification CountingOpenTickets
+        given caller
+          authenticated
+          role "Agent"
+        given TicketOpened
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e1001"
+          subject   = "Cannot sign in after password reset"
+          requester = "Isla Morgan"
+          email     = "isla.morgan@example.co.uk"
+          priority  = "urgent"
+          channel   = "email"
+        then readmodel SupportFigures
+          summaryId   = "global"
+          openTickets = 1

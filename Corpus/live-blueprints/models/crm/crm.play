@@ -1,0 +1,1059 @@
+// ============================================================
+// Crm - a sales team's CRM, from the CRM blueprint
+//
+// Leads become contacts and companies, and the people the team
+// sells to take part in deals that move through a pipeline.
+// The whole application is built from Scene's `Cratis.Blueprint.Crm`
+// package: every screen fills one of its templates - dashboard,
+// lists, the pipeline board, record pages, forms and quick-create
+// dialogs - and the application's navigation, topbar and sidebar,
+// is declared here with the same regions the designer shows.
+// The demo data is the blueprint's own Nordic pack.
+//
+// One sales representative uses it, so every screen is drawn for
+// that persona on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Crm
+// ============================================================
+
+domain Cratis.Crm
+
+concept LeadId     : Uuid
+concept ContactId  : Uuid
+concept CompanyId  : Uuid
+concept DealId     : Uuid
+concept ActivityId : Uuid
+
+concept PersonName   : String
+concept Subject      : String
+concept CompanyName  : String
+concept EmailAddress : String
+concept PhoneNumber  : String
+concept OwnerName    : String
+concept DealName     : String
+concept Industry     : String
+concept City         : String
+concept Amount       : Decimal
+
+concept LeadStatus : Enum
+  new = 0
+  contacted = 1
+  qualified = 2
+  unqualified = 3
+
+concept LeadSource : Enum
+  web = 0
+  referral = 1
+  event = 2
+  outbound = 3
+
+concept DealStage : Enum
+  new = 0
+  qualified = 1
+  proposal = 2
+  negotiation = 3
+  won = 4
+
+concept ActivityKind : Enum
+  call = 0
+  meeting = 1
+  email = 2
+  task = 3
+
+policy IsSalesRep
+  require role "SalesRep"
+
+persona SalesRep
+  description "Works leads, keeps contacts and companies up to date and moves deals through the pipeline"
+  policy IsSalesRep
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/crm.svg" title "CRM"
+    item crm title "CRM" target Crm
+  navigation sidebar
+    item dashboard title "Dashboard" icon home target Crm.Dashboard
+    item leads title "Leads" icon user-plus target Crm.Leads
+    item contacts title "Contacts" icon users target Crm.Contacts
+    item companies title "Companies" icon building target Crm.Companies
+    item deals title "Deals" icon dollar target Crm.Deals
+      item pipeline title "Pipeline" target Crm.Deals
+      item list title "List" target Crm.Deals.DealList
+    item activities title "Activities" icon calendar target Crm.Activities
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Crm
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint crm-nordic-smb
+
+module Crm
+  description "Leads, contacts, companies, deals and the activities around them"
+  authorize IsSalesRep
+
+  feature Leads
+    description "Prospects who have not yet become contacts"
+
+    slice StateChange RegisterLead
+      description "Adds a lead to the team's book"
+
+      command RegisterLead
+        leadId LeadId identifier
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        source  LeadSource
+        status  LeadStatus
+        owner   OwnerName
+
+        produces LeadRegistered
+          for leadId
+          name    = name
+          company = company
+          email   = email
+          source  = source
+          status  = status
+          owner   = owner
+
+      event LeadRegistered
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        source  LeadSource
+        status  LeadStatus
+        owner   OwnerName
+
+      screen NewLead
+        template blueprint Cratis.Blueprint.Crm CrmLeadCreateForm version "^1.0"
+          actions
+            action RegisterLead
+
+      screen QuickNewLead
+        template blueprint Cratis.Blueprint.Crm CrmQuickCreateLead version "^1.0"
+
+      specification RegisteringALead
+        given caller
+          authenticated
+          role "SalesRep"
+        when RegisterLead
+          leadId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name    = "Kari Nordmann"
+          company = "Fjordtech AS"
+          email   = "kari.nordmann@eksempel.no"
+          source  = "web"
+          status  = "new"
+          owner   = "Ingrid Solberg"
+        then LeadRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name    = "Kari Nordmann"
+          company = "Fjordtech AS"
+          email   = "kari.nordmann@eksempel.no"
+          source  = "web"
+          status  = "new"
+          owner   = "Ingrid Solberg"
+
+    slice StateChange UpdateLead
+      description "Corrects what is recorded about a lead"
+
+      command UpdateLead
+        leadId LeadId identifier
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        source  LeadSource
+        status  LeadStatus
+        owner   OwnerName
+
+        produces LeadUpdated
+          for leadId
+          name    = name
+          company = company
+          email   = email
+          source  = source
+          status  = status
+          owner   = owner
+
+      event LeadUpdated
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        source  LeadSource
+        status  LeadStatus
+        owner   OwnerName
+
+      screen EditLead
+        template blueprint Cratis.Blueprint.Crm CrmLeadEditForm version "^1.0"
+          actions
+            action UpdateLead
+
+      specification UpdatingALead
+        given caller
+          authenticated
+          role "SalesRep"
+        when UpdateLead
+          leadId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name    = "Kari Nordmann"
+          company = "Fjordtech AS"
+          email   = "kari.nordmann@eksempel.no"
+          source  = "web"
+          status  = "new"
+          owner   = "Ingrid Solberg"
+        then LeadUpdated
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name    = "Kari Nordmann"
+          company = "Fjordtech AS"
+          email   = "kari.nordmann@eksempel.no"
+          source  = "web"
+          status  = "new"
+          owner   = "Ingrid Solberg"
+
+    slice StateView LeadList
+      description "The people who may become customers"
+
+      readmodel Leads
+        leadId LeadId
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        source  LeadSource
+        status  LeadStatus
+        owner   OwnerName
+
+      query AllLeads => observable Leads[]
+        authorize IsSalesRep
+
+      projection LeadsProjection => Leads
+        from LeadRegistered
+          leadId = $eventSourceId
+          name    = name
+          company = company
+          email   = email
+          source  = source
+          status  = status
+          owner   = owner
+        from LeadUpdated
+          name    = name
+          company = company
+          email   = email
+          source  = source
+          status  = status
+          owner   = owner
+
+      screen Leads
+        template blueprint Cratis.Blueprint.Crm CrmLeadList version "^1.0"
+
+      specification ListingTheRegisteredLead
+        given caller
+          authenticated
+          role "SalesRep"
+        given LeadRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name    = "Kari Nordmann"
+          company = "Fjordtech AS"
+          email   = "kari.nordmann@eksempel.no"
+          source  = "web"
+          status  = "new"
+          owner   = "Ingrid Solberg"
+        then readmodel Leads
+          leadId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name = "Kari Nordmann"
+
+  feature Contacts
+    description "The people the team sells to"
+
+    slice StateChange RegisterContact
+      description "Adds a contact to the team's book"
+
+      command RegisterContact
+        contactId ContactId identifier
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        phone   PhoneNumber
+        owner   OwnerName
+
+        produces ContactRegistered
+          for contactId
+          name    = name
+          company = company
+          email   = email
+          phone   = phone
+          owner   = owner
+
+      event ContactRegistered
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        phone   PhoneNumber
+        owner   OwnerName
+
+      screen NewContact
+        template blueprint Cratis.Blueprint.Crm CrmContactCreateForm version "^1.0"
+          actions
+            action RegisterContact
+
+      screen QuickNewContact
+        template blueprint Cratis.Blueprint.Crm CrmQuickCreateContact version "^1.0"
+
+      specification RegisteringAContact
+        given caller
+          authenticated
+          role "SalesRep"
+        when RegisterContact
+          contactId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name    = "Silje Andersen"
+          company = "Nordlys Bygg AS"
+          email   = "silje.andersen@eksempel.no"
+          phone   = "+47 55 00 20 02"
+          owner   = "Magnus Dahl"
+        then ContactRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name    = "Silje Andersen"
+          company = "Nordlys Bygg AS"
+          email   = "silje.andersen@eksempel.no"
+          phone   = "+47 55 00 20 02"
+          owner   = "Magnus Dahl"
+
+    slice StateChange UpdateContact
+      description "Corrects what is recorded about a contact"
+
+      command UpdateContact
+        contactId ContactId identifier
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        phone   PhoneNumber
+        owner   OwnerName
+
+        produces ContactUpdated
+          for contactId
+          name    = name
+          company = company
+          email   = email
+          phone   = phone
+          owner   = owner
+
+      event ContactUpdated
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        phone   PhoneNumber
+        owner   OwnerName
+
+      screen EditContact
+        template blueprint Cratis.Blueprint.Crm CrmContactEditForm version "^1.0"
+          actions
+            action UpdateContact
+
+      specification UpdatingAContact
+        given caller
+          authenticated
+          role "SalesRep"
+        when UpdateContact
+          contactId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name    = "Silje Andersen"
+          company = "Nordlys Bygg AS"
+          email   = "silje.andersen@eksempel.no"
+          phone   = "+47 55 00 20 02"
+          owner   = "Magnus Dahl"
+        then ContactUpdated
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name    = "Silje Andersen"
+          company = "Nordlys Bygg AS"
+          email   = "silje.andersen@eksempel.no"
+          phone   = "+47 55 00 20 02"
+          owner   = "Magnus Dahl"
+
+    slice StateView ContactList
+      description "The people at the companies the team sells to"
+
+      readmodel Contacts
+        contactId ContactId
+        name    PersonName
+        company CompanyName
+        email   EmailAddress
+        phone   PhoneNumber
+        owner   OwnerName
+
+      query AllContacts => observable Contacts[]
+        authorize IsSalesRep
+
+      query GetContact => Contacts optional
+        by contactId ContactId
+        authorize IsSalesRep
+
+      projection ContactsProjection => Contacts
+        from ContactRegistered
+          contactId = $eventSourceId
+          name    = name
+          company = company
+          email   = email
+          phone   = phone
+          owner   = owner
+        from ContactUpdated
+          name    = name
+          company = company
+          email   = email
+          phone   = phone
+          owner   = owner
+
+      screen Contacts
+        template blueprint Cratis.Blueprint.Crm CrmContactList version "^1.0"
+
+      screen ContactRecord
+        template blueprint Cratis.Blueprint.Crm CrmContactPage version "^1.0"
+
+      specification ListingTheRegisteredContact
+        given caller
+          authenticated
+          role "SalesRep"
+        given ContactRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name    = "Silje Andersen"
+          company = "Nordlys Bygg AS"
+          email   = "silje.andersen@eksempel.no"
+          phone   = "+47 55 00 20 02"
+          owner   = "Magnus Dahl"
+        then readmodel Contacts
+          contactId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name = "Silje Andersen"
+
+  feature Companies
+    description "The accounts the team sells to"
+
+    slice StateChange RegisterCompany
+      description "Adds a company to the team's book"
+
+      command RegisterCompany
+        companyId CompanyId identifier
+        name     CompanyName
+        industry Industry
+        city     City
+        owner    OwnerName
+
+        produces CompanyRegistered
+          for companyId
+          name     = name
+          industry = industry
+          city     = city
+          owner    = owner
+
+      event CompanyRegistered
+        name     CompanyName
+        industry Industry
+        city     City
+        owner    OwnerName
+
+      screen NewCompany
+        template blueprint Cratis.Blueprint.Crm CrmCompanyCreateForm version "^1.0"
+          actions
+            action RegisterCompany
+
+      screen QuickNewCompany
+        template blueprint Cratis.Blueprint.Crm CrmQuickCreateCompany version "^1.0"
+
+      specification RegisteringACompany
+        given caller
+          authenticated
+          role "SalesRep"
+        when RegisterCompany
+          companyId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          name     = "Bergen Havn AS"
+          industry = "Havn og logistikk"
+          city     = "Bergen"
+          owner    = "Sofie Berg"
+        then CompanyRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          name     = "Bergen Havn AS"
+          industry = "Havn og logistikk"
+          city     = "Bergen"
+          owner    = "Sofie Berg"
+
+    slice StateChange UpdateCompany
+      description "Corrects what is recorded about a company"
+
+      command UpdateCompany
+        companyId CompanyId identifier
+        name     CompanyName
+        industry Industry
+        city     City
+        owner    OwnerName
+
+        produces CompanyUpdated
+          for companyId
+          name     = name
+          industry = industry
+          city     = city
+          owner    = owner
+
+      event CompanyUpdated
+        name     CompanyName
+        industry Industry
+        city     City
+        owner    OwnerName
+
+      screen EditCompany
+        template blueprint Cratis.Blueprint.Crm CrmCompanyEditForm version "^1.0"
+          actions
+            action UpdateCompany
+
+      specification UpdatingACompany
+        given caller
+          authenticated
+          role "SalesRep"
+        when UpdateCompany
+          companyId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          name     = "Bergen Havn AS"
+          industry = "Havn og logistikk"
+          city     = "Bergen"
+          owner    = "Sofie Berg"
+        then CompanyUpdated
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          name     = "Bergen Havn AS"
+          industry = "Havn og logistikk"
+          city     = "Bergen"
+          owner    = "Sofie Berg"
+
+    slice StateView CompanyList
+      description "The accounts the team sells to"
+
+      readmodel Companies
+        companyId CompanyId
+        name     CompanyName
+        industry Industry
+        city     City
+        owner    OwnerName
+
+      query AllCompanies => observable Companies[]
+        authorize IsSalesRep
+
+      query GetCompany => Companies optional
+        by companyId CompanyId
+        authorize IsSalesRep
+
+      projection CompaniesProjection => Companies
+        from CompanyRegistered
+          companyId = $eventSourceId
+          name     = name
+          industry = industry
+          city     = city
+          owner    = owner
+        from CompanyUpdated
+          name     = name
+          industry = industry
+          city     = city
+          owner    = owner
+
+      screen Companies
+        template blueprint Cratis.Blueprint.Crm CrmCompanyList version "^1.0"
+
+      screen CompanyRecord
+        template blueprint Cratis.Blueprint.Crm CrmCompanyPage version "^1.0"
+
+      specification ListingTheRegisteredCompany
+        given caller
+          authenticated
+          role "SalesRep"
+        given CompanyRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          name     = "Bergen Havn AS"
+          industry = "Havn og logistikk"
+          city     = "Bergen"
+          owner    = "Sofie Berg"
+        then readmodel Companies
+          companyId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          name = "Bergen Havn AS"
+
+  feature Deals
+    description "What the team is trying to win"
+
+    slice StateChange RegisterDeal
+      description "Adds a deal to the team's book"
+
+      command RegisterDeal
+        dealId DealId identifier
+        name    DealName
+        company CompanyName
+        amount  Amount
+        stage   DealStage
+        closes  Date
+        owner   OwnerName
+
+        produces DealRegistered
+          for dealId
+          name    = name
+          company = company
+          amount  = amount
+          stage   = stage
+          closes  = closes
+          owner   = owner
+
+      event DealRegistered
+        name    DealName
+        company CompanyName
+        amount  Amount
+        stage   DealStage
+        closes  Date
+        owner   OwnerName
+
+      screen NewDeal
+        template blueprint Cratis.Blueprint.Crm CrmDealCreateForm version "^1.0"
+          actions
+            action RegisterDeal
+
+      screen QuickNewDeal
+        template blueprint Cratis.Blueprint.Crm CrmQuickCreateDeal version "^1.0"
+
+      specification RegisteringADeal
+        given caller
+          authenticated
+          role "SalesRep"
+        when RegisterDeal
+          dealId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name    = "Fjordtech driftsplattform"
+          company = "Fjordtech AS"
+          amount  = 48000
+          stage   = "new"
+          closes  = "2026-11-30"
+          owner   = "Ingrid Solberg"
+        then DealRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name    = "Fjordtech driftsplattform"
+          company = "Fjordtech AS"
+          amount  = 48000
+          stage   = "new"
+          closes  = "2026-11-30"
+          owner   = "Ingrid Solberg"
+
+    slice StateChange UpdateDeal
+      description "Corrects what is recorded about a deal"
+
+      command UpdateDeal
+        dealId DealId identifier
+        name    DealName
+        company CompanyName
+        amount  Amount
+        stage   DealStage
+        closes  Date
+        owner   OwnerName
+
+        produces DealUpdated
+          for dealId
+          name    = name
+          company = company
+          amount  = amount
+          stage   = stage
+          closes  = closes
+          owner   = owner
+
+      event DealUpdated
+        name    DealName
+        company CompanyName
+        amount  Amount
+        stage   DealStage
+        closes  Date
+        owner   OwnerName
+
+      screen EditDeal
+        template blueprint Cratis.Blueprint.Crm CrmDealEditForm version "^1.0"
+          actions
+            action UpdateDeal
+
+      specification UpdatingADeal
+        given caller
+          authenticated
+          role "SalesRep"
+        when UpdateDeal
+          dealId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name    = "Fjordtech driftsplattform"
+          company = "Fjordtech AS"
+          amount  = 48000
+          stage   = "new"
+          closes  = "2026-11-30"
+          owner   = "Ingrid Solberg"
+        then DealUpdated
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name    = "Fjordtech driftsplattform"
+          company = "Fjordtech AS"
+          amount  = 48000
+          stage   = "new"
+          closes  = "2026-11-30"
+          owner   = "Ingrid Solberg"
+
+    slice StateChange MoveDeal
+      description "Moves a deal to another stage of the pipeline"
+
+      command MoveDeal
+        dealId DealId identifier
+        stage  DealStage
+
+        produces DealMoved
+          for dealId
+          stage = stage
+
+      event DealMoved
+        stage DealStage
+
+      screen MoveDeal
+        template blueprint Cratis.Blueprint.Crm CrmDealPipeline version "^1.0"
+          toolbar
+            action MoveDeal
+
+      specification MovingADeal
+        given caller
+          authenticated
+          role "SalesRep"
+        given DealRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name    = "Fjordtech driftsplattform"
+          company = "Fjordtech AS"
+          amount  = 48000
+          stage   = "new"
+          closes  = "2026-11-30"
+          owner   = "Ingrid Solberg"
+        when MoveDeal
+          dealId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          stage  = "won"
+        then DealMoved
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          stage = "won"
+
+    slice StateView DealBoard
+      description "What the team is trying to win, and how far along it is"
+
+      readmodel Deals
+        dealId DealId
+        name    DealName
+        company CompanyName
+        amount  Amount
+        stage   DealStage
+        closes  Date
+        owner   OwnerName
+
+      query AllDeals => observable Deals[]
+        authorize IsSalesRep
+
+      query GetDeal => Deals optional
+        by dealId DealId
+        authorize IsSalesRep
+
+      projection DealsProjection => Deals
+        from DealRegistered
+          dealId = $eventSourceId
+          name    = name
+          company = company
+          amount  = amount
+          stage   = stage
+          closes  = closes
+          owner   = owner
+        from DealMoved
+          stage = stage
+        from DealUpdated
+          name    = name
+          company = company
+          amount  = amount
+          stage   = stage
+          closes  = closes
+          owner   = owner
+
+      screen Pipeline
+        template blueprint Cratis.Blueprint.Crm CrmDealPipeline version "^1.0"
+
+      screen DealRecord
+        template blueprint Cratis.Blueprint.Crm CrmDealPage version "^1.0"
+
+      specification ListingTheRegisteredDeal
+        given caller
+          authenticated
+          role "SalesRep"
+        given DealRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name    = "Fjordtech driftsplattform"
+          company = "Fjordtech AS"
+          amount  = 48000
+          stage   = "new"
+          closes  = "2026-11-30"
+          owner   = "Ingrid Solberg"
+        then readmodel Deals
+          dealId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name = "Fjordtech driftsplattform"
+
+    feature DealList
+      description "Every deal as a table, grouped by stage"
+
+      slice StateView DealRows
+        description "The same deals as a table, grouped by stage with the value of each stage as its subtotal"
+
+        readmodel DealRows
+          dealId  DealId
+          name    DealName
+          company CompanyName
+          amount  Amount
+          stage   DealStage
+          closes  Date
+          owner   OwnerName
+
+        query AllDealRows => observable DealRows[]
+          authorize IsSalesRep
+
+        projection DealRowsProjection => DealRows
+          from DealRegistered
+            dealId  = $eventSourceId
+            name    = name
+            company = company
+            amount  = amount
+            stage   = stage
+            closes  = closes
+            owner   = owner
+          from DealMoved
+            stage = stage
+          from DealUpdated
+            name    = name
+            company = company
+            amount  = amount
+            stage   = stage
+            closes  = closes
+            owner   = owner
+
+        screen DealList
+          template blueprint Cratis.Blueprint.Crm CrmDealList version "^1.0"
+
+        specification GroupingADealByItsStage
+          given caller
+            authenticated
+            role "SalesRep"
+          given DealRegistered
+            for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+            name    = "Fjordtech driftsplattform"
+            company = "Fjordtech AS"
+            amount  = 48000
+            stage   = "new"
+            closes  = "2026-11-30"
+            owner   = "Ingrid Solberg"
+          when append DealMoved
+            for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+            stage = "proposal"
+          then readmodel DealRows
+            dealId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+            stage  = "proposal"
+
+  feature Activities
+    description "Calls, meetings, emails and tasks"
+
+    slice StateChange RegisterActivity
+      description "Adds an activity to the team's book"
+
+      command RegisterActivity
+        activityId ActivityId identifier
+        subject Subject
+        kind    ActivityKind
+        related CompanyName
+        due     Date
+        owner   OwnerName
+
+        produces ActivityRegistered
+          for activityId
+          subject = subject
+          kind    = kind
+          related = related
+          due     = due
+          owner   = owner
+
+      event ActivityRegistered
+        subject Subject
+        kind    ActivityKind
+        related CompanyName
+        due     Date
+        owner   OwnerName
+
+      screen NewActivity
+        template blueprint Cratis.Blueprint.Crm CrmActivityCreateForm version "^1.0"
+          actions
+            action RegisterActivity
+
+      screen QuickNewActivity
+        template blueprint Cratis.Blueprint.Crm CrmQuickCreateActivity version "^1.0"
+
+      specification RegisteringAnActivity
+        given caller
+          authenticated
+          role "SalesRep"
+        when RegisterActivity
+          activityId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0005"
+          subject = "Behovsmote med Kari"
+          kind    = "meeting"
+          related = "Fjordtech AS"
+          due     = "2026-10-21"
+          owner   = "Ingrid Solberg"
+        then ActivityRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0005"
+          subject = "Behovsmote med Kari"
+          kind    = "meeting"
+          related = "Fjordtech AS"
+          due     = "2026-10-21"
+          owner   = "Ingrid Solberg"
+
+    slice StateChange UpdateActivity
+      description "Corrects what is recorded about an activity"
+
+      command UpdateActivity
+        activityId ActivityId identifier
+        subject Subject
+        kind    ActivityKind
+        related CompanyName
+        due     Date
+        owner   OwnerName
+
+        produces ActivityUpdated
+          for activityId
+          subject = subject
+          kind    = kind
+          related = related
+          due     = due
+          owner   = owner
+
+      event ActivityUpdated
+        subject Subject
+        kind    ActivityKind
+        related CompanyName
+        due     Date
+        owner   OwnerName
+
+      screen EditActivity
+        template blueprint Cratis.Blueprint.Crm CrmActivityEditForm version "^1.0"
+          actions
+            action UpdateActivity
+
+      specification UpdatingAnActivity
+        given caller
+          authenticated
+          role "SalesRep"
+        when UpdateActivity
+          activityId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0005"
+          subject = "Behovsmote med Kari"
+          kind    = "meeting"
+          related = "Fjordtech AS"
+          due     = "2026-10-21"
+          owner   = "Ingrid Solberg"
+        then ActivityUpdated
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0005"
+          subject = "Behovsmote med Kari"
+          kind    = "meeting"
+          related = "Fjordtech AS"
+          due     = "2026-10-21"
+          owner   = "Ingrid Solberg"
+
+    slice StateView ActivityList
+      description "Calls, meetings, emails and tasks"
+
+      readmodel Activities
+        activityId ActivityId
+        subject Subject
+        kind    ActivityKind
+        related CompanyName
+        due     Date
+        owner   OwnerName
+
+      query AllActivities => observable Activities[]
+        authorize IsSalesRep
+
+      projection ActivitiesProjection => Activities
+        from ActivityRegistered
+          activityId = $eventSourceId
+          subject = subject
+          kind    = kind
+          related = related
+          due     = due
+          owner   = owner
+        from ActivityUpdated
+          subject = subject
+          kind    = kind
+          related = related
+          due     = due
+          owner   = owner
+
+      screen Activities
+        template blueprint Cratis.Blueprint.Crm CrmActivityList version "^1.0"
+
+      specification ListingTheRegisteredActivity
+        given caller
+          authenticated
+          role "SalesRep"
+        given ActivityRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0005"
+          subject = "Behovsmote med Kari"
+          kind    = "meeting"
+          related = "Fjordtech AS"
+          due     = "2026-10-21"
+          owner   = "Ingrid Solberg"
+        then readmodel Activities
+          activityId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0005"
+          subject = "Behovsmote med Kari"
+
+  feature Dashboard
+    description "How the pipeline is doing"
+
+    slice StateView SalesDashboard
+      description "What is in the pipeline and how many deals the team has"
+
+      readmodel SalesFigures
+        summaryId    String
+        openPipeline Amount
+        dealCount    Int
+
+      query CurrentFigures => observable SalesFigures optional
+        by summaryId String
+        authorize IsSalesRep
+
+      projection SalesFiguresProjection => SalesFigures
+        from DealRegistered
+          key "global"
+          summaryId = "global"
+          add openPipeline by amount
+          increment dealCount
+
+      screen Dashboard
+        template blueprint Cratis.Blueprint.Crm CrmDashboard version "^1.0"
+
+      specification CountingWhatIsInThePipeline
+        given caller
+          authenticated
+          role "SalesRep"
+        given DealRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name    = "Fjordtech driftsplattform"
+          company = "Fjordtech AS"
+          amount  = 48000
+          stage   = "new"
+          closes  = "2026-11-30"
+          owner   = "Ingrid Solberg"
+        then readmodel SalesFigures
+          summaryId    = "global"
+          openPipeline = 48000
+          dealCount    = 1
