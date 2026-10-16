@@ -627,8 +627,7 @@ module Support
         summaryId   String
         openTickets Int
 
-      query CurrentFigures => observable SupportFigures optional
-        by summaryId String
+      query CurrentFigures => observable SupportFigures[]
         authorize IsAgent
 
       projection SupportFiguresProjection => SupportFigures

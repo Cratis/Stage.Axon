@@ -65,6 +65,7 @@ layout AppShell
     item board title "Board" icon columns target Projects.Board
       item by-status title "By status" target Projects.Board
       item by-person title "By person" target Projects.Board.ByPerson
+    item timeline title "Timeline" icon chart target Projects.Timeline
 
   arrangement flow
     column
@@ -431,3 +432,46 @@ module Projects
           then readmodel LaneCards
             taskId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
             assignee = "Amelia Hart"
+
+  feature Timeline
+    description "Every project on a schedule, by owner"
+
+    slice StateView ProjectTimeline
+      description "Each project as a bar in a lane for its owner, with its progress"
+
+      readmodel ProjectTimelineItems
+        projectId ProjectId
+        title     ProjectName
+        lane      PersonName
+        progress  Percent
+        end       Date
+
+      query AllProjectTimelineItems => observable ProjectTimelineItems[]
+        authorize IsTeamMember
+
+      projection ProjectTimelineItemsProjection => ProjectTimelineItems
+        from ProjectRegistered
+          projectId = $eventSourceId
+          title = name
+          lane = owner
+          progress = progress
+          end = due
+
+      screen Timeline
+        template blueprint Cratis.Blueprint.ProjectTracker ProjectTimeline version "^1.0"
+
+      specification PlacingTheProjectOnTheSchedule
+        given caller
+          authenticated
+          role "TeamMember"
+        given ProjectRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name     = "Website relaunch"
+          owner    = "Amelia Hart"
+          progress = 72
+          due      = "2026-11-13"
+          status   = "onTrack"
+        then readmodel ProjectTimelineItems
+          projectId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          title     = "Website relaunch"
+          lane      = "Amelia Hart"
