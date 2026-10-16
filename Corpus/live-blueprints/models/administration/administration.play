@@ -1,0 +1,528 @@
+// ============================================================
+// Admin - the administrator of an application, from the Administration blueprint
+//
+// Users hold roles, roles hold permissions and every change is written to an
+// audit log. The whole application is built from Scene's
+// `Cratis.Blueprint.Administration` package: every screen fills one of its
+// templates - the user list and page, the roles beside their permission
+// matrix, the settings and the audit log - and the navigation is declared
+// here with the same regions the designer shows. The demo data is the
+// blueprint's own pack.
+//
+// One administrator uses it, so every screen is drawn for that persona on
+// the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Administration
+// ============================================================
+
+domain Cratis.Admin
+
+concept UserId       : Uuid
+concept RoleId       : Uuid
+concept SettingsId   : Uuid
+concept AuditEntryId : Uuid
+
+concept PersonName : String
+concept EmailAddress : String
+concept RoleName : String
+concept Description : String
+concept OrganizationName : String
+concept LanguageName : String
+concept TimeZoneName : String
+concept ColorValue : String
+concept Count : Int
+concept Flag : Bool
+
+concept UserStatus : Enum
+  active = 0
+  invited = 1
+  suspended = 2
+
+concept AuditAction : Enum
+  signedIn = 0
+  invited = 1
+  changedRole = 2
+  suspended = 3
+  changedSetting = 4
+  exported = 5
+
+policy IsAdministrator
+  require role "Administrator"
+
+persona Administrator
+  description "Looks after who may use the application: invites people, decides what each role may do, keeps the organization settings and reads the audit log"
+  policy IsAdministrator
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/admin.svg" title "Administration"
+    item admin title "Administration" target Admin
+  navigation sidebar
+    item users title "Users" icon users target Admin.Users
+    item roles title "Roles" icon shield target Admin.Roles
+    item settings title "Settings" icon cog target Admin.Settings
+    item audit title "Audit log" icon list target Admin.Audit
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Administration
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint admin-default
+
+module Admin
+  description "The people who use the application, what they may do and how it is set up"
+  authorize IsAdministrator
+
+  feature Users
+    description "The people with an account"
+
+    slice StateChange InviteUser
+      description "Invites someone to use the application"
+
+      command InviteUser
+        userId UserId identifier
+        name       PersonName
+        email      EmailAddress
+        role       RoleName
+        status     UserStatus
+        lastActive Date
+
+        produces UserInvited
+          for userId
+          name       = name
+          email      = email
+          role       = role
+          status     = status
+          lastActive = lastActive
+
+      event UserInvited
+        name       PersonName
+        email      EmailAddress
+        role       RoleName
+        status     UserStatus
+        lastActive Date
+
+      screen InviteUser
+        template blueprint Cratis.Blueprint.Administration AdministrationInviteUser version "^1.0"
+          actions
+            action InviteUser
+
+      specification InvitingAUser
+        given caller
+          authenticated
+          role "Administrator"
+        when InviteUser
+          userId     = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Tom Eriksen"
+          email      = "tom.eriksen@example.co.uk"
+          role       = "viewer"
+          status     = "invited"
+          lastActive = "2026-10-16"
+        then UserInvited
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Tom Eriksen"
+          email      = "tom.eriksen@example.co.uk"
+          role       = "viewer"
+          status     = "invited"
+          lastActive = "2026-10-16"
+
+    slice StateChange ChangeUserRole
+      description "Gives a user another role"
+
+      command ChangeUserRole
+        userId UserId identifier
+        role RoleName
+
+        produces UserRoleChanged
+          for userId
+          role = role
+
+      event UserRoleChanged
+        role RoleName
+
+      screen ChangeRole
+        template blueprint Cratis.Blueprint.Administration AdministrationUserList version "^1.0"
+          toolbar
+            action ChangeUserRole
+
+      specification ChangingTheRoleOfAUser
+        given caller
+          authenticated
+          role "Administrator"
+        given UserInvited
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Tom Eriksen"
+          email      = "tom.eriksen@example.co.uk"
+          role       = "viewer"
+          status     = "invited"
+          lastActive = "2026-10-16"
+        when ChangeUserRole
+          userId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          role   = "editor"
+        then UserRoleChanged
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          role = "editor"
+
+    slice StateView UserList
+      description "Everyone with an account, their role and status"
+
+      readmodel Users
+        userId     UserId
+        name       PersonName
+        email      EmailAddress
+        role       RoleName
+        status     UserStatus
+        lastActive Date
+
+      query AllUsers => observable Users[]
+        authorize IsAdministrator
+
+      query GetUser => Users optional
+        by userId UserId
+        authorize IsAdministrator
+
+      projection UsersProjection => Users
+        from UserInvited
+          userId = $eventSourceId
+          name = name
+          email = email
+          role = role
+          status = status
+          lastActive = lastActive
+        from UserRoleChanged
+          role = role
+
+      screen Users
+        template blueprint Cratis.Blueprint.Administration AdministrationUserList version "^1.0"
+
+      screen UserRecord
+        template blueprint Cratis.Blueprint.Administration AdministrationUserPage version "^1.0"
+
+      specification ListingTheRegisteredUser
+        given caller
+          authenticated
+          role "Administrator"
+        given UserInvited
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Tom Eriksen"
+          email      = "tom.eriksen@example.co.uk"
+          role       = "viewer"
+          status     = "invited"
+          lastActive = "2026-10-16"
+        then readmodel Users
+          userId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name   = "Tom Eriksen"
+
+  feature Roles
+    description "What each role may do"
+
+    slice StateChange RegisterRole
+      description "Adds a role"
+
+      command RegisterRole
+        roleId RoleId identifier
+        name        RoleName
+        description Description
+        members     Count
+
+        produces RoleRegistered
+          for roleId
+          name        = name
+          description = description
+          members     = members
+
+      event RoleRegistered
+        name        RoleName
+        description Description
+        members     Count
+
+      screen QuickNewRole
+        template blueprint Cratis.Blueprint.Administration AdministrationQuickCreateRole version "^1.0"
+          actions
+            action RegisterRole
+
+      specification RegisteringARole
+        given caller
+          authenticated
+          role "Administrator"
+        when RegisterRole
+          roleId      = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name        = "Auditor"
+          description = "Reads the audit log"
+          members     = 1
+        then RoleRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name        = "Auditor"
+          description = "Reads the audit log"
+          members     = 1
+
+    slice StateView RoleList
+      description "The roles and how many people hold each"
+
+      readmodel Roles
+        roleId      RoleId
+        name        RoleName
+        description Description
+        members     Count
+
+      query AllRoles => observable Roles[]
+        authorize IsAdministrator
+
+      query GetRole => Roles optional
+        by roleId RoleId
+        authorize IsAdministrator
+
+      projection RolesProjection => Roles
+        from RoleRegistered
+          roleId = $eventSourceId
+          name = name
+          description = description
+          members = members
+
+      screen Roles
+        template blueprint Cratis.Blueprint.Administration AdministrationRoles version "^1.0"
+
+      specification ListingTheRegisteredRole
+        given caller
+          authenticated
+          role "Administrator"
+        given RoleRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name        = "Auditor"
+          description = "Reads the audit log"
+          members     = 1
+        then readmodel Roles
+          roleId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name   = "Auditor"
+
+  feature Settings
+    description "How the organization is set up"
+
+    slice StateChange SaveSettings
+      description "Saves the settings of the organization"
+
+      command SaveSettings
+        settingsId SettingsId identifier
+        organization   OrganizationName
+        language       LanguageName
+        timeZone       TimeZoneName
+        supportEmail   EmailAddress
+        primaryColor   ColorValue
+        tagline        Description
+        securityAlerts Flag
+        weeklyDigest   Flag
+
+        produces SettingsSaved
+          for settingsId
+          organization   = organization
+          language       = language
+          timeZone       = timeZone
+          supportEmail   = supportEmail
+          primaryColor   = primaryColor
+          tagline        = tagline
+          securityAlerts = securityAlerts
+          weeklyDigest   = weeklyDigest
+
+      event SettingsSaved
+        organization   OrganizationName
+        language       LanguageName
+        timeZone       TimeZoneName
+        supportEmail   EmailAddress
+        primaryColor   ColorValue
+        tagline        Description
+        securityAlerts Flag
+        weeklyDigest   Flag
+
+      screen SaveSettings
+        template blueprint Cratis.Blueprint.Administration AdministrationSettings version "^1.0"
+          actions
+            action SaveSettings
+
+      specification SavingTheSettings
+        given caller
+          authenticated
+          role "Administrator"
+        when SaveSettings
+          settingsId     = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          organization   = "Cedar & Pine Ltd"
+          language       = "English (UK)"
+          timeZone       = "Europe/London"
+          supportEmail   = "help@cedarandpine.example.co.uk"
+          primaryColor   = "#4f46e5"
+          tagline        = "Good timber, honestly priced"
+          securityAlerts = true
+          weeklyDigest   = true
+        then SettingsSaved
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          organization   = "Cedar & Pine Ltd"
+          language       = "English (UK)"
+          timeZone       = "Europe/London"
+          supportEmail   = "help@cedarandpine.example.co.uk"
+          primaryColor   = "#4f46e5"
+          tagline        = "Good timber, honestly priced"
+          securityAlerts = true
+          weeklyDigest   = true
+
+    slice StateView SettingsView
+      description "The settings the organization has chosen"
+
+      readmodel OrganizationSettings
+        settingsId     SettingsId
+        organization   OrganizationName
+        language       LanguageName
+        timeZone       TimeZoneName
+        supportEmail   EmailAddress
+        primaryColor   ColorValue
+        tagline        Description
+        securityAlerts Flag
+        weeklyDigest   Flag
+
+      query AllOrganizationSettings => observable OrganizationSettings[]
+        authorize IsAdministrator
+
+      projection OrganizationSettingsProjection => OrganizationSettings
+        from SettingsSaved
+          settingsId = $eventSourceId
+          organization = organization
+          language = language
+          timeZone = timeZone
+          supportEmail = supportEmail
+          primaryColor = primaryColor
+          tagline = tagline
+          securityAlerts = securityAlerts
+          weeklyDigest = weeklyDigest
+
+      screen Settings
+        template blueprint Cratis.Blueprint.Administration AdministrationSettings version "^1.0"
+
+      specification ShowingTheSavedSettings
+        given caller
+          authenticated
+          role "Administrator"
+        given SettingsSaved
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          organization   = "Cedar & Pine Ltd"
+          language       = "English (UK)"
+          timeZone       = "Europe/London"
+          supportEmail   = "help@cedarandpine.example.co.uk"
+          primaryColor   = "#4f46e5"
+          tagline        = "Good timber, honestly priced"
+          securityAlerts = true
+          weeklyDigest   = true
+        then readmodel OrganizationSettings
+          settingsId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          organization = "Cedar & Pine Ltd"
+
+  feature Audit
+    description "What has been done, and by whom"
+
+    slice StateChange RecordAuditEntry
+      description "Writes an entry to the audit log"
+
+      command RecordAuditEntry
+        entryId AuditEntryId identifier
+        happened Date
+        actor    PersonName
+        action   AuditAction
+        target   Description
+
+        produces AuditEntryRecorded
+          for entryId
+          happened = happened
+          actor    = actor
+          action   = action
+          target   = target
+
+      event AuditEntryRecorded
+        happened Date
+        actor    PersonName
+        action   AuditAction
+        target   Description
+
+      screen NoteInTheLog
+        template Dialog
+          body
+            title "Add a note to the log"
+          actions
+            action RecordAuditEntry
+
+      specification RecordingAnEntry
+        given caller
+          authenticated
+          role "Administrator"
+        when RecordAuditEntry
+          entryId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          happened = "2026-10-16"
+          actor    = "Amelia Hart"
+          action   = "invited"
+          target   = "tom.eriksen@example.co.uk"
+        then AuditEntryRecorded
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          happened = "2026-10-16"
+          actor    = "Amelia Hart"
+          action   = "invited"
+          target   = "tom.eriksen@example.co.uk"
+
+    slice StateView AuditLog
+      description "Who did what to what, and when - nothing here is ever changed"
+
+      readmodel AuditEntries
+        entryId  AuditEntryId
+        happened Date
+        actor    PersonName
+        action   AuditAction
+        target   Description
+
+      query AllAuditEntries => observable AuditEntries[]
+        authorize IsAdministrator
+
+      projection AuditEntriesProjection => AuditEntries
+        from AuditEntryRecorded
+          entryId = $eventSourceId
+          happened = happened
+          actor = actor
+          action = action
+          target = target
+
+      screen AuditLog
+        template blueprint Cratis.Blueprint.Administration AdministrationAuditLog version "^1.0"
+
+      specification ListingARecordedEntry
+        given caller
+          authenticated
+          role "Administrator"
+        given AuditEntryRecorded
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          happened = "2026-10-16"
+          actor    = "Amelia Hart"
+          action   = "invited"
+          target   = "tom.eriksen@example.co.uk"
+        then readmodel AuditEntries
+          entryId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          actor   = "Amelia Hart"

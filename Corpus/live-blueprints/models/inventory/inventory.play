@@ -1,0 +1,662 @@
+// ============================================================
+// Inventory - a warehouse, from the Inventory and Assets blueprint
+//
+// Items are kept in locations, move in and out as movements and come
+// from suppliers. The whole application is built from Scene's
+// `Cratis.Blueprint.Inventory` package: every screen fills one of its
+// templates - the dashboard, the item table and gallery, the item page,
+// the location tree, the movements, the check in and out form and the
+// quick dialogs - and the navigation is declared here with the same
+// regions the designer shows. The demo data is the blueprint's own pack.
+//
+// One warehouse clerk uses it, so every screen is drawn for that persona
+// on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Inventory
+// ============================================================
+
+domain Cratis.Inventory
+
+concept ItemId       : Uuid
+concept MovementId   : Uuid
+concept SupplierId   : Uuid
+concept LocationId   : Uuid
+
+concept ItemSku : String
+concept ItemName : String
+concept CategoryName : String
+concept LocationName : String
+concept LocationPath : String
+concept SupplierName : String
+concept PersonName : String
+concept EmailAddress : String
+concept PhoneNumber : String
+concept Quantity : Int
+concept Money : Decimal
+
+concept ItemStatus : Enum
+  inStock = 0
+  lowStock = 1
+  outOfStock = 2
+
+concept MovementType : Enum
+  checkIn = 0
+  checkOut = 1
+  transfer = 2
+  adjustment = 3
+
+concept SupplierStatus : Enum
+  active = 0
+  onHold = 1
+
+policy IsWarehouseClerk
+  require role "WarehouseClerk"
+
+persona WarehouseClerk
+  description "Keeps the warehouse in order: registers items, checks them in and out and adjusts the stock when a count disagrees"
+  policy IsWarehouseClerk
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/inventory.svg" title "Inventory"
+    item inventory title "Inventory" target Inventory
+  navigation sidebar
+    item dashboard title "Dashboard" icon home target Inventory.Dashboard
+    item items title "Items" icon box target Inventory.Items
+      item item-table title "Table" target Inventory.Items
+      item item-gallery title "Gallery" target Inventory.Items.Gallery
+    item locations title "Locations" icon map target Inventory.Locations
+    item movements title "Movements" icon refresh target Inventory.Movements
+    item suppliers title "Suppliers" icon truck target Inventory.Suppliers
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Inventory
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint inventory-warehouse
+
+module Inventory
+  description "Items, where they are kept, how they move and who supplies them"
+  authorize IsWarehouseClerk
+
+  feature Items
+    description "What the warehouse keeps"
+
+    slice StateChange RegisterItem
+      description "Adds an item to the warehouse"
+
+      command RegisterItem
+        itemId ItemId identifier
+        sku          ItemSku
+        name         ItemName
+        category     CategoryName
+        location     LocationPath
+        quantity     Quantity
+        reorderLevel Quantity
+        unitCost     Money
+        status       ItemStatus
+        supplier     SupplierName
+
+        produces ItemRegistered
+          for itemId
+          sku          = sku
+          name         = name
+          category     = category
+          location     = location
+          quantity     = quantity
+          reorderLevel = reorderLevel
+          unitCost     = unitCost
+          status       = status
+          supplier     = supplier
+
+      event ItemRegistered
+        sku          ItemSku
+        name         ItemName
+        category     CategoryName
+        location     LocationPath
+        quantity     Quantity
+        reorderLevel Quantity
+        unitCost     Money
+        status       ItemStatus
+        supplier     SupplierName
+
+      screen QuickNewItem
+        template blueprint Cratis.Blueprint.Inventory InventoryQuickCreateItem version "^1.0"
+          actions
+            action RegisterItem
+
+      specification RegisteringAnItem
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        when RegisterItem
+          itemId       = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          sku          = "EQ-1001"
+          name         = "Pallet jack"
+          category     = "Equipment"
+          location     = "Main warehouse / Aisle A / Shelf A1"
+          quantity     = 6
+          reorderLevel = 2
+          unitCost     = 289
+          status       = "inStock"
+          supplier     = "Hartley Industrial"
+        then ItemRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          sku          = "EQ-1001"
+          name         = "Pallet jack"
+          category     = "Equipment"
+          location     = "Main warehouse / Aisle A / Shelf A1"
+          quantity     = 6
+          reorderLevel = 2
+          unitCost     = 289
+          status       = "inStock"
+          supplier     = "Hartley Industrial"
+
+    slice StateChange AdjustStock
+      description "Corrects the stock of an item after a count"
+
+      command AdjustStock
+        itemId ItemId identifier
+        quantity Quantity
+        status   ItemStatus
+
+        produces StockAdjusted
+          for itemId
+          quantity = quantity
+          status   = status
+
+      event StockAdjusted
+        quantity Quantity
+        status   ItemStatus
+
+      screen AdjustStock
+        template blueprint Cratis.Blueprint.Inventory InventoryAdjustStock version "^1.0"
+          actions
+            action AdjustStock
+
+      specification AdjustingTheStockOfAnItem
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        given ItemRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          sku          = "EQ-1001"
+          name         = "Pallet jack"
+          category     = "Equipment"
+          location     = "Main warehouse / Aisle A / Shelf A1"
+          quantity     = 6
+          reorderLevel = 2
+          unitCost     = 289
+          status       = "inStock"
+          supplier     = "Hartley Industrial"
+        when AdjustStock
+          itemId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          quantity = 4
+          status   = "lowStock"
+        then StockAdjusted
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          quantity = 4
+          status   = "lowStock"
+
+    slice StateView ItemList
+      description "What the warehouse keeps and how much of it"
+
+      readmodel Items
+        itemId       ItemId
+        sku          ItemSku
+        name         ItemName
+        category     CategoryName
+        location     LocationPath
+        quantity     Quantity
+        reorderLevel Quantity
+        unitCost     Money
+        status       ItemStatus
+        supplier     SupplierName
+
+      query AllItems => observable Items[]
+        authorize IsWarehouseClerk
+
+      query GetItem => Items optional
+        by itemId ItemId
+        authorize IsWarehouseClerk
+
+      projection ItemsProjection => Items
+        from ItemRegistered
+          itemId = $eventSourceId
+          sku = sku
+          name = name
+          category = category
+          location = location
+          quantity = quantity
+          reorderLevel = reorderLevel
+          unitCost = unitCost
+          status = status
+          supplier = supplier
+        from StockAdjusted
+          quantity = quantity
+          status = status
+
+      screen Items
+        template blueprint Cratis.Blueprint.Inventory InventoryItemList version "^1.0"
+
+      screen ItemRecord
+        template blueprint Cratis.Blueprint.Inventory InventoryItemPage version "^1.0"
+
+      specification ListingTheRegisteredItem
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        given ItemRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          sku          = "EQ-1001"
+          name         = "Pallet jack"
+          category     = "Equipment"
+          location     = "Main warehouse / Aisle A / Shelf A1"
+          quantity     = 6
+          reorderLevel = 2
+          unitCost     = 289
+          status       = "inStock"
+          supplier     = "Hartley Industrial"
+        then readmodel Items
+          itemId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name   = "Pallet jack"
+
+    feature Gallery
+      description "Every item as a card with its picture"
+
+      slice StateView ItemCards
+        description "The same items as cards, each with its picture"
+
+        readmodel ItemCards
+          itemId   ItemId
+          sku      ItemSku
+          name     ItemName
+          quantity Quantity
+          status   ItemStatus
+
+        query AllItemCards => observable ItemCards[]
+          authorize IsWarehouseClerk
+
+        projection ItemCardsProjection => ItemCards
+          from ItemRegistered
+            itemId = $eventSourceId
+            sku = sku
+            name = name
+            quantity = quantity
+            status = status
+          from StockAdjusted
+            quantity = quantity
+            status = status
+
+        screen Gallery
+          template blueprint Cratis.Blueprint.Inventory InventoryItemGallery version "^1.0"
+
+        specification ShowingTheRegisteredItemAsACard
+          given caller
+            authenticated
+            role "WarehouseClerk"
+          given ItemRegistered
+            for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+            sku          = "EQ-1001"
+            name         = "Pallet jack"
+            category     = "Equipment"
+            location     = "Main warehouse / Aisle A / Shelf A1"
+            quantity     = 6
+            reorderLevel = 2
+            unitCost     = 289
+            status       = "inStock"
+            supplier     = "Hartley Industrial"
+          then readmodel ItemCards
+            itemId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+            name   = "Pallet jack"
+
+  feature Locations
+    description "Where things are kept"
+
+    slice StateChange RegisterLocation
+      description "Adds a place to keep things"
+
+      command RegisterLocation
+        locationId LocationId identifier
+        name LocationName
+        path LocationPath
+
+        produces LocationRegistered
+          for locationId
+          name = name
+          path = path
+
+      event LocationRegistered
+        name LocationName
+        path LocationPath
+
+      screen NewLocation
+        template Dialog
+          body
+            title "Add a location"
+          actions
+            action RegisterLocation
+
+      specification RegisteringALocation
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        when RegisterLocation
+          locationId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name       = "Shelf A1"
+          path       = "Main warehouse / Aisle A / Shelf A1"
+        then LocationRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name = "Shelf A1"
+          path = "Main warehouse / Aisle A / Shelf A1"
+
+    slice StateView LocationTree
+      description "The places the warehouse keeps things, as a tree"
+
+      readmodel Locations
+        locationId LocationId
+        name       LocationName
+        path       LocationPath
+
+      query AllLocations => observable Locations[]
+        authorize IsWarehouseClerk
+
+      query GetLocation => Locations optional
+        by locationId LocationId
+        authorize IsWarehouseClerk
+
+      projection LocationsProjection => Locations
+        from LocationRegistered
+          locationId = $eventSourceId
+          name = name
+          path = path
+
+      screen Locations
+        template blueprint Cratis.Blueprint.Inventory InventoryLocations version "^1.0"
+
+      specification ListingTheRegisteredLocation
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        given LocationRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          name = "Shelf A1"
+          path = "Main warehouse / Aisle A / Shelf A1"
+        then readmodel Locations
+          locationId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          path       = "Main warehouse / Aisle A / Shelf A1"
+
+  feature Movements
+    description "What came in, went out and moved"
+
+    slice StateChange RegisterMovement
+      description "Records that stock came in, went out or moved"
+
+      command RegisterMovement
+        movementId MovementId identifier
+        moved        Date
+        item         ItemName
+        movementType MovementType
+        quantity     Quantity
+        location     LocationPath
+        handledBy    PersonName
+
+        produces MovementRegistered
+          for movementId
+          moved        = moved
+          item         = item
+          movementType = movementType
+          quantity     = quantity
+          location     = location
+          handledBy    = handledBy
+
+      event MovementRegistered
+        moved        Date
+        item         ItemName
+        movementType MovementType
+        quantity     Quantity
+        location     LocationPath
+        handledBy    PersonName
+
+      screen CheckInOut
+        template blueprint Cratis.Blueprint.Inventory InventoryCheckInOut version "^1.0"
+          actions
+            action RegisterMovement
+
+      specification RegisteringAMovement
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        when RegisterMovement
+          movementId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          moved        = "2026-10-16"
+          item         = "Pallet jack"
+          movementType = "checkIn"
+          quantity     = 4
+          location     = "Main warehouse / Aisle A / Shelf A1"
+          handledBy    = "Hannah Cole"
+        then MovementRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          moved        = "2026-10-16"
+          item         = "Pallet jack"
+          movementType = "checkIn"
+          quantity     = 4
+          location     = "Main warehouse / Aisle A / Shelf A1"
+          handledBy    = "Hannah Cole"
+
+    slice StateView MovementList
+      description "Every check in, check out, transfer and adjustment"
+
+      readmodel Movements
+        movementId   MovementId
+        moved        Date
+        item         ItemName
+        movementType MovementType
+        quantity     Quantity
+        location     LocationPath
+        handledBy    PersonName
+
+      query AllMovements => observable Movements[]
+        authorize IsWarehouseClerk
+
+      query GetMovement => Movements optional
+        by movementId MovementId
+        authorize IsWarehouseClerk
+
+      projection MovementsProjection => Movements
+        from MovementRegistered
+          movementId = $eventSourceId
+          moved = moved
+          item = item
+          movementType = movementType
+          quantity = quantity
+          location = location
+          handledBy = handledBy
+
+      screen Movements
+        template blueprint Cratis.Blueprint.Inventory InventoryMovementList version "^1.0"
+
+      specification ListingTheRegisteredMovement
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        given MovementRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          moved        = "2026-10-16"
+          item         = "Pallet jack"
+          movementType = "checkIn"
+          quantity     = 4
+          location     = "Main warehouse / Aisle A / Shelf A1"
+          handledBy    = "Hannah Cole"
+        then readmodel Movements
+          movementId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+          item       = "Pallet jack"
+
+  feature Suppliers
+    description "Where the stock comes from"
+
+    slice StateChange RegisterSupplier
+      description "Adds a supplier"
+
+      command RegisterSupplier
+        supplierId SupplierId identifier
+        name    SupplierName
+        contact PersonName
+        email   EmailAddress
+        phone   PhoneNumber
+        status  SupplierStatus
+
+        produces SupplierRegistered
+          for supplierId
+          name    = name
+          contact = contact
+          email   = email
+          phone   = phone
+          status  = status
+
+      event SupplierRegistered
+        name    SupplierName
+        contact PersonName
+        email   EmailAddress
+        phone   PhoneNumber
+        status  SupplierStatus
+
+      screen QuickNewSupplier
+        template blueprint Cratis.Blueprint.Inventory InventoryQuickCreateSupplier version "^1.0"
+          actions
+            action RegisterSupplier
+
+      specification RegisteringASupplier
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        when RegisterSupplier
+          supplierId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name       = "Hartley Industrial"
+          contact    = "Ben Hartley"
+          email      = "orders@hartley.example.co.uk"
+          phone      = "+44 20 7946 0210"
+          status     = "active"
+        then SupplierRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name    = "Hartley Industrial"
+          contact = "Ben Hartley"
+          email   = "orders@hartley.example.co.uk"
+          phone   = "+44 20 7946 0210"
+          status  = "active"
+
+    slice StateView SupplierList
+      description "The companies items are bought from"
+
+      readmodel Suppliers
+        supplierId SupplierId
+        name       SupplierName
+        contact    PersonName
+        email      EmailAddress
+        phone      PhoneNumber
+        status     SupplierStatus
+
+      query AllSuppliers => observable Suppliers[]
+        authorize IsWarehouseClerk
+
+      query GetSupplier => Suppliers optional
+        by supplierId SupplierId
+        authorize IsWarehouseClerk
+
+      projection SuppliersProjection => Suppliers
+        from SupplierRegistered
+          supplierId = $eventSourceId
+          name = name
+          contact = contact
+          email = email
+          phone = phone
+          status = status
+
+      screen Suppliers
+        template blueprint Cratis.Blueprint.Inventory InventorySupplierList version "^1.0"
+
+      specification ListingTheRegisteredSupplier
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        given SupplierRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name    = "Hartley Industrial"
+          contact = "Ben Hartley"
+          email   = "orders@hartley.example.co.uk"
+          phone   = "+44 20 7946 0210"
+          status  = "active"
+        then readmodel Suppliers
+          supplierId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name       = "Hartley Industrial"
+
+  feature Dashboard
+    description "How the stock is doing"
+
+    slice StateView InventoryDashboard
+      description "How much is in stock and how many items the warehouse holds"
+
+      readmodel InventoryFigures
+        summaryId   String
+        itemCount   Int
+        unitsOnHand Int
+
+      query CurrentFigures => observable InventoryFigures optional
+        by summaryId String
+        authorize IsWarehouseClerk
+
+      projection InventoryFiguresProjection => InventoryFigures
+        from ItemRegistered
+          key "global"
+          summaryId = "global"
+          add unitsOnHand by quantity
+          increment itemCount
+
+      screen Dashboard
+        template blueprint Cratis.Blueprint.Inventory InventoryDashboard version "^1.0"
+
+      specification CountingWhatIsInStock
+        given caller
+          authenticated
+          role "WarehouseClerk"
+        given ItemRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          sku          = "EQ-1001"
+          name         = "Pallet jack"
+          category     = "Equipment"
+          location     = "Main warehouse / Aisle A / Shelf A1"
+          quantity     = 6
+          reorderLevel = 2
+          unitCost     = 289
+          status       = "inStock"
+          supplier     = "Hartley Industrial"
+        then readmodel InventoryFigures
+          summaryId   = "global"
+          unitsOnHand = 6
+          itemCount   = 1
