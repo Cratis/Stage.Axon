@@ -1,0 +1,433 @@
+// ============================================================
+// Projects - a team tracking its work, from the Project and Task Tracker blueprint
+//
+// Projects hold tasks, and tasks move from to do to done. The whole
+// application is built from Scene's `Cratis.Blueprint.ProjectTracker`
+// package: every screen fills one of its templates - the projects as cards,
+// the project page, my tasks grouped by due date, the board by status and
+// by person, and the task side sheet - and the navigation is declared here
+// with the same regions the designer shows. The demo data is the
+// blueprint's own pack.
+//
+// One team member uses it, so every screen is drawn for that persona on
+// the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Projects
+// ============================================================
+
+domain Cratis.Projects
+
+concept ProjectId    : Uuid
+concept TaskId       : Uuid
+
+concept ProjectName : String
+concept TaskTitle : String
+concept PersonName : String
+concept Percent : Int
+
+concept ProjectStatus : Enum
+  onTrack = 0
+  atRisk = 1
+  late = 2
+  done = 3
+
+concept TaskStatus : Enum
+  toDo = 0
+  inProgress = 1
+  review = 2
+  done = 3
+
+concept TaskPriority : Enum
+  low = 0
+  medium = 1
+  high = 2
+
+policy IsTeamMember
+  require role "TeamMember"
+
+persona TeamMember
+  description "Plans and does the work of a team: starts projects, adds tasks and moves them across the board until they are done"
+  policy IsTeamMember
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/projects.svg" title "Projects"
+    item projects title "Projects" target Projects
+  navigation sidebar
+    item projects title "Projects" icon folder target Projects.Projects
+    item mytasks title "My tasks" icon check target Projects.MyTasks
+    item board title "Board" icon columns target Projects.Board
+      item by-status title "By status" target Projects.Board
+      item by-person title "By person" target Projects.Board.ByPerson
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.ProjectTracker
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint project-tracker-en
+
+module Projects
+  description "Projects, the tasks inside them and the board the team works from"
+  authorize IsTeamMember
+
+  feature Projects
+    description "What the team is working on"
+
+    slice StateChange RegisterProject
+      description "Starts a project"
+
+      command RegisterProject
+        projectId ProjectId identifier
+        name     ProjectName
+        owner    PersonName
+        progress Percent
+        due      Date
+        status   ProjectStatus
+
+        produces ProjectRegistered
+          for projectId
+          name     = name
+          owner    = owner
+          progress = progress
+          due      = due
+          status   = status
+
+      event ProjectRegistered
+        name     ProjectName
+        owner    PersonName
+        progress Percent
+        due      Date
+        status   ProjectStatus
+
+      screen QuickNewProject
+        template blueprint Cratis.Blueprint.ProjectTracker ProjectQuickCreateProject version "^1.0"
+          actions
+            action RegisterProject
+
+      specification RegisteringAProject
+        given caller
+          authenticated
+          role "TeamMember"
+        when RegisterProject
+          projectId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name      = "Website relaunch"
+          owner     = "Amelia Hart"
+          progress  = 72
+          due       = "2026-11-13"
+          status    = "onTrack"
+        then ProjectRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name     = "Website relaunch"
+          owner    = "Amelia Hart"
+          progress = 72
+          due      = "2026-11-13"
+          status   = "onTrack"
+
+    slice StateView ProjectList
+      description "Every project with its owner, how far along it is and when it is due"
+
+      readmodel Projects
+        projectId ProjectId
+        name      ProjectName
+        owner     PersonName
+        progress  Percent
+        due       Date
+        status    ProjectStatus
+
+      query AllProjects => observable Projects[]
+        authorize IsTeamMember
+
+      query GetProject => Projects optional
+        by projectId ProjectId
+        authorize IsTeamMember
+
+      projection ProjectsProjection => Projects
+        from ProjectRegistered
+          projectId = $eventSourceId
+          name = name
+          owner = owner
+          progress = progress
+          due = due
+          status = status
+
+      screen Projects
+        template blueprint Cratis.Blueprint.ProjectTracker ProjectList version "^1.0"
+
+      screen ProjectRecord
+        template blueprint Cratis.Blueprint.ProjectTracker ProjectPage version "^1.0"
+
+      specification ListingTheRegisteredProject
+        given caller
+          authenticated
+          role "TeamMember"
+        given ProjectRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name     = "Website relaunch"
+          owner    = "Amelia Hart"
+          progress = 72
+          due      = "2026-11-13"
+          status   = "onTrack"
+        then readmodel Projects
+          projectId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name      = "Website relaunch"
+
+  feature MyTasks
+    description "What is due, soonest first"
+
+    slice StateChange RegisterTask
+      description "Adds a task to a project"
+
+      command RegisterTask
+        taskId TaskId identifier
+        title    TaskTitle
+        project  ProjectName
+        assignee PersonName
+        status   TaskStatus
+        priority TaskPriority
+        due      Date
+
+        produces TaskRegistered
+          for taskId
+          title    = title
+          project  = project
+          assignee = assignee
+          status   = status
+          priority = priority
+          due      = due
+
+      event TaskRegistered
+        title    TaskTitle
+        project  ProjectName
+        assignee PersonName
+        status   TaskStatus
+        priority TaskPriority
+        due      Date
+
+      screen QuickNewTask
+        template blueprint Cratis.Blueprint.ProjectTracker ProjectQuickCreateTask version "^1.0"
+          actions
+            action RegisterTask
+
+      specification RegisteringATask
+        given caller
+          authenticated
+          role "TeamMember"
+        when RegisterTask
+          taskId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          title    = "Fix the checkout bug"
+          project  = "Website relaunch"
+          assignee = "Amelia Hart"
+          status   = "inProgress"
+          priority = "high"
+          due      = "2026-10-14"
+        then TaskRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          title    = "Fix the checkout bug"
+          project  = "Website relaunch"
+          assignee = "Amelia Hart"
+          status   = "inProgress"
+          priority = "high"
+          due      = "2026-10-14"
+
+    slice StateView TaskList
+      description "Every task with who has it, in what status and when it is due"
+
+      readmodel Tasks
+        taskId   TaskId
+        title    TaskTitle
+        project  ProjectName
+        assignee PersonName
+        status   TaskStatus
+        priority TaskPriority
+        due      Date
+
+      query AllTasks => observable Tasks[]
+        authorize IsTeamMember
+
+      query GetTask => Tasks optional
+        by taskId TaskId
+        authorize IsTeamMember
+
+      projection TasksProjection => Tasks
+        from TaskRegistered
+          taskId = $eventSourceId
+          title = title
+          project = project
+          assignee = assignee
+          status = status
+          priority = priority
+          due = due
+
+      screen MyTasks
+        template blueprint Cratis.Blueprint.ProjectTracker ProjectMyTasks version "^1.0"
+
+      screen TaskSheet
+        template blueprint Cratis.Blueprint.ProjectTracker ProjectTaskSheet version "^1.0"
+
+      specification ListingTheRegisteredTask
+        given caller
+          authenticated
+          role "TeamMember"
+        given TaskRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          title    = "Fix the checkout bug"
+          project  = "Website relaunch"
+          assignee = "Amelia Hart"
+          status   = "inProgress"
+          priority = "high"
+          due      = "2026-10-14"
+        then readmodel Tasks
+          taskId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          title  = "Fix the checkout bug"
+
+  feature Board
+    description "Tasks in a column for each status"
+
+    slice StateChange MoveTask
+      description "Moves a task to another status"
+
+      command MoveTask
+        taskId TaskId identifier
+        status TaskStatus
+
+        produces TaskMoved
+          for taskId
+          status = status
+
+      event TaskMoved
+        status TaskStatus
+
+      screen MoveTask
+        template blueprint Cratis.Blueprint.ProjectTracker ProjectTaskBoard version "^1.0"
+          toolbar
+            action MoveTask
+
+      specification MovingATask
+        given caller
+          authenticated
+          role "TeamMember"
+        given TaskRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          title    = "Fix the checkout bug"
+          project  = "Website relaunch"
+          assignee = "Amelia Hart"
+          status   = "inProgress"
+          priority = "high"
+          due      = "2026-10-14"
+        when MoveTask
+          taskId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          status = "review"
+        then TaskMoved
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          status = "review"
+
+    slice StateView TaskBoard
+      description "Every task as a card in the column of its status"
+
+      readmodel BoardCards
+        taskId   TaskId
+        title    TaskTitle
+        assignee PersonName
+        status   TaskStatus
+        priority TaskPriority
+
+      query AllBoardCards => observable BoardCards[]
+        authorize IsTeamMember
+
+      projection BoardCardsProjection => BoardCards
+        from TaskRegistered
+          taskId = $eventSourceId
+          title = title
+          assignee = assignee
+          status = status
+          priority = priority
+        from TaskMoved
+          status = status
+
+      screen Board
+        template blueprint Cratis.Blueprint.ProjectTracker ProjectTaskBoard version "^1.0"
+
+      specification ShowingTheTaskOnTheBoard
+        given caller
+          authenticated
+          role "TeamMember"
+        given TaskRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          title    = "Fix the checkout bug"
+          project  = "Website relaunch"
+          assignee = "Amelia Hart"
+          status   = "inProgress"
+          priority = "high"
+          due      = "2026-10-14"
+        then readmodel BoardCards
+          taskId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          title  = "Fix the checkout bug"
+
+    feature ByPerson
+      description "The same board with a lane for each person"
+
+      slice StateView TaskLanes
+        description "The same cards, in a lane for each assignee"
+
+        readmodel LaneCards
+          taskId   TaskId
+          title    TaskTitle
+          assignee PersonName
+          status   TaskStatus
+
+        query AllLaneCards => observable LaneCards[]
+          authorize IsTeamMember
+
+        projection LaneCardsProjection => LaneCards
+          from TaskRegistered
+            taskId = $eventSourceId
+            title = title
+            assignee = assignee
+            status = status
+          from TaskMoved
+            status = status
+
+        screen ByPerson
+          template blueprint Cratis.Blueprint.ProjectTracker ProjectTaskLanes version "^1.0"
+
+        specification PlacingTheTaskInItsLane
+          given caller
+            authenticated
+            role "TeamMember"
+          given TaskRegistered
+            for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+            title    = "Fix the checkout bug"
+            project  = "Website relaunch"
+            assignee = "Amelia Hart"
+            status   = "inProgress"
+            priority = "high"
+            due      = "2026-10-14"
+          then readmodel LaneCards
+            taskId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+            assignee = "Amelia Hart"

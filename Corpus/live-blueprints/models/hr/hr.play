@@ -1,0 +1,687 @@
+// ============================================================
+// Hr - the people side of a company, from the HR blueprint
+//
+// Employees sit in an org chart, ask for time off and are onboarded when
+// they join. The whole application is built from Scene's
+// `Cratis.Blueprint.Hr` package: every screen fills one of its templates -
+// the directory of cards, the employee page, the org chart, the time-off
+// requests and balances, the onboarding list and checklist - and the
+// navigation is declared here with the same regions the designer shows.
+// The demo data is the blueprint's own Nordic pack.
+//
+// One HR manager uses it, so every screen is drawn for that persona on
+// the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Hr
+// ============================================================
+
+domain Cratis.Hr
+
+concept EmployeeId   : Uuid
+concept TimeOffRequestId : Uuid
+concept BalanceId    : Uuid
+concept OnboardingId : Uuid
+
+concept PersonName : String
+concept JobTitle : String
+concept DepartmentName : String
+concept OfficeName : String
+concept EmailAddress : String
+concept PhoneNumber : String
+concept Days : Int
+concept Percent : Int
+
+concept EmploymentStatus : Enum
+  active = 0
+  probation = 1
+  leave = 2
+
+concept LeaveType : Enum
+  vacation = 0
+  sickLeave = 1
+  parentalLeave = 2
+  timeInLieu = 3
+
+concept RequestStatus : Enum
+  pending = 0
+  approved = 1
+  declined = 2
+
+concept OnboardingStatus : Enum
+  waiting = 0
+  inProgress = 1
+  completed = 2
+
+policy IsHrManager
+  require role "HrManager"
+
+persona HrManager
+  description "Looks after the people of the company: keeps the directory, answers time-off requests and walks new hires through their first weeks"
+  policy IsHrManager
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/hr.svg" title "HR"
+    item hr title "HR" target Hr
+  navigation sidebar
+    item directory title "Directory" icon users target Hr.Directory
+    item org title "Org chart" icon sitemap target Hr.OrgChart
+    item timeoff title "Time off" icon calendar target Hr.TimeOff
+      item requests title "Requests" target Hr.TimeOff
+      item balances title "Balances" target Hr.TimeOff.Balances
+    item onboarding title "Onboarding" icon check target Hr.Onboarding
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Hr
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint hr-nordic
+
+module Hr
+  description "The people of the company, their time off and their first weeks"
+  authorize IsHrManager
+
+  feature Directory
+    description "The people of the company"
+
+    slice StateChange RegisterEmployee
+      description "Adds a person to the directory"
+
+      command RegisterEmployee
+        employeeId EmployeeId identifier
+        name       PersonName
+        title      JobTitle
+        department DepartmentName
+        location   OfficeName
+        email      EmailAddress
+        phone      PhoneNumber
+        status     EmploymentStatus
+        manager    PersonName
+
+        produces EmployeeRegistered
+          for employeeId
+          name       = name
+          title      = title
+          department = department
+          location   = location
+          email      = email
+          phone      = phone
+          status     = status
+          manager    = manager
+
+      event EmployeeRegistered
+        name       PersonName
+        title      JobTitle
+        department DepartmentName
+        location   OfficeName
+        email      EmailAddress
+        phone      PhoneNumber
+        status     EmploymentStatus
+        manager    PersonName
+
+      screen QuickNewEmployee
+        template blueprint Cratis.Blueprint.Hr HrQuickCreateEmployee version "^1.0"
+          actions
+            action RegisterEmployee
+
+      specification RegisteringAnEmployee
+        given caller
+          authenticated
+          role "HrManager"
+        when RegisterEmployee
+          employeeId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Silje Andersen"
+          title      = "Seniorutvikler"
+          department = "Utvikling"
+          location   = "Bergen"
+          email      = "silje.andersen@eksempel.no"
+          phone      = "+47 400 10 200"
+          status     = "active"
+          manager    = "Jonas Eriksen"
+        then EmployeeRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Silje Andersen"
+          title      = "Seniorutvikler"
+          department = "Utvikling"
+          location   = "Bergen"
+          email      = "silje.andersen@eksempel.no"
+          phone      = "+47 400 10 200"
+          status     = "active"
+          manager    = "Jonas Eriksen"
+
+    slice StateView EmployeeDirectory
+      description "Everyone in the company as cards with photo, title, department and contact"
+
+      readmodel Employees
+        employeeId EmployeeId
+        name       PersonName
+        title      JobTitle
+        department DepartmentName
+        location   OfficeName
+        email      EmailAddress
+        phone      PhoneNumber
+        status     EmploymentStatus
+        manager    PersonName
+
+      query AllEmployees => observable Employees[]
+        authorize IsHrManager
+
+      query GetEmployee => Employees optional
+        by employeeId EmployeeId
+        authorize IsHrManager
+
+      projection EmployeesProjection => Employees
+        from EmployeeRegistered
+          employeeId = $eventSourceId
+          name = name
+          title = title
+          department = department
+          location = location
+          email = email
+          phone = phone
+          status = status
+          manager = manager
+
+      screen Directory
+        template blueprint Cratis.Blueprint.Hr HrEmployeeDirectory version "^1.0"
+
+      screen EmployeeRecord
+        template blueprint Cratis.Blueprint.Hr HrEmployeePage version "^1.0"
+
+      specification ListingTheRegisteredEmployee
+        given caller
+          authenticated
+          role "HrManager"
+        given EmployeeRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Silje Andersen"
+          title      = "Seniorutvikler"
+          department = "Utvikling"
+          location   = "Bergen"
+          email      = "silje.andersen@eksempel.no"
+          phone      = "+47 400 10 200"
+          status     = "active"
+          manager    = "Jonas Eriksen"
+        then readmodel Employees
+          employeeId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Silje Andersen"
+
+  feature OrgChart
+    description "Who reports to whom"
+
+    slice StateView ReportingLines
+      description "Who reports to whom, as a tree"
+
+      readmodel ReportingLines
+        employeeId EmployeeId
+        name       PersonName
+        title      JobTitle
+        manager    PersonName
+
+      query AllReportingLines => observable ReportingLines[]
+        authorize IsHrManager
+
+      projection ReportingLinesProjection => ReportingLines
+        from EmployeeRegistered
+          employeeId = $eventSourceId
+          name = name
+          title = title
+          manager = manager
+
+      screen OrgChart
+        template blueprint Cratis.Blueprint.Hr HrOrgChart version "^1.0"
+
+      specification PlacingAnEmployeeInTheChart
+        given caller
+          authenticated
+          role "HrManager"
+        given EmployeeRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Silje Andersen"
+          title      = "Seniorutvikler"
+          department = "Utvikling"
+          location   = "Bergen"
+          email      = "silje.andersen@eksempel.no"
+          phone      = "+47 400 10 200"
+          status     = "active"
+          manager    = "Jonas Eriksen"
+        then readmodel ReportingLines
+          employeeId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0001"
+          name       = "Silje Andersen"
+
+  feature TimeOff
+    description "Asking for time off and seeing who is away"
+
+    slice StateChange RequestTimeOff
+      description "Asks for time off"
+
+      command RequestTimeOff
+        requestId TimeOffRequestId identifier
+        employee  PersonName
+        leaveType LeaveType
+        fromDate  Date
+        toDate    Date
+        days      Days
+        status    RequestStatus
+
+        produces TimeOffRequestRegistered
+          for requestId
+          employee  = employee
+          leaveType = leaveType
+          fromDate  = fromDate
+          toDate    = toDate
+          days      = days
+          status    = status
+
+      event TimeOffRequestRegistered
+        employee  PersonName
+        leaveType LeaveType
+        fromDate  Date
+        toDate    Date
+        days      Days
+        status    RequestStatus
+
+      screen RequestTimeOff
+        template blueprint Cratis.Blueprint.Hr HrRequestTimeOff version "^1.0"
+          actions
+            action RequestTimeOff
+
+      specification RegisteringATimeOffRequest
+        given caller
+          authenticated
+          role "HrManager"
+        when RequestTimeOff
+          requestId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          employee  = "Silje Andersen"
+          leaveType = "vacation"
+          fromDate  = "2026-10-26"
+          toDate    = "2026-10-30"
+          days      = 5
+          status    = "pending"
+        then TimeOffRequestRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          employee  = "Silje Andersen"
+          leaveType = "vacation"
+          fromDate  = "2026-10-26"
+          toDate    = "2026-10-30"
+          days      = 5
+          status    = "pending"
+
+    slice StateChange DecideTimeOff
+      description "Approves or declines a request"
+
+      command DecideTimeOff
+        requestId TimeOffRequestId identifier
+        status RequestStatus
+
+        produces TimeOffDecided
+          for requestId
+          status = status
+
+      event TimeOffDecided
+        status RequestStatus
+
+      screen DecideRequest
+        template blueprint Cratis.Blueprint.Hr HrTimeOffList version "^1.0"
+          actions
+            action DecideTimeOff
+
+      specification ApprovingATimeOffRequest
+        given caller
+          authenticated
+          role "HrManager"
+        given TimeOffRequestRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          employee  = "Silje Andersen"
+          leaveType = "vacation"
+          fromDate  = "2026-10-26"
+          toDate    = "2026-10-30"
+          days      = 5
+          status    = "pending"
+        when DecideTimeOff
+          requestId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          status    = "approved"
+        then TimeOffDecided
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          status = "approved"
+
+    slice StateView TimeOffList
+      description "Every request with who asked, for when and what became of it"
+
+      readmodel TimeOffRequests
+        requestId TimeOffRequestId
+        employee  PersonName
+        leaveType LeaveType
+        fromDate  Date
+        toDate    Date
+        days      Days
+        status    RequestStatus
+
+      query AllTimeOffRequests => observable TimeOffRequests[]
+        authorize IsHrManager
+
+      query GetTimeOffRequest => TimeOffRequests optional
+        by requestId TimeOffRequestId
+        authorize IsHrManager
+
+      projection TimeOffRequestsProjection => TimeOffRequests
+        from TimeOffRequestRegistered
+          requestId = $eventSourceId
+          employee = employee
+          leaveType = leaveType
+          fromDate = fromDate
+          toDate = toDate
+          days = days
+          status = status
+        from TimeOffDecided
+          status = status
+
+      screen TimeOff
+        template blueprint Cratis.Blueprint.Hr HrTimeOffList version "^1.0"
+
+      specification ListingTheRegisteredTimeOffRequest
+        given caller
+          authenticated
+          role "HrManager"
+        given TimeOffRequestRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          employee  = "Silje Andersen"
+          leaveType = "vacation"
+          fromDate  = "2026-10-26"
+          toDate    = "2026-10-30"
+          days      = 5
+          status    = "pending"
+        then readmodel TimeOffRequests
+          requestId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0002"
+          employee  = "Silje Andersen"
+
+    feature Balances
+      description "What each person has taken and has left"
+
+      slice StateChange OpenBalance
+        description "Opens the leave balance of a person for the year"
+
+        command OpenBalance
+          balanceId BalanceId identifier
+          employee    PersonName
+          department  DepartmentName
+          entitlement Days
+          taken       Days
+          remaining   Days
+          used        Percent
+
+          produces BalanceRegistered
+            for balanceId
+            employee    = employee
+            department  = department
+            entitlement = entitlement
+            taken       = taken
+            remaining   = remaining
+            used        = used
+
+        event BalanceRegistered
+          employee    PersonName
+          department  DepartmentName
+          entitlement Days
+          taken       Days
+          remaining   Days
+          used        Percent
+
+        screen OpenBalance
+          template Dialog
+            body
+              title "Open a leave balance"
+            actions
+              action OpenBalance
+
+        specification RegisteringABalance
+          given caller
+            authenticated
+            role "HrManager"
+          when OpenBalance
+            balanceId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+            employee    = "Silje Andersen"
+            department  = "Utvikling"
+            entitlement = 25
+            taken       = 7
+            remaining   = 18
+            used        = 28
+          then BalanceRegistered
+            for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+            employee    = "Silje Andersen"
+            department  = "Utvikling"
+            entitlement = 25
+            taken       = 7
+            remaining   = 18
+            used        = 28
+
+      slice StateView BalanceList
+        description "Entitlement, days taken and days left for each person"
+
+        readmodel Balances
+          balanceId   BalanceId
+          employee    PersonName
+          department  DepartmentName
+          entitlement Days
+          taken       Days
+          remaining   Days
+          used        Percent
+
+        query AllBalances => observable Balances[]
+          authorize IsHrManager
+
+        query GetBalance => Balances optional
+          by balanceId BalanceId
+          authorize IsHrManager
+
+        projection BalancesProjection => Balances
+          from BalanceRegistered
+            balanceId = $eventSourceId
+            employee = employee
+            department = department
+            entitlement = entitlement
+            taken = taken
+            remaining = remaining
+            used = used
+
+        screen Balances
+          template blueprint Cratis.Blueprint.Hr HrTimeOffBalanceList version "^1.0"
+
+        specification ListingTheRegisteredBalance
+          given caller
+            authenticated
+            role "HrManager"
+          given BalanceRegistered
+            for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+            employee    = "Silje Andersen"
+            department  = "Utvikling"
+            entitlement = 25
+            taken       = 7
+            remaining   = 18
+            used        = 28
+          then readmodel Balances
+            balanceId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0003"
+            employee  = "Silje Andersen"
+
+  feature Onboarding
+    description "Getting new hires started"
+
+    slice StateChange StartOnboarding
+      description "Starts the onboarding of a new hire"
+
+      command StartOnboarding
+        onboardingId OnboardingId identifier
+        name      PersonName
+        role      JobTitle
+        startDate Date
+        owner     PersonName
+        progress  Percent
+        status    OnboardingStatus
+
+        produces OnboardingRegistered
+          for onboardingId
+          name      = name
+          role      = role
+          startDate = startDate
+          owner     = owner
+          progress  = progress
+          status    = status
+
+      event OnboardingRegistered
+        name      PersonName
+        role      JobTitle
+        startDate Date
+        owner     PersonName
+        progress  Percent
+        status    OnboardingStatus
+
+      screen StartOnboarding
+        template Dialog
+          body
+            title "Start an onboarding"
+          actions
+            action StartOnboarding
+
+      specification RegisteringAnOnboarding
+        given caller
+          authenticated
+          role "HrManager"
+        when StartOnboarding
+          onboardingId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name         = "Emil Johansen"
+          role         = "Utvikler"
+          startDate    = "2026-10-01"
+          owner        = "Marte Haugen"
+          progress     = 58
+          status       = "inProgress"
+        then OnboardingRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name      = "Emil Johansen"
+          role      = "Utvikler"
+          startDate = "2026-10-01"
+          owner     = "Marte Haugen"
+          progress  = 58
+          status    = "inProgress"
+
+    slice StateChange AdvanceOnboarding
+      description "Records how far along a new hire is"
+
+      command AdvanceOnboarding
+        onboardingId OnboardingId identifier
+        progress Percent
+        status   OnboardingStatus
+
+        produces OnboardingAdvanced
+          for onboardingId
+          progress = progress
+          status   = status
+
+      event OnboardingAdvanced
+        progress Percent
+        status   OnboardingStatus
+
+      screen AdvanceChecklist
+        template blueprint Cratis.Blueprint.Hr HrOnboardingChecklist version "^1.0"
+          actions
+            action AdvanceOnboarding
+
+      specification AdvancingAnOnboarding
+        given caller
+          authenticated
+          role "HrManager"
+        given OnboardingRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name      = "Emil Johansen"
+          role      = "Utvikler"
+          startDate = "2026-10-01"
+          owner     = "Marte Haugen"
+          progress  = 58
+          status    = "inProgress"
+        when AdvanceOnboarding
+          onboardingId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          progress     = 75
+          status       = "inProgress"
+        then OnboardingAdvanced
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          progress = 75
+          status   = "inProgress"
+
+    slice StateView OnboardingList
+      description "New hires and how far along their onboarding is"
+
+      readmodel Onboardings
+        onboardingId OnboardingId
+        name         PersonName
+        role         JobTitle
+        startDate    Date
+        owner        PersonName
+        progress     Percent
+        status       OnboardingStatus
+
+      query AllOnboardings => observable Onboardings[]
+        authorize IsHrManager
+
+      query GetOnboarding => Onboardings optional
+        by onboardingId OnboardingId
+        authorize IsHrManager
+
+      projection OnboardingsProjection => Onboardings
+        from OnboardingRegistered
+          onboardingId = $eventSourceId
+          name = name
+          role = role
+          startDate = startDate
+          owner = owner
+          progress = progress
+          status = status
+        from OnboardingAdvanced
+          progress = progress
+          status = status
+
+      screen Onboarding
+        template blueprint Cratis.Blueprint.Hr HrOnboardingList version "^1.0"
+
+      screen OnboardingChecklist
+        template blueprint Cratis.Blueprint.Hr HrOnboardingChecklist version "^1.0"
+
+      specification ListingTheRegisteredOnboarding
+        given caller
+          authenticated
+          role "HrManager"
+        given OnboardingRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name      = "Emil Johansen"
+          role      = "Utvikler"
+          startDate = "2026-10-01"
+          owner     = "Marte Haugen"
+          progress  = 58
+          status    = "inProgress"
+        then readmodel Onboardings
+          onboardingId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0004"
+          name         = "Emil Johansen"

@@ -1,0 +1,351 @@
+// ============================================================
+// Approvals - requests and approvals, from the Approvals blueprint
+//
+// Someone asks for leave, an expense, a purchase or a trip; the
+// request goes through the steps that approve its type; the
+// approver decides from an inbox and the requester follows it
+// on a page that shows the chain. The whole application is built
+// from Scene's `Cratis.Blueprint.Approvals` package: every screen
+// fills one of its templates - the inbox, the lists, the wizard,
+// the request page, the editor and the decision dialog - and the
+// application's navigation is declared here with the same regions
+// the designer shows. The demo data is the blueprint's own pack.
+//
+// One employee uses it, so every screen is drawn for that persona
+// on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Approvals
+// ============================================================
+
+domain Cratis.Approvals
+
+concept RequestId     : Uuid
+concept TypeId        : Uuid
+
+concept Title       : String
+concept Reason      : String
+concept Comment     : String
+concept PersonName  : String
+concept Amount      : Decimal
+
+concept Decision : Enum
+  approve = 0
+  reject = 1
+  changes = 2
+
+concept RequestState : Enum
+  draft = 0
+  submitted = 1
+  approved = 2
+  rejected = 3
+  changes = 4
+
+policy IsEmployee
+  require role "Employee"
+
+persona Employee
+  description "Asks for things, decides what is waiting for them and follows what they asked for"
+  policy IsEmployee
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/approvals.svg" title "Approvals"
+    item approvals title "Approvals" target Approvals
+  navigation sidebar
+    item inbox title "Inbox" icon inbox target Approvals.Inbox
+    item requests title "My requests" icon file target Approvals.Requests
+    item all title "All requests" icon list target Approvals.All
+    item templates title "Templates" icon cog target Approvals.Templates
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Default
+    Cratis.Blueprint.Approvals
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint approvals-general
+
+module Approvals
+  description "Requests, the steps that approve them and the people who decide"
+  authorize IsEmployee
+
+  feature Requests
+    description "What I asked for, and the new-request wizard"
+
+    slice StateChange SubmitRequest
+      description "Sends a request off for approval, from the wizard's last step"
+
+      command SubmitRequest
+        requestId   RequestId identifier
+        title       Title
+        requestType String
+        amount      Amount
+        reason      Reason
+
+        produces RequestSubmitted
+          for requestId
+          title       = title
+          requestType = requestType
+          amount      = amount
+          reason      = reason
+
+      event RequestSubmitted
+        title       Title
+        requestType String
+        amount      Amount
+        reason      Reason
+
+      screen NewRequest
+        template blueprint Cratis.Blueprint.Approvals NewRequestWizard version "^1.0"
+          actions
+            action SubmitRequest
+
+      specification SubmittingARequest
+        given caller
+          authenticated
+          role "Employee"
+        when SubmitRequest
+          requestId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2001"
+          title     = "Expense: Priya Nair"
+          requestType = "expense"
+          amount    = 1240
+          reason    = "Train and hotel for the customer visit"
+        then RequestSubmitted
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2001"
+          title     = "Expense: Priya Nair"
+          requestType = "expense"
+          amount    = 1240
+          reason    = "Train and hotel for the customer visit"
+
+    slice StateView MyRequests
+      description "Every request, with where it stands"
+
+      readmodel Requests
+        requestId   RequestId
+        title       Title
+        requestType String
+        amount      Amount
+        reason      Reason
+        state       RequestState
+
+      query AllRequests => observable Requests[]
+        authorize IsEmployee
+
+      query GetRequest => Requests optional
+        by requestId RequestId
+        authorize IsEmployee
+
+      projection RequestsProjection => Requests
+        from RequestSubmitted
+          requestId   = $eventSourceId
+          title       = title
+          requestType = requestType
+          amount      = amount
+          reason      = reason
+          state       = "submitted"
+
+      screen MyRequests
+        template blueprint Cratis.Blueprint.Approvals MyRequests version "^1.0"
+
+      screen Request
+        template blueprint Cratis.Blueprint.Approvals RequestPage version "^1.0"
+
+      specification ListingTheSubmittedRequest
+        given caller
+          authenticated
+          role "Employee"
+        given RequestSubmitted
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2001"
+          title     = "Expense: Priya Nair"
+          requestType = "expense"
+          amount    = 1240
+          reason    = "Train and hotel for the customer visit"
+        then readmodel Requests
+          requestId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2001"
+          title     = "Expense: Priya Nair"
+
+  feature Inbox
+    description "What is waiting for my decision"
+
+    slice StateChange DecideRequest
+      description "Approves, rejects or asks for changes, with a comment the requester sees"
+
+      command DecideRequest
+        requestId RequestId identifier
+        decision  Decision
+        comment   Comment
+
+        produces RequestDecided
+          for requestId
+          decision = decision
+          comment  = comment
+
+      event RequestDecided
+        decision Decision
+        comment  Comment
+
+      screen Decide
+        template blueprint Cratis.Blueprint.Approvals DecisionDialog version "^1.0"
+          actions
+            action DecideRequest
+
+      screen WaitingForMe
+        template blueprint Cratis.Blueprint.Approvals ApprovalInbox version "^1.0"
+          toolbar
+            action DecideRequest
+
+      specification ApprovingARequest
+        given caller
+          authenticated
+          role "Employee"
+        given RequestSubmitted
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2001"
+          title     = "Expense: Priya Nair"
+          requestType = "expense"
+          amount    = 1240
+          reason    = "Train and hotel for the customer visit"
+        when DecideRequest
+          requestId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2001"
+          decision  = "approve"
+          comment   = "Fine by me"
+        then RequestDecided
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2001"
+          decision = "approve"
+          comment  = "Fine by me"
+
+  feature All
+    description "Every request of the organisation, for the people who oversee them"
+
+    slice StateView EveryRequest
+      description "Every request with its current approver"
+
+      readmodel EveryRequestRow
+        requestId RequestId
+        title     Title
+        approver  PersonName
+
+      query AllEveryRequest => observable EveryRequestRow[]
+        authorize IsEmployee
+
+      projection EveryRequestProjection => EveryRequestRow
+        from RequestSubmitted
+          requestId = $eventSourceId
+          title     = title
+          approver  = "Manager"
+        from RequestDecided
+          approver = "Decided"
+
+      screen Everything
+        template blueprint Cratis.Blueprint.Approvals AllRequests version "^1.0"
+
+      specification ListingEveryRequest
+        given caller
+          authenticated
+          role "Employee"
+        given RequestSubmitted
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2001"
+          title       = "Expense: Priya Nair"
+          requestType = "expense"
+          amount      = 1240
+          reason      = "Train and hotel for the customer visit"
+        then readmodel EveryRequestRow
+          requestId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2001"
+          approver  = "Manager"
+
+  feature Templates
+    description "The request types an organisation offers"
+
+    slice StateChange DefineRequestType
+      description "Adds or changes a request type: its name, what it asks for and its approval steps"
+
+      command DefineRequestType
+        typeId TypeId identifier
+        name   Title
+        steps  Comment
+
+        produces RequestTypeDefined
+          for typeId
+          name  = name
+          steps = steps
+
+      event RequestTypeDefined
+        name  Title
+        steps Comment
+
+      screen EditType
+        template blueprint Cratis.Blueprint.Approvals RequestTypeEditForm version "^1.0"
+          actions
+            action DefineRequestType
+
+      screen QuickNewType
+        template blueprint Cratis.Blueprint.Approvals RequestTypeQuickCreate version "^1.0"
+
+      specification DefiningARequestType
+        given caller
+          authenticated
+          role "Employee"
+        when DefineRequestType
+          typeId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2002"
+          name   = "Expense"
+          steps  = "Manager, Finance"
+        then RequestTypeDefined
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2002"
+          name  = "Expense"
+          steps = "Manager, Finance"
+
+    slice StateView RequestTypes
+      description "Every request type, with the steps that approve it"
+
+      readmodel Types
+        typeId TypeId
+        name   Title
+        steps  Comment
+
+      query AllTypes => observable Types[]
+        authorize IsEmployee
+
+      projection TypesProjection => Types
+        from RequestTypeDefined
+          typeId = $eventSourceId
+          name   = name
+          steps  = steps
+
+      screen Types
+        template blueprint Cratis.Blueprint.Approvals RequestTypes version "^1.0"
+
+      specification ListingTheDefinedType
+        given caller
+          authenticated
+          role "Employee"
+        given RequestTypeDefined
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2002"
+          name  = "Expense"
+          steps = "Manager, Finance"
+        then readmodel Types
+          typeId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e2002"
+          name   = "Expense"
