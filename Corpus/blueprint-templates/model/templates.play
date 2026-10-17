@@ -1,0 +1,135 @@
+// ============================================================
+// Templates - the default blueprint's MasterDetail, Dashboard and ProfileSettings templates applied to screens
+//
+// Rendered on the live Stage and as a generated React application; a browser asserts the same things on both: the template's slots are
+// filled, the page is accessible (colour contrast and landmarks included) and the layout answers the viewport (Cratis/Scene#95).
+// ============================================================
+
+domain Cratis.Templates
+
+concept CustomerId   : Uuid
+concept CustomerName : String
+concept City         : String
+
+policy IsAnyone
+  require role "Anyone"
+
+persona Manager
+  description "Looks after customers"
+  policy IsAnyone
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation sidebar
+    item customers title "Customers" icon users target Customers.Customers
+    item overview title "Overview" icon home target Customers.Overview
+    item profile title "Profile" icon user target Customers.Profile
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Default
+  root template AppShell
+
+module Customers
+  description "Customers and how they are looked after"
+  authorize IsAnyone
+
+  feature Customers
+    description "Every customer"
+
+    slice StateChange RegisterCustomer
+      description "Registers a customer"
+
+      command RegisterCustomer
+        customerId CustomerId identifier
+        name       CustomerName
+        city       City
+
+        produces CustomerRegistered
+          for customerId
+          name = name
+          city = city
+
+      event CustomerRegistered
+        name CustomerName
+        city City
+
+    slice StateView CustomerList
+      description "Every customer"
+
+      readmodel Customers
+        customerId CustomerId
+        name       CustomerName
+        city       City
+
+      query AllCustomers => observable Customers[]
+        authorize IsAnyone
+
+      projection CustomersProjection => Customers
+        from CustomerRegistered
+          customerId = $eventSourceId
+          name = name
+          city = city
+
+      screen Customers
+        template blueprint Cratis.Blueprint.Default MasterDetail version "^1.0"
+
+  feature Overview
+    description "How the customers are doing"
+
+    slice StateView CustomerOverview
+      description "Customers at a glance"
+
+      readmodel Overview
+        overviewId CustomerId
+        name       CustomerName
+
+      query GetOverview => Overview optional
+        by overviewId CustomerId
+        authorize IsAnyone
+
+      projection OverviewProjection => Overview
+        from CustomerRegistered
+          overviewId = $eventSourceId
+          name = name
+
+      screen Overview
+        template blueprint Cratis.Blueprint.Default Dashboard version "^1.0"
+
+  feature Profile
+    description "The signed-in manager's own settings"
+
+    slice StateView ManagerProfile
+      description "The manager's profile"
+
+      readmodel Profile
+        profileId CustomerId
+        name      CustomerName
+
+      query GetProfile => Profile optional
+        by profileId CustomerId
+        authorize IsAnyone
+
+      projection ProfileProjection => Profile
+        from CustomerRegistered
+          profileId = $eventSourceId
+          name = name
+
+      screen Profile
+        template blueprint Cratis.Blueprint.Default ProfileSettings version "^1.0"
