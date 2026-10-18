@@ -2,11 +2,19 @@
 # Copyright (c) Cratis. All rights reserved.
 # Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-"""Build the spec matrix, guard solution coverage, and reject empty test runs."""
+"""Build the spec matrix, guard solution coverage, and reject empty test runs.
+
+Refresh measured prefix weights from directories of successful runs:
+    python3 .github/spec-shards.py refresh-timings .ai-work/318/trx
+Each immediate child of the TRX root is one run, containing all four Rendering
+artifacts. `estimate` reports summed test work, not parallel job wall time.
+"""
 
 import argparse
 from collections import Counter
+from datetime import datetime
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -23,6 +31,8 @@ EXCLUSIONS = (
 )
 BLUEPRINT_TEMPLATES_FIXTURE = "when_building_the_blueprint_templates_application"
 RENDERING_SHARDS = 4
+TIMINGS = ROOT / ".github/spec-shard-timings.json"
+TRX_NAMESPACE = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
 PROJECT_SHARDS = {
     "small-projects": [
         "Source/Contracts/Contracts.csproj",
@@ -73,25 +83,23 @@ def merge_nested_groups(groups):
     return merged
 
 
-def group_category(prefix):
-    if not prefix.startswith(PLANNER):
-        return "renderer"
-    # Balance generated application fixtures independently of cheaper planning assertions.
-    if any(name in prefix for name in (".when_executing_", ".when_building_", ".when_verifying_", ".when_comparing_", ".when_matching_lookup_")):
-        return "generated"
-    return "planner"
+def rendering_weights(groups):
+    measured = json.loads(TIMINGS.read_text())["prefix_seconds"]
+    if any(not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
+           for value in measured.values()):
+        raise SystemExit("Spec shard timings must contain finite, non-negative seconds.")
+    # One second per source file for unmeasured/new prefixes; discovery still owns coverage.
+    return {prefix: measured.get(prefix, count) for prefix, count in groups.items()}
 
 
 def rendering_partitions():
-    groups = source_groups()
+    weights = rendering_weights(source_groups())
     partitions = [[] for _ in range(RENDERING_SHARDS)]
-    for category in ("generated", "planner", "renderer"):
-        loads = [0] * RENDERING_SHARDS
-        candidates = [name for name in groups if group_category(name) == category]
-        for prefix in sorted(candidates, key=lambda name: (-groups[name], name)):
-            index = min(range(RENDERING_SHARDS), key=lambda i: (loads[i], i))
-            partitions[index].append(prefix)
-            loads[index] += groups[prefix]
+    loads = [0.0] * RENDERING_SHARDS
+    for prefix in sorted(weights, key=lambda name: (-weights[name], name)):
+        index = min(range(RENDERING_SHARDS), key=lambda i: (loads[i], i))
+        partitions[index].append(prefix)
+        loads[index] += weights[prefix]
     if any(not partition for partition in partitions):
         raise SystemExit("Rendering spec discovery must populate all four partitions.")
     return partitions
@@ -175,15 +183,82 @@ def run_shard(shard):
         raise SystemExit("Spec shard failed:\n" + "\n".join(failures))
 
 
+def test_seconds(result):
+    hours, minutes, seconds = result.get("duration", "0:0:0").split(":")
+    duration = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    # xUnit's duration can omit Establish/Because, including generated application builds.
+    elapsed = (datetime.fromisoformat(result.attrib["endTime"]) -
+               datetime.fromisoformat(result.attrib["startTime"])).total_seconds()
+    if not math.isfinite(duration) or duration < 0 or elapsed < 0:
+        raise SystemExit("TRX test timings must be finite and non-negative.")
+    return max(duration, elapsed)
+
+
+def run_timings(directory, groups):
+    totals = Counter()
+    rendering_files = 0
+    for path in sorted(directory.rglob("*.trx")):
+        root = ET.parse(path).getroot()
+        methods = root.findall("t:TestDefinitions/t:UnitTest/t:TestMethod", TRX_NAMESPACE)
+        if not methods or not all(method.get("codeBase", "").replace("\\", "/").endswith(
+                "/Cratis.Stage.Rendering.Cratis.dll") for method in methods):
+            continue  # Conformance also has Rendering namespaces; identify the assembly, not the name.
+        rendering = root.findall("t:Results/t:UnitTestResult", TRX_NAMESPACE)
+        require_executed(path)
+        if any(result.get("outcome") not in ("Passed", "NotExecuted") for result in rendering):
+            raise SystemExit(f"{path}: refresh timings only from successful runs.")
+        rendering_files += 1
+        for result in rendering:
+            if result.get("outcome") != "Passed":
+                continue
+            prefix = next((name for name in groups
+                           if result.attrib["testName"].casefold().startswith(name.casefold())), None)
+            if prefix is not None:
+                totals[prefix] += test_seconds(result)
+    if rendering_files != RENDERING_SHARDS or not totals:
+        raise SystemExit(f"{directory}: expected all four Rendering TRX files, got {rendering_files}.")
+    return totals
+
+
+def refresh_timings(directory):
+    groups = source_groups()
+    runs = sorted(path for path in Path(directory).iterdir() if path.is_dir())
+    if not runs:
+        raise SystemExit("Provide one directory per successful run, each containing four Rendering TRX files.")
+    observations = [run_timings(run, groups) for run in runs]
+    prefixes = sorted(set().union(*(run.keys() for run in observations)))
+    measured = {prefix: round(sum(run[prefix] for run in observations if prefix in run) /
+                              sum(prefix in run for run in observations), 6) for prefix in prefixes}
+    data = {"measurement": "Mean per-run sum of max(duration, endTime-startTime) in seconds; includes fixture setup. "
+                           "Parallel test work, not job wall time. Unmeasured prefixes use one second per source file.",
+            "runs": [run.name for run in runs], "prefix_seconds": measured}
+    TIMINGS.write_text(json.dumps(data, indent=2) + "\n")
+    print(f"Wrote {len(measured)} measured prefixes from {len(runs)} runs to {TIMINGS}.")
+
+
+def estimate():
+    weights = rendering_weights(source_groups())
+    loads = [sum(weights[prefix] for prefix in partition) for partition in rendering_partitions()]
+    for name, seconds in zip(("rendering-1", "rendering-2", "rendering-3", "rendering-remainder"), loads):
+        print(f"{name}: {seconds:.1f} work-seconds (not parallel job wall time)")
+    print(f"Spread: {max(loads) - min(loads):.1f} work-seconds")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("matrix", "guard", "run", "require-executed"))
+    parser.add_argument("command", choices=("matrix", "guard", "run", "require-executed", "refresh-timings", "estimate"))
     parser.add_argument("argument", nargs="?")
     parser.add_argument("--blueprint-templates-lane", action="store_true",
                         help="Exclude blueprint template specs only when their dedicated lane runs")
     args = parser.parse_args()
-    if args.command in ("run", "require-executed") and args.argument is None:
+    if args.command in ("run", "require-executed", "refresh-timings") and args.argument is None:
         parser.error(args.command + " requires a shard name/JSON entry or TRX path")
+    if args.command == "refresh-timings":
+        refresh_timings(args.argument)
+        return
+    if args.command == "estimate":
+        estimate()
+        return
     if args.command == "require-executed":
         require_executed(args.argument)
         return
