@@ -21,6 +21,7 @@ EXCLUSIONS = (
     "FullyQualifiedName!~when_compiling_generated_name_matrix&"
     "FullyQualifiedName!~when_building_the_generated_screen_composition_application"
 )
+BLUEPRINT_TEMPLATES_FIXTURE = "when_building_the_blueprint_templates_application"
 RENDERING_SHARDS = 4
 PROJECT_SHARDS = {
     "small-projects": [
@@ -96,20 +97,23 @@ def rendering_partitions():
     return partitions
 
 
-def matrix():
-    shards = [{"name": name, "projects": projects, "filter": EXCLUSIONS}
+def matrix(blueprint_templates_lane=False):
+    exclusions = EXCLUSIONS
+    if blueprint_templates_lane:
+        exclusions += "&FullyQualifiedName!~" + BLUEPRINT_TEMPLATES_FIXTURE
+    shards = [{"name": name, "projects": projects, "filter": exclusions}
               for name, projects in PROJECT_SHARDS.items()]
     partitions = rendering_partitions()
     for index, prefixes in enumerate(partitions[:-1], start=1):
         selected = "|".join("FullyQualifiedName~" + prefix for prefix in prefixes)
         shards.append({"name": f"rendering-{index}", "projects": [RENDERING],
-                       "filter": EXCLUSIONS + "&(" + selected + ")"})
+                       "filter": exclusions + "&(" + selected + ")"})
     # Negate EVERY positive prefix, not a snapshot of the remaining tests. New/unrecognized
     # namespaces and classes necessarily land here, even if discovery never sees their source.
     remainder = "&".join("FullyQualifiedName!~" + prefix
                          for partition in partitions[:-1] for prefix in partition)
     shards.append({"name": "rendering-remainder", "projects": [RENDERING],
-                   "filter": EXCLUSIONS + "&" + remainder})
+                   "filter": exclusions + "&" + remainder})
     return {"include": shards}
 
 
@@ -175,13 +179,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("matrix", "guard", "run", "require-executed"))
     parser.add_argument("argument", nargs="?")
+    parser.add_argument("--blueprint-templates-lane", action="store_true",
+                        help="Exclude blueprint template specs only when their dedicated lane runs")
     args = parser.parse_args()
     if args.command in ("run", "require-executed") and args.argument is None:
         parser.error(args.command + " requires a shard name/JSON entry or TRX path")
     if args.command == "require-executed":
         require_executed(args.argument)
         return
-    shards = matrix()
+    shards = matrix(blueprint_templates_lane=args.blueprint_templates_lane)
     if args.command == "matrix":
         print(json.dumps(shards))
     elif args.command == "guard":
