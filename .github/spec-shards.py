@@ -2,11 +2,21 @@
 # Copyright (c) Cratis. All rights reserved.
 # Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-"""Build the spec matrix, guard solution coverage, and reject empty test runs."""
+"""Build the spec matrix, guard solution coverage, and reject empty test runs.
+
+Refresh measured prefix weights from directories of successful runs:
+    python3 .github/spec-shards.py refresh-timings .ai-work/318/trx
+Each immediate child of the TRX root is one run, containing all four Rendering
+artifacts. A prefix weighs the summed wall-clock span of its test classes: xUnit's
+per-test duration omits the Establish/Because a class shares, so it cannot be used.
+`estimate` reports summed class spans, not parallel job wall time.
+"""
 
 import argparse
 from collections import Counter
+from datetime import datetime
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -17,12 +27,18 @@ ROOT = Path(__file__).resolve().parent.parent
 RENDERING = "Source/Rendering.Cratis/Rendering.Cratis.csproj"
 NAMESPACE = "Cratis.Stage.Rendering.Cratis"
 PLANNER = NAMESPACE + ".for_CratisArtifactRenderPlanner"
-EXCLUSIONS = (
-    "FullyQualifiedName!~when_compiling_generated_name_matrix&"
-    "FullyQualifiedName!~when_building_the_generated_screen_composition_application"
+# Each fixture runs in exactly one dedicated workflow job (dotnet-build.yml) and in no shard.
+STANDALONE_APPLICATION_FIXTURE = "when_verifying_a_standalone_generated_application"
+DEDICATED_FIXTURES = (
+    "when_compiling_generated_name_matrix",
+    "when_building_the_generated_screen_composition_application",
+    STANDALONE_APPLICATION_FIXTURE,
 )
+EXCLUSIONS = "&".join("FullyQualifiedName!~" + fixture for fixture in DEDICATED_FIXTURES)
 BLUEPRINT_TEMPLATES_FIXTURE = "when_building_the_blueprint_templates_application"
 RENDERING_SHARDS = 4
+TIMINGS = ROOT / ".github/spec-shard-timings.json"
+TRX_NAMESPACE = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
 PROJECT_SHARDS = {
     "small-projects": [
         "Source/Contracts/Contracts.csproj",
@@ -73,25 +89,23 @@ def merge_nested_groups(groups):
     return merged
 
 
-def group_category(prefix):
-    if not prefix.startswith(PLANNER):
-        return "renderer"
-    # Balance generated application fixtures independently of cheaper planning assertions.
-    if any(name in prefix for name in (".when_executing_", ".when_building_", ".when_verifying_", ".when_comparing_", ".when_matching_lookup_")):
-        return "generated"
-    return "planner"
+def rendering_weights(groups):
+    measured = json.loads(TIMINGS.read_text())["prefix_seconds"]
+    if any(not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
+           for value in measured.values()):
+        raise SystemExit("Spec shard timings must contain finite, non-negative seconds.")
+    # One second per source file for unmeasured/new prefixes; discovery still owns coverage.
+    return {prefix: measured.get(prefix, count) for prefix, count in groups.items()}
 
 
 def rendering_partitions():
-    groups = source_groups()
+    weights = rendering_weights(source_groups())
     partitions = [[] for _ in range(RENDERING_SHARDS)]
-    for category in ("generated", "planner", "renderer"):
-        loads = [0] * RENDERING_SHARDS
-        candidates = [name for name in groups if group_category(name) == category]
-        for prefix in sorted(candidates, key=lambda name: (-groups[name], name)):
-            index = min(range(RENDERING_SHARDS), key=lambda i: (loads[i], i))
-            partitions[index].append(prefix)
-            loads[index] += groups[prefix]
+    loads = [0.0] * RENDERING_SHARDS
+    for prefix in sorted(weights, key=lambda name: (-weights[name], name)):
+        index = min(range(RENDERING_SHARDS), key=lambda i: (loads[i], i))
+        partitions[index].append(prefix)
+        loads[index] += weights[prefix]
     if any(not partition for partition in partitions):
         raise SystemExit("Rendering spec discovery must populate all four partitions.")
     return partitions
@@ -175,15 +189,99 @@ def run_shard(shard):
         raise SystemExit("Spec shard failed:\n" + "\n".join(failures))
 
 
+def class_spans(root):
+    """Wall-clock seconds from a class's first test start to its last test end.
+
+    A shared-lifecycle class runs Establish/Because once, and xUnit leaves that time out of every
+    per-test duration. The span keeps it. Concurrent classes overlap, so spans sum to work, not wall time.
+    """
+    classes = {test.get("id"): test.find("t:TestMethod", TRX_NAMESPACE).get("className")
+               for test in root.findall("t:TestDefinitions/t:UnitTest", TRX_NAMESPACE)}
+    bounds = {}
+    for result in root.findall("t:Results/t:UnitTestResult", TRX_NAMESPACE):
+        if result.get("outcome") != "Passed":
+            continue
+        start = datetime.fromisoformat(result.attrib["startTime"])
+        end = datetime.fromisoformat(result.attrib["endTime"])
+        if end < start:
+            raise SystemExit("TRX test timings must be non-negative.")
+        name = classes[result.attrib["testId"]]
+        first, last = bounds.get(name, (start, end))
+        bounds[name] = (min(first, start), max(last, end))
+    return {name: (last - first).total_seconds() for name, (first, last) in bounds.items()}
+
+
+def dedicated(name):
+    # Dedicated-lane fixtures never run in a shard, so their time must not weigh one.
+    return any(fixture.casefold() in name.casefold()
+               for fixture in DEDICATED_FIXTURES + (BLUEPRINT_TEMPLATES_FIXTURE,))
+
+
+def run_timings(directory, groups):
+    totals = Counter()
+    rendering_files = 0
+    for path in sorted(directory.rglob("*.trx")):
+        root = ET.parse(path).getroot()
+        methods = root.findall("t:TestDefinitions/t:UnitTest/t:TestMethod", TRX_NAMESPACE)
+        if not methods or not all(method.get("codeBase", "").replace("\\", "/").endswith(
+                "/Cratis.Stage.Rendering.Cratis.dll") for method in methods):
+            continue  # Conformance also has Rendering namespaces; identify the assembly, not the name.
+        rendering = root.findall("t:Results/t:UnitTestResult", TRX_NAMESPACE)
+        require_executed(path)
+        if any(result.get("outcome") not in ("Passed", "NotExecuted") for result in rendering):
+            raise SystemExit(f"{path}: refresh timings only from successful runs.")
+        rendering_files += 1
+        for name, seconds in class_spans(root).items():
+            prefix = next((group for group in groups
+                           if (name + ".").casefold().startswith(group.casefold())), None)
+            if prefix is not None and not dedicated(name):
+                totals[prefix] += seconds
+    if rendering_files != RENDERING_SHARDS or not totals:
+        raise SystemExit(f"{directory}: expected all four Rendering TRX files, got {rendering_files}.")
+    return totals
+
+
+def refresh_timings(directory):
+    groups = source_groups()
+    runs = sorted(path for path in Path(directory).iterdir() if path.is_dir())
+    if not runs:
+        raise SystemExit("Provide one directory per successful run, each containing four Rendering TRX files.")
+    observations = [run_timings(run, groups) for run in runs]
+    prefixes = sorted(set().union(*(run.keys() for run in observations)))
+    measured = {prefix: round(sum(run[prefix] for run in observations if prefix in run) /
+                              sum(prefix in run for run in observations), 6) for prefix in prefixes}
+    data = {"measurement": "Mean per-run sum of test-class wall-clock spans (first startTime to last endTime) in "
+                           "seconds; includes shared class setup. Dedicated-lane fixtures are excluded. Concurrent "
+                           "classes overlap, so this is test work, not job wall time. Unmeasured prefixes use one "
+                           "second per source file.",
+            "runs": [run.name for run in runs], "prefix_seconds": measured}
+    TIMINGS.write_text(json.dumps(data, indent=2) + "\n")
+    print(f"Wrote {len(measured)} measured prefixes from {len(runs)} runs to {TIMINGS}.")
+
+
+def estimate():
+    weights = rendering_weights(source_groups())
+    loads = [sum(weights[prefix] for prefix in partition) for partition in rendering_partitions()]
+    for name, seconds in zip(("rendering-1", "rendering-2", "rendering-3", "rendering-remainder"), loads):
+        print(f"{name}: {seconds:.1f} class-span seconds (not parallel job wall time)")
+    print(f"Spread: {max(loads) - min(loads):.1f} class-span seconds")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("matrix", "guard", "run", "require-executed"))
+    parser.add_argument("command", choices=("matrix", "guard", "run", "require-executed", "refresh-timings", "estimate"))
     parser.add_argument("argument", nargs="?")
     parser.add_argument("--blueprint-templates-lane", action="store_true",
                         help="Exclude blueprint template specs only when their dedicated lane runs")
     args = parser.parse_args()
-    if args.command in ("run", "require-executed") and args.argument is None:
+    if args.command in ("run", "require-executed", "refresh-timings") and args.argument is None:
         parser.error(args.command + " requires a shard name/JSON entry or TRX path")
+    if args.command == "refresh-timings":
+        refresh_timings(args.argument)
+        return
+    if args.command == "estimate":
+        estimate()
+        return
     if args.command == "require-executed":
         require_executed(args.argument)
         return
