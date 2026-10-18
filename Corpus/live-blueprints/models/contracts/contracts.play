@@ -1,0 +1,283 @@
+// ============================================================
+// Contracts - contracts for a legal or procurement team, from the Contracts blueprint
+//
+// Contracts for a legal or procurement team: a contract list, a contract page with its parties, obligations and amendments, a timeline of terms and an inbox for what needs review or signature.
+// The whole application is built from Scene's `Cratis.Blueprint.Contracts` package: every screen fills one of its templates and the navigation is declared
+// here with the same regions the designer shows. The demo data is the blueprint's own pack.
+//
+// One contract manager uses it, so every screen is drawn for that persona on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Contracts
+// ============================================================
+
+domain Cratis.Contracts
+
+concept ContractId : Uuid
+concept Money : Decimal
+
+concept ContractStatus : Enum
+  draft = 0
+  inReview = 1
+  active = 2
+  expiring = 3
+  expired = 4
+  terminated = 5
+
+policy IsContractManager
+  require role "ContractManager"
+
+persona ContractManager
+  description "Drafts, reviews and renews the contracts the company is bound by"
+  policy IsContractManager
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/contracts.svg" title "Contracts"
+    item contracts title "Contracts" target Contracts
+  navigation sidebar
+    item contracts title "Contracts" icon folder target Contracts.Contracts
+    item timeline title "Timeline" icon chart target Contracts.Timeline
+    item needsAttention title "Needs attention" icon check target Contracts.NeedsAttention
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Contracts
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint contracts-en
+
+module Contracts
+  description "Contracts for a legal or procurement team"
+  authorize IsContractManager
+
+  feature Contracts
+    description "Every agreement you are bound by"
+
+    slice StateChange RegisterContract
+      description "Registers a contract"
+
+      command RegisterContract
+        contractId ContractId identifier
+        number       String
+        title        String
+        counterparty String
+        typeValue    String
+        endValue     Date
+        valueValue   Money
+        status       ContractStatus
+
+        produces ContractRegistered
+          for contractId
+          number       = number
+          title        = title
+          counterparty = counterparty
+          typeValue    = typeValue
+          endValue     = endValue
+          valueValue   = valueValue
+          status       = status
+
+      event ContractRegistered
+        number       String
+        title        String
+        counterparty String
+        typeValue    String
+        endValue     Date
+        valueValue   Money
+        status       ContractStatus
+
+      screen QuickNewContract
+        template blueprint Cratis.Blueprint.Contracts ContractsQuickCreateContract version "^1.0"
+          actions
+            action RegisterContract
+
+      specification RegisteringAContract
+        given caller
+          authenticated
+          role "ContractManager"
+        when RegisterContract
+          contractId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "CT-2026-014"
+          title        = "Annual supply of fittings"
+          counterparty = "Hartwell Supply"
+          typeValue    = "Supply"
+          endValue     = "2026-12-31"
+          valueValue   = 184000.00
+          status       = "active"
+        then ContractRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "CT-2026-014"
+          title        = "Annual supply of fittings"
+          counterparty = "Hartwell Supply"
+          typeValue    = "Supply"
+          endValue     = "2026-12-31"
+          valueValue   = 184000.00
+          status       = "active"
+
+    slice StateView ContractsList
+      description "Every contract with who it is with, when it ends and what it is worth."
+
+      readmodel Contracts
+        contractId ContractId
+        number       String
+        title        String
+        counterparty String
+        typeValue    String
+        endValue     Date
+        valueValue   Money
+        status       ContractStatus
+
+      query AllContracts => observable Contracts[]
+        authorize IsContractManager
+
+      query GetContract => Contracts optional
+        by contractId ContractId
+        authorize IsContractManager
+
+      projection ContractsProjection => Contracts
+        from ContractRegistered
+          contractId = $eventSourceId
+          number = number
+          title = title
+          counterparty = counterparty
+          typeValue = typeValue
+          endValue = endValue
+          valueValue = valueValue
+          status = status
+
+      screen Contracts
+        template blueprint Cratis.Blueprint.Contracts ContractsList version "^1.0"
+
+      screen ContractRecord
+        template blueprint Cratis.Blueprint.Contracts ContractPage version "^1.0"
+
+      specification ListingTheRegisteredContract
+        given caller
+          authenticated
+          role "ContractManager"
+        given ContractRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "CT-2026-014"
+          title        = "Annual supply of fittings"
+          counterparty = "Hartwell Supply"
+          typeValue    = "Supply"
+          endValue     = "2026-12-31"
+          valueValue   = 184000.00
+          status       = "active"
+        then readmodel Contracts
+          contractId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "CT-2026-014"
+
+
+  feature Timeline
+    description "Every live contract on a schedule, in a lane for each counterparty, with its notice dates"
+
+    slice StateView TimelineView
+      description "Terms and notice dates by counterparty"
+
+      readmodel TimelineItems
+        contractId ContractId
+        number       String
+        title        String
+        counterparty String
+        typeValue    String
+
+      query AllTimelineItems => observable TimelineItems[]
+        authorize IsContractManager
+
+      projection TimelineItemsProjection => TimelineItems
+        from ContractRegistered
+          contractId = $eventSourceId
+          number = number
+          title = title
+          counterparty = counterparty
+          typeValue = typeValue
+
+      screen Timeline
+        template blueprint Cratis.Blueprint.Contracts ContractsTimeline version "^1.0"
+
+      specification ShowingTheRegisteredContractOnTimeline
+        given caller
+          authenticated
+          role "ContractManager"
+        given ContractRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "CT-2026-014"
+          title        = "Annual supply of fittings"
+          counterparty = "Hartwell Supply"
+          typeValue    = "Supply"
+          endValue     = "2026-12-31"
+          valueValue   = 184000.00
+          status       = "active"
+        then readmodel TimelineItems
+          contractId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "CT-2026-014"
+
+
+  feature NeedsAttention
+    description "What needs your review, your signature or a renewal decision"
+
+    slice StateView NeedsAttentionView
+      description "Review, sign or renew"
+
+      readmodel NeedsAttentionItems
+        contractId ContractId
+        number       String
+        title        String
+        counterparty String
+        typeValue    String
+
+      query AllNeedsAttentionItems => observable NeedsAttentionItems[]
+        authorize IsContractManager
+
+      projection NeedsAttentionItemsProjection => NeedsAttentionItems
+        from ContractRegistered
+          contractId = $eventSourceId
+          number = number
+          title = title
+          counterparty = counterparty
+          typeValue = typeValue
+
+      screen NeedsAttention
+        template blueprint Cratis.Blueprint.Contracts ContractsReview version "^1.0"
+
+      specification ShowingTheRegisteredContractOnNeedsAttention
+        given caller
+          authenticated
+          role "ContractManager"
+        given ContractRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "CT-2026-014"
+          title        = "Annual supply of fittings"
+          counterparty = "Hartwell Supply"
+          typeValue    = "Supply"
+          endValue     = "2026-12-31"
+          valueValue   = 184000.00
+          status       = "active"
+        then readmodel NeedsAttentionItems
+          contractId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "CT-2026-014"

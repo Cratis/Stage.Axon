@@ -1,0 +1,417 @@
+// ============================================================
+// Customer portal - a self-service portal for customers, from the Customer portal blueprint
+//
+// A self-service portal for customers: an account home, their orders and invoices, a support inbox and their own profile.
+// The whole application is built from Scene's `Cratis.Blueprint.CustomerPortal` package: every screen fills one of its templates and the navigation is declared
+// here with the same regions the designer shows. The demo data is the blueprint's own pack.
+//
+// One customer uses it, so every screen is drawn for that persona on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/CustomerPortal
+// ============================================================
+
+domain Cratis.CustomerPortal
+
+concept PortalOrderId : Uuid
+concept PortalInvoiceId : Uuid
+concept Money : Decimal
+
+concept PortalOrderStatus : Enum
+  inProgress = 0
+  shipped = 1
+  delivered = 2
+  cancelled = 3
+
+concept PortalInvoiceStatus : Enum
+  unpaid = 0
+  overdue = 1
+  paid = 2
+
+policy IsCustomer
+  require role "Customer"
+
+persona Customer
+  description "A customer's contact who follows their orders and invoices and asks for help"
+  policy IsCustomer
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/customer-portal.svg" title "Customer portal"
+    item portal title "Customer portal" target Portal
+  navigation sidebar
+    item home title "Home" icon chart target Portal.Home
+    item orders title "Orders" icon folder target Portal.Orders
+    item invoices title "Invoices" icon folder target Portal.Invoices
+    item support title "Support" icon check target Portal.Support
+    item profile title "Profile" icon folder target Portal.Profile
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.CustomerPortal
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint customer-portal-en
+
+module Portal
+  description "A self-service portal for customers"
+  authorize IsCustomer
+
+  feature Orders
+    description "Everything you have ordered"
+
+    slice StateChange RegisterPortalOrder
+      description "Registers a portal order"
+
+      command RegisterPortalOrder
+        portalOrderId PortalOrderId identifier
+        number       String
+        placed       Date
+        delivery     Date
+        itemsValue   Int
+        total        Money
+        status       PortalOrderStatus
+
+        produces PortalOrderRegistered
+          for portalOrderId
+          number       = number
+          placed       = placed
+          delivery     = delivery
+          itemsValue   = itemsValue
+          total        = total
+          status       = status
+
+      event PortalOrderRegistered
+        number       String
+        placed       Date
+        delivery     Date
+        itemsValue   Int
+        total        Money
+        status       PortalOrderStatus
+
+      screen QuickNewPortalOrder
+        template blueprint Cratis.Blueprint.CustomerPortal PortalQuickCreateReorder version "^1.0"
+          actions
+            action RegisterPortalOrder
+
+      specification RegisteringAPortalOrder
+        given caller
+          authenticated
+          role "Customer"
+        when RegisterPortalOrder
+          portalOrderId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"
+          placed       = "2026-10-12"
+          delivery     = "2026-10-19"
+          itemsValue   = 4
+          total        = 1284.50
+          status       = "inProgress"
+        then PortalOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"
+          placed       = "2026-10-12"
+          delivery     = "2026-10-19"
+          itemsValue   = 4
+          total        = 1284.50
+          status       = "inProgress"
+
+    slice StateView PortalOrdersList
+      description "Your orders and where each one is."
+
+      readmodel PortalOrders
+        portalOrderId PortalOrderId
+        number       String
+        placed       Date
+        delivery     Date
+        itemsValue   Int
+        total        Money
+        status       PortalOrderStatus
+
+      query AllPortalOrders => observable PortalOrders[]
+        authorize IsCustomer
+
+      query GetPortalOrder => PortalOrders optional
+        by portalOrderId PortalOrderId
+        authorize IsCustomer
+
+      projection PortalOrdersProjection => PortalOrders
+        from PortalOrderRegistered
+          portalOrderId = $eventSourceId
+          number = number
+          placed = placed
+          delivery = delivery
+          itemsValue = itemsValue
+          total = total
+          status = status
+
+      screen Orders
+        template blueprint Cratis.Blueprint.CustomerPortal PortalOrdersList version "^1.0"
+
+      screen PortalOrderRecord
+        template blueprint Cratis.Blueprint.CustomerPortal PortalOrderPage version "^1.0"
+
+      specification ListingTheRegisteredPortalOrder
+        given caller
+          authenticated
+          role "Customer"
+        given PortalOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"
+          placed       = "2026-10-12"
+          delivery     = "2026-10-19"
+          itemsValue   = 4
+          total        = 1284.50
+          status       = "inProgress"
+        then readmodel PortalOrders
+          portalOrderId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"
+
+
+  feature Invoices
+    description "What you have been billed"
+
+    slice StateChange RegisterPortalInvoice
+      description "Registers a portal invoice"
+
+      command RegisterPortalInvoice
+        portalInvoiceId PortalInvoiceId identifier
+        number       String
+        issued       Date
+        due          Date
+        amount       Money
+        status       PortalInvoiceStatus
+
+        produces PortalInvoiceRegistered
+          for portalInvoiceId
+          number       = number
+          issued       = issued
+          due          = due
+          amount       = amount
+          status       = status
+
+      event PortalInvoiceRegistered
+        number       String
+        issued       Date
+        due          Date
+        amount       Money
+        status       PortalInvoiceStatus
+
+      specification RegisteringAPortalInvoice
+        given caller
+          authenticated
+          role "Customer"
+        when RegisterPortalInvoice
+          portalInvoiceId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          number       = "INV-2041"
+          issued       = "2026-10-12"
+          due          = "2026-11-11"
+          amount       = 4820.00
+          status       = "unpaid"
+        then PortalInvoiceRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          number       = "INV-2041"
+          issued       = "2026-10-12"
+          due          = "2026-11-11"
+          amount       = 4820.00
+          status       = "unpaid"
+
+    slice StateView PortalInvoicesList
+      description "Your invoices and which ones are still to pay."
+
+      readmodel PortalInvoices
+        portalInvoiceId PortalInvoiceId
+        number       String
+        issued       Date
+        due          Date
+        amount       Money
+        status       PortalInvoiceStatus
+
+      query AllPortalInvoices => observable PortalInvoices[]
+        authorize IsCustomer
+
+      query GetPortalInvoice => PortalInvoices optional
+        by portalInvoiceId PortalInvoiceId
+        authorize IsCustomer
+
+      projection PortalInvoicesProjection => PortalInvoices
+        from PortalInvoiceRegistered
+          portalInvoiceId = $eventSourceId
+          number = number
+          issued = issued
+          due = due
+          amount = amount
+          status = status
+
+      screen Invoices
+        template blueprint Cratis.Blueprint.CustomerPortal PortalInvoicesList version "^1.0"
+
+      specification ListingTheRegisteredPortalInvoice
+        given caller
+          authenticated
+          role "Customer"
+        given PortalInvoiceRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          number       = "INV-2041"
+          issued       = "2026-10-12"
+          due          = "2026-11-11"
+          amount       = 4820.00
+          status       = "unpaid"
+        then readmodel PortalInvoices
+          portalInvoiceId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          number       = "INV-2041"
+
+
+  feature Home
+    description "Your account at a glance: open orders, what you owe and what happened lately"
+
+    slice StateView HomeView
+      description "Your orders, invoices and requests"
+
+      readmodel HomeItems
+        portalOrderId PortalOrderId
+        number       String
+        placed       Date
+        delivery     Date
+        itemsValue   Int
+
+      query AllHomeItems => observable HomeItems[]
+        authorize IsCustomer
+
+      projection HomeItemsProjection => HomeItems
+        from PortalOrderRegistered
+          portalOrderId = $eventSourceId
+          number = number
+          placed = placed
+          delivery = delivery
+          itemsValue = itemsValue
+
+      screen Home
+        template blueprint Cratis.Blueprint.CustomerPortal PortalHome version "^1.0"
+
+      specification ShowingTheRegisteredPortalOrderOnHome
+        given caller
+          authenticated
+          role "Customer"
+        given PortalOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"
+          placed       = "2026-10-12"
+          delivery     = "2026-10-19"
+          itemsValue   = 4
+          total        = 1284.50
+          status       = "inProgress"
+        then readmodel HomeItems
+          portalOrderId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"
+
+
+  feature Support
+    description "Your conversations with us: questions, reminders and quotes"
+
+    slice StateView SupportView
+      description "Your conversations with us"
+
+      readmodel SupportItems
+        portalOrderId PortalOrderId
+        number       String
+        placed       Date
+        delivery     Date
+        itemsValue   Int
+
+      query AllSupportItems => observable SupportItems[]
+        authorize IsCustomer
+
+      projection SupportItemsProjection => SupportItems
+        from PortalOrderRegistered
+          portalOrderId = $eventSourceId
+          number = number
+          placed = placed
+          delivery = delivery
+          itemsValue = itemsValue
+
+      screen Support
+        template blueprint Cratis.Blueprint.CustomerPortal PortalSupport version "^1.0"
+
+      specification ShowingTheRegisteredPortalOrderOnSupport
+        given caller
+          authenticated
+          role "Customer"
+        given PortalOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"
+          placed       = "2026-10-12"
+          delivery     = "2026-10-19"
+          itemsValue   = 4
+          total        = 1284.50
+          status       = "inProgress"
+        then readmodel SupportItems
+          portalOrderId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"
+
+
+  feature Profile
+    description "Your details, delivery address and preferences"
+
+    slice StateView ProfileView
+      description "Your details, delivery address and preferences"
+
+      readmodel ProfileItems
+        portalOrderId PortalOrderId
+        number       String
+        placed       Date
+        delivery     Date
+        itemsValue   Int
+
+      query AllProfileItems => observable ProfileItems[]
+        authorize IsCustomer
+
+      projection ProfileItemsProjection => ProfileItems
+        from PortalOrderRegistered
+          portalOrderId = $eventSourceId
+          number = number
+          placed = placed
+          delivery = delivery
+          itemsValue = itemsValue
+
+      screen Profile
+        template blueprint Cratis.Blueprint.CustomerPortal PortalProfile version "^1.0"
+
+      specification ShowingTheRegisteredPortalOrderOnProfile
+        given caller
+          authenticated
+          role "Customer"
+        given PortalOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"
+          placed       = "2026-10-12"
+          delivery     = "2026-10-19"
+          itemsValue   = 4
+          total        = 1284.50
+          status       = "inProgress"
+        then readmodel ProfileItems
+          portalOrderId = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "SO-1042"

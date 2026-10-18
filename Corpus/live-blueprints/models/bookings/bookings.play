@@ -1,0 +1,401 @@
+// ============================================================
+// Bookings - bookings for shared rooms, equipment and vehicles, from the Bookings blueprint
+//
+// Bookings for shared rooms, equipment and vehicles: a booking calendar, a booking list, a booking page, the resources and a wizard that books one in four steps.
+// The whole application is built from Scene's `Cratis.Blueprint.Bookings` package: every screen fills one of its templates and the navigation is declared
+// here with the same regions the designer shows. The demo data is the blueprint's own pack.
+//
+// One employee uses it, so every screen is drawn for that persona on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Bookings
+// ============================================================
+
+domain Cratis.Bookings
+
+concept BookingId : Uuid
+concept ResourceId : Uuid
+
+concept BookingStatus : Enum
+  requested = 0
+  confirmed = 1
+  checkedIn = 2
+  completed = 3
+  cancelled = 4
+
+concept ResourceStatus : Enum
+  available = 0
+  booked = 1
+  maintenance = 2
+
+policy IsEmployee
+  require role "Employee"
+
+persona Employee
+  description "Books rooms, equipment and vehicles and keeps track of what is booked"
+  policy IsEmployee
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/bookings.svg" title "Bookings"
+    item bookings title "Bookings" target Bookings
+  navigation sidebar
+    item calendar title "Calendar" icon calendar target Bookings.Calendar
+    item bookings title "Bookings" icon folder target Bookings.Bookings
+    item resources title "Resources" icon folder target Bookings.Resources
+    item newBooking title "New booking" icon check target Bookings.NewBooking
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Bookings
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint bookings-en
+
+module Bookings
+  description "Bookings for shared rooms, equipment and vehicles"
+  authorize IsEmployee
+
+  feature Bookings
+    description "Everything that has been booked"
+
+    slice StateChange RegisterBooking
+      description "Registers a booking"
+
+      command RegisterBooking
+        bookingId BookingId identifier
+        reference    String
+        resourceValue String
+        bookedBy     String
+        dateValue    Date
+        fromValue    String
+        untilValue   String
+        status       BookingStatus
+
+        produces BookingRegistered
+          for bookingId
+          reference    = reference
+          resourceValue = resourceValue
+          bookedBy     = bookedBy
+          dateValue    = dateValue
+          fromValue    = fromValue
+          untilValue   = untilValue
+          status       = status
+
+      event BookingRegistered
+        reference    String
+        resourceValue String
+        bookedBy     String
+        dateValue    Date
+        fromValue    String
+        untilValue   String
+        status       BookingStatus
+
+      screen QuickNewBooking
+        template blueprint Cratis.Blueprint.Bookings BookingsQuickCreateBooking version "^1.0"
+          actions
+            action RegisterBooking
+
+      specification RegisteringABooking
+        given caller
+          authenticated
+          role "Employee"
+        when RegisterBooking
+          bookingId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          reference    = "BK-4410"
+          resourceValue = "Fjord meeting room"
+          bookedBy     = "Grace Hopper"
+          dateValue    = "2026-10-15"
+          fromValue    = "09:00"
+          untilValue   = "11:00"
+          status       = "checkedIn"
+        then BookingRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          reference    = "BK-4410"
+          resourceValue = "Fjord meeting room"
+          bookedBy     = "Grace Hopper"
+          dateValue    = "2026-10-15"
+          fromValue    = "09:00"
+          untilValue   = "11:00"
+          status       = "checkedIn"
+
+    slice StateView BookingsList
+      description "Every booking with its resource, time and status."
+
+      readmodel Bookings
+        bookingId BookingId
+        reference    String
+        resourceValue String
+        bookedBy     String
+        dateValue    Date
+        fromValue    String
+        untilValue   String
+        status       BookingStatus
+
+      query AllBookings => observable Bookings[]
+        authorize IsEmployee
+
+      query GetBooking => Bookings optional
+        by bookingId BookingId
+        authorize IsEmployee
+
+      projection BookingsProjection => Bookings
+        from BookingRegistered
+          bookingId = $eventSourceId
+          reference = reference
+          resourceValue = resourceValue
+          bookedBy = bookedBy
+          dateValue = dateValue
+          fromValue = fromValue
+          untilValue = untilValue
+          status = status
+
+      screen Bookings
+        template blueprint Cratis.Blueprint.Bookings BookingsList version "^1.0"
+
+      screen BookingRecord
+        template blueprint Cratis.Blueprint.Bookings BookingPage version "^1.0"
+
+      specification ListingTheRegisteredBooking
+        given caller
+          authenticated
+          role "Employee"
+        given BookingRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          reference    = "BK-4410"
+          resourceValue = "Fjord meeting room"
+          bookedBy     = "Grace Hopper"
+          dateValue    = "2026-10-15"
+          fromValue    = "09:00"
+          untilValue   = "11:00"
+          status       = "checkedIn"
+        then readmodel Bookings
+          bookingId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          reference    = "BK-4410"
+
+
+  feature Resources
+    description "What can be booked"
+
+    slice StateChange RegisterResource
+      description "Registers a resource"
+
+      command RegisterResource
+        resourceId ResourceId identifier
+        name         String
+        typeValue    String
+        capacity     Int
+        location     String
+        status       ResourceStatus
+
+        produces ResourceRegistered
+          for resourceId
+          name         = name
+          typeValue    = typeValue
+          capacity     = capacity
+          location     = location
+          status       = status
+
+      event ResourceRegistered
+        name         String
+        typeValue    String
+        capacity     Int
+        location     String
+        status       ResourceStatus
+
+      specification RegisteringAResource
+        given caller
+          authenticated
+          role "Employee"
+        when RegisterResource
+          resourceId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          name         = "Fjord meeting room"
+          typeValue    = "Room"
+          capacity     = 12
+          location     = "Floor 2"
+          status       = "booked"
+        then ResourceRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          name         = "Fjord meeting room"
+          typeValue    = "Room"
+          capacity     = 12
+          location     = "Floor 2"
+          status       = "booked"
+
+    slice StateView ResourcesList
+      description "The rooms, equipment and vehicles that can be booked."
+
+      readmodel Resources
+        resourceId ResourceId
+        name         String
+        typeValue    String
+        capacity     Int
+        location     String
+        status       ResourceStatus
+
+      query AllResources => observable Resources[]
+        authorize IsEmployee
+
+      query GetResource => Resources optional
+        by resourceId ResourceId
+        authorize IsEmployee
+
+      projection ResourcesProjection => Resources
+        from ResourceRegistered
+          resourceId = $eventSourceId
+          name = name
+          typeValue = typeValue
+          capacity = capacity
+          location = location
+          status = status
+
+      screen Resources
+        template blueprint Cratis.Blueprint.Bookings ResourcesList version "^1.0"
+
+      specification ListingTheRegisteredResource
+        given caller
+          authenticated
+          role "Employee"
+        given ResourceRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          name         = "Fjord meeting room"
+          typeValue    = "Room"
+          capacity     = 12
+          location     = "Floor 2"
+          status       = "booked"
+        then readmodel Resources
+          resourceId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          name         = "Fjord meeting room"
+
+
+  feature Calendar
+    description "Every booking on a calendar: who has what, and when"
+
+    slice StateView CalendarView
+      description "Who has what, and when"
+
+      readmodel CalendarItems
+        bookingId BookingId
+        reference    String
+        resourceValue String
+        bookedBy     String
+        dateValue    Date
+
+      query AllCalendarItems => observable CalendarItems[]
+        authorize IsEmployee
+
+      projection CalendarItemsProjection => CalendarItems
+        from BookingRegistered
+          bookingId = $eventSourceId
+          reference = reference
+          resourceValue = resourceValue
+          bookedBy = bookedBy
+          dateValue = dateValue
+
+      screen Calendar
+        template blueprint Cratis.Blueprint.Bookings BookingsCalendar version "^1.0"
+
+      specification ShowingTheRegisteredBookingOnCalendar
+        given caller
+          authenticated
+          role "Employee"
+        given BookingRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          reference    = "BK-4410"
+          resourceValue = "Fjord meeting room"
+          bookedBy     = "Grace Hopper"
+          dateValue    = "2026-10-15"
+          fromValue    = "09:00"
+          untilValue   = "11:00"
+          status       = "checkedIn"
+        then readmodel CalendarItems
+          bookingId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          reference    = "BK-4410"
+
+
+  feature NewBooking
+    description "Book a room, equipment or a vehicle in four short steps"
+
+    slice StateChange RequestBooking
+      description "Requests a booking in a few steps"
+
+      command RequestBooking
+        bookingId BookingId identifier
+        reference    String
+        resourceValue String
+        bookedBy     String
+        dateValue    Date
+        fromValue    String
+        untilValue   String
+        status       BookingStatus
+
+        produces BookingRequested
+          for bookingId
+          reference    = reference
+          resourceValue = resourceValue
+          bookedBy     = bookedBy
+          dateValue    = dateValue
+          fromValue    = fromValue
+          untilValue   = untilValue
+          status       = status
+
+      event BookingRequested
+        reference    String
+        resourceValue String
+        bookedBy     String
+        dateValue    Date
+        fromValue    String
+        untilValue   String
+        status       BookingStatus
+
+      screen NewBooking
+        template blueprint Cratis.Blueprint.Bookings NewBookingWizard version "^1.0"
+          actions
+            action RequestBooking
+
+      specification RequestingABooking
+        given caller
+          authenticated
+          role "Employee"
+        when RequestBooking
+          bookingId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0012"
+          reference    = "BK-4410"
+          resourceValue = "Fjord meeting room"
+          bookedBy     = "Grace Hopper"
+          dateValue    = "2026-10-15"
+          fromValue    = "09:00"
+          untilValue   = "11:00"
+          status       = "checkedIn"
+        then BookingRequested
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0012"
+          reference    = "BK-4410"
+          resourceValue = "Fjord meeting room"
+          bookedBy     = "Grace Hopper"
+          dateValue    = "2026-10-15"
+          fromValue    = "09:00"
+          untilValue   = "11:00"
+          status       = "checkedIn"

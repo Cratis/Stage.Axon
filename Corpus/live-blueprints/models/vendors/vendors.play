@@ -1,0 +1,308 @@
+// ============================================================
+// Vendors - vendors for a purchasing team, from the Vendors blueprint
+//
+// Vendors for a purchasing team: a vendor list, a vendor page with its contacts, orders and certificates, an onboarding board and a performance dashboard.
+// The whole application is built from Scene's `Cratis.Blueprint.Vendors` package: every screen fills one of its templates and the navigation is declared
+// here with the same regions the designer shows. The demo data is the blueprint's own pack.
+//
+// One purchasing manager uses it, so every screen is drawn for that persona on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Vendors
+// ============================================================
+
+domain Cratis.Vendors
+
+concept VendorId : Uuid
+concept Money : Decimal
+
+concept VendorStatus : Enum
+  prospect = 0
+  inReview = 1
+  approved = 2
+  active = 3
+  suspended = 4
+
+policy IsPurchasingManager
+  require role "PurchasingManager"
+
+persona PurchasingManager
+  description "Onboards and reviews vendors and follows what is bought from them"
+  policy IsPurchasingManager
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/vendors.svg" title "Vendors"
+    item vendors title "Vendors" target Vendors
+  navigation sidebar
+    item vendors title "Vendors" icon folder target Vendors.Vendors
+    item onboarding title "Onboarding" icon columns target Vendors.Onboarding
+    item performance title "Performance" icon chart target Vendors.Performance
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Vendors
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint vendors-en
+
+module Vendors
+  description "Vendors for a purchasing team"
+  authorize IsPurchasingManager
+
+  feature Vendors
+    description "Everyone you buy from"
+
+    slice StateChange RegisterVendor
+      description "Registers a vendor"
+
+      command RegisterVendor
+        vendorId VendorId identifier
+        name         String
+        category     String
+        country      String
+        spend        Money
+        rating       Decimal
+        status       VendorStatus
+
+        produces VendorRegistered
+          for vendorId
+          name         = name
+          category     = category
+          country      = country
+          spend        = spend
+          rating       = rating
+          status       = status
+
+      event VendorRegistered
+        name         String
+        category     String
+        country      String
+        spend        Money
+        rating       Decimal
+        status       VendorStatus
+
+      screen QuickNewVendor
+        template blueprint Cratis.Blueprint.Vendors VendorsQuickCreateVendor version "^1.0"
+          actions
+            action RegisterVendor
+
+      specification RegisteringAVendor
+        given caller
+          authenticated
+          role "PurchasingManager"
+        when RegisterVendor
+          vendorId     = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          name         = "Hartwell Supply"
+          category     = "Materials"
+          country      = "United Kingdom"
+          spend        = 184200.00
+          rating       = 4.60
+          status       = "active"
+        then VendorRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          name         = "Hartwell Supply"
+          category     = "Materials"
+          country      = "United Kingdom"
+          spend        = 184200.00
+          rating       = 4.60
+          status       = "active"
+
+    slice StateView VendorsList
+      description "Every vendor with what you spend with them and how they perform."
+
+      readmodel Vendors
+        vendorId VendorId
+        name         String
+        category     String
+        country      String
+        spend        Money
+        rating       Decimal
+        status       VendorStatus
+
+      query AllVendors => observable Vendors[]
+        authorize IsPurchasingManager
+
+      query GetVendor => Vendors optional
+        by vendorId VendorId
+        authorize IsPurchasingManager
+
+      projection VendorsProjection => Vendors
+        from VendorRegistered
+          vendorId = $eventSourceId
+          name = name
+          category = category
+          country = country
+          spend = spend
+          rating = rating
+          status = status
+
+      screen Vendors
+        template blueprint Cratis.Blueprint.Vendors VendorsList version "^1.0"
+
+      screen VendorRecord
+        template blueprint Cratis.Blueprint.Vendors VendorPage version "^1.0"
+
+      specification ListingTheRegisteredVendor
+        given caller
+          authenticated
+          role "PurchasingManager"
+        given VendorRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          name         = "Hartwell Supply"
+          category     = "Materials"
+          country      = "United Kingdom"
+          spend        = 184200.00
+          rating       = 4.60
+          status       = "active"
+        then readmodel Vendors
+          vendorId     = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          name         = "Hartwell Supply"
+
+
+  feature Onboarding
+    description "Vendors in a column for each onboarding step: prospect, in review, approved and active"
+
+    slice StateChange MoveVendor
+      description "Moves a vendor to its next step"
+
+      command MoveVendor
+        vendorId VendorId identifier
+        status       VendorStatus
+
+        produces VendorMoved
+          for vendorId
+          status       = status
+
+      event VendorMoved
+        status       VendorStatus
+
+      screen MoveVendor
+        template blueprint Cratis.Blueprint.Vendors VendorsOnboardingBoard version "^1.0"
+          toolbar
+            action MoveVendor
+
+      specification MovingAVendor
+        given caller
+          authenticated
+          role "PurchasingManager"
+        given VendorRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          name         = "Hartwell Supply"
+          category     = "Materials"
+          country      = "United Kingdom"
+          spend        = 184200.00
+          rating       = 4.60
+          status       = "active"
+        when MoveVendor
+          vendorId     = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          status       = "inReview"
+        then VendorMoved
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          status       = "inReview"
+
+    slice StateView OnboardingCards
+      description "Every open vendor as a card in the column of its step"
+
+      readmodel VendorCards
+        vendorId VendorId
+        name         String
+        status       VendorStatus
+
+      query AllVendorCards => observable VendorCards[]
+        authorize IsPurchasingManager
+
+      projection VendorCardsProjection => VendorCards
+        from VendorRegistered
+          vendorId = $eventSourceId
+          name = name
+          status = status
+        from VendorMoved
+          status = status
+
+      screen Onboarding
+        template blueprint Cratis.Blueprint.Vendors VendorsOnboardingBoard version "^1.0"
+
+      specification ShowingTheVendorOnTheBoard
+        given caller
+          authenticated
+          role "PurchasingManager"
+        given VendorRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          name         = "Hartwell Supply"
+          category     = "Materials"
+          country      = "United Kingdom"
+          spend        = 184200.00
+          rating       = 4.60
+          status       = "active"
+        then readmodel VendorCards
+          vendorId     = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          name         = "Hartwell Supply"
+
+
+  feature Performance
+    description "How vendors perform: spend, on-time delivery and the vendors to watch"
+
+    slice StateView PerformanceView
+      description "Spend and delivery this year"
+
+      readmodel PerformanceItems
+        vendorId VendorId
+        name         String
+        category     String
+        country      String
+        spend        Money
+
+      query AllPerformanceItems => observable PerformanceItems[]
+        authorize IsPurchasingManager
+
+      projection PerformanceItemsProjection => PerformanceItems
+        from VendorRegistered
+          vendorId = $eventSourceId
+          name = name
+          category = category
+          country = country
+          spend = spend
+
+      screen Performance
+        template blueprint Cratis.Blueprint.Vendors VendorsPerformance version "^1.0"
+
+      specification ShowingTheRegisteredVendorOnPerformance
+        given caller
+          authenticated
+          role "PurchasingManager"
+        given VendorRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          name         = "Hartwell Supply"
+          category     = "Materials"
+          country      = "United Kingdom"
+          spend        = 184200.00
+          rating       = 4.60
+          status       = "active"
+        then readmodel PerformanceItems
+          vendorId     = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          name         = "Hartwell Supply"

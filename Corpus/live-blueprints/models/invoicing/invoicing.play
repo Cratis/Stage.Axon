@@ -1,0 +1,368 @@
+// ============================================================
+// Invoicing - invoices for a finance team, from the Invoicing blueprint
+//
+// Invoices for a finance team: a receivables overview, an invoice list, an invoice page with its lines and payments, the payments received and a due-date calendar.
+// The whole application is built from Scene's `Cratis.Blueprint.Invoicing` package: every screen fills one of its templates and the navigation is declared
+// here with the same regions the designer shows. The demo data is the blueprint's own pack.
+//
+// One accountant uses it, so every screen is drawn for that persona on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Billing
+// ============================================================
+
+domain Cratis.Invoicing
+
+concept InvoiceId : Uuid
+concept PaymentId : Uuid
+concept Money : Decimal
+
+concept InvoiceStatus : Enum
+  draft = 0
+  sent = 1
+  overdue = 2
+  paid = 3
+  void = 4
+
+policy IsAccountant
+  require role "Accountant"
+
+persona Accountant
+  description "Bills customers, records the payments that come in and chases what is overdue"
+  policy IsAccountant
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/invoicing.svg" title "Invoicing"
+    item invoicing title "Invoicing" target Invoicing
+  navigation sidebar
+    item overview title "Overview" icon chart target Invoicing.Overview
+    item invoices title "Invoices" icon folder target Invoicing.Invoices
+    item payments title "Payments" icon folder target Invoicing.Payments
+    item dueDates title "Due dates" icon calendar target Invoicing.DueDates
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Invoicing
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint invoicing-en
+
+module Invoicing
+  description "Invoices for a finance team"
+  authorize IsAccountant
+
+  feature Invoices
+    description "Everything you have billed"
+
+    slice StateChange RegisterInvoice
+      description "Registers an invoice"
+
+      command RegisterInvoice
+        invoiceId InvoiceId identifier
+        number       String
+        customer     String
+        issued       Date
+        due          Date
+        amount       Money
+        status       InvoiceStatus
+
+        produces InvoiceRegistered
+          for invoiceId
+          number       = number
+          customer     = customer
+          issued       = issued
+          due          = due
+          amount       = amount
+          status       = status
+
+      event InvoiceRegistered
+        number       String
+        customer     String
+        issued       Date
+        due          Date
+        amount       Money
+        status       InvoiceStatus
+
+      screen QuickNewInvoice
+        template blueprint Cratis.Blueprint.Invoicing InvoicingQuickCreateInvoice version "^1.0"
+          actions
+            action RegisterInvoice
+
+      specification RegisteringAnInvoice
+        given caller
+          authenticated
+          role "Accountant"
+        when RegisterInvoice
+          invoiceId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "INV-2041"
+          customer     = "Northwind Traders"
+          issued       = "2026-10-12"
+          due          = "2026-11-11"
+          amount       = 4820.00
+          status       = "sent"
+        then InvoiceRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "INV-2041"
+          customer     = "Northwind Traders"
+          issued       = "2026-10-12"
+          due          = "2026-11-11"
+          amount       = 4820.00
+          status       = "sent"
+
+    slice StateView InvoicesList
+      description "Every invoice with what is owed and its status."
+
+      readmodel Invoices
+        invoiceId InvoiceId
+        number       String
+        customer     String
+        issued       Date
+        due          Date
+        amount       Money
+        status       InvoiceStatus
+
+      query AllInvoices => observable Invoices[]
+        authorize IsAccountant
+
+      query GetInvoice => Invoices optional
+        by invoiceId InvoiceId
+        authorize IsAccountant
+
+      projection InvoicesProjection => Invoices
+        from InvoiceRegistered
+          invoiceId = $eventSourceId
+          number = number
+          customer = customer
+          issued = issued
+          due = due
+          amount = amount
+          status = status
+
+      screen Invoices
+        template blueprint Cratis.Blueprint.Invoicing InvoicesList version "^1.0"
+
+      screen InvoiceRecord
+        template blueprint Cratis.Blueprint.Invoicing InvoicePage version "^1.0"
+
+      specification ListingAnRegisteredInvoice
+        given caller
+          authenticated
+          role "Accountant"
+        given InvoiceRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "INV-2041"
+          customer     = "Northwind Traders"
+          issued       = "2026-10-12"
+          due          = "2026-11-11"
+          amount       = 4820.00
+          status       = "sent"
+        then readmodel Invoices
+          invoiceId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "INV-2041"
+
+
+  feature Payments
+    description "What has come in"
+
+    slice StateChange RegisterPayment
+      description "Registers a payment"
+
+      command RegisterPayment
+        paymentId PaymentId identifier
+        reference    String
+        invoice      String
+        received     Date
+        method       String
+        amount       Money
+
+        produces PaymentRegistered
+          for paymentId
+          reference    = reference
+          invoice      = invoice
+          received     = received
+          method       = method
+          amount       = amount
+
+      event PaymentRegistered
+        reference    String
+        invoice      String
+        received     Date
+        method       String
+        amount       Money
+
+      specification RegisteringAPayment
+        given caller
+          authenticated
+          role "Accountant"
+        when RegisterPayment
+          paymentId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          reference    = "PAY-3318"
+          invoice      = "INV-2036"
+          received     = "2026-10-14"
+          method       = "Bank transfer"
+          amount       = 5430.00
+        then PaymentRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          reference    = "PAY-3318"
+          invoice      = "INV-2036"
+          received     = "2026-10-14"
+          method       = "Bank transfer"
+          amount       = 5430.00
+
+    slice StateView PaymentsList
+      description "The payments received and the invoices they settled."
+
+      readmodel Payments
+        paymentId PaymentId
+        reference    String
+        invoice      String
+        received     Date
+        method       String
+        amount       Money
+
+      query AllPayments => observable Payments[]
+        authorize IsAccountant
+
+      query GetPayment => Payments optional
+        by paymentId PaymentId
+        authorize IsAccountant
+
+      projection PaymentsProjection => Payments
+        from PaymentRegistered
+          paymentId = $eventSourceId
+          reference = reference
+          invoice = invoice
+          received = received
+          method = method
+          amount = amount
+
+      screen Payments
+        template blueprint Cratis.Blueprint.Invoicing PaymentsList version "^1.0"
+
+      specification ListingTheRegisteredPayment
+        given caller
+          authenticated
+          role "Accountant"
+        given PaymentRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          reference    = "PAY-3318"
+          invoice      = "INV-2036"
+          received     = "2026-10-14"
+          method       = "Bank transfer"
+          amount       = 5430.00
+        then readmodel Payments
+          paymentId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          reference    = "PAY-3318"
+
+
+  feature Overview
+    description "What is owed, what is overdue and what came in this month"
+
+    slice StateView OverviewView
+      description "What is owed and what has come in"
+
+      readmodel OverviewItems
+        invoiceId InvoiceId
+        number       String
+        customer     String
+        issued       Date
+        due          Date
+
+      query AllOverviewItems => observable OverviewItems[]
+        authorize IsAccountant
+
+      projection OverviewItemsProjection => OverviewItems
+        from InvoiceRegistered
+          invoiceId = $eventSourceId
+          number = number
+          customer = customer
+          issued = issued
+          due = due
+
+      screen Overview
+        template blueprint Cratis.Blueprint.Invoicing InvoicingOverview version "^1.0"
+
+      specification ShowingAnRegisteredInvoiceOnOverview
+        given caller
+          authenticated
+          role "Accountant"
+        given InvoiceRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "INV-2041"
+          customer     = "Northwind Traders"
+          issued       = "2026-10-12"
+          due          = "2026-11-11"
+          amount       = 4820.00
+          status       = "sent"
+        then readmodel OverviewItems
+          invoiceId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "INV-2041"
+
+
+  feature DueDates
+    description "The day each invoice falls due, on a calendar"
+
+    slice StateView DueDatesView
+      description "When each invoice falls due"
+
+      readmodel DueDatesItems
+        invoiceId InvoiceId
+        number       String
+        customer     String
+        issued       Date
+        due          Date
+
+      query AllDueDatesItems => observable DueDatesItems[]
+        authorize IsAccountant
+
+      projection DueDatesItemsProjection => DueDatesItems
+        from InvoiceRegistered
+          invoiceId = $eventSourceId
+          number = number
+          customer = customer
+          issued = issued
+          due = due
+
+      screen DueDates
+        template blueprint Cratis.Blueprint.Invoicing InvoicingDueDates version "^1.0"
+
+      specification ShowingAnRegisteredInvoiceOnDueDates
+        given caller
+          authenticated
+          role "Accountant"
+        given InvoiceRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "INV-2041"
+          customer     = "Northwind Traders"
+          issued       = "2026-10-12"
+          due          = "2026-11-11"
+          amount       = 4820.00
+          status       = "sent"
+        then readmodel DueDatesItems
+          invoiceId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "INV-2041"

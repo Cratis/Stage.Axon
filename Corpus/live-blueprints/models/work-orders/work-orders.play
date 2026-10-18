@@ -1,0 +1,318 @@
+// ============================================================
+// Work orders - work orders for a maintenance or field-service team, from the Work orders blueprint
+//
+// Work orders for a maintenance or field-service team: a work order list, a work order page with its tasks, parts and time, a board by step and a schedule of visits.
+// The whole application is built from Scene's `Cratis.Blueprint.WorkOrders` package: every screen fills one of its templates and the navigation is declared
+// here with the same regions the designer shows. The demo data is the blueprint's own pack.
+//
+// One technician uses it, so every screen is drawn for that persona on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/WorkOrders
+// ============================================================
+
+domain Cratis.WorkOrders
+
+concept WorkOrderId : Uuid
+
+concept WorkOrderStatus : Enum
+  new = 0
+  scheduled = 1
+  inProgress = 2
+  onHold = 3
+  done = 4
+
+policy IsTechnician
+  require role "Technician"
+
+persona Technician
+  description "Plans and does maintenance work: takes work orders, logs time and parts and closes them"
+  policy IsTechnician
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/work-orders.svg" title "Work orders"
+    item workOrders title "Work orders" target WorkOrders
+  navigation sidebar
+    item workOrders title "Work orders" icon folder target WorkOrders.WorkOrders
+    item board title "Board" icon columns target WorkOrders.Board
+    item schedule title "Schedule" icon calendar target WorkOrders.Schedule
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.WorkOrders
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint work-orders-en
+
+module WorkOrders
+  description "Work orders for a maintenance or field-service team"
+  authorize IsTechnician
+
+  feature WorkOrders
+    description "Everything that needs doing"
+
+    slice StateChange RegisterWorkOrder
+      description "Registers a work order"
+
+      command RegisterWorkOrder
+        workOrderId WorkOrderId identifier
+        number       String
+        title        String
+        site         String
+        priority     String
+        assignee     String
+        due          Date
+        status       WorkOrderStatus
+
+        produces WorkOrderRegistered
+          for workOrderId
+          number       = number
+          title        = title
+          site         = site
+          priority     = priority
+          assignee     = assignee
+          due          = due
+          status       = status
+
+      event WorkOrderRegistered
+        number       String
+        title        String
+        site         String
+        priority     String
+        assignee     String
+        due          Date
+        status       WorkOrderStatus
+
+      screen QuickNewWorkOrder
+        template blueprint Cratis.Blueprint.WorkOrders WorkOrdersQuickCreateWorkOrder version "^1.0"
+          actions
+            action RegisterWorkOrder
+
+      specification RegisteringAWorkOrder
+        given caller
+          authenticated
+          role "Technician"
+        when RegisterWorkOrder
+          workOrderId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "WO-3108"
+          title        = "Replace the boiler pressure valve"
+          site         = "Bergen depot"
+          priority     = "Urgent"
+          assignee     = "Grace Hopper"
+          due          = "2026-10-16"
+          status       = "inProgress"
+        then WorkOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "WO-3108"
+          title        = "Replace the boiler pressure valve"
+          site         = "Bergen depot"
+          priority     = "Urgent"
+          assignee     = "Grace Hopper"
+          due          = "2026-10-16"
+          status       = "inProgress"
+
+    slice StateView WorkOrdersList
+      description "Every work order with its site, priority, assignee and status."
+
+      readmodel WorkOrders
+        workOrderId WorkOrderId
+        number       String
+        title        String
+        site         String
+        priority     String
+        assignee     String
+        due          Date
+        status       WorkOrderStatus
+
+      query AllWorkOrders => observable WorkOrders[]
+        authorize IsTechnician
+
+      query GetWorkOrder => WorkOrders optional
+        by workOrderId WorkOrderId
+        authorize IsTechnician
+
+      projection WorkOrdersProjection => WorkOrders
+        from WorkOrderRegistered
+          workOrderId = $eventSourceId
+          number = number
+          title = title
+          site = site
+          priority = priority
+          assignee = assignee
+          due = due
+          status = status
+
+      screen WorkOrders
+        template blueprint Cratis.Blueprint.WorkOrders WorkOrdersList version "^1.0"
+
+      screen WorkOrderRecord
+        template blueprint Cratis.Blueprint.WorkOrders WorkOrderPage version "^1.0"
+
+      specification ListingTheRegisteredWorkOrder
+        given caller
+          authenticated
+          role "Technician"
+        given WorkOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "WO-3108"
+          title        = "Replace the boiler pressure valve"
+          site         = "Bergen depot"
+          priority     = "Urgent"
+          assignee     = "Grace Hopper"
+          due          = "2026-10-16"
+          status       = "inProgress"
+        then readmodel WorkOrders
+          workOrderId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "WO-3108"
+
+
+  feature Board
+    description "Work orders in a column for each step: new, scheduled, in progress and done"
+
+    slice StateChange MoveWorkOrder
+      description "Moves a work order to its next step"
+
+      command MoveWorkOrder
+        workOrderId WorkOrderId identifier
+        status       WorkOrderStatus
+
+        produces WorkOrderMoved
+          for workOrderId
+          status       = status
+
+      event WorkOrderMoved
+        status       WorkOrderStatus
+
+      screen MoveWorkOrder
+        template blueprint Cratis.Blueprint.WorkOrders WorkOrdersBoard version "^1.0"
+          toolbar
+            action MoveWorkOrder
+
+      specification MovingAWorkOrder
+        given caller
+          authenticated
+          role "Technician"
+        given WorkOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "WO-3108"
+          title        = "Replace the boiler pressure valve"
+          site         = "Bergen depot"
+          priority     = "Urgent"
+          assignee     = "Grace Hopper"
+          due          = "2026-10-16"
+          status       = "inProgress"
+        when MoveWorkOrder
+          workOrderId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          status       = "scheduled"
+        then WorkOrderMoved
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          status       = "scheduled"
+
+    slice StateView BoardCards
+      description "Every open work order as a card in the column of its step"
+
+      readmodel WorkOrderCards
+        workOrderId WorkOrderId
+        number       String
+        status       WorkOrderStatus
+
+      query AllWorkOrderCards => observable WorkOrderCards[]
+        authorize IsTechnician
+
+      projection WorkOrderCardsProjection => WorkOrderCards
+        from WorkOrderRegistered
+          workOrderId = $eventSourceId
+          number = number
+          status = status
+        from WorkOrderMoved
+          status = status
+
+      screen Board
+        template blueprint Cratis.Blueprint.WorkOrders WorkOrdersBoard version "^1.0"
+
+      specification ShowingTheWorkOrderOnTheBoard
+        given caller
+          authenticated
+          role "Technician"
+        given WorkOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "WO-3108"
+          title        = "Replace the boiler pressure valve"
+          site         = "Bergen depot"
+          priority     = "Urgent"
+          assignee     = "Grace Hopper"
+          due          = "2026-10-16"
+          status       = "inProgress"
+        then readmodel WorkOrderCards
+          workOrderId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "WO-3108"
+
+
+  feature Schedule
+    description "The day each work order is planned, on a calendar"
+
+    slice StateView ScheduleView
+      description "When each job is planned"
+
+      readmodel ScheduleItems
+        workOrderId WorkOrderId
+        number       String
+        title        String
+        site         String
+        priority     String
+
+      query AllScheduleItems => observable ScheduleItems[]
+        authorize IsTechnician
+
+      projection ScheduleItemsProjection => ScheduleItems
+        from WorkOrderRegistered
+          workOrderId = $eventSourceId
+          number = number
+          title = title
+          site = site
+          priority = priority
+
+      screen Schedule
+        template blueprint Cratis.Blueprint.WorkOrders WorkOrdersSchedule version "^1.0"
+
+      specification ShowingTheRegisteredWorkOrderOnSchedule
+        given caller
+          authenticated
+          role "Technician"
+        given WorkOrderRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "WO-3108"
+          title        = "Replace the boiler pressure valve"
+          site         = "Bergen depot"
+          priority     = "Urgent"
+          assignee     = "Grace Hopper"
+          due          = "2026-10-16"
+          status       = "inProgress"
+        then readmodel ScheduleItems
+          workOrderId  = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          number       = "WO-3108"

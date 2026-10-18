@@ -1,0 +1,323 @@
+// ============================================================
+// Catalog - products and categories for a sales team, from the Catalog blueprint
+//
+// Products and categories for a sales team: a catalog overview, a product list, a product page with its variants and price history, and the categories they sit in.
+// The whole application is built from Scene's `Cratis.Blueprint.Catalog` package: every screen fills one of its templates and the navigation is declared
+// here with the same regions the designer shows. The demo data is the blueprint's own pack.
+//
+// One catalog manager uses it, so every screen is drawn for that persona on the event model board.
+//
+// Verify it with:  screenplay --warnaserror Samples/Catalog
+// ============================================================
+
+domain Cratis.Catalog
+
+concept ProductId : Uuid
+concept CategoryId : Uuid
+concept Money : Decimal
+
+concept ProductStatus : Enum
+  active = 0
+  draft = 1
+  lowStock = 2
+  discontinued = 3
+
+concept CategoryStatus : Enum
+  visible = 0
+  hidden = 1
+
+policy IsCatalogManager
+  require role "CatalogManager"
+
+persona CatalogManager
+  description "Keeps the catalog: publishes products, prices them and groups them in categories"
+  policy IsCatalogManager
+
+layout AppShell
+  category Shell
+  topbar
+  navigation contributes Navigation
+  content
+  footer
+
+  navigation topbar
+    logo image "/assets/catalog.svg" title "Catalog"
+    item catalog title "Catalog" target Catalog
+  navigation sidebar
+    item overview title "Overview" icon chart target Catalog.Overview
+    item products title "Products" icon folder target Catalog.Products
+    item categories title "Categories" icon folder target Catalog.Categories
+
+  arrangement flow
+    column
+      topbar height 56
+      row
+        navigation width 240
+        content grow
+      footer height 32
+
+    when width compact
+      column
+        topbar height 48
+        content grow
+        navigation height 64
+
+ui profile Desktop
+  target platform web
+  target size regular
+  packages
+    Cratis.Components
+    Cratis.Blueprint.Catalog
+  layout AppShell
+
+  // The blueprint ships the demo data; the application chooses which pack previews, once, here.
+  sample data
+    active blueprint catalog-en
+
+module Catalog
+  description "Products and categories for a sales team"
+  authorize IsCatalogManager
+
+  feature Products
+    description "Everything you sell"
+
+    slice StateChange RegisterProduct
+      description "Registers a product"
+
+      command RegisterProduct
+        productId ProductId identifier
+        sku          String
+        name         String
+        category     String
+        price        Money
+        stock        Int
+        status       ProductStatus
+
+        produces ProductRegistered
+          for productId
+          sku          = sku
+          name         = name
+          category     = category
+          price        = price
+          stock        = stock
+          status       = status
+
+      event ProductRegistered
+        sku          String
+        name         String
+        category     String
+        price        Money
+        stock        Int
+        status       ProductStatus
+
+      screen QuickNewProduct
+        template blueprint Cratis.Blueprint.Catalog CatalogQuickCreateProduct version "^1.0"
+          actions
+            action RegisterProduct
+
+      specification RegisteringAProduct
+        given caller
+          authenticated
+          role "CatalogManager"
+        when RegisterProduct
+          productId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          sku          = "FIT-210"
+          name         = "Compression fitting 22 mm"
+          category     = "Fittings"
+          price        = 12.50
+          stock        = 420
+          status       = "active"
+        then ProductRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          sku          = "FIT-210"
+          name         = "Compression fitting 22 mm"
+          category     = "Fittings"
+          price        = 12.50
+          stock        = 420
+          status       = "active"
+
+    slice StateView ProductsList
+      description "Every product with its price, stock and status."
+
+      readmodel Products
+        productId ProductId
+        sku          String
+        name         String
+        category     String
+        price        Money
+        stock        Int
+        status       ProductStatus
+
+      query AllProducts => observable Products[]
+        authorize IsCatalogManager
+
+      query GetProduct => Products optional
+        by productId ProductId
+        authorize IsCatalogManager
+
+      projection ProductsProjection => Products
+        from ProductRegistered
+          productId = $eventSourceId
+          sku = sku
+          name = name
+          category = category
+          price = price
+          stock = stock
+          status = status
+
+      screen Products
+        template blueprint Cratis.Blueprint.Catalog ProductsList version "^1.0"
+
+      screen ProductRecord
+        template blueprint Cratis.Blueprint.Catalog ProductPage version "^1.0"
+
+      specification ListingTheRegisteredProduct
+        given caller
+          authenticated
+          role "CatalogManager"
+        given ProductRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          sku          = "FIT-210"
+          name         = "Compression fitting 22 mm"
+          category     = "Fittings"
+          price        = 12.50
+          stock        = 420
+          status       = "active"
+        then readmodel Products
+          productId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          sku          = "FIT-210"
+
+
+  feature Categories
+    description "Where products are found"
+
+    slice StateChange RegisterCategory
+      description "Registers a category"
+
+      command RegisterCategory
+        categoryId CategoryId identifier
+        name         String
+        products     Int
+        owner        String
+        status       CategoryStatus
+
+        produces CategoryRegistered
+          for categoryId
+          name         = name
+          products     = products
+          owner        = owner
+          status       = status
+
+      event CategoryRegistered
+        name         String
+        products     Int
+        owner        String
+        status       CategoryStatus
+
+      screen QuickNewCategory
+        template blueprint Cratis.Blueprint.Catalog CatalogQuickCreateCategory version "^1.0"
+          actions
+            action RegisterCategory
+
+      specification RegisteringACategory
+        given caller
+          authenticated
+          role "CatalogManager"
+        when RegisterCategory
+          categoryId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          name         = "Fittings"
+          products     = 2
+          owner        = "Grace Hopper"
+          status       = "visible"
+        then CategoryRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          name         = "Fittings"
+          products     = 2
+          owner        = "Grace Hopper"
+          status       = "visible"
+
+    slice StateView CategoriesList
+      description "The categories products sit in and who owns them."
+
+      readmodel Categories
+        categoryId CategoryId
+        name         String
+        products     Int
+        owner        String
+        status       CategoryStatus
+
+      query AllCategories => observable Categories[]
+        authorize IsCatalogManager
+
+      query GetCategory => Categories optional
+        by categoryId CategoryId
+        authorize IsCatalogManager
+
+      projection CategoriesProjection => Categories
+        from CategoryRegistered
+          categoryId = $eventSourceId
+          name = name
+          products = products
+          owner = owner
+          status = status
+
+      screen Categories
+        template blueprint Cratis.Blueprint.Catalog CategoriesList version "^1.0"
+
+      specification ListingTheRegisteredCategory
+        given caller
+          authenticated
+          role "CatalogManager"
+        given CategoryRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          name         = "Fittings"
+          products     = 2
+          owner        = "Grace Hopper"
+          status       = "visible"
+        then readmodel Categories
+          categoryId   = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021"
+          name         = "Fittings"
+
+
+  feature Overview
+    description "How the catalog is doing: what is live, what is out of stock and what changed lately"
+
+    slice StateView OverviewView
+      description "What is live, what is running out and what changed"
+
+      readmodel OverviewItems
+        productId ProductId
+        sku          String
+        name         String
+        category     String
+        price        Money
+
+      query AllOverviewItems => observable OverviewItems[]
+        authorize IsCatalogManager
+
+      projection OverviewItemsProjection => OverviewItems
+        from ProductRegistered
+          productId = $eventSourceId
+          sku = sku
+          name = name
+          category = category
+          price = price
+
+      screen Overview
+        template blueprint Cratis.Blueprint.Catalog CatalogOverview version "^1.0"
+
+      specification ShowingTheRegisteredProductOnOverview
+        given caller
+          authenticated
+          role "CatalogManager"
+        given ProductRegistered
+          for "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          sku          = "FIT-210"
+          name         = "Compression fitting 22 mm"
+          category     = "Fittings"
+          price        = 12.50
+          stock        = 420
+          status       = "active"
+        then readmodel OverviewItems
+          productId    = "6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0011"
+          sku          = "FIT-210"
