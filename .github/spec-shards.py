@@ -7,7 +7,9 @@
 Refresh measured prefix weights from directories of successful runs:
     python3 .github/spec-shards.py refresh-timings .ai-work/318/trx
 Each immediate child of the TRX root is one run, containing all four Rendering
-artifacts. `estimate` reports summed test work, not parallel job wall time.
+artifacts. A prefix weighs the summed wall-clock span of its test classes: xUnit's
+per-test duration omits the Establish/Because a class shares, so it cannot be used.
+`estimate` reports summed class spans, not parallel job wall time.
 """
 
 import argparse
@@ -25,10 +27,14 @@ ROOT = Path(__file__).resolve().parent.parent
 RENDERING = "Source/Rendering.Cratis/Rendering.Cratis.csproj"
 NAMESPACE = "Cratis.Stage.Rendering.Cratis"
 PLANNER = NAMESPACE + ".for_CratisArtifactRenderPlanner"
-EXCLUSIONS = (
-    "FullyQualifiedName!~when_compiling_generated_name_matrix&"
-    "FullyQualifiedName!~when_building_the_generated_screen_composition_application"
+# Each fixture runs in exactly one dedicated workflow job (dotnet-build.yml) and in no shard.
+STANDALONE_APPLICATION_FIXTURE = "when_verifying_a_standalone_generated_application"
+DEDICATED_FIXTURES = (
+    "when_compiling_generated_name_matrix",
+    "when_building_the_generated_screen_composition_application",
+    STANDALONE_APPLICATION_FIXTURE,
 )
+EXCLUSIONS = "&".join("FullyQualifiedName!~" + fixture for fixture in DEDICATED_FIXTURES)
 BLUEPRINT_TEMPLATES_FIXTURE = "when_building_the_blueprint_templates_application"
 RENDERING_SHARDS = 4
 TIMINGS = ROOT / ".github/spec-shard-timings.json"
@@ -183,15 +189,32 @@ def run_shard(shard):
         raise SystemExit("Spec shard failed:\n" + "\n".join(failures))
 
 
-def test_seconds(result):
-    hours, minutes, seconds = result.get("duration", "0:0:0").split(":")
-    duration = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
-    # xUnit's duration can omit Establish/Because, including generated application builds.
-    elapsed = (datetime.fromisoformat(result.attrib["endTime"]) -
-               datetime.fromisoformat(result.attrib["startTime"])).total_seconds()
-    if not math.isfinite(duration) or duration < 0 or elapsed < 0:
-        raise SystemExit("TRX test timings must be finite and non-negative.")
-    return max(duration, elapsed)
+def class_spans(root):
+    """Wall-clock seconds from a class's first test start to its last test end.
+
+    A shared-lifecycle class runs Establish/Because once, and xUnit leaves that time out of every
+    per-test duration. The span keeps it. Concurrent classes overlap, so spans sum to work, not wall time.
+    """
+    classes = {test.get("id"): test.find("t:TestMethod", TRX_NAMESPACE).get("className")
+               for test in root.findall("t:TestDefinitions/t:UnitTest", TRX_NAMESPACE)}
+    bounds = {}
+    for result in root.findall("t:Results/t:UnitTestResult", TRX_NAMESPACE):
+        if result.get("outcome") != "Passed":
+            continue
+        start = datetime.fromisoformat(result.attrib["startTime"])
+        end = datetime.fromisoformat(result.attrib["endTime"])
+        if end < start:
+            raise SystemExit("TRX test timings must be non-negative.")
+        name = classes[result.attrib["testId"]]
+        first, last = bounds.get(name, (start, end))
+        bounds[name] = (min(first, start), max(last, end))
+    return {name: (last - first).total_seconds() for name, (first, last) in bounds.items()}
+
+
+def dedicated(name):
+    # Dedicated-lane fixtures never run in a shard, so their time must not weigh one.
+    return any(fixture.casefold() in name.casefold()
+               for fixture in DEDICATED_FIXTURES + (BLUEPRINT_TEMPLATES_FIXTURE,))
 
 
 def run_timings(directory, groups):
@@ -208,13 +231,11 @@ def run_timings(directory, groups):
         if any(result.get("outcome") not in ("Passed", "NotExecuted") for result in rendering):
             raise SystemExit(f"{path}: refresh timings only from successful runs.")
         rendering_files += 1
-        for result in rendering:
-            if result.get("outcome") != "Passed":
-                continue
-            prefix = next((name for name in groups
-                           if result.attrib["testName"].casefold().startswith(name.casefold())), None)
-            if prefix is not None:
-                totals[prefix] += test_seconds(result)
+        for name, seconds in class_spans(root).items():
+            prefix = next((group for group in groups
+                           if (name + ".").casefold().startswith(group.casefold())), None)
+            if prefix is not None and not dedicated(name):
+                totals[prefix] += seconds
     if rendering_files != RENDERING_SHARDS or not totals:
         raise SystemExit(f"{directory}: expected all four Rendering TRX files, got {rendering_files}.")
     return totals
@@ -229,8 +250,10 @@ def refresh_timings(directory):
     prefixes = sorted(set().union(*(run.keys() for run in observations)))
     measured = {prefix: round(sum(run[prefix] for run in observations if prefix in run) /
                               sum(prefix in run for run in observations), 6) for prefix in prefixes}
-    data = {"measurement": "Mean per-run sum of max(duration, endTime-startTime) in seconds; includes fixture setup. "
-                           "Parallel test work, not job wall time. Unmeasured prefixes use one second per source file.",
+    data = {"measurement": "Mean per-run sum of test-class wall-clock spans (first startTime to last endTime) in "
+                           "seconds; includes shared class setup. Dedicated-lane fixtures are excluded. Concurrent "
+                           "classes overlap, so this is test work, not job wall time. Unmeasured prefixes use one "
+                           "second per source file.",
             "runs": [run.name for run in runs], "prefix_seconds": measured}
     TIMINGS.write_text(json.dumps(data, indent=2) + "\n")
     print(f"Wrote {len(measured)} measured prefixes from {len(runs)} runs to {TIMINGS}.")
@@ -240,8 +263,8 @@ def estimate():
     weights = rendering_weights(source_groups())
     loads = [sum(weights[prefix] for prefix in partition) for partition in rendering_partitions()]
     for name, seconds in zip(("rendering-1", "rendering-2", "rendering-3", "rendering-remainder"), loads):
-        print(f"{name}: {seconds:.1f} work-seconds (not parallel job wall time)")
-    print(f"Spread: {max(loads) - min(loads):.1f} work-seconds")
+        print(f"{name}: {seconds:.1f} class-span seconds (not parallel job wall time)")
+    print(f"Spread: {max(loads) - min(loads):.1f} class-span seconds")
 
 
 def main():
