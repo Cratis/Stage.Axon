@@ -34,7 +34,7 @@ module Home
   feature Welcome
     slice StateView WelcomeInfo
       readmodel WelcomeRow
-        id OrderId
+        id OrderId key
         text String
       screen Welcome
         title "Welcome"
@@ -60,7 +60,7 @@ module Sales
         quantity Int
     slice StateView OrderList
       readmodel OrderRow
-        orderId OrderId
+        orderId OrderId key
         customer String
         quantity Int
       screen List
@@ -70,7 +70,7 @@ module Sales
   feature Customers
     slice StateView CustomerList
       readmodel CustomerRow
-        id OrderId
+        id OrderId key
         name String
       screen CustomerScreen
         title "Customers"
@@ -79,7 +79,7 @@ module Support
   feature Tickets
     slice StateView TicketList
       readmodel TicketRow
-        id TicketId
+        id TicketId key
         subject String
       screen TicketScreen
         title "Tickets"
