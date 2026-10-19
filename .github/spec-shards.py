@@ -47,10 +47,10 @@ PROJECT_SHARDS = {
         "Source/Rendering.Cratis.Scaffolding/Rendering.Cratis.Scaffolding.csproj",
     ],
     "host": ["Source/Host/Host.csproj"],
-    "specifications-conformance": [
-        "Source/Specifications/Specifications.csproj",
-        "Source/Conformance.Specs/Conformance.Specs.csproj",
-    ],
+    # Measured class-span seconds per run: Specifications ~168 (one namespace), Conformance.Specs ~178.
+    # The two projects already balance, so a project split is exact and cannot skip or double-run a test.
+    "specifications": ["Source/Specifications/Specifications.csproj"],
+    "conformance": ["Source/Conformance.Specs/Conformance.Specs.csproj"],
 }
 
 
