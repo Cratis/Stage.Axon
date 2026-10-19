@@ -51,6 +51,7 @@ module Sales
         customer String
         quantity Int
         produces OrderPlaced
+          for orderId
           orderId = orderId
           customer = customer
           quantity = quantity
