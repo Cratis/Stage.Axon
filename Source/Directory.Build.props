@@ -11,7 +11,7 @@
         <RepositoryType>git</RepositoryType>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <RepositoryUrl>https://github.com/Cratis/Stage</RepositoryUrl>
-        <PackageProjectUrl>https://github.com/Cratis/Stage</PackageProjectUrl>
+        <PackageProjectUrl>https://www.cratis.io/screenplay/</PackageProjectUrl>
         <PackageTags>cratis;event-sourcing;event-modeling;cqrs;stage;code-generation;renderer</PackageTags>
 
         <GenerateAssemblyTitleAttribute>true</GenerateAssemblyTitleAttribute>
@@ -21,6 +21,7 @@
         <IsTestProject>false</IsTestProject>
         <IsPackable>false</IsPackable>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageIcon>logo.png</PackageIcon>
         <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     </PropertyGroup>
 
@@ -30,6 +31,7 @@
 
     <ItemGroup Condition="'$(IsPackable)'=='true'">
         <None Include="$(MSBuildThisFileDirectory)/../README.md" Pack="true" PackagePath="/" />
+        <None Include="$(MSBuildThisFileDirectory)/../logo.png" Pack="true" PackagePath="/" />
     </ItemGroup>
 
     <!--
