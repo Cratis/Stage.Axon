@@ -69,16 +69,16 @@ CONFORMANCE_SHARDING = Sharding("conformance", CONFORMANCE, "Source/Conformance.
 SHARDED = (RENDERING_SHARDING, CONFORMANCE_SHARDING)
 FACT = re.compile(r"\[(?:Fact|Theory)(?:\(|\])")
 TOP_LEVEL_CLASS = re.compile(r"^public (?:(?:sealed|abstract|partial|static) )*class (\w+)", re.MULTILINE)
+# One static shard: Host is the slowest project, so it runs first. Specifications is one namespace.
 PROJECT_SHARDS = {
     "small-projects": [
+        "Source/Host/Host.csproj",
+        "Source/Specifications/Specifications.csproj",
         "Source/Contracts/Contracts.csproj",
         "Source/Stage/Stage.csproj",
         "Source/SpecRunner/SpecRunner.csproj",
         "Source/Rendering.Cratis.Scaffolding/Rendering.Cratis.Scaffolding.csproj",
     ],
-    "host": ["Source/Host/Host.csproj"],
-    # Specifications is one namespace (~168 class-span seconds per run), so a project shard is exact.
-    "specifications": ["Source/Specifications/Specifications.csproj"],
 }
 
 
