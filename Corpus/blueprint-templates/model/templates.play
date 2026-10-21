@@ -43,6 +43,7 @@ ui profile Desktop
   target size regular
   packages
     Cratis.Components
+    PrimeReact
     Cratis.Blueprint.Default
   root template AppShell
 
