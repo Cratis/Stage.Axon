@@ -2,6 +2,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageVersionOverrideEnabled>false</CentralPackageVersionOverrideEnabled>
+    <CratisScreenplayVersion Condition="'$(CratisScreenplayVersion)' == ''">4.241.0</CratisScreenplayVersion>
     <PureTransitionReferencePackVersion>10.0.12</PureTransitionReferencePackVersion>
   </PropertyGroup>
   <ItemGroup>
@@ -30,7 +31,8 @@
     <PackageVersion Include="MongoDB.Driver" Version="3.12.0" />
     <PackageVersion Include="Cratis.Scene.Engine" Version="4.80.2" />
     <PackageVersion Include="Cratis.Scene.Model" Version="4.80.2" />
-    <PackageVersion Include="Cratis.Screenplay" Version="4.240.6" />
+    <PackageVersion Include="Cratis.Screenplay" Version="$(CratisScreenplayVersion)" />
+    <PackageVersion Include="Cratis.Screenplay.Matching" Version="$(CratisScreenplayVersion)" />
     <!-- Spec-only: freezes the released RegisterProject conformance corpus consumed by the Cratis renderer's planner fixtures. -->
     <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.240.6" />
     <PackageVersion Include="Cratis.Templates" Version="1.7.4" />
