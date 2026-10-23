@@ -7,7 +7,7 @@
   <ItemGroup>
     <!-- Cratis -->
     <PackageVersion Include="Cratis" Version="22.131.0" />
-    <PackageVersion Include="Cratis.Fundamentals" Version="7.25.1" />
+    <PackageVersion Include="Cratis.Fundamentals" Version="7.26.0" />
     <PackageVersion Include="Cratis.Arc" Version="22.131.0" />
     <PackageVersion Include="Cratis.Arc.Chronicle" Version="22.131.0" />
     <PackageVersion Include="Cratis.Arc.Chronicle.Testing" Version="22.131.0" />
@@ -30,9 +30,9 @@
     <PackageVersion Include="MongoDB.Driver" Version="3.12.0" />
     <PackageVersion Include="Cratis.Scene.Engine" Version="4.80.2" />
     <PackageVersion Include="Cratis.Scene.Model" Version="4.80.2" />
-    <PackageVersion Include="Cratis.Screenplay" Version="4.240.2" />
+    <PackageVersion Include="Cratis.Screenplay" Version="4.240.6" />
     <!-- Spec-only: freezes the released RegisterProject conformance corpus consumed by the Cratis renderer's planner fixtures. -->
-    <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.240.2" />
+    <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.240.6" />
     <PackageVersion Include="Cratis.Templates" Version="1.7.4" />
     <!-- Microsoft -->
     <!-- Audited reducer-binding references, embedded in the renderer for runtime-only hosts. -->
