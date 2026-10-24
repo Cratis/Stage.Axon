@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Rendering.Axon.Emitters.Decisions;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -14,8 +15,11 @@ internal static class CommandStreamEmitter
     {
         var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located);
         var name = JavaNames.Type(command.Name) + "Stream";
-        var contracts = ScopeSelection.Locate(context.Request.Model.Application).Where(slice => slice.Module.Id == located.Module.Id)
-            .SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id).ToArray();
+        var decisions = new CommandDecisionReads(context, command, source).Prepare() ?? [];
+        var required = decisions.SelectMany(read => read.Events.All).ToHashSet();
+        var contracts = ScopeSelection.Locate(context.Request.Model.Application)
+            .SelectMany(slice => slice.Slice.Events.Where(contract => slice.Module.Id == located.Module.Id || required.Contains(contract.Id)))
+            .DistinctBy(contract => contract.Id).ToArray();
         var code = new JavaCodeBuilder(package)
             .Import("org.axonframework.extension.spring.stereotype.EventSourced")
             .Import("org.axonframework.eventsourcing.annotation.reflection.EntityCreator")
@@ -27,10 +31,12 @@ internal static class CommandStreamEmitter
             {
                 body.Line("@EntityCreator").Line($"public {name}() {{}}")
                     .Line("// Replay the module's event types so the append condition covers the entire primary stream position.");
+                foreach (var read in decisions) body.Line($"private boolean {read.Member};").Line($"public boolean {read.Member}() {{ return {read.Member}; }}");
                 for (var index = 0; index < contracts.Length; index++)
                 {
+                    var updates = string.Join(' ', decisions.Where(read => read.Events.All.Contains(contracts[index].Id)).Select(read => read.Member + " = " + (read.Events.Removes.Contains(contracts[index].Id) ? "false;" : "true;")));
                     body.Line("@EventSourcingHandler")
-                        .Line($"public void on{index}({AxonEventsEmitter.TypeFor(context, contracts[index].Id)} event) {{}}");
+                        .Line($"public void on{index}({AxonEventsEmitter.TypeFor(context, contracts[index].Id)} event) {{{updates}}}");
                 }
             });
         context.AddJava(package, name, code.Build(), sources: [command.Id]);

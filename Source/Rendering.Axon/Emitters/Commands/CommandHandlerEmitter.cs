@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Decisions;
 using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -57,6 +58,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             }
             appends.Add(append.Value);
         }
+        new CommandDecisionReads(context, command, source).Check(body);
         Prepare(body);
         body.Line("rules.validate(command);");
         if (appends.Count > 0) Append(body, appends);
@@ -66,7 +68,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     bool Supported(JavaCodeBuilder body, CommandResponses response)
     {
         if (command.Handler is not null) return Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation");
-        if (!command.Reads.IsEmpty) return Unsupported(body, AxonRefusalCodes.ProtectedReads, "check modeled decision reads before changing state");
+        if (new CommandDecisionReads(context, command, source).Prepare() is null) return Unsupported(body, AxonRefusalCodes.ProtectedReads, "check modeled decision reads before changing state");
         if (source is null && !command.Produces.IsEmpty) return Unsupported(body, AxonRefusalCodes.CommandMapping, "resolve the command's primary event-source identity");
         return response.Value is not null || Unsupported(body, AxonRefusalCodes.CommandMapping, "compute the complete modeled command response");
     }
