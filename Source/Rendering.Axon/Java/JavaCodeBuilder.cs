@@ -34,6 +34,9 @@ internal sealed class JavaCodeBuilder(string package)
         return escaped.Append('"').ToString();
     }
 
+    internal static string UnsupportedComment(string intent, string modelPath, string code) =>
+        $"// Screenplay wanted to {CommentText(intent)} ({CommentText(modelPath)}), but this is not supported by the Axon target yet ({CommentText(code)}).";
+
     internal JavaCodeBuilder Import(string type)
     {
         _imports.Add(type);
@@ -48,7 +51,7 @@ internal sealed class JavaCodeBuilder(string package)
     }
 
     internal JavaCodeBuilder UnsupportedIntent(string intent, string modelPath, string code) =>
-        Line($"// Screenplay wanted to {CommentText(intent)} ({CommentText(modelPath)}), but this is not supported by the Axon target yet ({CommentText(code)}).");
+        Line(UnsupportedComment(intent, modelPath, code));
 
     internal JavaCodeBuilder DiffersFromScreenplay(string difference) =>
         Line($"// Differs from Screenplay: {CommentText(difference)}");

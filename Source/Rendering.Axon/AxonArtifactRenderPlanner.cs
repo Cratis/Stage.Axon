@@ -8,8 +8,7 @@ using Cratis.Stage.Rendering.Axon.Emitters;
 namespace Cratis.Stage.Rendering.Axon;
 
 /// <summary>
-/// Admits requests for the experimental Axon target. Scaffold emission awaits the verified Phase 0 runtime.
-/// No domain behavior or executable application is claimed by this initial skeleton.
+/// Plans the experimental Axon target, preserving explicit diagnostics for unsupported modeled behavior.
 /// </summary>
 public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
 {
@@ -27,7 +26,7 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
 
         return ArtifactRenderPlan.Create(
             request,
-            [.. context.Artifacts],
+            degradation.Refusals.IsEmpty ? [.. context.Artifacts] : [],
             [.. diagnostics, .. degradation.UnsupportedConstructs],
             [],
             degradation.Refusals,
@@ -37,6 +36,7 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
     static void Emit(AxonEmissionContext context)
     {
         foreach (var emitter in AxonEmitters.Ordered.Where(emitter => emitter.IsImplemented)) emitter.Emit(context);
+        UnsupportedSummary.Emit(context);
         if (context.Artifacts.Count == 0)
         {
             context.Degradation.Unsupported(
