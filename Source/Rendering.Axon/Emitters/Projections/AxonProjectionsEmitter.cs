@@ -73,19 +73,13 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             .Line($"@Namespace({JavaCodeBuilder.StringLiteral(package)})");
         code.Block($"public class {name}", body =>
         {
-            body.Line($"private final ReadModelStore<Object, {modelName}> store;");
-            updates.Field(body);
-            if (updates.Enabled) body.Line("@org.springframework.beans.factory.annotation.Autowired");
-            body.Block($"public {name}(@Qualifier({JavaCodeBuilder.StringLiteral(package + "." + modelName)}) ReadModelStore<Object, {modelName}> store{updates.Parameter})", constructor =>
-            {
-                constructor.Line("this.store = store;");
-                updates.Assign(constructor);
-            });
-            if (updates.Enabled) body.Block($"public {name}(ReadModelStore<Object, {modelName}> store)", constructor => constructor.Line("this(store, null);"));
+            body.Line($"private final ReadModelStore<Object, {modelName}> store;")
+                .Block($"public {name}(@Qualifier({JavaCodeBuilder.StringLiteral(package + "." + modelName)}) ReadModelStore<Object, {modelName}> store)", constructor => constructor.Line("this.store = store;"));
             foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
             {
                 var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == group.Key);
-                body.Line("@EventHandler").Block($"public void on({types.EventType(group.Key)} event)", method =>
+                if (updates.Enabled) body.Block($"public void on({types.EventType(group.Key)} event)", method => method.Line("on(event, null);"));
+                body.Line("@EventHandler").Block($"public void on({types.EventType(group.Key)} event{updates.Parameter})", method =>
                 {
                     foreach (var from in group) EmitFrom(context, types, method, projection, model, @event, from);
                     updates.Notify(method);

@@ -32,7 +32,7 @@ internal static class AxonViewLiveSpecs
                 @org.springframework.beans.factory.annotation.Autowired
                 private org.axonframework.messaging.queryhandling.gateway.QueryGateway gateway;
                 @org.springframework.beans.factory.annotation.Autowired
-                private org.axonframework.messaging.queryhandling.QueryUpdateEmitter updates;
+                private org.axonframework.common.configuration.Configuration configuration;
                 @org.springframework.beans.factory.annotation.Autowired
                 private {{projector}} projector;
                 @org.springframework.beans.factory.annotation.Autowired
@@ -61,7 +61,11 @@ internal static class AxonViewLiveSpecs
                         org.junit.jupiter.api.Assertions.assertNull(error.get());
                         org.junit.jupiter.api.Assertions.assertEquals(1, values.size());
                         org.junit.jupiter.api.Assertions.assertTrue(values.getFirst().rows().isEmpty());
-                        projector.on({{AxonViewEvents.Expression(context, types, given)}});
+                        configuration.getComponent(org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory.class).create()
+                            .executeWithResult(processing -> {
+                                projector.on({{AxonViewEvents.Expression(context, types, given)}}, org.axonframework.messaging.queryhandling.QueryUpdateEmitter.forContext(processing));
+                                return java.util.concurrent.CompletableFuture.completedFuture(null);
+                            }).get(10, java.util.concurrent.TimeUnit.SECONDS);
                         org.junit.jupiter.api.Assertions.assertTrue(changed.await(10, java.util.concurrent.TimeUnit.SECONDS), "Live query update timed out");
                         org.junit.jupiter.api.Assertions.assertNull(error.get());
                         org.junit.jupiter.api.Assertions.assertEquals(2, values.size());
@@ -70,7 +74,12 @@ internal static class AxonViewLiveSpecs
                         var active = subscription.get();
                         if (active != null) active.cancel();
                     }
-                    org.junit.jupiter.api.Assertions.assertEquals(0, updates.emitAndCount({{name}}.class, query -> true, {{name}}.Result::invalidation).orElseThrow());
+                    var remaining = configuration.getComponent(org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory.class).create()
+                        .executeWithResult(processing -> java.util.concurrent.CompletableFuture.completedFuture(
+                            org.axonframework.messaging.queryhandling.QueryUpdateEmitter.forContext(processing)
+                                .emitAndCount({{name}}.class, query -> true, {{name}}.Result::invalidation).orElseThrow()))
+                        .get(10, java.util.concurrent.TimeUnit.SECONDS);
+                    org.junit.jupiter.api.Assertions.assertEquals(0, remaining);
                 }
             }
             """).Build();

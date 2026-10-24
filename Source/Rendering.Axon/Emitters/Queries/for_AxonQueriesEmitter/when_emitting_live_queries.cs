@@ -31,6 +31,8 @@ public class when_emitting_live_queries : a_view_request
     [Fact] void should_cancel_the_native_registration() => _subscription.ShouldContain("if (upstream != null) upstream.cancel()");
     [Fact] void should_cancel_pending_reads() => _subscription.ShouldContain("if (pending != null) pending.cancel(false)");
     [Fact] void should_invalidate_after_projecting_an_event() => _projector.ShouldContain("LiveTotals.Result::invalidation");
+    [Fact] void should_resolve_updates_from_the_handler_context() => _projector.ShouldContain("event, org.axonframework.messaging.queryhandling.QueryUpdateEmitter updates)");
+    [Fact] void should_not_require_a_global_update_emitter() => _projector.ShouldNotContain("private final org.axonframework.messaging.queryhandling.QueryUpdateEmitter");
     [Fact] void should_emit_an_initial_and_update_native_test() => Source("LiveTotalsSubscriptionTest.java").ShouldContain("shouldDeliverInitialSnapshotAndUpdateAndReleaseRegistration");
     [Fact] void should_not_degrade_live_queries_to_snapshots() => _context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
 

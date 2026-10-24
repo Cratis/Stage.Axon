@@ -18,16 +18,6 @@ internal sealed class ProjectionUpdates(AxonEmissionContext context, ViewJavaTyp
 
     internal string DefaultArgument => Enabled ? ", null" : string.Empty;
 
-    internal void Field(JavaCodeBuilder code)
-    {
-        if (Enabled) code.Line("private final org.axonframework.messaging.queryhandling.QueryUpdateEmitter updates;");
-    }
-
-    internal void Assign(JavaCodeBuilder code)
-    {
-        if (Enabled) code.Line("this.updates = updates;");
-    }
-
     internal void Notify(JavaCodeBuilder code)
     {
         if (!Enabled) return;
