@@ -12,19 +12,23 @@ namespace Cratis.Stage.Rendering.Axon.Admission;
 internal sealed class AxonDegradation(ArtifactRenderProfile profile)
 {
     readonly List<ArtifactRenderDiagnostic> _diagnostics = [];
+    readonly List<AxonUnsupportedIntent> _intents = [];
 
     internal bool Strict { get; } = profile.Inputs.Any(input => input.Name == AxonRendering.StrictInput && Encoding.UTF8.GetString(input.Bytes.AsSpan()) == "true");
 
     internal IReadOnlyList<ArtifactRenderDiagnostic> UnsupportedConstructs => _diagnostics;
 
+    internal IReadOnlyList<AxonUnsupportedIntent> Intents => _intents;
+
     internal ImmutableArray<ArtifactRenderRefusal> Refusals => Strict
         ? [.. _diagnostics.Select(diagnostic => new ArtifactRenderRefusal(diagnostic.Artifact, "construct", [diagnostic.Code]))]
         : [];
 
-    internal ArtifactRenderDiagnostic Unsupported(string code, SemanticId construct, string reason)
+    internal ArtifactRenderDiagnostic Unsupported(string code, SemanticId construct, string reason, string? intent = null, string? modelPath = null)
     {
         var diagnostic = new ArtifactRenderDiagnostic(code, Strict ? ArtifactRenderDiagnosticSeverity.Error : ArtifactRenderDiagnosticSeverity.Warning, reason, construct);
         _diagnostics.Add(diagnostic);
+        _intents.Add(new(code, construct, intent ?? reason, modelPath ?? construct.ToString()));
         return diagnostic;
     }
 }
