@@ -22,6 +22,8 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
 
     internal Dictionary<SemanticId, AxonSpecificationEntry> Specifications { get; } = [];
 
+    internal Dictionary<SemanticId, AxonHttpScenario> HttpScenarios { get; } = [];
+
     internal IReadOnlyDictionary<string, SemanticSurfaceDisposition> SemanticSurface => SemanticSurfaceLedger.Entries;
 
     internal void AddJava(string package, string name, string code, bool test = false, params SemanticId[] sources) =>

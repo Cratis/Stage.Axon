@@ -56,5 +56,17 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
         code.ShouldContain(context.BasePackage + ".runtime.json.ConceptsModule");
     }
 
+    [Fact]
+    void should_replace_only_storage_beans_under_the_persistent_profile()
+    {
+        var wiring = context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/AxonConfiguration.java", StringComparison.Ordinal));
+        var code = Encoding.UTF8.GetString(wiring.Bytes.AsSpan());
+        code.ShouldContain("@Profile(\"!persistent\")\n    EventStorageEngine eventStorageEngine()");
+        code.ShouldContain("@Profile(\"!persistent\")\n    TokenStore tokenStore()");
+        code.ShouldContain("@Profile(\"!persistent\")\n    UniqueValueStore uniqueValueStore()");
+        code.ShouldContain("@Bean\n    Clock clock()");
+        code.ShouldContain("@Bean\n    JacksonModule conceptsModule()");
+    }
+
     string Content(string path) => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath == path).Bytes.AsSpan());
 }
