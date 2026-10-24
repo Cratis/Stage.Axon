@@ -21,27 +21,34 @@ public static class AxonRendering
     public const string Version = "0.1.0";
 
     internal const string OptionsInput = "axon-options";
+    internal const string StrictInput = "strict";
 
-    /// <summary>Creates a fully resolved profile. Non-refuse modes are retained for explicit admission refusal.</summary>
+    /// <summary>Creates a fully resolved profile. Unsupported constructs warn unless strict mode is enabled.</summary>
     /// <param name="implementationGaps">The requested implementation-gap policy.</param>
     /// <param name="refusals">The requested artifact-refusal policy.</param>
+    /// <param name="strict">Whether unsupported constructs produce errors and refusals instead of warnings.</param>
     /// <returns>The immutable Axon profile.</returns>
     public static ArtifactRenderProfile CreateProfile(
         ImplementationGapMode implementationGaps = ImplementationGapMode.Refuse,
-        ArtifactRefusalMode refusals = ArtifactRefusalMode.Refuse) =>
-        ArtifactRenderProfile.Create(
+        ArtifactRefusalMode refusals = ArtifactRefusalMode.Refuse,
+        bool strict = false)
+    {
+        ImmutableArray<ArtifactRenderInput> inputs = [ArtifactRenderInput.Create(OptionsInput, "1", [.. Encoding.UTF8.GetBytes($"{(int)implementationGaps}:{(int)refusals}")])];
+        if (strict) inputs = inputs.Add(ArtifactRenderInput.Create(StrictInput, "1", [.. Encoding.UTF8.GetBytes("true")]));
+        return ArtifactRenderProfile.Create(
             Target,
             Version,
             "stage-axon",
             Version,
-            [ArtifactRenderInput.Create(OptionsInput, "1", [.. Encoding.UTF8.GetBytes($"{(int)implementationGaps}:{(int)refusals}")])]);
+            inputs);
+    }
 
     /// <summary>Plans the selected scope from a compiler result, preserving its implementation sidecars.</summary>
     /// <param name="loaded">The compiled semantic model.</param>
     /// <param name="scope">The primary selected scope.</param>
     /// <param name="additionalScopes">Additional scopes to union with the primary scope.</param>
     /// <param name="profile">An optional resolved Axon profile.</param>
-    /// <returns>The scaffold-only plan, or an empty plan with admission errors.</returns>
+    /// <returns>The plan with explicit warnings for unsupported constructs, or errors for invalid requests and strict refusals.</returns>
     public static ArtifactRenderPlan PlanFrom(
         LoadedSemanticModel loaded,
         ArtifactRenderScope scope,

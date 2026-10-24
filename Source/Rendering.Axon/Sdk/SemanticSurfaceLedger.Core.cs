@@ -8,7 +8,7 @@ namespace Cratis.Stage.Rendering.Axon.Sdk;
 /// are deliberately deferred, not claimed as implemented. Later phases replace these dispositions
 /// with rendering or construct-specific refusals. Reflection is used only by the drift spec, never here.
 /// </summary>
-internal static class SemanticSurfaceLedger
+internal static partial class SemanticSurfaceLedger
 {
     // One row per audited semantic type. This intentionally long inventory has no inferred fallback.
     const string Members = """
@@ -24,10 +24,6 @@ internal static class SemanticSurfaceLedger
         SemanticModule Features Id Name
         SemanticFeature Features Id Name Slices
         SemanticSlice Commands Constraints Events Id Kind Name Projections Queries ReadModels Specifications Reducers Reactions Captures Direction
-        SemanticReducer Name ReadModel Transitions Key InitialState Result Target From
-        SemanticReducerTransition EventContract RequirementId
-        SemanticReducerKey EventSourceId
-        SemanticReducerResult StateOrDelete
         SemanticSliceKind StateChange StateView Automation Unknown Translate
         SemanticConcept Id Name Primitive Validations Values Numbers Compliance Generation
         SemanticGeneration Kind Prefix Case Size Alphabet Count Encoding Pattern Checksum Minimum Maximum RequirementId
@@ -42,11 +38,6 @@ internal static class SemanticSurfaceLedger
         SemanticValidationRule Kind Message Property Severity Operand Name RequirementId
         SemanticValidationRuleKind NotEmpty Maximum Minimum Equal NotEqual GreaterThan GreaterThanOrEqual LessThan LessThanOrEqual Length AllGreaterThan AllGreaterThanOrEqual Matches Checksum Contains NotContains StartsWith EndsWith RulePredicate CodeValidation DecimalPlaces Unknown
         SemanticValidationSeverity Error Information Warning
-        SemanticCommand Id Name Properties Validations Produces Destination Requirements Authorization Route Handler CodeValidations Response Reads
-        SemanticCommandHandler RequirementId ResultVersion
-        SemanticCodeValidation RequirementId
-        SemanticCommandRoute Source Stream StreamId StreamIdParts
-        SemanticCommandRoutePart Part Value
         SemanticEventSource Id IdentifierType Name SourceKind Streams
         SemanticEventStream Id Name StreamIdParts StreamIdType StreamKind
         SemanticStreamIdPart Name Type
@@ -67,39 +58,6 @@ internal static class SemanticSurfaceLedger
         SemanticEventContextExpression Type Value
         SemanticEventContextValueKind Occurred Unknown EventSourceIdentity CausedBySubject CausedByName CausedByUserName
         SemanticValueExpression Value
-        SemanticReadModel Id Name Properties
-        SemanticProjection Id Name ReadModel Transitions Scope Target
-        SemanticProjectionTransition AffectedInstance EventContract Mappings
-        SemanticAffectedInstance Cardinality Key
-        AffectedInstanceCardinality One Unknown Many ZeroOrOne
-        SemanticKeyedQuery Argument Cardinality Delivery Id KeyProperty Name ReadModel Authorization Filters KeyParts
-        SemanticQueryKeyPart Id Name Type KeyProperty
-        SemanticQueryFilter Id Name Type Property
-        SemanticQueryFilterValue Filter Value
-        SemanticReadModelQueryArgument Id Name Type
-        SemanticQueryCardinality ZeroOrOne Many Unknown One
-        SemanticQueryDelivery Snapshot Live Unknown
-        SemanticProjectionScope Children From Joins Every JoinRemovals Nested Removals
-        SemanticProjectionChildren IdentifiedBy Property Scope
-        SemanticProjectionCompositeKey Parts Type
-        SemanticProjectionEventContextValue Path
-        SemanticProjectionEventProperty Path
-        SemanticProjectionEvery IncludeChildren Mappings SubscribesToAllEvents
-        SemanticProjectionFrom EventContract Key Mappings ParentKey
-        SemanticProjectionJoin EventContract Mappings On Key
-        SemanticProjectionJoinRemoval EventContract Key
-        SemanticProjectionKey Kind
-        SemanticProjectionKeyKind Value Unknown Composite Parts
-        SemanticProjectionPartsKey Parts
-        SemanticProjectionKeyPart Property Value
-        SemanticProjectionLiteral Value
-        SemanticProjectionMapping Operation Source Target Factor
-        SemanticProjectionNested Property Scope
-        SemanticProjectionOperation Set Add Subtract Increment Decrement Clear Unknown
-        SemanticProjectionRemoval EventContract Key ParentKey
-        SemanticProjectionValue Kind
-        SemanticProjectionValueKey Value
-        SemanticProjectionValueKind EventProperty EventSourceIdentity Literal Unknown EventContext
         SemanticSpecification Id Name GivenEvents GivenReadModels GivenCaller ThenEvents ThenEventsInAnyOrder ThenReadModels ThenQueries ThenErrors ThenDenied When ThenAbsentReadModels WhenAppended ThenNoEvents WhenRedelivered GivenCaptures GivenClock WhenCapture WhenClock WhenTrigger GivenGenerated ThenReturns
         SemanticSpecificationAbsentReadModel Key ReadModel
         SemanticSpecificationRedelivery Reaction Given
@@ -218,8 +176,18 @@ internal static class SemanticSurfaceLedger
     static Dictionary<string, SemanticSurfaceDisposition> Build()
     {
         var entries = new Dictionary<string, SemanticSurfaceDisposition>(StringComparer.Ordinal);
+        AddMembers(entries, Members);
+        AddMembers(entries, ViewsMembers);
+        AddMembers(entries, ChangesMembers);
+        entries["ExecutableSemanticModel.LanguageVersion"] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-VERSION");
+        entries["ExecutableSemanticModel.SemanticVersion"] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-VERSION");
+        return entries;
+    }
+
+    static void AddMembers(Dictionary<string, SemanticSurfaceDisposition> entries, string members)
+    {
         var deferred = new SemanticSurfaceDisposition(SemanticSurfaceDispositionKind.Ignored, "Phase 1 is scaffold-only; domain behavior is not emitted.");
-        foreach (var line in Members.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var line in members.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             foreach (var member in parts.Skip(1))
@@ -227,9 +195,5 @@ internal static class SemanticSurfaceLedger
                 entries.Add($"{parts[0]}.{member}", deferred);
             }
         }
-
-        entries["ExecutableSemanticModel.LanguageVersion"] = new(SemanticSurfaceDispositionKind.Rejected, "STAGE-AXON-VERSION");
-        entries["ExecutableSemanticModel.SemanticVersion"] = new(SemanticSurfaceDispositionKind.Rejected, "STAGE-AXON-VERSION");
-        return entries;
     }
 }

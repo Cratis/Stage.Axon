@@ -15,12 +15,12 @@ internal static class AxonAdmission
     internal static bool Supports(ExecutableSemanticModel model) =>
         (model.LanguageVersion.Major, model.LanguageVersion.Minor, model.SemanticVersion.Major, model.SemanticVersion.Minor) == (2, 0, 2, 0);
 
-    internal static ImmutableArray<ArtifactRenderDiagnostic> Inspect(ArtifactRenderRequest request)
+    internal static ImmutableArray<ArtifactRenderDiagnostic> Inspect(ArtifactRenderRequest request, AxonDegradation degradation)
     {
         var diagnostics = ImmutableArray.CreateBuilder<ArtifactRenderDiagnostic>();
         if (!Supports(request.Model))
         {
-            diagnostics.Add(Error(AxonRefusalCodes.Version, "Axon scaffolding admits only the measured language/semantic pair 2.0/2.0.", request));
+            degradation.Unsupported(AxonRefusalCodes.Version, request.Model.Application.Id, "Axon scaffolding admits only the measured language/semantic pair 2.0/2.0.");
         }
 
         InspectProfile(request, diagnostics);
@@ -33,28 +33,40 @@ internal static class AxonAdmission
         var profile = request.Profile;
         if (profile.Target != AxonRendering.Target || profile.TargetVersion != AxonRendering.Version ||
             profile.Renderer != "stage-axon" || profile.RendererVersion != AxonRendering.Version ||
-            profile.Inputs.Length != 1 || profile.Inputs[0].Name != AxonRendering.OptionsInput || profile.Inputs[0].Version != "1")
+            !ValidInputs(profile))
         {
             diagnostics.Add(Error(AxonRefusalCodes.Profile, "The resolved profile is not a supported Axon scaffold profile.", request));
             return;
         }
 
-        var modes = Encoding.UTF8.GetString(profile.Inputs[0].Bytes.AsSpan()).Split(':');
+        var options = profile.Inputs.Single(input => input.Name == AxonRendering.OptionsInput);
+        var modes = Encoding.UTF8.GetString(options.Bytes.AsSpan()).Split(':');
         if (modes.Length != 2)
         {
             diagnostics.Add(Error(AxonRefusalCodes.Profile, "The Axon mode input is malformed.", request));
             return;
         }
 
-        if (modes[0] != "0")
+        if (modes[0] != "0" && modes[0] != "1")
         {
-            diagnostics.Add(Error(AxonRefusalCodes.GapMode, "Axon does not support implementation-gap stubs; use Refuse.", request));
+            diagnostics.Add(Error(AxonRefusalCodes.GapMode, "Axon requires a known implementation-gap policy.", request));
         }
 
-        if (modes[1] != "0")
+        if (modes[1] != "0" && modes[1] != "1")
         {
-            diagnostics.Add(Error(AxonRefusalCodes.RefusalMode, "Axon does not support render-around plans; use Refuse.", request));
+            diagnostics.Add(Error(AxonRefusalCodes.RefusalMode, "Axon requires a known refusal policy.", request));
         }
+    }
+
+    static bool ValidInputs(ArtifactRenderProfile profile) =>
+        profile.Inputs.Count(input => input.Name == AxonRendering.OptionsInput) == 1 &&
+        profile.Inputs.Count(input => input.Name == AxonRendering.StrictInput) <= 1 &&
+        profile.Inputs.All(input => input.Name == AxonRendering.OptionsInput ? input.Version == "1" : ValidStrictInput(input));
+
+    static bool ValidStrictInput(ArtifactRenderInput input)
+    {
+        var value = Encoding.UTF8.GetString(input.Bytes.AsSpan());
+        return input.Name == AxonRendering.StrictInput && input.Version == "1" && (value == "true" || value == "false");
     }
 
     static void InspectScopes(ArtifactRenderRequest request, ImmutableArray<ArtifactRenderDiagnostic>.Builder diagnostics)

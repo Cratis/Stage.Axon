@@ -10,7 +10,7 @@
     <!-- These precursors are exercised by specs only until scaffold emission is implemented. -->
     <ItemGroup Condition="'$(Configuration)' == 'Release'">
         <Compile Remove="Java/**/*.cs" />
-        <Compile Remove="Sdk/SemanticSurfaceLedger.cs" />
+        <Compile Remove="Sdk/SemanticSurfaceLedger.*.cs" />
         <Compile Remove="Sdk/SemanticSurfaceDisposition.cs" />
     </ItemGroup>
     <ItemGroup>

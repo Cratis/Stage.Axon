@@ -3,6 +3,7 @@
 
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters;
 
 namespace Cratis.Stage.Rendering.Axon;
 
@@ -16,16 +17,32 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
     /// <exception cref="InvalidArtifactRenderContract">The request does not satisfy the artifact render contract, including scope selection.</exception>
     public ArtifactRenderPlan Plan(ArtifactRenderRequest request)
     {
-        var diagnostics = AxonAdmission.Inspect(request);
-        if (diagnostics.IsEmpty)
+        var degradation = new AxonDegradation(request.Profile);
+        var diagnostics = AxonAdmission.Inspect(request, degradation);
+        var context = new AxonEmissionContext(request, degradation);
+        if (diagnostics.IsEmpty && degradation.Refusals.IsEmpty)
         {
-            diagnostics = [new(
-                AxonRefusalCodes.Scaffold,
-                ArtifactRenderDiagnosticSeverity.Error,
-                "Axon scaffold emission is unavailable until the Phase 0 runtime has been verified.",
-                request.Model.Application.Id)];
+            Emit(context);
         }
 
-        return ArtifactRenderPlan.Create(request, [], diagnostics);
+        return ArtifactRenderPlan.Create(
+            request,
+            [.. context.Artifacts],
+            [.. diagnostics, .. degradation.UnsupportedConstructs],
+            [],
+            degradation.Refusals,
+            []);
+    }
+
+    static void Emit(AxonEmissionContext context)
+    {
+        foreach (var emitter in AxonEmitters.Ordered.Where(emitter => emitter.IsImplemented)) emitter.Emit(context);
+        if (context.Artifacts.Count == 0)
+        {
+            context.Degradation.Unsupported(
+                AxonRefusalCodes.Scaffold,
+                context.Request.Model.Application.Id,
+                "Axon scaffold emission is unavailable until the Phase 0 runtime has been verified.");
+        }
     }
 }

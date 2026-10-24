@@ -7,6 +7,7 @@ internal enum SemanticSurfaceDispositionKind
 {
     Rendered,
     Rejected,
+    Warned,
     Ignored
 }
 
