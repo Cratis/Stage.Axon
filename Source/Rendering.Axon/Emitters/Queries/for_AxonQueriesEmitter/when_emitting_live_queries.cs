@@ -34,6 +34,7 @@ public class when_emitting_live_queries : a_view_request
     [Fact] void should_resolve_updates_from_the_handler_context() => _projector.ShouldContain("event, org.axonframework.messaging.queryhandling.QueryUpdateEmitter updates)");
     [Fact] void should_not_require_a_global_update_emitter() => _projector.ShouldNotContain("private final org.axonframework.messaging.queryhandling.QueryUpdateEmitter");
     [Fact] void should_emit_an_initial_and_update_native_test() => Source("LiveTotalsSubscriptionTest.java").ShouldContain("shouldDeliverInitialSnapshotAndUpdateAndCancelAxonPublisher");
+    [Fact] void should_serialize_expected_sse_values_with_the_application_concept_mapper() => Source("LiveTotalsSseTest.java").ShouldContain("var mapper = application.getBean(tools.jackson.databind.json.JsonMapper.class);");
     [Fact] void should_emit_an_http_sse_probe() => Source("LiveTotalsSseTest.java").ShouldContain("shouldDeliverInitialDataAndOneUpdateOverHttpSse");
     [Fact] void should_complete_active_streams_before_web_server_shutdown() => Source("LiveTotalsStreams.java").ShouldContain("ApplicationListener<org.springframework.context.event.ContextClosedEvent>");
     [Fact] void should_close_every_session_on_context_close() => Source("LiveTotalsStreams.java").ShouldContain("sessions.forEach(Session::stop)");

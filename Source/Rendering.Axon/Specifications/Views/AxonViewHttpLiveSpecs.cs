@@ -38,7 +38,7 @@ internal static class AxonViewHttpLiveSpecs
                                  var reader = new java.io.BufferedReader(new java.io.InputStreamReader(stream, java.nio.charset.StandardCharsets.UTF_8))) {
                                 org.junit.jupiter.api.Assertions.assertEquals(200, response.statusCode());
                                 org.junit.jupiter.api.Assertions.assertTrue(response.headers().firstValue("Content-Type").orElse("").startsWith("text/event-stream"));
-                                var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+                                var mapper = application.getBean(tools.jackson.databind.json.JsonMapper.class);
                                 var initial = mapper.readTree(executor.submit(() -> nextData(reader)).get(10, java.util.concurrent.TimeUnit.SECONDS));
                                 org.junit.jupiter.api.Assertions.assertTrue(initial.isArray());
                                 org.junit.jupiter.api.Assertions.assertEquals(0, initial.size());
