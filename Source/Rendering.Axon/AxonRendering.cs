@@ -9,8 +9,8 @@ using Cratis.Stage.Contracts.Semantics;
 namespace Cratis.Stage.Rendering.Axon;
 
 /// <summary>
-/// Plans an experimental, scaffold-only Axon Framework application without writing files.
-/// Domain handlers, projections, policies and specifications are not emitted in this phase.
+/// Plans an experimental Axon Framework application without writing files.
+/// Constructs the target cannot express yet degrade to comments, warnings and ledger entries instead of failing the render.
 /// </summary>
 public static class AxonRendering
 {
