@@ -14,16 +14,9 @@ internal static class AxonEventSources
     {
         var producers = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Commands)
             .SelectMany(command => command.Produces.Where(produced => produced.EventContract == contract.Id).Select(produced => (Command: command, Produced: produced)));
-        foreach (var (command, produced) in producers)
-        {
-            var route = produced.Route ?? command.Route;
-            var source = route is null ? null : context.Request.Model.Application.EventSources.FirstOrDefault(source => source.Id == route.Source);
-            var identifier = Concept(context, produced.DestinationType) ?? Concept(context, command.Destination?.Type) ?? Concept(context, source?.IdentifierType)
-                ?? command.Properties.Where(property => property.IsIdentifier).Select(property => Concept(context, property.Type)).FirstOrDefault(concept => concept is not null);
-            if (identifier is not null) return Tag(context, identifier);
-        }
-        var modeled = contract.Properties.Where(property => property.IsIdentifier).Select(property => Concept(context, property.Type)).FirstOrDefault(concept => concept is not null);
-        return modeled is not null ? Tag(context, modeled) : ("eventSourceId", context.BasePackage + ".runtime.EventSourceId", "eventSourceId");
+        var identifier = producers.Select(pair => FromProducer(context, pair.Command, pair.Produced)).FirstOrDefault(concept => concept is not null)
+            ?? Identifier(context, contract.Properties);
+        return identifier is not null ? Tag(context, identifier) : ("eventSourceId", context.BasePackage + ".runtime.EventSourceId", "eventSourceId");
     }
 
     internal static string Record(AxonEmissionContext context, string package, SemanticEventContract contract, string annotation)
@@ -46,6 +39,20 @@ internal static class AxonEventSources
         }
         return code.Line(annotation).Line($"public record {JavaNames.Type(contract.Name)}({string.Join(", ", parameters)}) {{}}").Build();
     }
+
+    static SemanticConcept? FromProducer(AxonEmissionContext context, SemanticCommand command, SemanticProducedEvent produced) =>
+        Concept(context, produced.DestinationType) ?? Concept(context, command.Destination?.Type)
+        ?? FromRoute(context, produced.Route ?? command.Route) ?? Identifier(context, command.Properties);
+
+    static SemanticConcept? FromRoute(AxonEmissionContext context, SemanticCommandRoute? route)
+    {
+        if (route is null) return null;
+        var source = context.Request.Model.Application.EventSources.FirstOrDefault(source => source.Id == route.Source);
+        return Concept(context, source?.IdentifierType);
+    }
+
+    static SemanticConcept? Identifier(AxonEmissionContext context, IEnumerable<SemanticProperty> properties) =>
+        properties.Where(property => property.IsIdentifier).Select(property => Concept(context, property.Type)).FirstOrDefault(concept => concept is not null);
 
     static SemanticConcept? Concept(AxonEmissionContext context, SemanticTypeReference? type) =>
         type?.Kind == SemanticTypeReferenceKind.Concept ? context.Request.Model.Application.Concepts.FirstOrDefault(concept => concept.Id == type.Target) : null;

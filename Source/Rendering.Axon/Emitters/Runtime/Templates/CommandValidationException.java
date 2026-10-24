@@ -9,14 +9,14 @@ import java.util.List;
 public final class CommandValidationException extends RuntimeException {
     @Serial
     private static final long serialVersionUID = 1L;
-    private final List<ValidationError> errors;
+    private final ValidationError[] errors;
 
     public CommandValidationException(String message) { this(List.of(new ValidationError("", message))); }
 
     public CommandValidationException(List<ValidationError> errors) {
         super("Command validation failed");
-        this.errors = List.copyOf(errors);
+        this.errors = errors.toArray(ValidationError[]::new);
     }
 
-    public List<ValidationError> errors() { return errors; }
+    public List<ValidationError> errors() { return List.of(errors); }
 }

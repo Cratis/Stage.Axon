@@ -19,7 +19,9 @@ public record Caller(String identity, boolean authenticated, Set<String> roles, 
 
     public static Caller current() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) return anonymous();
+        if (authentication == null) return anonymous();
+        if (!authentication.isAuthenticated()) return anonymous();
+        if (authentication instanceof AnonymousAuthenticationToken) return anonymous();
         var roles = authentication.getAuthorities().stream().map(authority -> authority.getAuthority())
             .filter(authority -> authority.startsWith("ROLE_")).map(authority -> authority.substring(5)).collect(Collectors.toSet());
         return new Caller(authentication.getName(), true, roles, Map.of());

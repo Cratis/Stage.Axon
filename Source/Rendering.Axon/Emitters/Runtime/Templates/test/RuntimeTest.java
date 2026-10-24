@@ -16,13 +16,42 @@ import tools.jackson.core.type.TypeReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RuntimeTest {
-    public record Id(UUID value) implements ConceptAs<UUID> {}
+    public record Id(UUID value) implements ConceptAs<UUID>, Generatable<Id> {
+        public static Id create() { return new Id(GenerateValue.uuid()); }
+    }
+    public record TimedId(UUID value) implements ConceptAs<UUID>, GeneratableInContext<TimedId> {
+        public static TimedId create(GenerationContext context) {
+            if (context == null) throw new IllegalArgumentException("Generation context is required");
+            return new TimedId(GenerateValue.uuid());
+        }
+    }
     public record Text(String value) implements ConceptAs<String> {}
     public record Whole(Long value) implements ConceptAs<Long> {}
     public record Number(BigDecimal value) implements ConceptAs<BigDecimal> {}
     public record Flag(Boolean value) implements ConceptAs<Boolean> {}
     public record Date(LocalDate value) implements ConceptAs<LocalDate> {}
     public record Time(OffsetDateTime value) implements ConceptAs<OffsetDateTime> {}
+
+    @Test
+    void callerIsResolvedFromTheCurrentSecurityContext() {
+        var context = org.springframework.security.core.context.SecurityContextHolder.getContext();
+        context.setAuthentication(null);
+        assertFalse(Caller.current().authenticated());
+        try {
+            var authority = new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_Sales");
+            context.setAuthentication(org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("sales", null, java.util.List.of(authority)));
+            assertTrue(Caller.current().authenticated());
+            assertEquals("sales", Caller.current().identity());
+            assertEquals(java.util.Set.of("Sales"), Caller.current().roles());
+        } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+    }
+
+    @Test
+    void generationUsesTheSelfTypedMarkers() {
+        assertInstanceOf(Generatable.class, Id.create());
+        assertInstanceOf(GeneratableInContext.class, TimedId.create(GenerationContext.current()));
+        assertThrows(IllegalArgumentException.class, () -> TimedId.create(null));
+    }
 
     @Test
     void conceptsUsePrimitiveJsonAndCanonicalConstructors() {
@@ -68,6 +97,17 @@ class RuntimeTest {
         assertFalse(store.claim("email", "value", "second"));
         store.release("email", "value", "first");
         assertTrue(store.claim("email", "value", "second"));
+    }
+
+    @Test
+    void validationErrorsSurviveExceptionSerialization() throws Exception {
+        var original = new CommandValidationException(java.util.List.of(new ValidationError("amount", "Must be positive")));
+        var bytes = new java.io.ByteArrayOutputStream();
+        try (var output = new java.io.ObjectOutputStream(bytes)) { output.writeObject(original); }
+        try (var input = new java.io.ObjectInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray()))) {
+            var restored = (CommandValidationException) input.readObject();
+            assertEquals(original.errors(), restored.errors());
+        }
     }
 
     @Test
