@@ -21,7 +21,8 @@ internal sealed class AxonDegradation(ArtifactRenderProfile profile)
     internal IReadOnlyList<AxonUnsupportedIntent> Intents => _intents;
 
     internal ImmutableArray<ArtifactRenderRefusal> Refusals => Strict
-        ? [.. _diagnostics.Select(diagnostic => new ArtifactRenderRefusal(diagnostic.Artifact, "construct", [diagnostic.Code]))]
+        ? [.. _diagnostics.GroupBy(diagnostic => (diagnostic.Artifact, Kind: "construct"))
+            .Select(group => new ArtifactRenderRefusal(group.Key.Artifact, group.Key.Kind, [.. group.Select(diagnostic => diagnostic.Code).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)]))]
         : [];
 
     internal ArtifactRenderDiagnostic Unsupported(string code, SemanticId construct, string reason, string? intent = null, string? modelPath = null)
