@@ -2,10 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
-using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
+using Cratis.Stage.Rendering.Axon.Specifications.Views;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
 
@@ -29,18 +30,30 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                 var name = JavaNames.Type(query.Name);
                 EmitRecord(context, package, query, name, modelType, shape);
                 EmitHandler(context, types, package, query, name, modelType, shape);
-                EmitEndpoint(context, located, package, query, name, modelType, shape);
+                new QueryEndpoint(context, types, located, query, modelType, shape).Emit();
+                if (query.Delivery != SemanticQueryDelivery.Live) continue;
+                LiveQuerySubscription.Emit(context, package, query);
+                AxonViewLiveSpecs.Emit(context, types, located, query, owner, model);
             }
         }
     }
 
-    static string RouteSegment(string name) => string.Concat(name.Select((character, index) =>
-        char.IsUpper(character) && index > 0 && char.IsLower(name[index - 1]) ? "-" + char.ToLowerInvariant(character) : char.ToLowerInvariant(character).ToString())).Replace('_', '-');
-
     static void EmitRecord(AxonEmissionContext context, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
     {
+        var live = query.Delivery == SemanticQueryDelivery.Live;
         var code = new JavaCodeBuilder(package).Block($"public record {name}({shape.Components})", body =>
-            body.Line($"public record Result(java.util.List<{modelType}> rows) {{}}"));
+        {
+            if (live)
+            {
+                body.Block($"public record Result(java.util.List<{modelType}> rows, boolean invalidated)", result => result
+                    .Block($"public Result(java.util.List<{modelType}> rows)", constructor => constructor.Line("this(rows, false);"))
+                    .Block("public static Result invalidation()", factory => factory.Line("return new Result(java.util.List.of(), true);")));
+            }
+            else
+            {
+                body.Line($"public record Result(java.util.List<{modelType}> rows) {{}}");
+            }
+        });
         ViewJavaTypes.Add(context, package, name, code.Build(), query.Id);
     }
 
@@ -48,59 +61,26 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
     {
         var code = new JavaCodeBuilder(package)
             .Import("org.springframework.stereotype.Component").Import("org.springframework.beans.factory.annotation.Qualifier")
+            .Import("org.springframework.security.access.prepost.PreAuthorize")
             .Import("org.axonframework.messaging.queryhandling.annotation.QueryHandler").Import(types.BasePackage + ".runtime.ReadModelStore")
             .Line($"@Component({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")
             .Block($"public class {name}Handler", body =>
             {
                 body.Line($"private final ReadModelStore<Object, {modelType}> store;")
-                    .Block($"public {name}Handler(@Qualifier({JavaCodeBuilder.StringLiteral(modelType)}) ReadModelStore<Object, {modelType}> store)", constructor => constructor.Line("this.store = store;"))
-                    .Line("@QueryHandler").Block($"public {name}.Result handle({name} query)", method =>
-                    {
-                        var predicate = shape.Predicate;
-                        method.Line($"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
-                        if (query.Cardinality == SemanticQueryCardinality.One)
-                            method.Line("if (rows.size() != 1) throw new IllegalStateException(\"Expected exactly one query result\");");
-                        if (query.Cardinality == SemanticQueryCardinality.ZeroOrOne)
-                            method.Line("if (rows.size() > 1) throw new IllegalStateException(\"Expected at most one query result\");");
-                        method.Line($"return new {name}.Result(rows);");
-                    });
+                    .Block($"public {name}Handler(@Qualifier({JavaCodeBuilder.StringLiteral(modelType)}) ReadModelStore<Object, {modelType}> store)", constructor => constructor.Line("this.store = store;"));
+                var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
+                if (authorization.Length > 0) body.Line(authorization);
+                body.Line("@QueryHandler").Block($"public {name}.Result handle({name} query)", method =>
+                {
+                    var predicate = shape.Predicate;
+                    method.Line($"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
+                    if (query.Cardinality == SemanticQueryCardinality.One)
+                        method.Line("if (rows.size() != 1) throw new IllegalStateException(\"Expected exactly one query result\");");
+                    if (query.Cardinality == SemanticQueryCardinality.ZeroOrOne)
+                        method.Line("if (rows.size() > 1) throw new IllegalStateException(\"Expected at most one query result\");");
+                    method.Line($"return new {name}.Result(rows);");
+                });
             });
         ViewJavaTypes.Add(context, package, name + "Handler", code.Build(), query.Id);
-    }
-
-    static void EmitEndpoint(AxonEmissionContext context, LocatedSemanticSlice located, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
-    {
-        var code = new JavaCodeBuilder(package)
-            .Import("org.springframework.web.bind.annotation.RestController").Import("org.springframework.web.bind.annotation.GetMapping")
-            .Import("org.springframework.web.bind.annotation.RequestParam").Import("org.springframework.http.ResponseEntity")
-            .Import("org.axonframework.messaging.queryhandling.gateway.QueryGateway")
-            .Line($"@RestController({JavaCodeBuilder.StringLiteral(package + "." + name + "Endpoint")})");
-        code.Block($"public class {name}Endpoint", body =>
-        {
-            body.Line("private final QueryGateway gateway;")
-                .Block($"public {name}Endpoint(QueryGateway gateway)", constructor => constructor.Line("this.gateway = gateway;"));
-            if (query.Authorization is not null)
-            {
-                context.Degradation.Unsupported(AxonRefusalCodes.QueryAuthorization, query.Id, "Authorize this query with the modeled caller policy.");
-                body.UnsupportedIntent("authorize this query", query.Id.ToString(), AxonRefusalCodes.QueryAuthorization)
-                    .Line("@org.springframework.security.access.prepost.PreAuthorize(\"denyAll()\")");
-            }
-            if (query.Delivery == SemanticQueryDelivery.Live)
-            {
-                context.Degradation.Unsupported(AxonRefusalCodes.ObservableQuery, query.Id, "Deliver live query updates.");
-                body.DiffersFromScreenplay("this endpoint currently returns a snapshot rather than live query updates.");
-            }
-            var route = $"/api/{RouteSegment(located.Module.Name)}/{string.Join('/', located.Features.Select(feature => RouteSegment(feature.Name)))}/{RouteSegment(query.Name)}";
-            body.Line($"@GetMapping({JavaCodeBuilder.StringLiteral(route)})");
-            var result = query.Cardinality == SemanticQueryCardinality.Many ? $"java.util.List<{modelType}>" : modelType;
-            body.Block($"public java.util.concurrent.CompletableFuture<ResponseEntity<{result}>> get({shape.Parameters})", method =>
-            {
-                var mapped = query.Cardinality == SemanticQueryCardinality.Many
-                    ? "ResponseEntity.ok(result.rows())"
-                    : "result.rows().isEmpty() ? ResponseEntity.notFound().build() : ResponseEntity.ok(result.rows().getFirst())";
-                method.Line($"return gateway.query(new {name}({shape.Parsed}), {name}.Result.class).thenApply(result -> {mapped});");
-            });
-        });
-        ViewJavaTypes.Add(context, package, name + "Endpoint", code.Build(), query.Id);
     }
 }

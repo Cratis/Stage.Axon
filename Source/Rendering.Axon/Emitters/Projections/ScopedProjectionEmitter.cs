@@ -9,6 +9,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
 internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticProjection projection, SemanticReadModel model)
 {
+    readonly ProjectionUpdates _updates = new(context, types, model.Id);
     readonly ProjectionScopeNode _root = ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, JavaNames.Type(model.Name));
 
     internal static string Cache(ProjectionScopeNode node, int index) => "join" + node.Name + index;
@@ -45,14 +46,19 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             .Line("private final java.util.List<java.util.function.BooleanSupplier> pending = new java.util.ArrayList<>();")
             .Line("private record Change<T>(T value, boolean touched, boolean ancestors) {}")
             .DiffersFromScreenplay("projection join indexes are replay-built; restore them by replaying events after restarting a persistent store.");
+        _updates.Field(code);
         foreach (var node in _root.All)
         {
             for (var index = 0; index < node.Scope.Joins.Length; index++)
                 code.Line($"private final java.util.Map<String, java.util.function.UnaryOperator<{node.Type}>> {Cache(node, index)} = new java.util.HashMap<>();");
         }
         code.Line("@org.springframework.beans.factory.annotation.Autowired")
-            .Block($"public {name}(@Qualifier({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) ReadModelStore<Object, {_root.Type}> store, java.time.Clock clock)", constructor => constructor.Line("this.store = store;").Line("this.clock = clock;"))
-            .Block($"public {name}(ReadModelStore<Object, {_root.Type}> store)", constructor => constructor.Line("this(store, java.time.Clock.systemUTC());"));
+            .Block($"public {name}(@Qualifier({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) ReadModelStore<Object, {_root.Type}> store, java.time.Clock clock{_updates.Parameter})", constructor =>
+            {
+                constructor.Line("this.store = store;").Line("this.clock = clock;");
+                _updates.Assign(constructor);
+            })
+            .Block($"public {name}(ReadModelStore<Object, {_root.Type}> store)", constructor => constructor.Line($"this(store, java.time.Clock.systemUTC(){_updates.DefaultArgument});"));
     }
 
     void Handler(JavaCodeBuilder code, SemanticEventContract @event, ProjectionScopeMethods methods)
@@ -64,12 +70,13 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             {
                 foreach (var node in _root.All) methods.Caches(body, node, @event);
                 var deferred = _root.All.Any(node => node.Identity is not null && (node.Scope.From.Any(from => from.EventContract == @event.Id) || node.Scope.Removals.Any(removal => removal.EventContract == @event.Id)));
-                if (deferred) body.Line($"if (!{method}(event, message)) pending.add(() -> {method}(event, message));");
-                else body.Line($"{method}(event, message);");
+                body.Line($"boolean modified = {method}(event, message);");
+                if (deferred) body.Line($"if (!modified) pending.add(() -> {method}(event, message));");
                 body.Line("boolean progressed;").Block("do", loop => loop
                     .Line("progressed = false;").Line("var iterator = pending.iterator();")
-                    .Block("while (iterator.hasNext())", iteration => iteration.Block("if (iterator.next().getAsBoolean())", found => found.Line("iterator.remove();").Line("progressed = true;"))))
+                    .Block("while (iterator.hasNext())", iteration => iteration.Block("if (iterator.next().getAsBoolean())", found => found.Line("iterator.remove();").Line("progressed = true;").Line("modified = true;"))))
                     .Line("while (progressed);");
+                if (_updates.Enabled) body.Block("if (modified)", _updates.Notify);
             }).Block($"private boolean {method}({eventType} event, EventMessage message)", body =>
         {
             var values = new ProjectionValues(context, types);

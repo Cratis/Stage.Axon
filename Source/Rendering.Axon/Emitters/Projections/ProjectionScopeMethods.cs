@@ -36,8 +36,11 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             Joins(body, node, @event);
             foreach (var removal in node.Scope.Removals.Where(removal => removal.EventContract == @event.Id))
                 body.Line($"if ({Matches(removal.Key, removal.ParentKey, @event, node)}) return new Change<>(null, true, true);");
-            foreach (var removal in node.Scope.JoinRemovals.Where(removal => removal.EventContract == @event.Id))
-                body.Line($"if (java.util.Objects.equals(key, {_values.Key(removal.Key, @event)})) return new Change<>(null, true, true);");
+            if (node.Identity is not null)
+            {
+                foreach (var removal in node.Scope.JoinRemovals.Where(removal => removal.EventContract == @event.Id))
+                    body.Line($"if (java.util.Objects.equals(key, {_values.Key(removal.Key, @event)})) return new Change<>(null, true, false);");
+            }
             Descendants(body, node, @event);
             if (node == root && node.Scope.Every is { SubscribesToAllEvents: true } && !Known(@event))
             {
@@ -98,10 +101,11 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
         foreach (var nested in node.Nested)
         {
             var property = nested.Property!;
-            code.Line($"var {nested.Name} = {Method(nested, @event)}(event, message, key, parentKey, state.{JavaNames.Member(property.Name)}());")
-                .Block($"if ({nested.Name}.touched())", changed => changed
-                    .Line($"state = {_records.Set(node.Type, node.Properties, [property.Id], "state", nested.Name + ".value()")};")
-                    .Line("childTouched = true;").Line($"childAncestors |= {nested.Name}.ancestors();"));
+            var variable = JavaNames.Member(nested.Name);
+            code.Line($"var {variable} = {Method(nested, @event)}(event, message, key, parentKey, state.{JavaNames.Member(property.Name)}());")
+                .Block($"if ({variable}.touched())", changed => changed
+                    .Line($"state = {_records.Set(node.Type, node.Properties, [property.Id], "state", variable + ".value()")};")
+                    .Line("childTouched = true;").Line($"childAncestors |= {variable}.ancestors();"));
         }
         foreach (var child in node.Children) Children(code, node, child, @event);
         if (node.Scope.Every is { IncludeChildren: true } every)
@@ -114,23 +118,24 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
         var property = child.Property!;
         var identity = child.Properties.First(candidate => candidate.Id == child.Identity);
         var member = JavaNames.Member(property.Name);
-        code.Line($"var {child.Name} = new java.util.ArrayList<{child.Type}>();")
+        var variable = JavaNames.Member(child.Name);
+        code.Line($"var {variable} = new java.util.ArrayList<{child.Type}>();")
             .Block($"if (state.{member}() != null)", items => items.Block($"for (var item : state.{member}())", item => item
                 .Line($"var identity = String.valueOf({types.Unwrap(identity.Type, $"item.{JavaNames.Member(identity.Name)}()")});")
                 .Line($"var changed = {Method(child, @event)}(event, message, identity, key, item);")
-                .Line($"if (changed.value() != null) {child.Name}.add(changed.value());")
+                .Line($"if (changed.value() != null) {variable}.add(changed.value());")
                 .Line("childTouched |= changed.touched();").Line("childAncestors |= changed.ancestors();")));
         foreach (var from in child.Scope.From.Where(from => from.EventContract == @event.Id))
         {
             var key = _values.Key(from.Key, @event);
             var parentKey = _values.Key(from.ParentKey ?? SemanticProjectionKey.EventSourceIdentity, @event);
             if (parent.Scope.From.Any(candidate => candidate.EventContract == @event.Id)) parentKey = "key";
-            code.Block($"if (java.util.Objects.equals(key, {parentKey}) && {child.Name}.stream().noneMatch(item -> java.util.Objects.equals(String.valueOf({types.Unwrap(identity.Type, $"item.{JavaNames.Member(identity.Name)}()")}), String.valueOf({key}))))", create => create
+            code.Block($"if (java.util.Objects.equals(key, {parentKey}) && {variable}.stream().noneMatch(item -> java.util.Objects.equals(String.valueOf({types.Unwrap(identity.Type, $"item.{JavaNames.Member(identity.Name)}()")}), String.valueOf({key}))))", create => create
                 .Line($"var added = {Method(child, @event)}(event, message, {key}, key, null);")
-                .Line($"if (added.value() != null) {child.Name}.add(added.value());")
+                .Line($"if (added.value() != null) {variable}.add(added.value());")
                 .Line("childTouched |= added.touched();").Line("childAncestors |= added.ancestors();"));
         }
-        code.Line($"state = {_records.Set(parent.Type, parent.Properties, [property.Id], "state", "java.util.List.copyOf(" + child.Name + ")")};");
+        code.Line($"state = {_records.Set(parent.Type, parent.Properties, [property.Id], "state", "java.util.List.copyOf(" + variable + ")")};");
     }
 
     string Matches(SemanticProjectionKey key, SemanticProjectionKey? parentKey, SemanticEventContract @event, ProjectionScopeNode node)

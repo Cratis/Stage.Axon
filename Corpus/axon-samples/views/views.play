@@ -27,6 +27,7 @@ module Views
         note String optional
 
       query AllTotals => Total[]
+      query LiveTotals => observable Total[]
       query FindTotal => Total optional
         by name String
 

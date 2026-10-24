@@ -16,8 +16,8 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
     {
         SemanticProjectionEventProperty property => EventProperty(property, target, @event),
         SemanticProjectionEventSourceIdentity => types.Parse(target, Source(@event)),
-        SemanticProjectionLiteral literal when literal.Value is SemanticTextValue or SemanticNumberValue or SemanticBooleanValue or SemanticNullValue => types.Literal(literal.Value, target),
-        SemanticProjectionEventContextValue context => Context(context.Path, target),
+        SemanticProjectionLiteral literal when literal.Value is SemanticTextValue or SemanticNumberValue or SemanticBooleanValue or SemanticNullValue or SemanticArrayValue or SemanticCompositeValue => types.Literal(literal.Value, target),
+        SemanticProjectionEventContextValue context => Context(context.Path, target, @event),
         _ => null
     };
 
@@ -25,6 +25,8 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
     {
         SemanticProjectionValueKey { Value: SemanticProjectionEventSourceIdentity } => Source(@event),
         SemanticProjectionValueKey { Value: SemanticProjectionLiteral { Value: SemanticTextValue literal } } => JavaCodeBuilder.StringLiteral(literal.Value),
+        SemanticProjectionValueKey { Value: SemanticProjectionLiteral { Value: SemanticNumberValue literal } } => JavaCodeBuilder.StringLiteral(literal.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        SemanticProjectionValueKey { Value: SemanticProjectionLiteral { Value: SemanticBooleanValue literal } } => JavaCodeBuilder.StringLiteral(literal.Value ? "true" : "false"),
         SemanticProjectionValueKey { Value: SemanticProjectionEventProperty property } => EventKey(property, @event),
         SemanticProjectionCompositeKey composite => Composite(composite, @event),
         SemanticProjectionPartsKey parts => Parts(parts, @event),
@@ -34,9 +36,10 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
     internal string? Mapping(SemanticProjectionMapping mapping, SemanticProperty target, SemanticEventContract @event, string? previous = null)
     {
         var old = previous ?? $"state.{JavaNames.Member(target.Name)}()";
-        if (mapping.Operation == SemanticProjectionOperation.Clear) return "null";
+        if (mapping.Operation == SemanticProjectionOperation.Clear) return target.Type.IsCollection ? "java.util.List.of()" : "null";
         var source = Value(mapping.Source, target.Type, @event);
         if (mapping.Operation == SemanticProjectionOperation.Set) return source;
+        if (mapping.Operation is not (SemanticProjectionOperation.Add or SemanticProjectionOperation.Subtract or SemanticProjectionOperation.Increment or SemanticProjectionOperation.Decrement)) return null;
         var primitive = types.PrimitiveOf(target.Type);
         if (primitive is not (SemanticPrimitiveType.WholeNumber or SemanticPrimitiveType.DecimalNumber)) return null;
         var left = $"({old} == null ? {types.Default(target.Type)} : {old})";
@@ -58,9 +61,17 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
         return types.Wrap(target.Type, result);
     }
 
-    string? Context(string path, SemanticTypeReference target)
+    internal string? CompositeValue(SemanticProjectionCompositeKey key, SemanticEventContract @event)
+    {
+        var composite = _application.Types.First(type => type.Id == key.Type);
+        var arguments = composite.Properties.Select(property => key.Parts.FirstOrDefault(part => part.Property == property.Id) is { } part ? Value(part.Value, property.Type, @event) : null).ToArray();
+        return arguments.Any(argument => argument is null) ? null : $"new {types.BasePackage}.types.{JavaNames.Type(composite.Name)}({string.Join(", ", arguments)})";
+    }
+
+    string? Context(string path, SemanticTypeReference target, SemanticEventContract @event)
     {
         var name = path.TrimStart('$').Replace("eventContext.", string.Empty, StringComparison.OrdinalIgnoreCase);
+        if (name.Equals("eventSourceId", StringComparison.OrdinalIgnoreCase)) return types.Parse(target, Source(@event));
         if (name.Equals("occurred", StringComparison.OrdinalIgnoreCase) || name.Equals("occurredAt", StringComparison.OrdinalIgnoreCase))
             return types.Wrap(target, "java.time.OffsetDateTime.ofInstant(message == null ? clock.instant() : message.timestamp(), java.time.ZoneOffset.UTC)");
         if (name.Equals("correlationId", StringComparison.OrdinalIgnoreCase) || name.Equals("causationId", StringComparison.OrdinalIgnoreCase))
@@ -71,12 +82,7 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
         return null;
     }
 
-    string? Composite(SemanticProjectionCompositeKey key, SemanticEventContract @event)
-    {
-        var composite = _application.Types.First(type => type.Id == key.Type);
-        var arguments = composite.Properties.Select(property => key.Parts.FirstOrDefault(part => part.Property == property.Id) is { } part ? Value(part.Value, property.Type, @event) : null).ToArray();
-        return arguments.Any(argument => argument is null) ? null : $"String.valueOf(new {types.BasePackage}.types.{JavaNames.Type(composite.Name)}({string.Join(", ", arguments)}))";
-    }
+    string? Composite(SemanticProjectionCompositeKey key, SemanticEventContract @event) => CompositeValue(key, @event) is { } value ? $"String.valueOf({value})" : null;
 
     string? Parts(SemanticProjectionPartsKey key, SemanticEventContract @event)
     {

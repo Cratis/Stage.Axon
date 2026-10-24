@@ -21,12 +21,12 @@ public class when_emitting_scoped_views : given.a_view_request
         _projector = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("BoardProjectionProjector.java", StringComparison.Ordinal)));
     }
 
-    [Fact] void should_copy_children_into_immutable_lists() => _projector.ShouldContain("java.util.List.copyOf(RootChild0)");
+    [Fact] void should_copy_children_into_immutable_lists() => _projector.ShouldContain("java.util.List.copyOf(rootChild0)");
     [Fact] void should_preserve_original_deferred_event_values() => _projector.ShouldContain("pending.add(() -> projectCardAdded(event, message))");
     [Fact] void should_backfill_joins() => _projector.ShouldContain("joined.apply(state)");
     [Fact] void should_remove_instances() => _projector.ShouldContain("return new Change<>(null, true, true)");
     [Fact] void should_inject_java_time_clock() => _projector.ShouldContain("java.time.Clock clock");
-    [Fact] void should_register_modeled_native_specs() => _context.Specifications.Count.ShouldEqual(5);
+    [Fact] void should_register_modeled_native_specs() => _context.Specifications.Count.ShouldEqual(ScopeSelection.Select(_request).Sum(slice => slice.Slice.Specifications.Length));
 
     [Fact]
     void should_match_the_reference_execution_for_every_authored_spec()

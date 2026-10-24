@@ -36,8 +36,14 @@ internal sealed class ProjectionScopeMappings(AxonEmissionContext context, ViewJ
             return;
         }
         SemanticProperty[] identifiers = node.Identity is { } identity ? [.. node.Properties.Where(property => property.Id == identity)] : [.. node.Properties.Where(property => property.IsIdentifier)];
-        if (identifiers.Length != 1 || identifiers[0].Type.Kind == SemanticTypeReferenceKind.CompositeType) return;
+        if (identifiers.Length != 1) return;
         var property = identifiers[0];
-        code.Line($"state = {_records.Set(node.Type, node.Properties, [property.Id], "state", types.Parse(property.Type, "String.valueOf(key)"))};");
+        var value = from.Key switch
+        {
+            SemanticProjectionValueKey key => _values.Value(key.Value, property.Type, @event),
+            SemanticProjectionCompositeKey key => _values.CompositeValue(key, @event),
+            _ => null
+        };
+        if (value is not null) code.Line($"state = {_records.Set(node.Type, node.Properties, [property.Id], "state", value)};");
     }
 }

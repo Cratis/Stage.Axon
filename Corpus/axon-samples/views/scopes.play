@@ -46,6 +46,14 @@ module Scopes
         boardId BoardId identifier
         produces BoardRemoved
           boardId = boardId
+      command ClearDetails
+        boardId BoardId identifier
+        produces DetailsRemoved
+          boardId = boardId
+      command PurgeCard
+        cardId CardId identifier
+        produces CardPurged
+          cardId = cardId
 
     slice StateView Boards
       event BoardCreated
@@ -63,10 +71,15 @@ module Scopes
         cardId CardId
       event BoardRemoved
         boardId BoardId
+      event DetailsRemoved
+        boardId BoardId
+      event CardPurged
+        cardId CardId
 
       readmodel Board
         boardId BoardId
         name String
+        source String
         changes Int
         details BoardDetails optional
         cards Card[]
@@ -80,11 +93,13 @@ module Scopes
           increment changes
         from BoardCreated key boardId
           name = name
+          source = $eventContext.eventSourceId
         nested details
           every
             increment count
           from BoardCreated key boardId
             note = "created"
+          remove with DetailsRemoved key boardId
         children cards identified by cardId
           every
             increment changes
@@ -96,6 +111,7 @@ module Scopes
               title = title
           remove with CardRemoved key cardId
             parent boardId
+          remove via join on CardPurged key cardId
         remove with BoardRemoved key boardId
 
       specification ParentThenChildAndJoin
@@ -115,6 +131,7 @@ module Scopes
         then readmodel Board
           boardId = "b1"
           name = "Board"
+          source = "b1"
           changes = 2
           details = {"note":"created","count":1}
           cards = [{"cardId":"c1","title":"Renamed","changes":2}]
@@ -156,3 +173,43 @@ module Scopes
           boardId = "b3"
           cards = []
           changes = 3
+
+      specification RemovingTheRoot
+        given BoardCreated
+          for "b4"
+          boardId = "b4"
+          name = "Root removal"
+        given BoardRemoved
+          for "b4"
+          boardId = "b4"
+        then no readmodel Board for "b4"
+
+      specification RemovingThroughNestedScope
+        given BoardCreated
+          for "b5"
+          boardId = "b5"
+          name = "Nested removal"
+        given DetailsRemoved
+          for "b5"
+          boardId = "b5"
+        then readmodel Board
+          boardId = "b5"
+          details = null
+
+      specification RemovingViaJoin
+        given BoardCreated
+          for "b6"
+          boardId = "b6"
+          name = "Joined removal"
+        given CardAdded
+          for "b6"
+          boardId = "b6"
+          cardId = "c6"
+          title = "To purge"
+        given CardPurged
+          for "c6"
+          cardId = "c6"
+        then readmodel Board
+          boardId = "b6"
+          cards = []
+          changes = 2
