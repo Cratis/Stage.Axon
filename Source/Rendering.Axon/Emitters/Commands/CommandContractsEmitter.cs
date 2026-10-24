@@ -26,7 +26,10 @@ internal static class CommandContractsEmitter
         var types = new CommandJavaTypes(context.Request.Model.Application);
         var components = command.Properties.Select(property => Component(property, types, source)).ToList();
         if (source?.Allocated == true) components.Insert(0, $"@com.fasterxml.jackson.annotation.JsonIgnore @org.axonframework.modelling.annotation.TargetEntityId {source.JavaType} {source.Member}");
-        return new JavaCodeBuilder(package).Block($"public record {JavaNames.Type(command.Name)}({string.Join(", ", components)})", body =>
+        return new JavaCodeBuilder(package)
+            .Import("org.axonframework.messaging.commandhandling.annotation.Command")
+            .Line($"@Command(name = {JavaCodeBuilder.StringLiteral(command.Name)})")
+            .Block($"public record {JavaNames.Type(command.Name)}({string.Join(", ", components)})", body =>
         {
             if (source?.NeedsAccessor(command) == true) body.Line("@org.axonframework.modelling.annotation.TargetEntityId").Line($"public {source.JavaType} {source.Member}() {{ return {source.Value(command, types, "this")}; }}");
             new CommandPreparation(context, command, source).Emit(body);
@@ -38,6 +41,7 @@ internal static class CommandContractsEmitter
         var required = property.Type.IsOptional || property.IsGenerated ? string.Empty : "@jakarta.validation.constraints.NotNull ";
         var generated = property.IsGenerated ? "@com.fasterxml.jackson.annotation.JsonIgnore " : string.Empty;
         var identifier = source?.Member == JavaNames.Member(property.Name) ? "@org.axonframework.modelling.annotation.TargetEntityId " : string.Empty;
-        return $"{identifier}{required}@jakarta.validation.Valid {generated}{types.Type(property.Type)} {JavaNames.Member(property.Name)}";
+        var cascaded = types.Cascades(property.Type) ? "@jakarta.validation.Valid " : string.Empty;
+        return $"{identifier}{required}{cascaded}{generated}{types.Type(property.Type)} {JavaNames.Member(property.Name)}";
     }
 }

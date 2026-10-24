@@ -33,6 +33,9 @@ public class when_rendering_command_contracts : for_AxonArtifactRenderPlanner.gi
     }
 
     [Fact] void should_emit_a_record() => contract.ShouldContain("public record ");
+    [Fact] void should_import_the_axon_command_annotation() => contract.ShouldContain("import org.axonframework.messaging.commandhandling.annotation.Command;");
+    [Fact] void should_name_the_command_explicitly() => contract.ShouldContain("@Command(name = \"PlaceOrder\")");
+    [Fact] void should_not_cascade_into_an_enum() => contract.ShouldNotContain("@jakarta.validation.Valid sample.concepts.OrderChannel");
     [Fact] void should_validate_nested_concepts() => contract.ShouldContain("@jakarta.validation.Valid ");
     [Fact] void should_validate_required_components() => contract.ShouldContain("@jakarta.validation.constraints.NotNull ");
     [Fact] void should_map_the_java_uuid_concept() => contract.ShouldContain(".concepts.OrderId orderId");

@@ -33,6 +33,9 @@ internal sealed class CommandJavaTypes(SemanticApplication application)
         return type.IsCollection ? $"java.util.List<{scalar}>" : scalar;
     }
 
+    internal bool Cascades(SemanticTypeReference type) => type.Kind == SemanticTypeReferenceKind.CompositeType ||
+        (type.Kind == SemanticTypeReferenceKind.Concept && Concept(type.Target).Values.IsDefaultOrEmpty);
+
     internal SemanticPrimitiveType PrimitiveOf(SemanticTypeReference type) => type.Kind == SemanticTypeReferenceKind.Concept ? Concept(type.Target).Primitive : type.Primitive;
 
     internal string Unwrap(string expression, SemanticTypeReference type) => type.Kind == SemanticTypeReferenceKind.Concept ? expression + ".value()" : expression;
