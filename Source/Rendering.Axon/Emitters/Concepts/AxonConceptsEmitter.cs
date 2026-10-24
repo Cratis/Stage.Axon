@@ -24,9 +24,9 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
         }
     }
 
-    internal static string Record(AxonEmissionContext context, string package, string name, IEnumerable<SemanticProperty> properties, string annotation = "", bool eventTags = false)
+    internal static string Record(AxonEmissionContext context, string package, string name, IEnumerable<SemanticProperty> properties, string annotation = "")
     {
-        var parameters = string.Join(", ", properties.Select(property => $"{(eventTags && property.IsIdentifier ? "@org.axonframework.eventsourcing.annotation.EventTag " : string.Empty)}@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(property.Name)}) {JavaSemanticTypes.TypeFor(context, property.Type)} {JavaNames.Member(property.Name)}"));
+        var parameters = string.Join(", ", properties.Select(property => $"@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(property.Name)}) {JavaSemanticTypes.TypeFor(context, property.Type)} {JavaNames.Member(property.Name)}"));
         var code = new JavaCodeBuilder(package);
         if (annotation.Length > 0) code.Line(annotation);
         return code.Line($"public record {name}({parameters}) {{}}").Build();

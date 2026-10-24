@@ -4,7 +4,6 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
-using Cratis.Stage.Rendering.Axon.Emitters.Concepts;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -42,6 +41,6 @@ internal sealed class AxonEventsEmitter : IAxonEmitter
             annotation = JavaCodeBuilder.UnsupportedComment(intent, path, AxonRefusalCodes.Evolution) + "\n" + annotation;
         }
         var name = JavaNames.Type(contract.Name);
-        context.AddJava(Package(context, module), name, AxonConceptsEmitter.Record(context, Package(context, module), name, contract.Properties, annotation, eventTags: true), sources: [contract.Id]);
+        context.AddJava(Package(context, module), name, AxonEventSources.Record(context, Package(context, module), contract, annotation), sources: [contract.Id]);
     }
 }
