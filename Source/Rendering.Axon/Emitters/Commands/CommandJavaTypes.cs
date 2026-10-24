@@ -10,9 +10,12 @@ internal sealed class CommandJavaTypes(SemanticApplication application)
 {
     static readonly IReadOnlyDictionary<SemanticPrimitiveType, string> _primitives = new Dictionary<SemanticPrimitiveType, string>
     {
-        [SemanticPrimitiveType.Uuid] = "java.util.UUID", [SemanticPrimitiveType.Text] = "String",
-        [SemanticPrimitiveType.WholeNumber] = "Long", [SemanticPrimitiveType.DecimalNumber] = "java.math.BigDecimal",
-        [SemanticPrimitiveType.Boolean] = "Boolean", [SemanticPrimitiveType.Date] = "java.time.LocalDate",
+        [SemanticPrimitiveType.Uuid] = "java.util.UUID",
+        [SemanticPrimitiveType.Text] = "String",
+        [SemanticPrimitiveType.WholeNumber] = "Long",
+        [SemanticPrimitiveType.DecimalNumber] = "java.math.BigDecimal",
+        [SemanticPrimitiveType.Boolean] = "Boolean",
+        [SemanticPrimitiveType.Date] = "java.time.LocalDate",
         [SemanticPrimitiveType.DateTime] = "java.time.OffsetDateTime"
     };
 

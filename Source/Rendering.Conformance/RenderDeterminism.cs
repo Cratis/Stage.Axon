@@ -26,8 +26,18 @@ public static class RenderDeterminism
 
     static object Metadata(ArtifactRenderPlan plan) => new
     {
-        plan.Target, plan.TargetVersion, plan.Renderer, plan.RendererVersion, plan.ApplicationName, plan.SemanticRevision,
-        plan.Scope, plan.AdditionalScopes, plan.Diagnostics, plan.Refusals, plan.ImplementationGaps, plan.RequiredRemovals
+        plan.Target,
+        plan.TargetVersion,
+        plan.Renderer,
+        plan.RendererVersion,
+        plan.ApplicationName,
+        plan.SemanticRevision,
+        plan.Scope,
+        plan.AdditionalScopes,
+        plan.Diagnostics,
+        plan.Refusals,
+        plan.ImplementationGaps,
+        plan.RequiredRemovals
     };
 
     static bool ArtifactsEqual(ArtifactRenderPlan first, ArtifactRenderPlan second) =>

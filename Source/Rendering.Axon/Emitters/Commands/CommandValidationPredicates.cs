@@ -10,21 +10,29 @@ internal sealed class CommandValidationPredicates(CommandJavaTypes types, Semant
 {
     static readonly Dictionary<SemanticValidationRuleKind, string> _textMethods = new()
     {
-        [SemanticValidationRuleKind.Equal] = "equals", [SemanticValidationRuleKind.NotEqual] = "equals",
-        [SemanticValidationRuleKind.Contains] = "contains", [SemanticValidationRuleKind.NotContains] = "contains",
-        [SemanticValidationRuleKind.StartsWith] = "startsWith", [SemanticValidationRuleKind.EndsWith] = "endsWith"
+        [SemanticValidationRuleKind.Equal] = "equals",
+        [SemanticValidationRuleKind.NotEqual] = "equals",
+        [SemanticValidationRuleKind.Contains] = "contains",
+        [SemanticValidationRuleKind.NotContains] = "contains",
+        [SemanticValidationRuleKind.StartsWith] = "startsWith",
+        [SemanticValidationRuleKind.EndsWith] = "endsWith"
     };
 
     static readonly Dictionary<SemanticValidationRuleKind, string> _comparisons = new()
     {
-        [SemanticValidationRuleKind.Maximum] = "<=", [SemanticValidationRuleKind.LessThanOrEqual] = "<=",
-        [SemanticValidationRuleKind.Minimum] = ">=", [SemanticValidationRuleKind.GreaterThanOrEqual] = ">=",
-        [SemanticValidationRuleKind.GreaterThan] = ">", [SemanticValidationRuleKind.LessThan] = "<"
+        [SemanticValidationRuleKind.Maximum] = "<=",
+        [SemanticValidationRuleKind.LessThanOrEqual] = "<=",
+        [SemanticValidationRuleKind.Minimum] = ">=",
+        [SemanticValidationRuleKind.GreaterThanOrEqual] = ">=",
+        [SemanticValidationRuleKind.GreaterThan] = ">",
+        [SemanticValidationRuleKind.LessThan] = "<"
     };
 
     static readonly IReadOnlyDictionary<SemanticValidationRuleKind, string> _lengthComparisons = new Dictionary<SemanticValidationRuleKind, string>
     {
-        [SemanticValidationRuleKind.Maximum] = "<=", [SemanticValidationRuleKind.Minimum] = ">=", [SemanticValidationRuleKind.Length] = "=="
+        [SemanticValidationRuleKind.Maximum] = "<=",
+        [SemanticValidationRuleKind.Minimum] = ">=",
+        [SemanticValidationRuleKind.Length] = "=="
     };
 
     static readonly Dictionary<SemanticPrimitiveType, Func<string, string>> _nonDefaults = new()

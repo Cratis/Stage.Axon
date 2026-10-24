@@ -31,8 +31,11 @@ public class a_reaction_model : for_AxonArtifactRenderPlanner.given.an_axon_requ
         var seed = ScopeSelection.Select(request).SelectMany(slice => slice.Slice.Specifications).First(specification => specification.When?.Command == command.Id);
         specification = seed with
         {
-            Id = SemanticId.Create(SemanticKind.Specification, "SubmitOrder.Firing"), Name = "Firing", When = null, GivenCaller = null,
-            WhenTrigger = new(SemanticReactionTriggerKind.ApplicationTrigger, [.. seed.When!.Values.Select(value => value with { TargetProperty = applicationTrigger.Properties.Single(property => property.Name == command.Properties.Single(property => property.Id == value.TargetProperty).Name).Id })]) { Trigger = applicationTrigger.Id }
+            Id = SemanticId.Create(SemanticKind.Specification, "SubmitOrder.Firing"),
+            Name = "Firing",
+            When = null,
+            GivenCaller = null,
+            WhenTrigger = new(SemanticReactionTriggerKind.ApplicationTrigger, [.. seed.When.Values.Select(value => value with { TargetProperty = applicationTrigger.Properties.Single(property => property.Name == command.Properties.Single(property => property.Id == value.TargetProperty).Name).Id })]) { Trigger = applicationTrigger.Id }
         };
     }
 
@@ -43,7 +46,7 @@ public class a_reaction_model : for_AxonArtifactRenderPlanner.given.an_axon_requ
             : expression;
         var production = command.Produces[0] with
         {
-            Destination = Map(command.Produces[0].Destination!),
+            Destination = Map(command.Produces[0].Destination),
             DestinationType = command.Properties.Single(property => property.IsIdentifier).Type,
             Mappings = [.. command.Produces[0].Mappings.Select(mapping => mapping with { Source = Map(mapping.Source) })]
         };

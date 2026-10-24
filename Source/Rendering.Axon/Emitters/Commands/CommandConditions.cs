@@ -10,14 +10,18 @@ internal sealed class CommandConditions(SemanticCommand command, CommandJavaType
 {
     static readonly IReadOnlyDictionary<SemanticComparisonOperator, string> _operations = new Dictionary<SemanticComparisonOperator, string>
     {
-        [SemanticComparisonOperator.Equal] = "==", [SemanticComparisonOperator.NotEqual] = "!=",
-        [SemanticComparisonOperator.GreaterThan] = ">", [SemanticComparisonOperator.GreaterThanOrEqual] = ">=",
-        [SemanticComparisonOperator.LessThan] = "<", [SemanticComparisonOperator.LessThanOrEqual] = "<="
+        [SemanticComparisonOperator.Equal] = "==",
+        [SemanticComparisonOperator.NotEqual] = "!=",
+        [SemanticComparisonOperator.GreaterThan] = ">",
+        [SemanticComparisonOperator.GreaterThanOrEqual] = ">=",
+        [SemanticComparisonOperator.LessThan] = "<",
+        [SemanticComparisonOperator.LessThanOrEqual] = "<="
     };
 
     static readonly IReadOnlyDictionary<SemanticLogicalOperator, string> _logicalOperations = new Dictionary<SemanticLogicalOperator, string>
     {
-        [SemanticLogicalOperator.And] = "&&", [SemanticLogicalOperator.Or] = "||"
+        [SemanticLogicalOperator.And] = "&&",
+        [SemanticLogicalOperator.Or] = "||"
     };
 
     internal string? Render(SemanticCondition condition)
