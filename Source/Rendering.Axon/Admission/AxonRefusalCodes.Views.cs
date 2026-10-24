@@ -11,6 +11,7 @@ internal static partial class AxonRefusalCodes
     internal const string Reduction = "STAGE-AXON-0306";
     internal const string ProjectionMapping = "STAGE-AXON-0307";
     internal const string ObservableQuery = "STAGE-AXON-0401";
+    internal const string QueryPerformer = "STAGE-AXON-0401";
     internal const string QueryAuthorization = "STAGE-AXON-0404";
     internal const string ViewSpecification = "STAGE-AXON-0501";
 }

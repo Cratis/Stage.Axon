@@ -7,12 +7,19 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
 
-internal sealed class QueryShape(SemanticKeyedQuery query, SemanticReadModel model, ViewJavaTypes types)
+internal sealed class QueryShape(SemanticKeyedQuery query, SemanticReadModel model, ViewJavaTypes types, SemanticImplementationRequirement? performer = null)
 {
     internal IEnumerable<(string Name, SemanticTypeReference Type, SemanticId Property)> Arguments
     {
         get
         {
+            if (performer?.QueryShape is { } performed)
+            {
+                foreach (var parameter in performed.Arguments)
+                    yield return (parameter.Name, parameter.Type! with { IsOptional = parameter.IsOptional }, default);
+                yield break;
+            }
+
             foreach (var part in query.KeyParts) yield return (part.Name, part.Type, part.KeyProperty);
             if (query.KeyParts.Length == 0 && query.Argument is { } argument && query.KeyProperty is { } key)
                 yield return (argument.Name, argument.Type, key);

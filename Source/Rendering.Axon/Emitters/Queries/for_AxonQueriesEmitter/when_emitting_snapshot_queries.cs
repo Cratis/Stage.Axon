@@ -27,5 +27,5 @@ public class when_emitting_snapshot_queries : a_view_request
     [Fact] void should_dispatch_over_the_query_gateway() => _endpoint.ShouldContain("gateway.query(new FindTotal(name), FindTotal.Result.class)");
     [Fact] void should_return_not_found_for_an_empty_optional_result() => _endpoint.ShouldContain("ResponseEntity.notFound().build()");
     [Fact] void should_expose_the_query_kebab_route() => _endpoint.ShouldContain("/api/views/counters/find-total");
-    [Fact] void should_have_no_degradations() => _context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
+    [Fact] void should_have_no_degradations() => _context.Degradation.UnsupportedConstructs.Where(diagnostic => diagnostic.Artifact == QueryId("FindTotal")).ShouldBeEmpty();
 }

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
@@ -20,15 +21,22 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
         var types = new ViewJavaTypes(application);
         foreach (var located in ScopeSelection.Select(context.Request))
         {
-            foreach (var query in located.Slice.Queries)
+            foreach (var query in located.Slice.Queries.Concat(QueryPerformer.Queries(context, located)))
             {
+                if (QueryPerformer.Requirement(context, query)?.QueryShape?.Arguments.Any(argument => argument.Type is null) == true)
+                {
+                    context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, "The performed query has an unresolved argument type.");
+                    continue;
+                }
+
                 var owner = ScopeSelection.Locate(application).First(slice => slice.Slice.ReadModels.Any(model => model.Id == query.ReadModel));
                 var model = owner.Slice.ReadModels.First(model => model.Id == query.ReadModel);
                 var modelType = types.Package(owner) + "." + JavaNames.Type(model.Name);
-                var shape = new QueryShape(query, model, types);
+                var shape = new QueryShape(query, model, types, QueryPerformer.Requirement(context, query));
                 var package = types.Package(located);
                 var name = JavaNames.Type(query.Name);
                 EmitRecord(context, package, query, name, modelType, shape);
+                if (QueryPerformer.Required(context, query)) QueryPerformer.Emit(context, package, query, modelType);
                 EmitHandler(context, types, package, query, name, modelType, shape);
                 new QueryEndpoint(context, types, located, query, modelType, shape).Emit();
                 if (query.Delivery != SemanticQueryDelivery.Live) continue;
@@ -66,14 +74,22 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
             .Line($"@Component({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")
             .Block($"public class {name}Handler", body =>
             {
-                body.Line($"private final ReadModelStore<Object, {modelType}> store;")
-                    .Block($"public {name}Handler(@Qualifier({JavaCodeBuilder.StringLiteral(modelType)}) ReadModelStore<Object, {modelType}> store)", constructor => constructor.Line("this.store = store;"));
+                var performed = QueryPerformer.Required(context, query);
+                body.Line($"private final ReadModelStore<Object, {modelType}> store;");
+                if (performed) body.Line($"private final {name}Performer performer;");
+                body.Block($"public {name}Handler(@Qualifier({JavaCodeBuilder.StringLiteral(modelType)}) ReadModelStore<Object, {modelType}> store{(performed ? $", {name}Performer performer" : string.Empty)})", constructor =>
+                {
+                    constructor.Line("this.store = store;");
+                    if (performed) constructor.Line("this.performer = performer;");
+                });
                 var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
                 if (authorization.Length > 0) body.Line(authorization);
                 body.Line("@QueryHandler").Block($"public {name}.Result handle({name} query)", method =>
                 {
-                    var predicate = shape.Predicate;
-                    method.Line($"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
+                    var predicate = QueryPerformer.Required(context, query) ? string.Empty : shape.Predicate;
+                    method.Line(performed
+                        ? "var rows = java.util.List.copyOf(performer.perform(query, store));"
+                        : $"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
                     if (query.Cardinality == SemanticQueryCardinality.One)
                         method.Line("if (rows.size() != 1) throw new IllegalStateException(\"Expected exactly one query result\");");
                     if (query.Cardinality == SemanticQueryCardinality.ZeroOrOne)

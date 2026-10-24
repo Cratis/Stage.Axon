@@ -26,6 +26,11 @@ module Views
         count Int
         note String optional
 
+      query RankedTotals => Total[]
+        performer
+          ```csharp
+          return totals.OrderByDescending(row => row.Amount);
+          ```
       query AllTotals => Total[]
       query LiveTotals => observable Total[]
       query FindTotal => Total optional
