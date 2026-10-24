@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Cratis.Stage.Rendering.Conformance</AssemblyName>
+        <RootNamespace>Cratis.Stage.Rendering.Conformance</RootNamespace>
+        <IsPackable>true</IsPackable>
+        <Description>Preview target-neutral conformance checks for Screenplay artifact renderers</Description>
+        <PackageTags>cratis;screenplay;stage;conformance;preview</PackageTags>
+        <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../Contracts/Contracts.csproj" />
+    </ItemGroup>
+</Project>

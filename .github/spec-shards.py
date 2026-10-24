@@ -80,6 +80,7 @@ PROJECT_SHARDS = {
         "Source/Rendering.Cratis.Scaffolding/Rendering.Cratis.Scaffolding.csproj",
         "Source/Rendering.Axon/Rendering.Axon.csproj",
         "Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj",
+        "Source/Rendering.Conformance/Rendering.Conformance.csproj",
     ],
 }
 

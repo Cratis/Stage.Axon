@@ -63,7 +63,7 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
         var code = Encoding.UTF8.GetString(wiring.Bytes.AsSpan());
         code.ShouldContain("@Profile(\"!persistent\")\n    EventStorageEngine eventStorageEngine()");
         code.ShouldContain("@Profile(\"!persistent\")\n    TokenStore tokenStore()");
-        code.ShouldContain("@Profile(\"!persistent\")\n    UniqueValueStore uniqueValueStore()");
+        code.ShouldNotContain("uniqueValueStore(");
         code.ShouldContain("@Bean\n    Clock clock()");
         code.ShouldContain("@Bean\n    JacksonModule conceptsModule()");
     }
