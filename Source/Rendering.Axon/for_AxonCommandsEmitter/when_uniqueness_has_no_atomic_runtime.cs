@@ -26,8 +26,7 @@ public class when_uniqueness_has_no_atomic_runtime : for_AxonArtifactRenderPlann
         command = slices.SelectMany(slice => slice.Slice.Commands).Single(command => command.Name == "PlaceOrder");
         unrelated = slices.SelectMany(slice => slice.Slice.Commands).Single(command => command.Name == "MoveOrder");
         var contract = slices.SelectMany(slice => slice.Slice.Events).Single(contract => contract.Id == command.Produces[0].EventContract);
-        var property = contract.Properties.Single(property => property.Name == "customer");
-        var constraint = new SemanticConstraint("CustomerUnique", SemanticConstraintKind.UniquePropertyValue, SemanticConstraintScope.EventSequence, [new(contract.Id, [property.Id])], [], false, null);
+        var constraint = new SemanticConstraint("CustomerUnique", SemanticConstraintKind.UniqueEventOccurrence, SemanticConstraintScope.EventSequence, [new(contract.Id, [])], [], false, null);
         SemanticFeature Feature(SemanticFeature feature) => feature with { Features = [.. feature.Features.Select(Feature)], Slices = [.. feature.Slices.Select(slice => slice.Commands.Any(candidate => candidate.Id == command.Id) ? slice with { Constraints = [constraint] } : slice)] };
         var app = loaded.Model.Application with { Modules = [.. loaded.Model.Application.Modules.Select(module => module with { Features = [.. module.Features.Select(Feature)] })] };
         var model = ExecutableSemanticModel.Create(loaded.Model.LanguageVersion, loaded.Model.SemanticVersion, app);

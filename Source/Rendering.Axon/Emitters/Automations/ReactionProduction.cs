@@ -20,9 +20,15 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
         context.AddJava(package, Name, command, sources: [reaction]);
         var handler = new JavaCodeBuilder(package)
             .Line("@org.springframework.stereotype.Component")
-            .Block($"public class {Name}Handler", body => body.Line("@org.axonframework.messaging.commandhandling.annotation.CommandHandler")
-                .Block($"public void handle({Name} command, org.axonframework.messaging.eventhandling.gateway.EventAppender appender, @org.axonframework.modelling.annotation.InjectEntity(idProperty = \"eventSourceId\") org.axonframework.modelling.repository.ManagedEntity<{Primary.JavaType}, {Name}Stream> stream)", method => method
+            .Block($"public class {Name}Handler", body => body
+                .Line($"private final {context.BasePackage}.runtime.UniqueValueStore uniqueValues;")
+                .Line($"public {Name}Handler() {{ uniqueValues = new {context.BasePackage}.runtime.InMemoryUniqueValueStore(); }}")
+                .Line("@org.springframework.beans.factory.annotation.Autowired")
+                .Line($"public {Name}Handler({context.BasePackage}.runtime.UniqueValueStore uniqueValues) {{ this.uniqueValues = uniqueValues; }}")
+                .Line("@org.axonframework.messaging.commandhandling.annotation.CommandHandler")
+                .Block($"public void handle({Name} command, org.axonframework.messaging.eventhandling.gateway.EventAppender appender, org.axonframework.messaging.core.unitofwork.ProcessingContext processingContext, @org.axonframework.modelling.annotation.InjectEntity(idProperty = \"eventSourceId\") org.axonframework.modelling.repository.ManagedEntity<{Primary.JavaType}, {Name}Stream> stream)", method => method
                     .Line($"if (!java.util.Objects.equals(command.eventSourceId(), command.event().{Primary.ComponentName}())) throw new IllegalArgumentException(\"Event source does not match append boundary\");")
+                    .Line($"{context.BasePackage}.infrastructure.ModeledConstraints.apply(uniqueValues, command.event(), processingContext);")
                     .Line("appender.append(command.event());")))
             .Build();
         context.AddJava(package, Name + "Handler", handler, sources: [reaction]);

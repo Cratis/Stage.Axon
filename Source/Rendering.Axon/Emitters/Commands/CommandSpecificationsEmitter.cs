@@ -94,6 +94,8 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
     string? Unsupported(SemanticSpecification specification, CommandFixtureValues values)
     {
         if (context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == command.Id)) return "verify a command whose implementation or guarantee is degraded";
+        if (!specification.GivenEvents.IsEmpty && Emitters.Constraints.ConstraintCoverage.All(context).Any(item => command.Produces.Any(produced => Emitters.Constraints.ConstraintCoverage.Applies(item.Constraint, produced.EventContract))))
+            return "seed append-time uniqueness from historical fixtures";
         if (HasReadModelFixtures(specification))
             return "verify command execution together with persisted read-model fixtures";
         if (HasUnsupportedCaptures(specification)) return "verify capture or invoked-command generation fixtures";
