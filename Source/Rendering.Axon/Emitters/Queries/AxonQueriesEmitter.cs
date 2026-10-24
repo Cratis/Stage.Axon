@@ -41,6 +41,7 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                 new QueryEndpoint(context, types, located, query, modelType, shape).Emit();
                 if (query.Delivery != SemanticQueryDelivery.Live) continue;
                 LiveQuerySubscription.Emit(context, package, query);
+                LiveQueryStreams.Emit(context, package, query);
                 AxonViewLiveSpecs.Emit(context, types, located, query, owner, model);
             }
         }
