@@ -47,6 +47,12 @@ internal sealed class JavaCodeBuilder(string package)
         return this;
     }
 
+    internal JavaCodeBuilder UnsupportedIntent(string intent, string modelPath, string code) =>
+        Line($"// Screenplay wanted to {CommentText(intent)} ({CommentText(modelPath)}), but this is not supported by the Axon target yet ({CommentText(code)}).");
+
+    internal JavaCodeBuilder DiffersFromScreenplay(string difference) =>
+        Line($"// Differs from Screenplay: {CommentText(difference)}");
+
     internal JavaCodeBuilder Block(string declaration, Action<JavaCodeBuilder> body)
     {
         Line(declaration + " {");
@@ -64,4 +70,6 @@ internal sealed class JavaCodeBuilder(string package)
         if (_imports.Count > 0) result.Append('\n');
         return result.Append(_body).ToString();
     }
+
+    static string CommentText(string text) => text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace('\r', ' ').Replace('\n', ' ');
 }

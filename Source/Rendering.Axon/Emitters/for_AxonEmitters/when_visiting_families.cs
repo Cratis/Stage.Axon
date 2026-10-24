@@ -30,9 +30,8 @@ public class when_visiting_families : for_AxonArtifactRenderPlanner.given.an_axo
     void should_not_invoke_unimplemented_families()
     {
         var context = new AxonEmissionContext(request, new AxonDegradation(request.Profile));
-        foreach (var emitter in AxonEmitters.Ordered)
+        foreach (var emitter in AxonEmitters.Ordered.Where(emitter => !emitter.IsImplemented))
         {
-            emitter.IsImplemented.ShouldBeFalse();
             Assert.Throws<NotSupportedException>(() => emitter.Emit(context));
         }
     }
