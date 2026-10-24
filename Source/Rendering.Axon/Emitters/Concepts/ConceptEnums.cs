@@ -27,6 +27,8 @@ internal static class ConceptEnums
                     .Line($"{name}({primitive} value) {{ this.value = value; }}")
                     .Line("@JsonValue")
                     .Line($"public {primitive} value() {{ return value; }}")
+                    .Line("@Override")
+                    .Line("public String toString() { return value.toString(); }")
                     .Line("@JsonCreator")
                     .Block($"public static {name} fromValue({primitive} value)", method => method
                         .Line("for (var candidate : values()) if (candidate.value.equals(value)) return candidate;")
