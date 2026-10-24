@@ -32,11 +32,11 @@ internal static class CommandStreamEmitter
                 body.Line("@EntityCreator").Line($"public {name}() {{}}")
                     .Line("// Replay the module's event types so the append condition covers the entire primary stream position.");
                 foreach (var read in decisions) body.Line($"private boolean {read.Member};").Line($"public boolean {read.Member}() {{ return {read.Member}; }}");
-                for (var index = 0; index < contracts.Length; index++)
+                foreach (var contract in contracts)
                 {
-                    var updates = string.Join(' ', decisions.Where(read => read.Events.All.Contains(contracts[index].Id)).Select(read => read.Member + " = " + (read.Events.Removes.Contains(contracts[index].Id) ? "false;" : "true;")));
+                    var updates = string.Join(' ', decisions.Where(read => read.Events.All.Contains(contract.Id)).Select(read => read.Member + " = " + (read.Events.Removes.Contains(contract.Id) ? "false;" : "true;")));
                     body.Line("@EventSourcingHandler")
-                        .Line($"public void on{index}({AxonEventsEmitter.TypeFor(context, contracts[index].Id)} event) {{{updates}}}");
+                        .Line($"public void on({AxonEventsEmitter.TypeFor(context, contract.Id)} event) {{{updates}}}");
                 }
             });
         context.AddJava(package, name, code.Build(), sources: [command.Id]);
