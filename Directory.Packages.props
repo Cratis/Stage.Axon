@@ -34,7 +34,7 @@
     <PackageVersion Include="Cratis.Screenplay" Version="$(CratisScreenplayVersion)" />
     <PackageVersion Include="Cratis.Screenplay.Matching" Version="$(CratisScreenplayVersion)" />
     <!-- Spec-only: freezes the released RegisterProject conformance corpus consumed by the Cratis renderer's planner fixtures. -->
-    <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.240.6" />
+    <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.241.0" />
     <PackageVersion Include="Cratis.Templates" Version="1.7.4" />
     <!-- Microsoft -->
     <!-- Audited reducer-binding references, embedded in the renderer for runtime-only hosts. -->
