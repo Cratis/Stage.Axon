@@ -7,12 +7,6 @@
         <PackageTags>cratis;screenplay;stage;axon;java;code-generation</PackageTags>
         <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
     </PropertyGroup>
-    <!-- These precursors are exercised by specs only until scaffold emission is implemented. -->
-    <ItemGroup Condition="'$(Configuration)' == 'Release'">
-        <Compile Remove="Java/**/*.cs" />
-        <Compile Remove="Sdk/SemanticSurfaceLedger.*.cs" />
-        <Compile Remove="Sdk/SemanticSurfaceDisposition.cs" />
-    </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="../Contracts/Contracts.csproj" />
     </ItemGroup>
