@@ -48,12 +48,13 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         ViewJavaTypes.Add(context, package, name, new JavaCodeBuilder(package).Line($"public record {name}({components}) {{}}").Build(), model.Id);
         var configuration = new JavaCodeBuilder(package)
             .Import("org.springframework.context.annotation.Configuration").Import("org.springframework.context.annotation.Bean")
-            .Import("org.springframework.context.annotation.PropertySource")
+            .Import("org.springframework.context.annotation.PropertySource").Import("org.springframework.context.annotation.Profile")
             .Import(types.BasePackage + ".runtime.ReadModelStore").Import(types.BasePackage + ".runtime.InMemoryReadModelStore")
             .Line($"@Configuration({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
             .Line("@PropertySource(\"classpath:axon-views.properties\")")
             .Block($"public class {name}StoreConfiguration", body => body
                 .Line($"@Bean({JavaCodeBuilder.StringLiteral(package + "." + name)})")
+                .Line("@Profile(\"!persistent\")")
                 .Block($"public ReadModelStore<Object, {name}> store()", method => method.Line("return new InMemoryReadModelStore<>();")));
         ViewJavaTypes.Add(context, package, name + "StoreConfiguration", configuration.Build(), model.Id);
     }

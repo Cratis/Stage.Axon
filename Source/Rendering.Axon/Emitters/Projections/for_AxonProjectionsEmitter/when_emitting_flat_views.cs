@@ -26,5 +26,6 @@ public class when_emitting_flat_views : given.a_view_request
     [Fact] void should_clear_the_optional_property() => _projector.ShouldContain("state.count(), null)");
     [Fact] void should_configure_subscribing_processing() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath == "src/main/resources/axon-views.properties")).ShouldContain(".mode=subscribing");
     [Fact] void should_use_a_model_specific_store_qualifier() => _projector.ShouldContain("@Qualifier(\"axonviews.views.counters.totals.Total\")");
+    [Fact] void should_replace_the_qualified_in_memory_store_under_the_persistent_profile() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/TotalStoreConfiguration.java", StringComparison.Ordinal))).ShouldContain("@Profile(\"!persistent\")");
     [Fact] void should_have_no_degradations() => _context.Degradation.UnsupportedConstructs.Where(diagnostic => diagnostic.Artifact == ReadModelId("Total")).ShouldBeEmpty();
 }
