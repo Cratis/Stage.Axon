@@ -71,6 +71,17 @@ class RuntimeTest {
     }
 
     @Test
+    void validationErrorsSurviveExceptionSerialization() throws Exception {
+        var original = new CommandValidationException(java.util.List.of(new ValidationError("amount", "Must be positive")));
+        var bytes = new java.io.ByteArrayOutputStream();
+        try (var output = new java.io.ObjectOutputStream(bytes)) { output.writeObject(original); }
+        try (var input = new java.io.ObjectInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray()))) {
+            var restored = (CommandValidationException) input.readObject();
+            assertEquals(original.errors(), restored.errors());
+        }
+    }
+
+    @Test
     void validationCannotSilentlySucceed() {
         var validation = new ValidationContext();
         validation.require(false, "amount", "Must be positive");
