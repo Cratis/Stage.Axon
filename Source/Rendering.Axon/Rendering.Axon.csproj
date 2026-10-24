@@ -9,5 +9,7 @@
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="../Contracts/Contracts.csproj" />
+        <EmbeddedResource Include="Emitters/Runtime/Templates/**/*.java" />
+        <EmbeddedResource Include="Emitters/Scaffold/Assets/*" />
     </ItemGroup>
 </Project>
