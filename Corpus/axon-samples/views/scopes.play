@@ -1,0 +1,158 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+concept BoardId : String
+concept CardId : String
+
+type Card
+  cardId CardId
+  title String
+  changes Int
+
+type BoardDetails
+  note String
+  count Int
+
+module Scopes
+  feature Boards
+    slice StateChange WriteBoards
+      command CreateBoard
+        boardId BoardId identifier
+        name String
+        produces BoardCreated
+          boardId = boardId
+          name = name
+      command AddCard
+        boardId BoardId identifier
+        cardId CardId
+        title String
+        produces CardAdded
+          boardId = boardId
+          cardId = cardId
+          title = title
+      command RenameCard
+        cardId CardId identifier
+        title String
+        produces CardRenamed
+          cardId = cardId
+          title = title
+      command RemoveCard
+        boardId BoardId identifier
+        cardId CardId
+        produces CardRemoved
+          boardId = boardId
+          cardId = cardId
+      command RemoveBoard
+        boardId BoardId identifier
+        produces BoardRemoved
+          boardId = boardId
+
+    slice StateView Boards
+      event BoardCreated
+        boardId BoardId
+        name String
+      event CardAdded
+        boardId BoardId
+        cardId CardId
+        title String
+      event CardRenamed
+        cardId CardId
+        title String
+      event CardRemoved
+        boardId BoardId
+        cardId CardId
+      event BoardRemoved
+        boardId BoardId
+
+      readmodel Board
+        boardId BoardId
+        name String
+        changes Int
+        details BoardDetails optional
+        cards Card[]
+
+      query AllBoards => Board[]
+      query BoardById => Board optional
+        by boardId BoardId
+
+      projection BoardProjection => Board
+        every
+          increment changes
+        from BoardCreated key boardId
+          name = name
+        nested details
+          every
+            increment count
+          from BoardCreated key boardId
+            note = "created"
+        children cards identified by cardId
+          every
+            increment changes
+          from CardAdded key cardId
+            parent boardId
+            title = title
+          join CardNames on cardId
+            with CardRenamed
+              title = title
+          remove with CardRemoved key cardId
+            parent boardId
+        remove with BoardRemoved key boardId
+
+      specification ParentThenChildAndJoin
+        given BoardCreated
+          for "b1"
+          boardId = "b1"
+          name = "Board"
+        given CardAdded
+          for "b1"
+          boardId = "b1"
+          cardId = "c1"
+          title = "One"
+        given CardRenamed
+          for "c1"
+          cardId = "c1"
+          title = "Renamed"
+        then readmodel Board
+          boardId = "b1"
+          name = "Board"
+          changes = 2
+          details = {"note":"created","count":1}
+          cards = [{"cardId":"c1","title":"Renamed","changes":2}]
+
+      specification ChildAndJoinBeforeParent
+        given CardRenamed
+          for "c2"
+          cardId = "c2"
+          title = "Latest"
+        given CardAdded
+          for "b2"
+          boardId = "b2"
+          cardId = "c2"
+          title = "First"
+        given BoardCreated
+          for "b2"
+          boardId = "b2"
+          name = "Deferred"
+        then readmodel Board
+          boardId = "b2"
+          cards = [{"cardId":"c2","title":"Latest","changes":1}]
+          changes = 2
+
+      specification RemovingTheChild
+        given BoardCreated
+          for "b3"
+          boardId = "b3"
+          name = "Removal"
+        given CardAdded
+          for "b3"
+          boardId = "b3"
+          cardId = "c3"
+          title = "Temporary"
+        given CardRemoved
+          for "b3"
+          boardId = "b3"
+          cardId = "c3"
+        then readmodel Board
+          boardId = "b3"
+          cards = []
+          changes = 3

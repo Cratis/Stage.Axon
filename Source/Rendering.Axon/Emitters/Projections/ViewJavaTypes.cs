@@ -50,6 +50,8 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
     internal string Literal(SemanticValue value, SemanticTypeReference type) => value switch
     {
         SemanticNullValue => "null",
+        SemanticArrayValue array => $"java.util.List.of({string.Join(", ", array.Values.Select(element => Literal(element, type with { IsCollection = false, IsOptional = false })))})",
+        SemanticCompositeValue composite => CompositeLiteral(composite, type),
         SemanticTextValue text => Parse(type, JavaCodeBuilder.StringLiteral(text.Value)),
         SemanticNumberValue number => Wrap(type, PrimitiveOf(type) == SemanticPrimitiveType.DecimalNumber
             ? $"new java.math.BigDecimal({JavaCodeBuilder.StringLiteral(number.Value.ToString(CultureInfo.InvariantCulture))})"
@@ -82,4 +84,11 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
         SemanticPrimitiveType.DateTime => "java.time.OffsetDateTime",
         _ => "String"
     };
+
+    string CompositeLiteral(SemanticCompositeValue value, SemanticTypeReference type)
+    {
+        var composite = application.Types.First(candidate => candidate.Id == type.Target);
+        var arguments = composite.Properties.Select(property => value.Properties.FirstOrDefault(entry => entry.TargetProperty == property.Id) is { } entry ? Literal(entry.Value, property.Type) : Default(property.Type));
+        return $"new {Type(type)}({string.Join(", ", arguments)})";
+    }
 }

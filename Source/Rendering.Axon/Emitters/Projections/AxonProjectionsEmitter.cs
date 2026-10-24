@@ -6,7 +6,7 @@ using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
-using Cratis.Stage.Rendering.Axon.Specifications;
+using Cratis.Stage.Rendering.Axon.Specifications.Views;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
@@ -56,6 +56,11 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
 
     static void EmitProjector(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticProjection projection, SemanticReadModel model)
     {
+        if (projection.Scope is { } scope && (scope.Every is not null || scope.Children.Length > 0 || scope.Nested.Length > 0 || scope.Joins.Length > 0 || scope.Removals.Length > 0 || scope.JoinRemovals.Length > 0 || scope.From.Any(from => from.Key is not SemanticProjectionValueKey || from.Mappings.Any(mapping => mapping.Target.Length > 1 || mapping.Source is SemanticProjectionEventContextValue))))
+        {
+            new ScopedProjectionEmitter(context, types, package, projection, model).Emit();
+            return;
+        }
         var modelName = JavaNames.Type(model.Name);
         var name = JavaNames.Type(projection.Name) + "Projector";
         var code = new JavaCodeBuilder(package).Import("org.springframework.stereotype.Component")
@@ -83,7 +88,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
 
     static void EmitFrom(AxonEmissionContext context, ViewJavaTypes types, JavaCodeBuilder code, SemanticProjection projection, SemanticReadModel model, SemanticEventContract @event, SemanticProjectionFrom from)
     {
-        var values = new ProjectionValues(context.Request.Model.Application, types);
+        var values = new ProjectionValues(context, types);
         var key = values.Key(from.Key, @event);
         if (key is null)
         {
