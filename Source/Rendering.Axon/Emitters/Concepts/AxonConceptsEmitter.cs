@@ -51,7 +51,7 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
                         constructor.UnsupportedIntent(intent, path, code)
                             .Line("throw new UnsupportedOperationException(" + JavaCodeBuilder.StringLiteral(code + ": " + intent) + ");");
                     }
-                });
+                }).Line("@Override").Line("public String toString() { return value.toString(); }");
                 ConceptGeneration.Emit(context, concept, body);
             }).Build();
     }
