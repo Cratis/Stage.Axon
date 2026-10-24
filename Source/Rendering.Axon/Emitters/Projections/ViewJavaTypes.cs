@@ -10,6 +10,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
 internal sealed class ViewJavaTypes(SemanticApplication application)
 {
+    readonly ViewConceptValues _concepts = new(application);
     internal string BasePackage { get; } = JavaNames.PackageSegment(application.Name);
 
     internal static void Add(AxonEmissionContext context, string package, string name, string source, params SemanticId[] ids) =>
@@ -29,10 +30,10 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
     }
 
     internal SemanticPrimitiveType PrimitiveOf(SemanticTypeReference type) => type.Kind == SemanticTypeReferenceKind.Concept
-        ? application.Concepts.Single(concept => concept.Id == type.Target).Primitive : type.Primitive;
+        ? _concepts.Primitive(type) : type.Primitive;
 
     internal string Wrap(SemanticTypeReference type, string value) => !type.IsCollection && type.Kind == SemanticTypeReferenceKind.Concept
-        ? $"new {Type(type)}({value})" : value;
+        ? _concepts.Wrap(type, Type(type), value) : value;
 
     internal string Unwrap(SemanticTypeReference type, string value) => !type.IsCollection && type.Kind == SemanticTypeReferenceKind.Concept ? $"{value}.value()" : value;
 
@@ -60,13 +61,7 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
         _ => "null"
     };
 
-    internal string Default(SemanticTypeReference type) => type.IsCollection ? "java.util.List.of()" : PrimitiveOf(type) switch
-    {
-        SemanticPrimitiveType.WholeNumber => Wrap(type, "0L"),
-        SemanticPrimitiveType.DecimalNumber => Wrap(type, "java.math.BigDecimal.ZERO"),
-        SemanticPrimitiveType.Boolean => Wrap(type, "false"),
-        _ => "null"
-    };
+    internal string Default(SemanticTypeReference type) => type.IsCollection ? "java.util.List.of()" : ScalarDefault(type);
 
     internal string EventType(SemanticId id)
     {
@@ -83,6 +78,14 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
         SemanticPrimitiveType.Date => "java.time.LocalDate",
         SemanticPrimitiveType.DateTime => "java.time.OffsetDateTime",
         _ => "String"
+    };
+
+    string ScalarDefault(SemanticTypeReference type) => _concepts.IsEnumeration(type) ? "null" : PrimitiveOf(type) switch
+    {
+        SemanticPrimitiveType.WholeNumber => Wrap(type, "0L"),
+        SemanticPrimitiveType.DecimalNumber => Wrap(type, "java.math.BigDecimal.ZERO"),
+        SemanticPrimitiveType.Boolean => Wrap(type, "false"),
+        _ => "null"
     };
 
     string CompositeLiteral(SemanticCompositeValue value, SemanticTypeReference type)
