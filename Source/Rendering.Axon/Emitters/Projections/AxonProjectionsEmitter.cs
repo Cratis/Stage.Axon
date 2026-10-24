@@ -37,7 +37,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             }
         }
         new AxonViewSpecsEmitter().Emit(context);
-        if (namespaces.Count > 0)
+        if (ScopeSelection.Select(context.Request).Any(owner => !owner.Slice.ReadModels.IsEmpty))
             context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/axon-views.properties", string.Join('\n', namespaces.Select(name => $"axon.eventhandling.processors.{name}.mode=subscribing")) + "\n", []));
     }
 
