@@ -11,16 +11,14 @@ namespace Cratis.Stage.Rendering.Axon.Admission;
 
 internal static class AxonAdmission
 {
-    // Measured from the authored orders, ticketing and inventory blueprints with Screenplay 4.240.2.
-    internal static bool Supports(ExecutableSemanticModel model) =>
-        (model.LanguageVersion.Major, model.LanguageVersion.Minor, model.SemanticVersion.Major, model.SemanticVersion.Minor) == (2, 0, 2, 0);
+    internal static bool Supports(ExecutableSemanticModel model) => AxonSupportedVersions.Contains(model.LanguageVersion, model.SemanticVersion);
 
     internal static ImmutableArray<ArtifactRenderDiagnostic> Inspect(ArtifactRenderRequest request, AxonDegradation degradation)
     {
         var diagnostics = ImmutableArray.CreateBuilder<ArtifactRenderDiagnostic>();
         if (!Supports(request.Model))
         {
-            degradation.Unsupported(AxonRefusalCodes.Version, request.Model.Application.Id, "Axon scaffolding admits only the measured language/semantic pair 2.0/2.0.");
+            degradation.Unsupported(AxonRefusalCodes.Version, request.Model.Application.Id, "Axon scaffolding admits only the measured language/semantic pairs 2.0/2.0, 6.0/6.0, 10.0/10.0 and 25.0/25.0; individual features remain subject to admission.");
         }
 
         InspectProfile(request, diagnostics);
