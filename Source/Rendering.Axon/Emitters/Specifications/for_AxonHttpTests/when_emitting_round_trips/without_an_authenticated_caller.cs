@@ -24,7 +24,7 @@ public class without_an_authenticated_caller : for_AxonArtifactRenderPlanner.giv
     void Because()
     {
         AxonHttpTests.Emit(context);
-        code = Encoding.UTF8.GetString(context.Artifacts.Single().Bytes.AsSpan());
+        code = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ModeledHttpRoundTripTest.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 
     [Fact] void should_keep_the_request_anonymous() => code.ShouldContain(".with(anonymous())");

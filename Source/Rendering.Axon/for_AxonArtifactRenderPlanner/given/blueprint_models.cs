@@ -24,7 +24,7 @@ public static class blueprint_models
         }
     }
 
-    static string Root([CallerFilePath] string path = "")
+    internal static string Root([CallerFilePath] string path = "")
     {
         var directory = Directory.GetParent(path);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Stage.slnx")))
@@ -32,6 +32,6 @@ public static class blueprint_models
             directory = directory.Parent;
         }
 
-        return directory!.FullName;
+        return directory.FullName;
     }
 }
