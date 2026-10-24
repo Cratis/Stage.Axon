@@ -17,6 +17,11 @@ public final class ProblemDetailsAdvice {
         return problem;
     }
 
+    @ExceptionHandler(UniqueValueConflict.class)
+    public ProblemDetail conflict(UniqueValueConflict exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail invalid(IllegalArgumentException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
