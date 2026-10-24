@@ -5,6 +5,7 @@ namespace Cratis.Stage.Rendering.Axon.Admission;
 
 internal static partial class AxonRefusalCodes
 {
+    internal const string CommandValidation = "STAGE-AXON-0107";
     internal const string Generation = "STAGE-AXON-GENERATION";
     internal const string Clock = "STAGE-AXON-CLOCK";
     internal const string Capture = "STAGE-AXON-CAPTURE";
