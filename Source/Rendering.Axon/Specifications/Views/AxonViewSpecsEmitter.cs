@@ -25,6 +25,12 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
             {
                 var specs = located.Slice.Specifications.Where(specification => !context.Specifications.ContainsKey(specification.Id) && (specification.ThenReadModels.Any(expected => expected.ReadModel == model.Id) || specification.ThenAbsentReadModels.Any(expected => expected.ReadModel == model.Id))).ToArray();
                 if (specs.Length == 0) continue;
+                if (located.Slice.Reducers.Any(reducer => reducer.ReadModel == model.Id))
+                {
+                    ReducerViewSpecifications.Emit(context, types, located, model, specs);
+                    continue;
+                }
+
                 EmitModel(context, types, located, model, specs);
             }
         }

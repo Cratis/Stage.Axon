@@ -15,6 +15,8 @@ public class a_view_request : Specification
 {
     protected ArtifactRenderRequest _request;
 
+    protected SemanticId ReadModelId(string name) => ScopeSelection.Select(_request).SelectMany(slice => slice.Slice.ReadModels).Single(model => model.Name == name).Id;
+
     protected SemanticId QueryId(string name) => ScopeSelection.Select(_request).SelectMany(slice => slice.Slice.Queries).Single(query => query.Name == name).Id;
 
     protected static string Text(PlannedArtifact artifact) => Encoding.UTF8.GetString(artifact.Bytes.AsSpan());

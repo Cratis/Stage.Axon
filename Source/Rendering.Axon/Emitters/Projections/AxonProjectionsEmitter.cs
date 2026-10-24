@@ -30,7 +30,11 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
                 namespaces.Add(package);
             }
             foreach (var reducer in located.Slice.Reducers)
-                context.Degradation.Unsupported(AxonRefusalCodes.Reduction, reducer.ReadModel, "Inline reducer bodies are not available in the Axon target.");
+            {
+                var model = located.Slice.ReadModels.First(candidate => candidate.Id == reducer.ReadModel);
+                ReducerProjection.Emit(context, types, located, model, reducer);
+                namespaces.Add(package);
+            }
         }
         new AxonViewSpecsEmitter().Emit(context);
         if (namespaces.Count > 0)

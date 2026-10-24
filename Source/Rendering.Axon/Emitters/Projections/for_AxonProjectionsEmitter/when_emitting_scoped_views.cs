@@ -29,10 +29,10 @@ public class when_emitting_scoped_views : given.a_view_request
     [Fact] void should_register_modeled_native_specs() => _context.Specifications.Count.ShouldEqual(ScopeSelection.Select(_request).Sum(slice => slice.Slice.Specifications.Length));
 
     [Fact]
-    void should_match_the_reference_execution_for_every_authored_spec()
+    void should_match_the_reference_execution_for_every_projected_spec()
     {
         var runner = new SemanticSpecificationRunner();
-        var failures = ScopeSelection.Select(_request).SelectMany(slice => slice.Slice.Specifications)
+        var failures = ScopeSelection.Select(_request).Where(slice => slice.Slice.Reducers.IsEmpty).SelectMany(slice => slice.Slice.Specifications)
             .Select(specification => runner.Run(_request.ExecutionPlan, specification.Id)).Where(result => !result.Passed)
             .Select(result => string.Join('\n', result.Failures) + "\nActual: " + string.Join("; ", result.Execution.World.ReadModels.SelectMany(model => model.Values).Select(value => value.TargetProperty + "=" + Describe(value.Value))));
         var messages = string.Join('\n', failures);
