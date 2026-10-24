@@ -26,7 +26,7 @@ public class when_admitting_requests : given.an_axon_request
     [InlineData(ImplementationGapMode.Stub, ArtifactRefusalMode.Refuse)]
     [InlineData(ImplementationGapMode.Refuse, ArtifactRefusalMode.RenderAround)]
     public void should_warn_for_valid_mode_preferences(ImplementationGapMode gaps, ArtifactRefusalMode refusals) =>
-        AssertWarned(AxonRendering.PlanFrom(loaded, request.Scope, profile: AxonRendering.CreateProfile(gaps, refusals)), AxonRefusalCodes.Scaffold);
+        AssertScaffold(AxonRendering.PlanFrom(loaded, request.Scope, profile: AxonRendering.CreateProfile(gaps, refusals)));
 
     [Theory]
     [InlineData((ImplementationGapMode)9, ArtifactRefusalMode.Refuse, AxonRefusalCodes.GapMode)]
@@ -42,7 +42,7 @@ public class when_admitting_requests : given.an_axon_request
         var input = ArtifactRenderInput.Create("strict", "1", [.. System.Text.Encoding.UTF8.GetBytes(value)]);
         var profile = ArtifactRenderProfile.Create(request.Profile.Target, request.Profile.TargetVersion, request.Profile.Renderer, request.Profile.RendererVersion, request.Profile.Inputs.Add(input));
         var plan = new AxonArtifactRenderPlanner().Plan(request with { Profile = profile });
-        if (valid) AssertWarned(plan, AxonRefusalCodes.Scaffold);
+        if (valid) AssertScaffold(plan);
         else AssertRefused(plan, AxonRefusalCodes.Profile);
     }
 
@@ -59,12 +59,12 @@ public class when_admitting_requests : given.an_axon_request
         AssertInvalidScope(request with { AdditionalScopes = [new(ArtifactRenderScopeKind.Module, loaded.Model.Application.Modules[0].Id)] });
 
     [Fact]
-    void should_warn_about_unverified_scaffold() =>
-        AssertWarned(AxonRendering.PlanFrom(loaded, request.Scope), AxonRefusalCodes.Scaffold);
+    void should_emit_the_verified_scaffold() =>
+        AssertScaffold(AxonRendering.PlanFrom(loaded, request.Scope));
 
     [Fact]
-    void should_refuse_unverified_scaffold_in_strict_mode() =>
-        AssertStrictlyRefused(AxonRendering.PlanFrom(loaded, request.Scope, profile: AxonRendering.CreateProfile(strict: true)), AxonRefusalCodes.Scaffold);
+    void should_refuse_unimplemented_specifications_in_strict_mode() =>
+        AssertStrictlyRefused(AxonRendering.PlanFrom(loaded, request.Scope, profile: AxonRendering.CreateProfile(strict: true)), "STAGE-AXON-SPEC");
 
     void AssertUnmeasuredPairs(ArtifactRenderProfile profile, Action<ArtifactRenderPlan, string> assert)
     {
@@ -89,6 +89,14 @@ public class when_admitting_requests : given.an_axon_request
     {
         Assert.Contains(AxonAdmission.Inspect(request, new AxonDegradation(request.Profile)), diagnostic => diagnostic.Code == AxonRefusalCodes.Scope && diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Error);
         Assert.Throws<InvalidArtifactRenderContract>(() => new AxonArtifactRenderPlanner().Plan(request));
+    }
+
+    static void AssertScaffold(ArtifactRenderPlan plan)
+    {
+        plan.Success.ShouldBeTrue();
+        plan.Refusals.ShouldBeEmpty();
+        Assert.Contains(plan.Artifacts, artifact => artifact.RelativePath == "pom.xml");
+        Assert.DoesNotContain(plan.Diagnostics, diagnostic => diagnostic.Code == AxonRefusalCodes.Scaffold);
     }
 
     static void AssertWarned(ArtifactRenderPlan plan, string code)

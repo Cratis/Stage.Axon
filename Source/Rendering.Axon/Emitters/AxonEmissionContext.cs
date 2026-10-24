@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -18,6 +19,8 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
     internal string BasePackage => JavaNames.PackageSegment(Request.Model.Application.Name);
 
     internal List<PlannedArtifact> Artifacts { get; } = [];
+
+    internal Dictionary<SemanticId, AxonSpecificationEntry> Specifications { get; } = [];
 
     internal IReadOnlyDictionary<string, SemanticSurfaceDisposition> SemanticSurface => SemanticSurfaceLedger.Entries;
 
