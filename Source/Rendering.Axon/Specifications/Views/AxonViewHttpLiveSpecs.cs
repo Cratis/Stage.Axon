@@ -56,7 +56,7 @@ internal static class AxonViewHttpLiveSpecs
                             var changed = mapper.readTree(executor.submit(() -> nextData(reader)).get(10, java.util.concurrent.TimeUnit.SECONDS));
                             org.junit.jupiter.api.Assertions.assertTrue(changed.isArray());
                             org.junit.jupiter.api.Assertions.assertEquals(1, changed.size());
-                            org.junit.jupiter.api.Assertions.assertEquals(mapper.valueToTree(store.all()), changed);
+                            org.junit.jupiter.api.Assertions.assertEquals(mapper.readTree(mapper.writeValueAsString(store.all())), changed);
                         }
                     }
                 }

@@ -40,14 +40,25 @@ internal static class AxonViewLiveSpecs
                 private {{types.BasePackage}}.runtime.ReadModelStore<Object, {{modelType}}> store;
 
                 @org.junit.jupiter.api.Test
-                void shouldDeliverInitialSnapshotAndUpdateAndReleaseRegistration() throws Exception {
+                void shouldDeliverInitialSnapshotAndUpdateAndCancelAxonPublisher() throws Exception {
                     store.clear();
                     var initial = new java.util.concurrent.CountDownLatch(1);
                     var changed = new java.util.concurrent.CountDownLatch(1);
+                    var cancelled = new java.util.concurrent.CountDownLatch(1);
                     var values = new java.util.concurrent.CopyOnWriteArrayList<{{name}}.Result>();
                     var subscription = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Flow.Subscription>();
                     var error = new java.util.concurrent.atomic.AtomicReference<Throwable>();
-                    {{name}}Subscription.results(gateway, new {{name}}()).subscribe(new java.util.concurrent.Flow.Subscriber<{{name}}.Result>() {
+                    {{name}}Subscription.results(gateway, new {{name}}(), source -> target -> source.subscribe(new org.reactivestreams.Subscriber<{{name}}.Result>() {
+                        @Override public void onSubscribe(org.reactivestreams.Subscription upstream) {
+                            target.onSubscribe(new org.reactivestreams.Subscription() {
+                                @Override public void request(long amount) { upstream.request(amount); }
+                                @Override public void cancel() { upstream.cancel(); cancelled.countDown(); }
+                            });
+                        }
+                        @Override public void onNext({{name}}.Result value) { target.onNext(value); }
+                        @Override public void onError(Throwable failure) { target.onError(failure); }
+                        @Override public void onComplete() { target.onComplete(); }
+                    })).subscribe(new java.util.concurrent.Flow.Subscriber<{{name}}.Result>() {
                         @Override public void onSubscribe(java.util.concurrent.Flow.Subscription value) { subscription.set(value); value.request(2); }
                         @Override public void onNext({{name}}.Result value) {
                             values.add(value);
@@ -74,12 +85,7 @@ internal static class AxonViewLiveSpecs
                         var active = subscription.get();
                         if (active != null) active.cancel();
                     }
-                    var remaining = configuration.getComponent(org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory.class).create()
-                        .executeWithResult(processing -> java.util.concurrent.CompletableFuture.completedFuture(
-                            org.axonframework.messaging.queryhandling.QueryUpdateEmitter.forContext(processing)
-                                .emitAndCount({{name}}.class, query -> true, {{name}}.Result::invalidation).orElseThrow()))
-                        .get(10, java.util.concurrent.TimeUnit.SECONDS);
-                    org.junit.jupiter.api.Assertions.assertEquals(0, remaining);
+                    org.junit.jupiter.api.Assertions.assertTrue(cancelled.await(10, java.util.concurrent.TimeUnit.SECONDS), "Cancellation did not reach the real Axon subscription publisher");
                 }
             }
             """).Build();

@@ -20,7 +20,12 @@ internal static class LiveQuerySubscription
                 private {{name}}Subscription() {}
 
                 public static Flow.Publisher<{{name}}.Result> results(QueryGateway gateway, {{name}} query) {
-                    return subscriber -> gateway.subscriptionQuery(query, {{name}}.Result.class)
+                    return results(gateway, query, source -> source);
+                }
+
+                static Flow.Publisher<{{name}}.Result> results(QueryGateway gateway, {{name}} query,
+                        java.util.function.UnaryOperator<org.reactivestreams.Publisher<{{name}}.Result>> observe) {
+                    return subscriber -> observe.apply(gateway.subscriptionQuery(query, {{name}}.Result.class))
                         .subscribe(new Bridge(gateway, query, subscriber));
                 }
 
