@@ -39,7 +39,7 @@ internal static class QueryPerformer
         var configuration = new JavaCodeBuilder(package)
             .Line($"@org.springframework.context.annotation.Configuration({JavaCodeBuilder.StringLiteral(package + "." + name + "PerformerConfiguration")})")
             .Block($"public class {name}PerformerConfiguration", body => body
-                .Line("@org.springframework.context.annotation.Bean")
+                .Line($"@org.springframework.context.annotation.Bean({JavaCodeBuilder.StringLiteral(package + "." + name + "Performer")})")
                 .Line($"@org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean({name}Performer.class)")
                 .Block($"public {name}Performer {JavaNames.Member(name)}Performer()", method => method.Line($"return new {name}Performer() {{}};")));
         context.AddJava(package, name + "PerformerConfiguration", configuration.Build(), sources: query.Id);

@@ -28,5 +28,6 @@ public class when_emitting_query_performers : a_view_request
     [Fact] void should_fail_loudly_until_implemented() => _contract.ShouldContain("throw new UnsupportedOperationException");
     [Fact] void should_preserve_the_modeled_intent() => _contract.ShouldContain("Screenplay wanted to answer the query with its modeled performer");
     [Fact] void should_allow_a_spring_bean_to_replace_the_default() => _configuration.ShouldContain("@org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(RankedTotalsPerformer.class)");
+    [Fact] void should_qualify_the_default_bean_name() => _configuration.ShouldContain("@org.springframework.context.annotation.Bean(\"axonviews.views.counters.totals.RankedTotalsPerformer\")");
     [Fact] void should_warn_for_the_exact_query() => _context.Degradation.UnsupportedConstructs.Single(diagnostic => diagnostic.Artifact == _request.ImplementationRequirements.Single(requirement => requirement.Role == Cratis.Screenplay.Semantics.SemanticImplementationRole.QueryPerformer).Source.SemanticId).Code.ShouldEqual("STAGE-AXON-0401");
 }

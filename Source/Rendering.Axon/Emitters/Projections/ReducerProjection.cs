@@ -8,9 +8,9 @@ using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal static class ReducerProjection
+internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTypes types)
 {
-    internal static void Emit(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticReadModel model, SemanticReducer reducer)
+    internal void Emit(LocatedSemanticSlice located, SemanticReadModel model, SemanticReducer reducer)
     {
         var package = types.Package(located);
         var name = JavaNames.Type(model.Name);
@@ -21,14 +21,14 @@ internal static class ReducerProjection
             .Block($"public interface {name}Reducer", body =>
             {
                 if (reducer.Transitions.IsEmpty) body.UnsupportedIntent("reduce events into the read model", model.Id.ToString(), AxonRefusalCodes.Reduction);
-                foreach (var transition in reducer.Transitions) EmitTransition(context, types, model, transition, body);
+                foreach (var transition in reducer.Transitions) EmitTransition(model, transition, body);
             });
         context.AddJava(package, name + "Reducer", contract.Build(), sources: model.Id);
-        EmitConfiguration(context, package, name, model.Id);
-        EmitProjector(context, types, package, model, reducer);
+        EmitConfiguration(package, name, model.Id);
+        EmitProjector(package, model, reducer);
     }
 
-    static void EmitTransition(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, SemanticReducerTransition transition, JavaCodeBuilder code)
+    void EmitTransition(SemanticReadModel model, SemanticReducerTransition transition, JavaCodeBuilder code)
     {
         var requirement = context.Request.ImplementationRequirements.FirstOrDefault(candidate => candidate.RequirementId == transition.RequirementId);
         var hasBody = requirement is not null && context.Request.ImplementationContents.Any(content => content.Key == transition.RequirementId && !string.IsNullOrWhiteSpace(content.Value));
@@ -41,18 +41,18 @@ internal static class ReducerProjection
             .Line($"throw new UnsupportedOperationException({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.Reduction + ": " + reason)});"));
     }
 
-    static void EmitConfiguration(AxonEmissionContext context, string package, string name, SemanticId id)
+    void EmitConfiguration(string package, string name, SemanticId id)
     {
         var code = new JavaCodeBuilder(package)
             .Line($"@org.springframework.context.annotation.Configuration({JavaCodeBuilder.StringLiteral(package + "." + name + "ReducerConfiguration")})")
             .Block($"public class {name}ReducerConfiguration", body => body
-                .Line("@org.springframework.context.annotation.Bean")
+                .Line($"@org.springframework.context.annotation.Bean({JavaCodeBuilder.StringLiteral(package + "." + name + "Reducer")})")
                 .Line($"@org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean({name}Reducer.class)")
                 .Block($"public {name}Reducer {JavaNames.Member(name)}Reducer()", method => method.Line($"return new {name}Reducer() {{}};")));
         context.AddJava(package, name + "ReducerConfiguration", code.Build(), sources: id);
     }
 
-    static void EmitProjector(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticReadModel model, SemanticReducer reducer)
+    void EmitProjector(string package, SemanticReadModel model, SemanticReducer reducer)
     {
         var name = JavaNames.Type(model.Name);
         var updates = new ProjectionUpdates(context, types, model.Id);

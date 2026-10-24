@@ -29,6 +29,7 @@ public class when_emitting_reducer_delegates : a_view_request
     [Fact] void should_delegate_from_an_event_handler() => _projector.ShouldContain("var next = reducer.reduce(event, store.get(key).orElse(null), message);");
     [Fact] void should_delete_when_the_reducer_returns_no_state() => _projector.ShouldContain("if (next == null) store.remove(key); else store.put(key, next);");
     [Fact] void should_disable_dependent_specs() => _specs.ShouldContain("@org.junit.jupiter.api.Disabled(\"STAGE-AXON-0306:");
+    [Fact] void should_qualify_the_default_bean_name() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalReducerConfiguration.java", StringComparison.Ordinal))).ShouldContain("@org.springframework.context.annotation.Bean(\"axonviews.reduction.counters.rebuilt.RebuiltTotalReducer\")");
     [Fact] void should_warn_that_the_body_needs_an_implementation() => _context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0306").ShouldBeTrue();
 
     [Fact]

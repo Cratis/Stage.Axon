@@ -32,7 +32,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             foreach (var reducer in located.Slice.Reducers)
             {
                 var model = located.Slice.ReadModels.First(candidate => candidate.Id == reducer.ReadModel);
-                ReducerProjection.Emit(context, types, located, model, reducer);
+                new ReducerProjection(context, types).Emit(located, model, reducer);
                 namespaces.Add(package);
             }
         }
