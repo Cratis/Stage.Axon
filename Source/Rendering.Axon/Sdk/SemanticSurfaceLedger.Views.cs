@@ -55,6 +55,7 @@ internal static partial class SemanticSurfaceLedger
                 entries[$"{parts[0]}.{member}"] = new(SemanticSurfaceDispositionKind.Rendered, "Axon immutable view, event projector or typed query artifact; unsupported forms degrade at their owner.");
         }
 
+        SetViews(entries, SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-0308: read-model rows remain volatile in-memory state in every profile; replay is required after restart.", "SemanticReadModel.Properties");
         SetViews(entries, SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-0306: typed reducer delegation is rendered, but bodies remain throwing extension points and dependent specs are disabled.", "SemanticReducer.Transitions SemanticReducer.InitialState SemanticReducer.Target SemanticReducer.From SemanticReducerTransition.RequirementId");
         SetViews(entries, SemanticSurfaceDispositionKind.Rejected, "STAGE-AXON-0501: query expectations in view specifications remain explicitly disabled.", "SemanticQueryFilterValue.Filter SemanticQueryFilterValue.Value");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Declaration identity metadata; the generated artifact is attributed to its owning query.", "SemanticQueryKeyPart.Id SemanticQueryFilter.Id SemanticReadModelQueryArgument.Id");

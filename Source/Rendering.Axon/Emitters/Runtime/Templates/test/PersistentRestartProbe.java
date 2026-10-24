@@ -23,7 +23,8 @@ import org.springframework.context.ConfigurableApplicationContext;
 import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfSystemProperty(named = "stage.restart", matches = "true")
-class PersistentRestartTest {
+// Named Probe rather than Test so default Surefire discovery does not skip this opt-in proof.
+class PersistentRestartProbe {
     public record Recorded(@org.axonframework.eventsourcing.annotation.EventTag(key = "owner") String owner) {}
 
     @Test
@@ -58,6 +59,11 @@ class PersistentRestartTest {
     private void assertPersistentStores(ConfigurableApplicationContext application) {
         assertInstanceOf(AggregateBasedJpaEventStorageEngine.class, application.getBean(EventStorageEngine.class));
         assertInstanceOf(__RUNTIME__.persistent.JpaUniqueValueStore.class, application.getBean(UniqueValueStore.class));
+        if (Boolean.getBoolean("stage.expectViews")) {
+            var stores = application.getBeansOfType(ReadModelStore.class);
+            assertFalse(stores.isEmpty(), "The persistent-profile proof must boot an application with generated views");
+            stores.values().forEach(store -> assertInstanceOf(InMemoryReadModelStore.class, store));
+        }
     }
 
     private java.util.concurrent.CompletableFuture<Void> append(ConfigurableApplicationContext application, String owner) {

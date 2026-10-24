@@ -46,15 +46,16 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var name = JavaNames.Type(model.Name);
         var components = string.Join(", ", model.Properties.Select(property => $"@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(property.Name)}) {types.Type(property.Type)} {JavaNames.Member(property.Name)}"));
         ViewJavaTypes.Add(context, package, name, new JavaCodeBuilder(package).Line($"public record {name}({components}) {{}}").Build(), model.Id);
+        context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Read-model rows use volatile in-memory storage even under the persistent profile; replay is required after restart.");
         var configuration = new JavaCodeBuilder(package)
             .Import("org.springframework.context.annotation.Configuration").Import("org.springframework.context.annotation.Bean")
-            .Import("org.springframework.context.annotation.PropertySource").Import("org.springframework.context.annotation.Profile")
+            .Import("org.springframework.context.annotation.PropertySource")
             .Import(types.BasePackage + ".runtime.ReadModelStore").Import(types.BasePackage + ".runtime.InMemoryReadModelStore")
+            .DiffersFromScreenplay($"Read-model rows are volatile in every profile; replay after restart ({AxonRefusalCodes.ReadModelPersistence}).")
             .Line($"@Configuration({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
             .Line("@PropertySource(\"classpath:axon-views.properties\")")
             .Block($"public class {name}StoreConfiguration", body => body
                 .Line($"@Bean({JavaCodeBuilder.StringLiteral(package + "." + name)})")
-                .Line("@Profile(\"!persistent\")")
                 .Block($"public ReadModelStore<Object, {package}.{name}> store()", method => method.Line("return new InMemoryReadModelStore<>();")));
         ViewJavaTypes.Add(context, package, name + "StoreConfiguration", configuration.Build(), model.Id);
     }

@@ -103,7 +103,7 @@ Then pass `target/surefire-reports` to the native-result check. A green Maven ru
 
 ### Current profile guarantees
 
-The default scaffold uses in-memory storage. The emitted `persistent` Spring profile provides an aggregate-based JPA event engine and a JPA uniqueness store backed by file-based H2. This is an event/uniqueness runtime, not complete persistence for every generated application: read-model stores, processor tokens and projector indexes have separate boundaries.
+The default scaffold uses in-memory storage. The emitted `persistent` Spring profile provides an aggregate-based JPA event engine and a JPA uniqueness store backed by file-based H2. This is an event/uniqueness runtime, not complete persistence for every generated application: read-model stores remain volatile in every profile, and processor tokens and projector indexes have separate boundaries.
 
 | Concern | Default in-memory application | Persistent profile and limits |
 | --- | --- | --- |
@@ -113,8 +113,8 @@ The default scaffold uses in-memory storage. The emitted `persistent` Spring pro
 | Unique constraints | Supported property-based constraints reserve claims during append and clean up reservations on rollback. Unsupported constraint shapes fail closed with `STAGE-AXON-0801`. | JPA claims, releases and event append share the transaction. Native race/rollback fixtures exercise both profiles; this is not arbitrary-query uniqueness. |
 | Reactions | Supported reactions invoke commands or append one typed event. Delivery is at least once, not exactly once; reaction handlers disallow replay. | Storage does not provide exactly-once side effects or durable processor checkpoints. |
 | Time | Injected `java.time.Clock`; UTC calendar guards and process-local Spring scheduling. Interval alignment/durability differs explicitly with `STAGE-AXON-0507`. | No durable scheduler guarantee. |
-| Restart | Events and default stores do not survive process restart. | A two-boot H2 fixture proves event and uniqueness-claim survival, including rejection of a second owner without another append. It does not prove durable processor tokens, read-model rows or join indexes. |
-| Read models | Qualified in-memory stores are active only under `!persistent`. | Supply a persistent `ReadModelStore` bean with the same qualifier before using generated views in this profile; no such implementation is emitted. |
+| Restart | Events and default stores do not survive process restart. | An opt-in two-boot H2 probe exercises event and uniqueness-claim survival, including rejection of a second owner without another append. Select `PersistentRestartProbe` with `-Dstage.restart=true`; add `-Dstage.expectViews=true` to require generated view-store beans during both persistent-profile boots. The probe is outside default Surefire discovery, not a disabled default test. It does not prove durable processor tokens, read-model rows or join indexes. |
+| Read models | Qualified in-memory stores remain active in every profile, including `persistent`. | This explicit closest equivalent emits a `STAGE-AXON-0308` Warning, an intent-ledger entry and a generated difference comment. View rows do not survive restart: replay is required. No JPA read-model store is emitted. |
 
 Protected decision support currently covers required **presence**, not arbitrary field-value reads. Reaction JUnit lowering currently covers unambiguous application-trigger scenarios without prior state, with event assertions and a pinned clock. Other fixtures stay explicitly disabled rather than succeeding without exercising their behavior. Captures and translations remain unsupported with `STAGE-AXON-0601`; an unauthenticated collection endpoint is not a substitute for source subscription and checkpoint semantics.
 

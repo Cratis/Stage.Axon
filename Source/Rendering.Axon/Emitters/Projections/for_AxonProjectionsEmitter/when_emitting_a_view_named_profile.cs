@@ -32,6 +32,6 @@ public class when_emitting_a_view_named_profile : Specification
     }
 
     [Fact] void should_type_the_store_with_the_model_rather_than_the_spring_annotation() => configuration.ShouldContain("ReadModelStore<Object, templates.customers.profile.managerprofile.Profile>");
-    [Fact] void should_preserve_the_profile_hook() => configuration.ShouldContain("@Profile(\"!persistent\")");
+    [Fact] void should_keep_the_store_available_under_the_persistent_profile() => configuration.ShouldNotContain("@Profile");
     [Fact] void should_preserve_the_qualified_store_name() => configuration.ShouldContain("@Bean(\"templates.customers.profile.managerprofile.Profile\")");
 }
