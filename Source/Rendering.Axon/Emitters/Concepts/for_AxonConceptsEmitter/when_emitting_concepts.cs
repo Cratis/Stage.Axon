@@ -24,6 +24,7 @@ public class when_emitting_concepts : for_AxonArtifactRenderPlanner.given.an_axo
         var id = Content("OrderId");
         id.ShouldContain("public record OrderId(java.util.UUID value) implements " + context.BasePackage + ".runtime.ConceptAs<java.util.UUID>");
         id.ShouldContain("java.util.Objects.requireNonNull(value, \"value\")");
+        id.ShouldContain("public String toString() { return value.toString(); }");
     }
 
     [Fact]
@@ -35,6 +36,7 @@ public class when_emitting_concepts : for_AxonArtifactRenderPlanner.given.an_axo
         status.ShouldContain("@JsonCreator");
         status.ShouldContain("@JsonValue");
         status.ShouldContain("public String value()");
+        status.ShouldContain("public String toString() { return value.toString(); }");
     }
 
     [Fact]

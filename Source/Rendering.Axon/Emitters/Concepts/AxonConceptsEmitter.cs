@@ -24,20 +24,20 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
         }
     }
 
-    internal static string Record(AxonEmissionContext context, string package, string name, IEnumerable<SemanticProperty> properties, string annotation = "")
+    internal static string Record(AxonEmissionContext context, string package, string name, IEnumerable<SemanticProperty> properties)
     {
         var parameters = string.Join(", ", properties.Select(property => $"@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(property.Name)}) {JavaSemanticTypes.TypeFor(context, property.Type)} {JavaNames.Member(property.Name)}"));
         var code = new JavaCodeBuilder(package);
-        if (annotation.Length > 0) code.Line(annotation);
         return code.Line($"public record {name}({parameters}) {{}}").Build();
     }
 
-    static string Scalar(AxonEmissionContext context, SemanticConcept concept)
+    internal static string Scalar(AxonEmissionContext context, SemanticConcept concept)
     {
         var name = JavaNames.Type(concept.Name);
         var primitive = JavaSemanticTypes.Primitive(concept.Primitive);
+        var marker = concept.Generation is null ? string.Empty : $", {context.BasePackage}.runtime.Generatable<{name}>";
         return new JavaCodeBuilder(context.BasePackage + ".concepts")
-            .Block($"public record {name}({primitive} value) implements {context.BasePackage}.runtime.ConceptAs<{primitive}>", body =>
+            .Block($"public record {name}({primitive} value) implements {context.BasePackage}.runtime.ConceptAs<{primitive}>{marker}", body =>
             {
                 body.Block($"public {name}", constructor =>
                 {
@@ -51,7 +51,7 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
                         constructor.UnsupportedIntent(intent, path, code)
                             .Line("throw new UnsupportedOperationException(" + JavaCodeBuilder.StringLiteral(code + ": " + intent) + ");");
                     }
-                });
+                }).Line("@Override").Line("public String toString() { return value.toString(); }");
                 ConceptGeneration.Emit(context, concept, body);
             }).Build();
     }

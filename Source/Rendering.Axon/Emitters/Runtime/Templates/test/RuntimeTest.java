@@ -16,13 +16,63 @@ import tools.jackson.core.type.TypeReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RuntimeTest {
-    public record Id(UUID value) implements ConceptAs<UUID> {}
+    public record Id(UUID value) implements ConceptAs<UUID>, Generatable<Id> {
+        public static Id create() { return new Id(GenerateValue.uuid()); }
+        @Override
+        public String toString() { return value.toString(); }
+    }
+    public record TimedId(UUID value) implements ConceptAs<UUID>, GeneratableInContext<TimedId> {
+        public static TimedId create(GenerationContext context) {
+            if (context == null) throw new IllegalArgumentException("Generation context is required");
+            return new TimedId(GenerateValue.uuid());
+        }
+    }
+    @org.axonframework.messaging.eventhandling.annotation.Event(namespace = "runtime", name = "concept-tag", version = "1")
+    public record ConceptTagged(@org.axonframework.eventsourcing.annotation.EventTag(key = "id") Id id) {}
+    @org.axonframework.messaging.eventhandling.annotation.Event(namespace = "runtime", name = "fallback-tag", version = "1")
+    public record FallbackTagged(@org.axonframework.eventsourcing.annotation.EventTag(key = "eventSourceId") EventSourceId eventSourceId) {}
     public record Text(String value) implements ConceptAs<String> {}
     public record Whole(Long value) implements ConceptAs<Long> {}
     public record Number(BigDecimal value) implements ConceptAs<BigDecimal> {}
     public record Flag(Boolean value) implements ConceptAs<Boolean> {}
     public record Date(LocalDate value) implements ConceptAs<LocalDate> {}
     public record Time(OffsetDateTime value) implements ConceptAs<OffsetDateTime> {}
+
+    @Test
+    void primaryTagsUsePrimitiveIdentityValuesNotRecordDebugStrings() {
+        var value = "00000000-0000-0000-0000-000000000001";
+        assertTag(new ConceptTagged(new Id(UUID.fromString(value))), "id", value);
+        assertTag(new FallbackTagged(new EventSourceId(value)), "eventSourceId", value);
+    }
+
+    private static void assertTag(Object event, String key, String value) {
+        var type = new org.axonframework.messaging.core.annotation.AnnotationMessageTypeResolver().resolve(event.getClass()).orElseThrow();
+        var message = new org.axonframework.messaging.eventhandling.GenericEventMessage(type, event);
+        var tags = new org.axonframework.eventsourcing.eventstore.AnnotationBasedTagResolver().resolve(message);
+        assertTrue(tags.contains(new org.axonframework.messaging.eventstreaming.Tag(key, value)));
+        assertEquals(1, tags.size());
+    }
+
+    @Test
+    void callerIsResolvedFromTheCurrentSecurityContext() {
+        var context = org.springframework.security.core.context.SecurityContextHolder.getContext();
+        context.setAuthentication(null);
+        assertFalse(Caller.current().authenticated());
+        try {
+            var authority = new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_Sales");
+            context.setAuthentication(org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("sales", null, java.util.List.of(authority)));
+            assertTrue(Caller.current().authenticated());
+            assertEquals("sales", Caller.current().identity());
+            assertEquals(java.util.Set.of("Sales"), Caller.current().roles());
+        } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+    }
+
+    @Test
+    void generationUsesTheSelfTypedMarkers() {
+        assertInstanceOf(Generatable.class, Id.create());
+        assertInstanceOf(GeneratableInContext.class, TimedId.create(GenerationContext.current()));
+        assertThrows(IllegalArgumentException.class, () -> TimedId.create(null));
+    }
 
     @Test
     void conceptsUsePrimitiveJsonAndCanonicalConstructors() {

@@ -10,6 +10,36 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Concepts;
 
 internal static class ConceptValidations
 {
+    static readonly IReadOnlyDictionary<SemanticValidationRuleKind, string> _comparisons = new Dictionary<SemanticValidationRuleKind, string>
+    {
+        [SemanticValidationRuleKind.Minimum] = ">=",
+        [SemanticValidationRuleKind.GreaterThanOrEqual] = ">=",
+        [SemanticValidationRuleKind.Maximum] = "<=",
+        [SemanticValidationRuleKind.LessThanOrEqual] = "<=",
+        [SemanticValidationRuleKind.GreaterThan] = ">",
+        [SemanticValidationRuleKind.LessThan] = "<",
+        [SemanticValidationRuleKind.Equal] = "==",
+        [SemanticValidationRuleKind.NotEqual] = "!="
+    };
+
+    static readonly IReadOnlyDictionary<SemanticValidationRuleKind, string> _textMethods = new Dictionary<SemanticValidationRuleKind, string>
+    {
+        [SemanticValidationRuleKind.Matches] = "value.matches({value})",
+        [SemanticValidationRuleKind.Contains] = "value.contains({value})",
+        [SemanticValidationRuleKind.NotContains] = "!value.contains({value})",
+        [SemanticValidationRuleKind.StartsWith] = "value.startsWith({value})",
+        [SemanticValidationRuleKind.EndsWith] = "value.endsWith({value})",
+        [SemanticValidationRuleKind.Equal] = "value.equals({value})",
+        [SemanticValidationRuleKind.NotEqual] = "!value.equals({value})"
+    };
+
+    static readonly IReadOnlyDictionary<SemanticValidationRuleKind, string> _lengthComparisons = new Dictionary<SemanticValidationRuleKind, string>
+    {
+        [SemanticValidationRuleKind.Length] = "==",
+        [SemanticValidationRuleKind.Minimum] = ">=",
+        [SemanticValidationRuleKind.Maximum] = "<="
+    };
+
     internal static void Emit(AxonEmissionContext context, SemanticConcept concept, JavaCodeBuilder body)
     {
         body.Line("java.util.Objects.requireNonNull(value, \"value\");");
@@ -33,42 +63,27 @@ internal static class ConceptValidations
     static string? Predicate(SemanticPrimitiveType primitive, SemanticValidationRule rule)
     {
         if (primitive == SemanticPrimitiveType.Text) return TextPredicate(rule);
-        if (rule.Operand is not SemanticNumberValue number) return null;
+        if (rule.Operand is not SemanticNumberValue number || primitive is not (SemanticPrimitiveType.DecimalNumber or SemanticPrimitiveType.WholeNumber)) return null;
         var literal = number.Value.ToString(CultureInfo.InvariantCulture);
-        var compare = primitive switch
-        {
-            SemanticPrimitiveType.DecimalNumber => $"value.compareTo(new java.math.BigDecimal(\"{literal}\"))",
-            SemanticPrimitiveType.WholeNumber => $"new java.math.BigDecimal(value.toString()).compareTo(new java.math.BigDecimal(\"{literal}\"))",
-            _ => null
-        };
-        var op = Comparison(rule.Kind);
-        return compare is null || op is null ? null : $"{compare} {op} 0";
+        var value = primitive == SemanticPrimitiveType.DecimalNumber ? "value" : "new java.math.BigDecimal(value.toString())";
+        var op = _comparisons.GetValueOrDefault(rule.Kind);
+        return op is null ? null : $"{value}.compareTo(new java.math.BigDecimal(\"{literal}\")) {op} 0";
     }
 
-    static string? TextPredicate(SemanticValidationRule rule) => rule.Kind switch
+    static string? TextPredicate(SemanticValidationRule rule)
     {
-        SemanticValidationRuleKind.NotEmpty => "!value.isEmpty()",
-        SemanticValidationRuleKind.Matches when rule.Operand is SemanticTextValue text => "value.matches(" + JavaCodeBuilder.StringLiteral(text.Value) + ")",
-        SemanticValidationRuleKind.Contains when rule.Operand is SemanticTextValue text => "value.contains(" + JavaCodeBuilder.StringLiteral(text.Value) + ")",
-        SemanticValidationRuleKind.NotContains when rule.Operand is SemanticTextValue text => "!value.contains(" + JavaCodeBuilder.StringLiteral(text.Value) + ")",
-        SemanticValidationRuleKind.StartsWith when rule.Operand is SemanticTextValue text => "value.startsWith(" + JavaCodeBuilder.StringLiteral(text.Value) + ")",
-        SemanticValidationRuleKind.EndsWith when rule.Operand is SemanticTextValue text => "value.endsWith(" + JavaCodeBuilder.StringLiteral(text.Value) + ")",
-        SemanticValidationRuleKind.Length when rule.Operand is SemanticNumberValue number => "value.length() == " + number.Value.ToString(CultureInfo.InvariantCulture),
-        SemanticValidationRuleKind.Minimum when rule.Operand is SemanticNumberValue number => "value.length() >= " + number.Value.ToString(CultureInfo.InvariantCulture),
-        SemanticValidationRuleKind.Maximum when rule.Operand is SemanticNumberValue number => "value.length() <= " + number.Value.ToString(CultureInfo.InvariantCulture),
-        SemanticValidationRuleKind.Equal when rule.Operand is SemanticTextValue text => "value.equals(" + JavaCodeBuilder.StringLiteral(text.Value) + ")",
-        SemanticValidationRuleKind.NotEqual when rule.Operand is SemanticTextValue text => "!value.equals(" + JavaCodeBuilder.StringLiteral(text.Value) + ")",
-        _ => null
-    };
+        if (rule.Kind == SemanticValidationRuleKind.NotEmpty) return "!value.isEmpty()";
+        return rule.Operand switch
+        {
+            SemanticTextValue text => _textMethods.GetValueOrDefault(rule.Kind)?.Replace("{value}", JavaCodeBuilder.StringLiteral(text.Value), StringComparison.Ordinal),
+            SemanticNumberValue number => TextLength(rule.Kind, number),
+            _ => null
+        };
+    }
 
-    static string? Comparison(SemanticValidationRuleKind kind) => kind switch
+    static string? TextLength(SemanticValidationRuleKind kind, SemanticNumberValue number)
     {
-        SemanticValidationRuleKind.Minimum or SemanticValidationRuleKind.GreaterThanOrEqual => ">=",
-        SemanticValidationRuleKind.Maximum or SemanticValidationRuleKind.LessThanOrEqual => "<=",
-        SemanticValidationRuleKind.GreaterThan => ">",
-        SemanticValidationRuleKind.LessThan => "<",
-        SemanticValidationRuleKind.Equal => "==",
-        SemanticValidationRuleKind.NotEqual => "!=",
-        _ => null
-    };
+        var op = _lengthComparisons.GetValueOrDefault(kind);
+        return op is null ? null : "value.length() " + op + " " + number.Value.ToString(CultureInfo.InvariantCulture);
+    }
 }
