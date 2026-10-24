@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Cratis.Stage.Rendering.Axon.Verification</AssemblyName>
+        <RootNamespace>Cratis.Stage.Rendering.Axon.Verification</RootNamespace>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+        <EnablePackageValidation>false</EnablePackageValidation>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../Rendering.Axon/Rendering.Axon.csproj" />
+        <None Update="disabled-tests.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+</Project>

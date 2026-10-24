@@ -20,10 +20,14 @@ public class when_rendering_the_verification_corpus : Specification
         blueprints = Directory.GetDirectories(Path.Combine(root, "Verification/live-blueprints/models"));
         var samples = new[] { "live-navigation", "blueprint-templates", "live-custom-packages" }
             .Select(sample => Path.Combine(root, "Verification", sample, "model"));
-        foreach (var path in blueprints.Concat(samples).Order(StringComparer.Ordinal))
+        var views = Path.Combine(root, "Verification/axon-samples/views");
+        foreach (var path in blueprints.Concat(samples).Append(views).Concat(Directory.GetFiles(views, "*.play")).Order(StringComparer.Ordinal))
         {
             var name = Path.GetRelativePath(root, path);
-            _compilations.Add(name, await SemanticModelLoader.LoadAsync(path, [], null, "Corpus" + _compilations.Count));
+            var compilation = File.Exists(path)
+                ? await SemanticModelLoader.LoadAsync(Path.GetDirectoryName(path), [Path.GetFileName(path)], null, "Corpus" + _compilations.Count)
+                : await SemanticModelLoader.LoadAsync(path, [], null, "Corpus" + _compilations.Count);
+            _compilations.Add(name, compilation);
         }
     }
 
@@ -37,7 +41,7 @@ public class when_rendering_the_verification_corpus : Specification
     }
 
     [Fact] void should_include_all_fifteen_live_blueprints() => blueprints.Length.ShouldEqual(15);
-    [Fact] void should_include_the_three_verification_samples() => _compilations.Count.ShouldEqual(18);
+    [Fact] void should_include_the_three_verification_samples_and_five_view_variants() => _compilations.Count.ShouldEqual(23);
     [Fact] void should_exclude_only_typed_upstream_compile_errors() => _compilations.Values.Where(result => !result.Success).All(result => result.Errors.Length > 0 && result.Errors.All(error => error.Code.StartsWith("PLAY", StringComparison.Ordinal))).ShouldBeTrue();
     [Fact] void should_render_every_successful_compilation() => _plans.Count.ShouldEqual(_compilations.Values.Count(result => result.Success));
     [Fact] void should_not_pass_without_rendering_any_application() => (_plans.Count > 0).ShouldBeTrue();
