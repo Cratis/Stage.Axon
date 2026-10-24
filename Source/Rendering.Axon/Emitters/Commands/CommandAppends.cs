@@ -12,6 +12,8 @@ internal sealed class CommandAppends(AxonEmissionContext context, SemanticComman
 {
     readonly CommandJavaTypes _types = new(context.Request.Model.Application);
 
+    internal bool UsesOccurred { get; private set; }
+
     internal static SemanticEventContract Contract(AxonEmissionContext context, SemanticId id) => ScopeSelection.Locate(context.Request.Model.Application)
         .SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id).Single(contract => contract.Id == id);
 
@@ -58,6 +60,7 @@ internal sealed class CommandAppends(AxonEmissionContext context, SemanticComman
     string? Occurrence(SemanticEventContextExpression expression, SemanticTypeReference target)
     {
         var expressions = new CommandExpressions(command, _types);
+        if (expression.Value == SemanticEventContextValueKind.Occurred) UsesOccurred = true;
         return expression.Value switch
         {
             SemanticEventContextValueKind.EventSourceIdentity => expressions.Convert("command." + source.Member + "()" + (source.RuntimeId ? ".value()" : string.Empty), source.Type, target),

@@ -51,7 +51,8 @@ public class when_rendering_command_fixtures : for_AxonArtifactRenderPlanner.giv
         var context = new AxonEmissionContext(request, new(request.Profile));
         var slice = located with { Slice = located.Slice with { Specifications = [candidate] } };
         var source = CommandSource.Create(context, command, CommandAppends.Contract(context, command.Produces[0].EventContract));
-        new CommandSpecificationsEmitter(context, slice, command, source).Emit();
-        return Encoding.UTF8.GetString(context.Artifacts.Single().Bytes.AsSpan());
+        var usesClock = new CommandHandlerEmitter(context, slice, command, source).Emit();
+        new CommandSpecificationsEmitter(context, slice, command, source, usesClock).Emit();
+        return Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("SpecificationsTest.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 }

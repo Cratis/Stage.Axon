@@ -22,10 +22,12 @@ internal static class CommandFixtureSecurity
         method.Line($"{holder}.getContext().setAuthentication(org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated({JavaCodeBuilder.StringLiteral(identity)}, null, java.util.List.of({string.Join(", ", roles)})));");
     }
 
-    internal static void Proxy(JavaCodeBuilder body, string name)
+    internal static void Proxy(JavaCodeBuilder body, string name, bool usesClock)
     {
-        body.Block($"private {name}Handler handler(java.time.Clock clock)", method => method
-            .Line($"var factory = new org.springframework.aop.framework.ProxyFactory(new {name}Handler(new {name}Rules(validators.getValidator()), clock));")
+        var parameter = usesClock ? "java.time.Clock clock" : string.Empty;
+        var argument = usesClock ? ", clock" : string.Empty;
+        body.Block($"private {name}Handler handler({parameter})", method => method
+            .Line($"var factory = new org.springframework.aop.framework.ProxyFactory(new {name}Handler(new {name}Rules(validators.getValidator()){argument}));")
             .Line("factory.setProxyTargetClass(true);")
             .Line("factory.addAdvisor(org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor.preAuthorize());")
             .Line($"return ({name}Handler) factory.getProxy();"));

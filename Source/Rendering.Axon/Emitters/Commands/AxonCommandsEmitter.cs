@@ -18,9 +18,9 @@ internal sealed class AxonCommandsEmitter : IAxonEmitter
                 var source = command.Produces.IsEmpty ? null : CommandSource.Create(context, command, CommandAppends.Contract(context, command.Produces[0].EventContract));
                 CommandContractsEmitter.EmitCommand(context, located, command, source);
                 if (source is not null) CommandStreamEmitter.Emit(context, located, command, source);
-                new CommandHandlerEmitter(context, located, command, source).Emit();
+                var usesClock = new CommandHandlerEmitter(context, located, command, source).Emit();
                 CommandEndpointEmitter.Emit(context, located, command, source);
-                new CommandSpecificationsEmitter(context, located, command, source).Emit();
+                new CommandSpecificationsEmitter(context, located, command, source, usesClock).Emit();
             }
         }
     }

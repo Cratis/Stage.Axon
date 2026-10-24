@@ -9,7 +9,7 @@ using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
-internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource? source)
+internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource? source, bool usesClock)
 {
     internal void Emit()
     {
@@ -40,16 +40,21 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         body.Line("private final jakarta.validation.ValidatorFactory validators = jakarta.validation.Validation.buildDefaultValidatorFactory();")
             .Line("private AxonTestFixture fixture;").Line("@AfterEach").Block("void stop()", method => method.Line("if (fixture != null) fixture.stop();")
                 .Line("validators.close();").Line("org.springframework.security.core.context.SecurityContextHolder.clearContext();"));
-        CommandFixtureSecurity.Proxy(body, name);
+        CommandFixtureSecurity.Proxy(body, name, usesClock);
         body.Block("private AxonTestFixture fixture(String instant)", method =>
         {
-            method.Line("var clock = java.time.Clock.fixed(java.time.OffsetDateTime.parse(instant).toInstant(), java.time.ZoneOffset.UTC);")
-                .Line("var configuration = EventSourcingConfigurer.create();");
+            FixtureClock(method);
+            method.Line("var configuration = EventSourcingConfigurer.create();");
             if (source is not null) method.Line($"configuration.registerEntity(EventSourcedEntityModule.autodetected({source.JavaType}.class, {name}Stream.class));");
             method.Line($"configuration.messaging(messaging -> messaging.registerCommandHandlingModule(CommandHandlingModule.named({JavaCodeBuilder.StringLiteral(name)})")
-                .Line("    .commandHandlers().autodetectedCommandHandlingComponent(components -> handler(clock)).build()));")
+                .Line($"    .commandHandlers().autodetectedCommandHandlingComponent(components -> handler({(usesClock ? "clock" : string.Empty)})).build()));")
                 .Line("fixture = AxonTestFixture.with(configuration);").Line("return fixture;");
         });
+    }
+
+    void FixtureClock(JavaCodeBuilder body)
+    {
+        if (usesClock) body.Line("var clock = java.time.Clock.fixed(java.time.OffsetDateTime.parse(instant).toInstant(), java.time.ZoneOffset.UTC);");
     }
 
     void Specification(JavaCodeBuilder body, SemanticSpecification specification, string testClass, int index)

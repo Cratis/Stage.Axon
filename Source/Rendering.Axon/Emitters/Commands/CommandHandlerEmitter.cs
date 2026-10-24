@@ -15,9 +15,11 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
 {
     readonly CommandJavaTypes _types = new(context.Request.Model.Application);
 
+    bool _usesClock;
+
     bool Constrained => ConstraintCoverage.All(context).Any(item => command.Produces.Any(produced => ConstraintCoverage.Applies(item.Constraint, produced.EventContract)));
 
-    internal void Emit()
+    internal bool Emit()
     {
         var package = CommandContractsEmitter.Package(_types, located);
         var name = JavaNames.Type(command.Name);
@@ -29,25 +31,36 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             .Import("org.axonframework.messaging.eventhandling.gateway.EventAppender");
         code.Line("@Component").Block($"public class {name}Handler", body =>
         {
-            body.Line($"private final {name}Rules rules;").Line("private final java.time.Clock clock;");
-            if (Constrained) body.Line($"private final {context.BasePackage}.runtime.UniqueValueStore uniqueValues;");
-            body.Block($"public {name}Handler({name}Rules rules, java.time.Clock clock)", constructor =>
-            {
-                constructor.Line("this.rules = rules;").Line("this.clock = clock;");
-                if (Constrained) constructor.Line($"this.uniqueValues = new {context.BasePackage}.runtime.InMemoryUniqueValueStore();");
-            });
-            if (Constrained)
-            {
-                body.Line("@org.springframework.beans.factory.annotation.Autowired")
-                    .Block($"public {name}Handler({name}Rules rules, java.time.Clock clock, {context.BasePackage}.runtime.UniqueValueStore uniqueValues)", constructor =>
-                        constructor.Line("this.rules = rules;").Line("this.clock = clock;").Line("this.uniqueValues = uniqueValues;"));
-            }
             body.Line("@CommandHandler");
             var authorization = SecurityAnnotations.For(context, command.Authorization, command.Id);
             if (authorization.Length > 0) body.Line(authorization);
             body.Block($"public {response.ReturnType} handle({Parameters(name)})", method => Handle(method, response));
+            Dependencies(body, name);
         });
         context.AddJava(package, name + "Handler", code.Build(), sources: [command.Id]);
+        return _usesClock;
+    }
+
+    void Dependencies(JavaCodeBuilder body, string name)
+    {
+        body.Line($"private final {name}Rules rules;");
+        if (_usesClock) body.Line("private final java.time.Clock clock;");
+        if (Constrained) body.Line($"private final {context.BasePackage}.runtime.UniqueValueStore uniqueValues;");
+        var parameters = $"{name}Rules rules" + (_usesClock ? ", java.time.Clock clock" : string.Empty);
+        body.Block($"public {name}Handler({parameters})", constructor =>
+        {
+            constructor.Line("this.rules = rules;");
+            if (_usesClock) constructor.Line("this.clock = clock;");
+            if (Constrained) constructor.Line($"this.uniqueValues = new {context.BasePackage}.runtime.InMemoryUniqueValueStore();");
+        });
+        if (!Constrained) return;
+        body.Line("@org.springframework.beans.factory.annotation.Autowired")
+            .Block($"public {name}Handler({parameters}, {context.BasePackage}.runtime.UniqueValueStore uniqueValues)", constructor =>
+            {
+                constructor.Line("this.rules = rules;");
+                if (_usesClock) constructor.Line("this.clock = clock;");
+                constructor.Line("this.uniqueValues = uniqueValues;");
+            });
     }
 
     string Parameters(string name)
@@ -63,9 +76,10 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     {
         if (!Supported(body, response)) return;
         var appends = new List<(string Event, string? Condition)>();
+        var builder = new CommandAppends(context, command, source!);
         foreach (var produced in command.Produces)
         {
-            var append = new CommandAppends(context, command, source!).Build(produced);
+            var append = builder.Build(produced);
             if (append is null)
             {
                 Unsupported(body, AxonRefusalCodes.CommandMapping, "append every modeled event with its identity and complete property mappings");
@@ -76,7 +90,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         new CommandDecisionReads(context, command, source).Check(body);
         Prepare(body);
         body.Line("rules.validate(command);");
-        if (appends.Count > 0) Append(body, appends);
+        if (appends.Count > 0) Append(body, appends, builder.UsesOccurred);
         if (response.ReturnType != "void") body.Line("return " + response.Value + ";");
     }
 
@@ -91,17 +105,25 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
 
     void Prepare(JavaCodeBuilder body)
     {
-        if (command.Properties.Any(property => property.IsGenerated) || source?.Allocated == true) body.Line("command = command.withGenerated(clock);");
+        if (command.Properties.Any(property => property.IsGenerated) || source?.Allocated == true)
+        {
+            _usesClock = true;
+            body.Line("command = command.withGenerated(clock);");
+        }
         if (source?.Generated != true) return;
         var name = JavaNames.Type(command.Name);
         body.Line($"context.component(org.axonframework.modelling.StateManager.class).loadManagedEntity({name}Stream.class, command.{source.Member}(), context).join();");
     }
 
-    void Append(JavaCodeBuilder body, IReadOnlyList<(string Event, string? Condition)> appends)
+    void Append(JavaCodeBuilder body, IReadOnlyList<(string Event, string? Condition)> appends, bool usesOccurred)
     {
         MetadataDifferences(body);
-        body.Line("var occurred = java.time.OffsetDateTime.ofInstant(clock.instant(), java.time.ZoneOffset.UTC);")
-            .Line("var events = new java.util.ArrayList<Object>();");
+        if (usesOccurred)
+        {
+            _usesClock = true;
+            body.Line("var occurred = java.time.OffsetDateTime.ofInstant(clock.instant(), java.time.ZoneOffset.UTC);");
+        }
+        body.Line("var events = new java.util.ArrayList<Object>();");
         foreach (var append in appends)
         {
             if (append.Condition is null) body.Line($"events.add({append.Event});");
