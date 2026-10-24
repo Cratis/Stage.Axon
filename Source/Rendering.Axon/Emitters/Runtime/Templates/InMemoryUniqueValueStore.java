@@ -67,7 +67,7 @@ public final class InMemoryUniqueValueStore implements UniqueValueStore {
     private Changes changes(ProcessingContext context) {
         return context.computeResourceIfAbsent(resource, () -> {
             var changes = new Changes();
-            context.whenComplete(completed -> complete(changes, completed.isCommitted()));
+            context.doFinally(completed -> complete(changes, completed.isCommitted()));
             return changes;
         });
     }

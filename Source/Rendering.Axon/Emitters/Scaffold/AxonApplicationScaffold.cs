@@ -25,8 +25,6 @@ internal static class AxonApplicationScaffold
         .Import("org.axonframework.messaging.eventhandling.processing.streaming.token.store.inmemory.InMemoryTokenStore")
         .Import("tools.jackson.databind.JacksonModule")
         .Import(package + ".runtime.json.ConceptsModule")
-        .Import(package + ".runtime.UniqueValueStore")
-        .Import(package + ".runtime.InMemoryUniqueValueStore")
         .Line("@Configuration")
         .Block("public class AxonConfiguration", body => body
             .Line("@Bean")
@@ -38,9 +36,6 @@ internal static class AxonApplicationScaffold
             .Line("@Bean")
             .Line("Clock clock() { return Clock.systemUTC(); }")
             .Line("@Bean")
-            .Line("JacksonModule conceptsModule() { return new ConceptsModule(); }")
-            .Line("@Bean")
-            .Line("@Profile(\"!persistent\")")
-            .Line("UniqueValueStore uniqueValueStore() { return new InMemoryUniqueValueStore(); }"))
+            .Line("JacksonModule conceptsModule() { return new ConceptsModule(); }"))
         .Build();
 }

@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.axonframework.common.configuration.Configuration;
 import org.axonframework.eventsourcing.eventstore.AppendCondition;
 import org.axonframework.eventsourcing.eventstore.EventStorageEngine;
@@ -25,6 +27,8 @@ import org.axonframework.messaging.eventstreaming.Tag;
 import org.axonframework.messaging.core.annotation.AnnotationMessageTypeResolver;
 
 @SpringBootTest
+@AutoConfigureMockMvc
+@Import(RuntimeHttpRoundTripTest.EchoEndpoint.class)
 class UniqueAppendTransactionTest {
     @Autowired Configuration configuration;
     @Autowired UniqueValueStore claims;
