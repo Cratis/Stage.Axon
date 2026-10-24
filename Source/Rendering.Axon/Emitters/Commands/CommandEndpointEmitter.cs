@@ -42,5 +42,5 @@ internal static partial class CommandEndpointEmitter
         context.AddJava(package, name + "Endpoint", code.Build(), sources: [command.Id]);
     }
 
-    static string Kebab(string name) => Separators.Replace(WordBoundary.Replace(name, "${lower}-${upper}"), "-").Trim('-').ToLowerInvariant();
+    internal static string Kebab(string name) => Separators.Replace(WordBoundary.Replace(name, "${lower}-${upper}"), "-").Trim('-').ToLowerInvariant();
 }
