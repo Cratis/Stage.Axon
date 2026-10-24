@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
+using Cratis.Stage.Rendering.Axon.Emitters.Constraints;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -16,6 +17,7 @@ internal static class ReactionInvocation
         var located = ScopeSelection.Locate(context.Request.Model.Application).SingleOrDefault(slice => slice.Slice.Commands.Any(command => command.Id == invocation.Command));
         var command = located?.Slice.Commands.Single(candidate => candidate.Id == invocation.Command);
         if (command?.Properties.Any(property => property.IsGenerated) != false) return null;
+        if (ConstraintCoverage.CommandRequiresUnsupportedConstraint(context, command)) return null;
         var arguments = command.Properties.Select(property => Argument(context, invocation, input, property)).ToArray();
         if (arguments.Any(argument => argument is null)) return null;
         var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located!);

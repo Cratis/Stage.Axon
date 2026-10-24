@@ -3,9 +3,9 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
+using Cratis.Stage.Rendering.Axon.Emitters.Constraints;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Java;
-using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
@@ -34,8 +34,7 @@ internal sealed class ReactionProductionPreparation(AxonEmissionContext context,
         return !Constrained();
     }
 
-    bool Constrained() => ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Constraints)
-        .Any(constraint => constraint.Targets.Any(target => target.EventContract == produced.EventContract) || constraint.ReleasedBy.Contains(produced.EventContract));
+    bool Constrained() => ConstraintCoverage.EventRequiresUnsupportedConstraint(context, produced.EventContract);
 
     bool MatchesPrimary(string javaType) => produced.DestinationType is not { } destination || destination.Equals(CommandSource.TypeFor(context, javaType));
 

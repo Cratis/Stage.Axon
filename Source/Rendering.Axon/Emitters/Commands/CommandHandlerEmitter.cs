@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Constraints;
 using Cratis.Stage.Rendering.Axon.Emitters.Decisions;
 using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
@@ -67,6 +68,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
 
     bool Supported(JavaCodeBuilder body, CommandResponses response)
     {
+        if (ConstraintCoverage.CommandRequiresUnsupportedConstraint(context, command)) return Unsupported(body, AxonRefusalCodes.Constraint, "enforce or release modeled uniqueness in the append unit of work");
         if (command.Handler is not null) return Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation");
         if (new CommandDecisionReads(context, command, source).Prepare() is null) return Unsupported(body, AxonRefusalCodes.ProtectedReads, "check modeled decision reads before changing state");
         if (source is null && !command.Produces.IsEmpty) return Unsupported(body, AxonRefusalCodes.CommandMapping, "resolve the command's primary event-source identity");
