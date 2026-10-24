@@ -16,6 +16,7 @@ internal sealed class AxonSpecificationsEmitter : IAxonEmitter
 
     public void Emit(AxonEmissionContext context)
     {
+        AxonHttpTests.Emit(context);
         var unclaimed = ScopeSelection.Select(context.Request).SelectMany(slice => slice.Slice.Specifications).Where(spec => !context.Specifications.ContainsKey(spec.Id)).ToArray();
         if (unclaimed.Length > 0) EmitUnclaimed(context, unclaimed);
         var lines = context.Specifications.Values.OrderBy(entry => entry.Id.ToString(), StringComparer.Ordinal).Select(entry =>
