@@ -1,0 +1,36 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+module Reduction
+  feature Counters
+    slice StateChange Record
+      command RecordCount
+        id String
+        amount Int
+        produces CountRecorded
+          id = id
+          amount = amount
+      event CountRecorded
+        id String
+        amount Int
+
+    slice StateView Rebuilt
+      readmodel RebuiltTotal
+        id String key
+        amount Int
+
+      reducer RebuildTotal => RebuiltTotal
+        on CountRecorded
+          ```csharp
+          return new RebuiltTotal(context.Event.Id, context.Event.Amount);
+          ```
+
+      query RebuiltTotals => RebuiltTotal[]
+
+      specification RebuildFromEvents
+        given CountRecorded
+          id = "counter"
+          amount = 4
+        then readmodel RebuiltTotal
+          id = "counter"
+          amount = 4

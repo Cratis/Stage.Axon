@@ -1,0 +1,66 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+module Metrics
+  feature Monthly
+    slice StateView Metrics
+      event MetricCounted
+        region String
+        month Int
+        amount Int
+      event MetricRemoved
+        region String
+        month Int
+
+      readmodel Metric
+        region String key
+        month Int key
+        total Int
+
+      query FindMetric => Metric optional
+        by
+          region String
+          month Int
+
+      projection MetricProjection => Metric
+        from MetricCounted
+          key
+            region = region
+            month = month
+          add total by amount
+        remove with MetricRemoved
+          key
+            region = region
+            month = month
+
+      specification CompositeKeyIsolation
+        given MetricCounted
+          region = "west"
+          month = 1
+          amount = 3
+        given MetricCounted
+          region = "east"
+          month = 1
+          amount = 9
+        given MetricCounted
+          region = "west"
+          month = 1
+          amount = 2
+        then readmodel Metric
+          region = "west"
+          month = 1
+          total = 5
+        then readmodel Metric
+          region = "east"
+          month = 1
+          total = 9
+
+      specification RemovingTheCompositeKey
+        given MetricCounted
+          region = "west"
+          month = 2
+          amount = 5
+        given MetricRemoved
+          region = "west"
+          month = 2
+        then no readmodel Metric for {"region":"west","month":2}
