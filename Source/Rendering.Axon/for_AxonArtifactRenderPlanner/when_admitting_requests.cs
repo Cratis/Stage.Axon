@@ -64,7 +64,7 @@ public class when_admitting_requests : given.an_axon_request
 
     [Fact]
     void should_refuse_unimplemented_specifications_in_strict_mode() =>
-        AssertStrictlyRefused(AxonRendering.PlanFrom(loaded, request.Scope, profile: AxonRendering.CreateProfile(strict: true)), "STAGE-AXON-SPEC");
+        AssertStrictlyRefused(AxonRendering.PlanFrom(loaded, request.Scope, profile: AxonRendering.CreateProfile(strict: true)), AxonRefusalCodes.ViewSpecification);
 
     void AssertUnmeasuredPairs(ArtifactRenderProfile profile, Action<ArtifactRenderPlan, string> assert)
     {
