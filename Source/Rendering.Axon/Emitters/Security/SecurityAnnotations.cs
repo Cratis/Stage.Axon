@@ -50,8 +50,8 @@ internal static class SecurityAnnotations
     static string? Combine(string? left, SemanticLogicalOperator op, string? right) =>
         left is null || right is null ? null : op switch
         {
-            SemanticLogicalOperator.And => $"({left}) and ({right})",
-            SemanticLogicalOperator.Or => $"({left}) or ({right})",
+            SemanticLogicalOperator.And => left == right ? left : $"({left}) and ({right})",
+            SemanticLogicalOperator.Or => left == right ? left : $"({left}) or ({right})",
             _ => null
         };
 }

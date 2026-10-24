@@ -23,6 +23,21 @@ public class when_rendering_policies : for_AxonArtifactRenderPlanner.given.an_ax
         SecurityAnnotations.For(context, new SemanticPolicyReference("IsSales"), loaded.Model.Application.Id).ShouldEqual("@PreAuthorize(\"hasRole('Sales')\")");
 
     [Fact]
+    void should_deduplicate_identical_and_operands() =>
+        SecurityAnnotations.For(context, new SemanticLogicalAuthorization(new SemanticPolicyReference("IsSales"), SemanticLogicalOperator.And, new SemanticPolicyReference("IsSales")), loaded.Model.Application.Id).ShouldEqual("@PreAuthorize(\"hasRole('Sales')\")");
+
+    [Fact]
+    void should_deduplicate_identical_or_operands() =>
+        SecurityAnnotations.For(context, new SemanticLogicalAuthorization(new SemanticPolicyReference("IsSales"), SemanticLogicalOperator.Or, new SemanticPolicyReference("IsSales")), loaded.Model.Application.Id).ShouldEqual("@PreAuthorize(\"hasRole('Sales')\")");
+
+    [Fact]
+    void should_deduplicate_identical_unknown_operands_without_allowing_access()
+    {
+        var authorization = new SemanticLogicalAuthorization(new SemanticPolicyReference("Missing"), SemanticLogicalOperator.Or, new SemanticPolicyReference("Missing"));
+        SecurityAnnotations.For(context, authorization, loaded.Model.Application.Id).ShouldContain("@PreAuthorize(\"denyAll()\")");
+    }
+
+    [Fact]
     void should_fail_closed_when_a_policy_is_unknown()
     {
         var annotation = SecurityAnnotations.For(context, new SemanticPolicyReference("Missing"), loaded.Model.Application.Id);
