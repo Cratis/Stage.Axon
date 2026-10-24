@@ -20,7 +20,7 @@ internal static class NativeTestResults
             .GroupBy(reason => reason, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
     }
 
-    internal static void RequireWithinBudget(IReadOnlyDictionary<string, int> disabled, IReadOnlyDictionary<string, int> budget)
+    internal static void RequireWithinBudget(IReadOnlyDictionary<string, int> disabled, IReadOnlyDictionary<string, DisabledTestBudget> budget)
     {
         foreach (var (reason, count) in disabled.OrderBy(entry => entry.Key, StringComparer.Ordinal))
         {
@@ -28,13 +28,18 @@ internal static class NativeTestResults
         }
 
         Console.WriteLine($"Disabled native tests total: {disabled.Values.Sum()}");
-        if (disabled.Any(entry => !budget.TryGetValue(entry.Key, out var allowed) || entry.Value > allowed))
+        if (disabled.Any(entry => !budget.TryGetValue(entry.Key, out var allowed) || entry.Value > allowed.Count))
         {
             throw new NativeVerificationFailed("Disabled native test counts exceed the checked-in per-reason allowlist.");
         }
+
+        if (budget.Any(entry => !entry.Value.Valid || disabled.GetValueOrDefault(entry.Key) != entry.Value.Count))
+        {
+            throw new NativeVerificationFailed("The disabled-test allowlist is stale or lacks a reason; ratchet it to the measured counts.");
+        }
     }
 
-    internal static void Verify(string repository, string output, IReadOnlyDictionary<string, int> budget)
+    internal static void Verify(string repository, string output, IReadOnlyDictionary<string, DisabledTestBudget> budget)
     {
         var totals = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var (name, _) in CorpusApplications.Find(repository))

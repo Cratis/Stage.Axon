@@ -17,6 +17,6 @@ if (args[0] == "render")
 }
 else
 {
-    var budget = JsonSerializer.Deserialize<Dictionary<string, int>>(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "disabled-tests.json")))!;
+    var budget = JsonSerializer.Deserialize<Dictionary<string, DisabledTestBudget>>(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "disabled-tests.json")))!;
     NativeTestResults.Verify(repository, output, budget);
 }

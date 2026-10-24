@@ -1,3 +1,14 @@
 {
-  "STAGE-AXON-SPEC": 126
+  "STAGE-AXON-0306": {
+    "Count": 2,
+    "Reason": "Reducer-dependent specifications need supplied reduction implementations; remove this entry when those specifications are executable."
+  },
+  "STAGE-AXON-0501": {
+    "Count": 63,
+    "Reason": "Seeded, action-based, exact or query view expectations are not yet lowered; ratchet this count whenever a specification becomes executable."
+  },
+  "STAGE-AXON-SPEC": {
+    "Count": 3,
+    "Reason": "Three custom-package view specifications remain unimplemented; remove this entry once those fixtures are lowered."
+  }
 }
