@@ -40,7 +40,8 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         var name = JavaNames.Type(reaction.Name) + "Reaction";
         var emitter = new ReactionTriggerEmitter(context, reaction);
         var duplicateEvents = reaction.Triggers.Where(trigger => trigger.Kind == SemanticReactionTriggerKind.Event).GroupBy(trigger => trigger.Source).Any(group => group.Count() > 1);
-        var triggers = reaction.Triggers.Select(trigger => duplicateEvents ? null : emitter.Prepare(trigger)).ToArray();
+        var triggers = reaction.Triggers.Select((trigger, index) => duplicateEvents ? null : emitter.Prepare(trigger, index)).ToArray();
+        EmitProductions(context, package, reaction.Id, triggers);
         var code = new JavaCodeBuilder(package);
         if (triggers.All(trigger => trigger is not null)) code.Line("@org.springframework.stereotype.Component");
         code.Line("@org.axonframework.messaging.core.annotation.Namespace(\"reactions\")")
@@ -63,5 +64,11 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         if (triggers.Any(trigger => trigger is null)) context.Degradation.Unsupported("STAGE-AXON-0504", reaction.Id, $"Reaction '{reaction.Name}' is not registered: a trigger's effects, routing, guards or identity cannot be preserved.");
         context.AddJava(package, name, code.Build(), sources: [reaction.Id, .. reaction.Triggers.Where(trigger => trigger.Source != default).Select(trigger => trigger.Source)]);
         return triggers.All(trigger => trigger is not null);
+    }
+
+    static void EmitProductions(AxonEmissionContext context, string package, SemanticId reaction, PreparedReactionTrigger?[] triggers)
+    {
+        if (triggers.Any(trigger => trigger is null)) return;
+        foreach (var production in triggers.Select(trigger => trigger!.Production).OfType<ReactionProduction>()) production.Emit(context, package, reaction);
     }
 }

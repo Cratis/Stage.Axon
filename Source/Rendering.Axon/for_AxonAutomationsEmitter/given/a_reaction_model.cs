@@ -25,6 +25,20 @@ public class a_reaction_model : for_AxonArtifactRenderPlanner.given.an_axon_requ
         reaction = new(SemanticId.Create(SemanticKind.Reaction, "SubmitOrder"), "SubmitOrder", [new(SemanticReactionTriggerKind.ApplicationTrigger) { Source = applicationTrigger.Id, Invokes = [invocation] }]);
     }
 
+    private protected void Produce()
+    {
+        SemanticExpression Map(SemanticExpression expression) => expression is SemanticResolvedExpression reference
+            ? reference with { Root = SemanticExpressionRootKind.Trigger, Target = applicationTrigger.Properties.Single(property => property.Name == command.Properties.Single(property => property.Id == reference.Target).Name).Id }
+            : expression;
+        var production = command.Produces[0] with
+        {
+            Destination = Map(command.Produces[0].Destination!),
+            DestinationType = command.Properties.Single(property => property.IsIdentifier).Type,
+            Mappings = [.. command.Produces[0].Mappings.Select(mapping => mapping with { Source = Map(mapping.Source) })]
+        };
+        reaction = reaction with { Triggers = [reaction.Triggers[0] with { Invokes = [], Produces = [production] }] };
+    }
+
     private protected void Render()
     {
         var application = request.Model.Application;

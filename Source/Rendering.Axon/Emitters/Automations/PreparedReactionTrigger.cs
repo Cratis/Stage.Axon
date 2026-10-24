@@ -3,4 +3,4 @@
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
-internal sealed record PreparedReactionTrigger(string Annotation, ReactionInput Input, string Invocation, string? Condition);
+internal sealed record PreparedReactionTrigger(string Annotation, ReactionInput Input, string Invocation, string? Condition, ReactionProduction? Production);

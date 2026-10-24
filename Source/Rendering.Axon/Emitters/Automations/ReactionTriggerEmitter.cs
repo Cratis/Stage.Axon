@@ -8,15 +8,16 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
 internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, SemanticReaction reaction)
 {
-    internal PreparedReactionTrigger? Prepare(SemanticReactionTrigger trigger)
+    internal PreparedReactionTrigger? Prepare(SemanticReactionTrigger trigger, int index)
     {
         if (!SupportedEffects(trigger) || !SupportedIdentity(trigger)) return null;
         var annotation = ReactionScheduling.Annotation(trigger);
         var input = ReactionInput.Create(context, trigger);
         if (annotation is null || input is null) return null;
-        var invocation = ReactionInvocation.Render(context, trigger.Invokes[0], input);
+        var production = trigger.Produces.IsEmpty ? null : new ReactionProductionPreparation(context, trigger.Produces[0], input).Prepare(JavaNames.Type(reaction.Name) + "On" + index + "Append");
+        var invocation = trigger.Invokes.IsEmpty ? production?.Invocation : ReactionInvocation.Render(context, trigger.Invokes[0], input);
         if (invocation is null) return null;
-        return WithGuard(trigger, new(annotation, input, invocation, null));
+        return WithGuard(trigger, new(annotation, input, invocation, null, production));
     }
 
     internal void Emit(SemanticReactionTrigger model, PreparedReactionTrigger trigger, int index, JavaCodeBuilder body)
@@ -46,11 +47,13 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
     bool SupportedIdentity(SemanticReactionTrigger trigger)
     {
         if (reaction.RunsAs is { Kind: not SemanticReactionIdentityKind.System }) return false;
-        if (!ReactionInvocation.RequiresIdentity(context, trigger.Invokes[0]) || reaction.RunsAs is not null) return true;
+        if (trigger.Invokes.IsEmpty || reaction.RunsAs is not null) return true;
+        if (!ReactionInvocation.RequiresIdentity(context, trigger.Invokes[0])) return true;
         context.Degradation.Unsupported("STAGE-AXON-0505", reaction.Id, $"Reaction '{reaction.Name}' must declare a trusted identity before invoking an authorized command.");
         return false;
     }
 
     bool SupportedEffects(SemanticReactionTrigger trigger) =>
-        reaction.From is null && trigger.Produces.IsDefaultOrEmpty && trigger.Invokes.Length == 1;
+        reaction.From is null && trigger.RequirementId is null &&
+        ((trigger.Produces.IsEmpty && trigger.Invokes.Length == 1) || (trigger.Invokes.IsEmpty && trigger.Produces.Length == 1));
 }
