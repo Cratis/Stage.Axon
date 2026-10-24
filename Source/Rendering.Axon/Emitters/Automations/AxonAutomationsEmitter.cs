@@ -21,7 +21,9 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         {
             foreach (var reaction in located.Slice.Reactions)
             {
-                if (EmitReaction(context, located, reaction)) registered.Add((CommandContractsEmitter.Package(new(context.Request.Model.Application), located) + "." + JavaNames.Type(reaction.Name) + "Reaction", reaction));
+                if (!EmitReaction(context, located, reaction)) continue;
+                registered.Add((CommandContractsEmitter.Package(new(context.Request.Model.Application), located) + "." + JavaNames.Type(reaction.Name) + "Reaction", reaction));
+                new ReactionSpecificationsEmitter(context, located, reaction).Emit();
             }
         }
         ApplicationTriggersEmitter.Emit(context, registered);
