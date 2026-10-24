@@ -1,0 +1,64 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+module Views
+  feature Counters
+    slice StateChange Increase
+      command Increase
+        amount Int
+        produces Increased
+          amount = amount
+      event Increased
+        amount Int
+
+    slice StateChange Decrease
+      command Decrease
+        amount Int
+        produces Decreased
+          amount = amount
+      event Decreased
+        amount Int
+
+    slice StateView Totals
+      readmodel Total
+        name String
+        amount Int
+        count Int
+        note String optional
+
+      query AllTotals => Total[]
+      query FindTotal => Total optional
+        by name String
+
+      projection TotalProjection => Total
+        from Increased
+          key "global"
+          name = "global"
+          note = "increased"
+          add amount by amount
+          increment count
+        from Decreased
+          key "global"
+          subtract amount by amount
+          decrement count
+          clear note
+
+      specification IncreasingTheTotal
+        given Increased
+          amount = 8
+        then readmodel Total
+          name = "global"
+          amount = 8
+          count = 1
+          note = "increased"
+
+      specification DecreasingAndClearing
+        given Increased
+          amount = 8
+        given Decreased
+          amount = 3
+        then readmodel Total
+          name = "global"
+          amount = 5
+          count = 0
+          note = null
