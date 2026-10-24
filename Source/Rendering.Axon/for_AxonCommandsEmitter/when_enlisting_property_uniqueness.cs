@@ -44,6 +44,8 @@ public class when_enlisting_property_uniqueness : for_AxonArtifactRenderPlanner.
     [Fact] void should_use_the_axon_transaction_callback() => Source("JpaUniqueValueStore.java").ShouldContain("ThrowingConsumer<EntityManager, Exception> action");
     [Fact] void should_release_in_memory_reservations_after_errors_too() => Source("InMemoryUniqueValueStore.java").ShouldContain("context.doFinally(completed -> complete(changes, completed.isCommitted()))");
     [Fact] void should_share_the_runtime_http_test_context() => Source("UniqueAppendTransactionTest.java").ShouldContain("@Import(RuntimeHttpRoundTripTest.EchoEndpoint.class)");
+    [Fact] void should_make_the_restart_proof_opt_in() => Source("PersistentRestartTest.java").ShouldContain("@EnabledIfSystemProperty(named = \"stage.restart\", matches = \"true\")");
+    [Fact] void should_boot_twice_on_the_same_database() => Source("PersistentRestartTest.java").ShouldContain("try (var second = boot(database))");
     [Fact] void should_construct_the_aggregate_jpa_engine() => Source("PersistentConfiguration.java").ShouldContain("new AggregateBasedJpaEventStorageEngine(");
     [Fact] void should_use_the_configured_event_converter() => Source("PersistentConfiguration.java").ShouldContain("configuration.getComponent(EventConverter.class)");
     [Fact] void should_tag_the_native_proof_event_with_the_owner() => Source("UniqueAppendTransactionTest.java").ShouldContain("@org.axonframework.eventsourcing.annotation.EventTag(key = \"owner\")");
