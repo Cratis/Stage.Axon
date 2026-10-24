@@ -84,5 +84,6 @@ internal static class AxonViewLiveSpecs
             }
             """).Build();
         context.Artifacts.Add(PlannedArtifact.CreateText($"src/test/java/{package.Replace('.', '/')}/{name}SubscriptionTest.java", code, [query.Id]));
+        AxonViewHttpLiveSpecs.Emit(context, types, located, query, modelType, projector, given);
     }
 }

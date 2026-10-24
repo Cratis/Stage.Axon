@@ -11,6 +11,9 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
 
 internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticKeyedQuery query, string modelType, QueryShape shape)
 {
+    internal static string Route(LocatedSemanticSlice owner, SemanticKeyedQuery definition) =>
+        $"/api/{RouteSegment(owner.Module.Name)}/{string.Join('/', owner.Features.Select(feature => RouteSegment(feature.Name)))}/{RouteSegment(definition.Name)}";
+
     internal void Emit()
     {
         var package = types.Package(located);
@@ -27,7 +30,7 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
                     .Block($"public {name}Endpoint(QueryGateway gateway)", constructor => constructor.Line("this.gateway = gateway;"));
                 var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
                 if (authorization.Length > 0) body.Line(authorization);
-                var route = $"/api/{RouteSegment(located.Module.Name)}/{string.Join('/', located.Features.Select(feature => RouteSegment(feature.Name)))}/{RouteSegment(query.Name)}";
+                var route = Route(located, query);
                 if (query.Delivery == SemanticQueryDelivery.Live) Live(body, types, name, route);
                 else Snapshot(body, name, route);
             });
