@@ -21,10 +21,29 @@ internal static class AxonHttpTests
 
     internal static void Emit(AxonEmissionContext context)
     {
+        EmitRuntimeEcho(context);
         if (context.HttpScenarios.Count == 0) return;
         var package = context.BasePackage + ".specifications";
         const string name = "ModeledHttpRoundTripTest";
-        var code = Imports(package)
+        var code = TestClass(Imports(package), name, context.HttpScenarios.Values);
+        context.AddJava(package, name, code.Build(), test: true, sources: [.. context.HttpScenarios.Keys]);
+    }
+
+    static void EmitRuntimeEcho(AxonEmissionContext context)
+    {
+        var package = context.BasePackage + ".runtime";
+        const string name = "RuntimeHttpExchangeTest";
+        const string payload = "{\"id\":\"00000000-0000-0000-0000-000000000001\"}";
+        var scenario = new AxonHttpScenario(
+            context.Request.Model.Application.Id,
+            [new(new("POST", "/_runtime/echo", payload), new(200, payload)), new(new("GET", "/_runtime/echo-async"), new(200, payload))],
+            new(string.Empty, [], false));
+        var code = Imports(package).Import("org.springframework.context.annotation.Import")
+            .Line("@Import(RuntimeHttpRoundTripTest.EchoEndpoint.class)");
+        context.AddJava(package, name, TestClass(code, name, [scenario]).Build(), test: true);
+    }
+
+    static JavaCodeBuilder TestClass(JavaCodeBuilder code, string name, IEnumerable<AxonHttpScenario> scenarios) => code
             .Line("@SpringBootTest")
             .Line("@AutoConfigureMockMvc")
             .Line("@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)")
@@ -32,7 +51,7 @@ internal static class AxonHttpTests
             {
                 body.Line("@Autowired").Line("private MockMvc http;");
                 var index = 0;
-                foreach (var scenario in context.HttpScenarios.Values.OrderBy(scenario => scenario.Id.ToString(), StringComparer.Ordinal))
+                foreach (var scenario in scenarios.OrderBy(scenario => scenario.Id.ToString(), StringComparer.Ordinal))
                 {
                     body.Line().Line("@Test")
                         .Line("@DisplayName(" + JavaCodeBuilder.StringLiteral("HTTP " + scenario.Id) + ")")
@@ -44,8 +63,6 @@ internal static class AxonHttpTests
 
                 EmitPerform(body);
             });
-        context.AddJava(package, name, code.Build(), test: true, sources: [.. context.HttpScenarios.Keys]);
-    }
 
     static void EmitExchange(JavaCodeBuilder code, AxonHttpExchange exchange, AxonHttpCaller caller)
     {

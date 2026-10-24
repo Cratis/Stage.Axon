@@ -64,6 +64,11 @@ class RuntimeHttpRoundTripTest {
         @GetMapping("/_runtime/echo")
         Payload read() { return stored.get(); }
 
+        @GetMapping("/_runtime/echo-async")
+        java.util.concurrent.CompletableFuture<Payload> readAsync() {
+            return java.util.concurrent.CompletableFuture.completedFuture(stored.get());
+        }
+
         @GetMapping("/_runtime/invalid")
         Payload invalid() { throw new CommandValidationException(java.util.List.of(new ValidationError("id", "Required"))); }
 
