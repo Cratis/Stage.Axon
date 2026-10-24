@@ -15,9 +15,14 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
 
     internal AxonDegradation Degradation { get; } = degradation;
 
+    internal string BasePackage => JavaNames.PackageSegment(Request.Model.Application.Name);
+
     internal List<PlannedArtifact> Artifacts { get; } = [];
 
     internal IReadOnlyDictionary<string, SemanticSurfaceDisposition> SemanticSurface => SemanticSurfaceLedger.Entries;
+
+    internal void AddJava(string package, string name, string code, bool test = false, params SemanticId[] sources) =>
+        Artifacts.Add(PlannedArtifact.CreateText($"src/{(test ? "test" : "main")}/java/{package.Replace('.', '/')}/{name}.java", code, [.. sources]));
 
     internal string UnsupportedBody(string code, SemanticId owner, string reason)
     {
