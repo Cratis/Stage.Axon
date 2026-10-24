@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Cratis.Stage.Rendering.Axon</AssemblyName>
+        <RootNamespace>Cratis.Stage.Rendering.Axon</RootNamespace>
+        <IsPackable>true</IsPackable>
+        <Description>Axon Framework JVM artifact planning from Screenplay executable semantic models</Description>
+        <PackageTags>cratis;screenplay;stage;axon;java;code-generation</PackageTags>
+        <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
+    </PropertyGroup>
+    <!-- These precursors are exercised by specs only until scaffold emission is implemented. -->
+    <ItemGroup Condition="'$(Configuration)' == 'Release'">
+        <Compile Remove="Java/**/*.cs" />
+        <Compile Remove="Sdk/SemanticSurfaceLedger.cs" />
+        <Compile Remove="Sdk/SemanticSurfaceDisposition.cs" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../Contracts/Contracts.csproj" />
+    </ItemGroup>
+</Project>
