@@ -41,6 +41,10 @@ public class when_enlisting_property_uniqueness : for_AxonArtifactRenderPlanner.
     [Fact] void should_claim_the_modeled_property() => constraints.ShouldContain("java.util.Arrays.asList(fact.customer()), fact.orderId(), true, \"Customer is already claimed\"");
     [Fact] void should_release_by_owner_on_the_modeled_event() => constraints.ShouldContain("OrderMoved fact) store.releaseOwner");
     [Fact] void should_emit_a_persistent_store() => Source("JpaUniqueValueStore.java").ShouldContain("findTransactionalExecutor(context)");
+    [Fact] void should_use_the_axon_transaction_callback() => Source("JpaUniqueValueStore.java").ShouldContain("ThrowingConsumer<EntityManager, Exception> action");
+    [Fact] void should_construct_the_aggregate_jpa_engine() => Source("PersistentConfiguration.java").ShouldContain("new AggregateBasedJpaEventStorageEngine(");
+    [Fact] void should_use_the_configured_event_converter() => Source("PersistentConfiguration.java").ShouldContain("configuration.getComponent(EventConverter.class)");
+    [Fact] void should_tag_the_native_proof_event_with_the_owner() => Source("UniqueAppendTransactionTest.java").ShouldContain("@org.axonframework.eventsourcing.annotation.EventTag(key = \"owner\")");
     [Fact] void should_map_conflicts_to_http_409() => Source("ProblemDetailsAdvice.java").ShouldContain("HttpStatus.CONFLICT");
     [Fact] void should_not_refuse_supported_uniqueness() => plan.Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0801").ShouldBeFalse();
 }

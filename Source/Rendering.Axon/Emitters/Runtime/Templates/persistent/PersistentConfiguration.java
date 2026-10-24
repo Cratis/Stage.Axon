@@ -7,18 +7,31 @@ import jakarta.persistence.EntityManagerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.axonframework.common.configuration.ComponentDefinition;
+import org.axonframework.common.configuration.ConfigurationEnhancer;
+import org.axonframework.common.configuration.SearchScope;
+import org.axonframework.common.lifecycle.Phase;
 import org.axonframework.eventsourcing.eventstore.EventStorageEngine;
-import org.axonframework.eventsourcing.eventstore.jpa.JpaEventStorageEngine;
-import org.axonframework.eventsourcing.eventstore.jpa.JpaEventStorageEngineConfiguration;
+import org.axonframework.eventsourcing.eventstore.jpa.AggregateBasedJpaEventStorageEngine;
 import org.axonframework.messaging.core.unitofwork.transaction.jpa.JpaTransactionalExecutorProvider;
+import org.axonframework.messaging.eventhandling.conversion.EventConverter;
 import __RUNTIME__.UniqueValueStore;
 
 @Configuration
 @Profile("persistent")
 public class PersistentConfiguration {
     @Bean
-    EventStorageEngine eventStorageEngine(EntityManagerFactory factory) {
-        return new JpaEventStorageEngine(new JpaTransactionalExecutorProvider(factory), JpaEventStorageEngineConfiguration.DEFAULT);
+    ConfigurationEnhancer eventStorageEngine(EntityManagerFactory factory) {
+        return registry -> registry.registerIfNotPresent(
+                ComponentDefinition.ofType(EventStorageEngine.class)
+                        .withBuilder(configuration -> new AggregateBasedJpaEventStorageEngine(
+                                new JpaTransactionalExecutorProvider(factory),
+                                configuration.getComponent(EventConverter.class),
+                                config -> config))
+                        .onShutdown(Phase.INBOUND_EVENT_CONNECTORS, engine -> {
+                            if (engine instanceof AggregateBasedJpaEventStorageEngine jpaEngine) jpaEngine.close();
+                        }),
+                SearchScope.ALL);
     }
 
     @Bean

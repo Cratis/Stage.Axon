@@ -6,6 +6,7 @@ package __RUNTIME__.persistent;
 import java.util.List;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
+import org.axonframework.common.function.ThrowingConsumer;
 import org.axonframework.messaging.core.unitofwork.ProcessingContext;
 import org.axonframework.messaging.core.unitofwork.transaction.jpa.JpaTransactionalExecutorProvider;
 import __RUNTIME__.UniqueValueConflict;
@@ -51,7 +52,7 @@ public final class JpaUniqueValueStore implements UniqueValueStore {
         execute(context, manager -> removeOwner(manager, constraint, UniqueValues.owner(owner), null));
     }
 
-    private void execute(ProcessingContext context, java.util.function.Consumer<EntityManager> action) {
+    private void execute(ProcessingContext context, ThrowingConsumer<EntityManager, Exception> action) {
         var executor = transactions.findTransactionalExecutor(context);
         if (executor == null) throw new IllegalStateException("No JPA transaction enlisted in the append ProcessingContext");
         executor.accept(action).join();

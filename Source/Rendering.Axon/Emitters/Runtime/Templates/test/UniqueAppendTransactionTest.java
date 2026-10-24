@@ -31,7 +31,7 @@ class UniqueAppendTransactionTest {
     @Autowired EventStorageEngine events;
 
     @Event(namespace = "stage-tests", name = "UniqueClaimed", version = "1")
-    record Claimed(@org.axonframework.messaging.eventstreaming.annotation.EventTag String owner) {}
+    record Claimed(@org.axonframework.eventsourcing.annotation.EventTag(key = "owner") String owner) {}
 
     @Test
     void rollsBackTheClaimAndAppendTogether() throws Exception {
