@@ -55,7 +55,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             .Block($"public class {name}StoreConfiguration", body => body
                 .Line($"@Bean({JavaCodeBuilder.StringLiteral(package + "." + name)})")
                 .Line("@Profile(\"!persistent\")")
-                .Block($"public ReadModelStore<Object, {name}> store()", method => method.Line("return new InMemoryReadModelStore<>();")));
+                .Block($"public ReadModelStore<Object, {package}.{name}> store()", method => method.Line("return new InMemoryReadModelStore<>();")));
         ViewJavaTypes.Add(context, package, name + "StoreConfiguration", configuration.Build(), model.Id);
     }
 
