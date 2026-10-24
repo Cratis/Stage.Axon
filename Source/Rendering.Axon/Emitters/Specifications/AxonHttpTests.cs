@@ -49,7 +49,8 @@ internal static class AxonHttpTests
             .Line("@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)")
             .Block("class " + name, body =>
             {
-                body.Line("@Autowired").Line("private MockMvc http;");
+                body.Line("@Autowired").Line("private MockMvc http;")
+                    .Line("@Autowired").Line("private org.springframework.context.ApplicationContext application;");
                 var index = 0;
                 foreach (var scenario in scenarios.OrderBy(scenario => scenario.Id.ToString(), StringComparer.Ordinal))
                 {
@@ -57,6 +58,7 @@ internal static class AxonHttpTests
                         .Line("@DisplayName(" + JavaCodeBuilder.StringLiteral("HTTP " + scenario.Id) + ")")
                         .Block("void scenario_" + index++.ToString(CultureInfo.InvariantCulture) + "() throws Exception", test =>
                         {
+                            foreach (var arrange in scenario.Arrange) test.Line(arrange);
                             foreach (var exchange in scenario.Exchanges) EmitExchange(test, exchange, scenario.Caller);
                         });
                 }
@@ -70,13 +72,13 @@ internal static class AxonHttpTests
         var builder = "request(HttpMethod.valueOf(" + JavaCodeBuilder.StringLiteral(request.Method) + "), " + JavaCodeBuilder.StringLiteral(request.Path) + ")";
         builder += ".with(" + Caller(caller) + ")";
         if (request.JsonBody is not null) builder += ".contentType(MediaType.APPLICATION_JSON).content(" + JavaCodeBuilder.StringLiteral(request.JsonBody) + ")";
-        code.Line("perform(" + builder + ")")
-            .Line("    .andExpect(status().is(" + exchange.Response.Status.ToString(CultureInfo.InvariantCulture) + "))" +
-                (exchange.Response.ExpectedJson is null ? ";" : string.Empty));
+        var assertions = new List<string> { "status().is(" + exchange.Response.Status.ToString(CultureInfo.InvariantCulture) + ")" };
         if (exchange.Response.ExpectedJson is not null)
-        {
-            code.Line("    .andExpect(content().json(" + JavaCodeBuilder.StringLiteral(exchange.Response.ExpectedJson) + ", JsonCompareMode.STRICT));");
-        }
+            assertions.Add("content().json(" + JavaCodeBuilder.StringLiteral(exchange.Response.ExpectedJson) + ", JsonCompareMode.STRICT)");
+        assertions.AddRange(exchange.Response.Assertions);
+        code.Line("perform(" + builder + ")");
+        for (var index = 0; index < assertions.Count; index++)
+            code.Line("    .andExpect(" + assertions[index] + ")" + (index == assertions.Count - 1 ? ";" : string.Empty));
     }
 
     static void EmitPerform(JavaCodeBuilder code) => code.Line()

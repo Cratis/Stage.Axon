@@ -42,6 +42,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
         var name = JavaNames.Type(model.Name) + "ViewSpecificationsTest";
         var projection = located.Slice.Projections.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
         if (projection is null) return;
+        var http = new AxonViewHttpSpecs(context, types, located, model);
         var code = new JavaCodeBuilder(package).Import("org.junit.jupiter.api.Test")
             .Import(types.BasePackage + ".runtime.ReadModelStore").Import(types.BasePackage + ".runtime.InMemoryReadModelStore")
             .Import(types.BasePackage + ".runtime.EventSourceId");
@@ -57,6 +58,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                     body.Line($"@org.junit.jupiter.api.Disabled({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.ViewSpecification)})");
                 }
                 AxonSpecificationsEmitter.Register(context, spec.Id, package + "." + name, JavaNames.Member(spec.Name), disabledCode);
+                http.Register(projection, spec);
                 body.Line("@Test").Line($"@org.junit.jupiter.api.DisplayName({JavaCodeBuilder.StringLiteral(spec.Id.ToString())})").Block($"void {JavaNames.Member(spec.Name)}()", method =>
                 {
                     if (!supported)

@@ -6,4 +6,7 @@ using Cratis.Screenplay.Semantics;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 
-internal sealed record AxonHttpScenario(SemanticId Id, ImmutableArray<AxonHttpExchange> Exchanges, AxonHttpCaller Caller);
+internal sealed record AxonHttpScenario(SemanticId Id, ImmutableArray<AxonHttpExchange> Exchanges, AxonHttpCaller Caller)
+{
+    internal ImmutableArray<string> Arrange { get; init; } = [];
+}
