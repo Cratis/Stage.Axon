@@ -25,7 +25,10 @@ public class when_rendering_command_contracts : for_AxonArtifactRenderPlanner.gi
 
     void Because()
     {
-        new CommandContractsEmitter().Emit(context);
+        foreach (var located in ScopeSelection.Select(request))
+        {
+            foreach (var command in located.Slice.Commands) CommandContractsEmitter.EmitCommand(context, located, command, null);
+        }
         contract = Encoding.UTF8.GetString(context.Artifacts.First(artifact => !artifact.RelativePath.EndsWith("Rules.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 

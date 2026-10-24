@@ -19,15 +19,16 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
         builder.Line("@Component").Block($"public final class {name}Rules", body =>
             body.Line("private final Validator validator;").Line()
                 .Block($"public {name}Rules(Validator validator)", constructor => constructor.Line("this.validator = validator;")).Line()
+                .Block($"public void validateInput({name} command)", method => BeanValidation(method).Line("validation.throwIfInvalid();")).Line()
                 .Block($"public void validate({name} command)", RenderValidation));
         return builder.Build();
     }
 
-    static string Safe(string value) => value.Replace('\\', '/').Replace('\r', ' ').Replace('\n', ' ');
+    static JavaCodeBuilder BeanValidation(JavaCodeBuilder builder) => builder.Line("var validation = new ValidationContext();").Line("validator.validate(command).stream().sorted(java.util.Comparator.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject(violation.getPropertyPath().toString(), violation.getMessage()));");
 
     void RenderValidation(JavaCodeBuilder builder)
     {
-        builder.Line("var validation = new ValidationContext();").Line("validator.validate(command).stream().sorted(java.util.Comparator.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject(violation.getPropertyPath().toString(), violation.getMessage()));");
+        BeanValidation(builder);
         RenderPropertyRules(builder);
         RenderConceptRules(builder);
         RenderRequirements(builder);
@@ -78,9 +79,10 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
 
     void Unsupported(JavaCodeBuilder builder, string intent)
     {
-        context.Degradation.Unsupported(AxonRefusalCodes.CommandValidation, command.Id, $"Axon cannot yet {intent}.");
+        var path = command.Id + "/validation";
+        context.Degradation.Unsupported(AxonRefusalCodes.CommandValidation, command.Id, $"Axon cannot yet {intent}.", intent, path);
 
         // Keep unsupported guards fail-closed: a warning is not permission to execute an unvalidated command.
-        builder.Line($"// Screenplay wanted to {Safe(intent)} ({Safe(command.Id.ToString())}), but this is not supported by the Axon target yet ({AxonRefusalCodes.CommandValidation}).").Line($"validation.reject(\"\", {JavaCodeBuilder.StringLiteral(AxonRefusalCodes.CommandValidation + ": " + intent)});");
+        builder.UnsupportedIntent(intent, path, AxonRefusalCodes.CommandValidation).Line($"validation.reject(\"\", {JavaCodeBuilder.StringLiteral(AxonRefusalCodes.CommandValidation + ": " + intent)});");
     }
 }
