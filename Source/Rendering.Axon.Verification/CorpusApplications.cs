@@ -7,8 +7,8 @@ internal static class CorpusApplications
 {
     internal static IReadOnlyList<(string Name, string Root)> Find(string repository)
     {
-        var blueprints = Directory.GetDirectories(Path.Combine(repository, "Verification/live-blueprints/models")).Order(StringComparer.Ordinal).ToArray();
-        var views = Path.Combine(repository, "Verification/axon-samples/views");
+        var blueprints = Directory.GetDirectories(Path.Combine(repository, "Corpus/live-blueprints/models")).Order(StringComparer.Ordinal).ToArray();
+        var views = Path.Combine(repository, "Corpus/axon-samples/views");
         var files = Directory.GetFiles(views, "*.play").Order(StringComparer.Ordinal).ToArray();
         if (blueprints.Length != 15 || files.Length != 4)
         {
@@ -18,9 +18,9 @@ internal static class CorpusApplications
         return
         [
             .. blueprints.Select(path => (new DirectoryInfo(path).Name, path)),
-            ("sample-navigation", Path.Combine(repository, "Verification/live-navigation/model")),
-            ("sample-templates", Path.Combine(repository, "Verification/blueprint-templates/model")),
-            ("sample-custom-packages", Path.Combine(repository, "Verification/live-custom-packages/model")),
+            ("sample-navigation", Path.Combine(repository, "Corpus/live-navigation/model")),
+            ("sample-templates", Path.Combine(repository, "Corpus/blueprint-templates/model")),
+            ("sample-custom-packages", Path.Combine(repository, "Corpus/live-custom-packages/model")),
             ("views-combined", views),
             .. files.Select(path => ("view-" + Path.GetFileNameWithoutExtension(path), path))
         ];

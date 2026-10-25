@@ -16,7 +16,7 @@ public static class blueprint_models
         {
             if (!_models.TryGetValue(sample, out var model))
             {
-                model = SemanticModelLoader.LoadFromPathAsync(Path.Combine(Root(), "Verification", "live-blueprints", "models", sample), null, "Sample");
+                model = SemanticModelLoader.LoadFromPathAsync(Path.Combine(Root(), "Corpus", "live-blueprints", "models", sample), null, "Sample");
                 _models.Add(sample, model);
             }
 
@@ -27,7 +27,7 @@ public static class blueprint_models
     internal static string Root([CallerFilePath] string path = "")
     {
         var directory = Directory.GetParent(path);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Stage.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Stage.Axon.slnx")))
         {
             directory = directory.Parent;
         }

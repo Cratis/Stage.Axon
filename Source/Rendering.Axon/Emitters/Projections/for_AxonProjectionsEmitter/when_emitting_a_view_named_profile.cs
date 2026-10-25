@@ -17,7 +17,7 @@ public class when_emitting_a_view_named_profile : Specification
 
     async Task Establish()
     {
-        var root = Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Verification/blueprint-templates/model");
+        var root = Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Corpus/blueprint-templates/model");
         var compilation = await SemanticModelLoader.LoadAsync(root, [], null, "Templates");
         compilation.Success.ShouldBeTrue();
         var loaded = compilation.Loaded;

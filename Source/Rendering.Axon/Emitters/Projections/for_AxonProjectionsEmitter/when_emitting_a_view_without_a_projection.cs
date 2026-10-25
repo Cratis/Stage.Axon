@@ -15,7 +15,7 @@ public class when_emitting_a_view_without_a_projection : Specification
 
     async Task Establish()
     {
-        var root = Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Verification/live-navigation/model");
+        var root = Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Corpus/live-navigation/model");
         var compilation = await SemanticModelLoader.LoadAsync(root, [], null, "Navigation");
         compilation.Success.ShouldBeTrue();
         var loaded = compilation.Loaded;

@@ -1,0 +1,10 @@
+# Build outputs and local work records
+**/bin/
+**/obj/
+**/target/
+**/TestResults/
+.ai-work/
+.vs/
+.idea/
+*.user
+.DS_Store

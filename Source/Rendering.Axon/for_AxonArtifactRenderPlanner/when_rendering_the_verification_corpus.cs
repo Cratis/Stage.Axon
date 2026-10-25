@@ -17,10 +17,10 @@ public class when_rendering_the_verification_corpus : Specification
     async Task Establish()
     {
         var root = given.blueprint_models.Root();
-        blueprints = Directory.GetDirectories(Path.Combine(root, "Verification/live-blueprints/models"));
+        blueprints = Directory.GetDirectories(Path.Combine(root, "Corpus/live-blueprints/models"));
         var samples = new[] { "live-navigation", "blueprint-templates", "live-custom-packages" }
-            .Select(sample => Path.Combine(root, "Verification", sample, "model"));
-        var views = Path.Combine(root, "Verification/axon-samples/views");
+            .Select(sample => Path.Combine(root, "Corpus", sample, "model"));
+        var views = Path.Combine(root, "Corpus/axon-samples/views");
         foreach (var path in blueprints.Concat(samples).Append(views).Concat(Directory.GetFiles(views, "*.play")).Order(StringComparer.Ordinal))
         {
             var name = Path.GetRelativePath(root, path);

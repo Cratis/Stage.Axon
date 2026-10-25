@@ -8,6 +8,6 @@
         <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
     </PropertyGroup>
     <ItemGroup>
-        <ProjectReference Include="../Contracts/Contracts.csproj" />
+        <PackageReference Include="Cratis.Stage.Contracts" />
     </ItemGroup>
 </Project>

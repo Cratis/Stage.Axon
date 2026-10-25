@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/Source/">
+    <Project Path="Source/Rendering.Axon/Rendering.Axon.csproj" />
+    <Project Path="Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj" />
+    <Project Path="Source/Rendering.Conformance/Rendering.Conformance.csproj" />
+  </Folder>
+</Solution>

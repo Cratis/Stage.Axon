@@ -24,13 +24,13 @@ public class a_view_request : Specification
     static string Root([CallerFilePath] string path = "")
     {
         var directory = Directory.GetParent(path);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Stage.slnx"))) directory = directory.Parent;
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Stage.Axon.slnx"))) directory = directory.Parent;
         return directory!.FullName;
     }
 
     async Task Establish()
     {
-        var model = await SemanticModelLoader.LoadFromPathAsync(Path.Combine(Root(), "Verification", "axon-samples", "views"), null, "AxonViews");
+        var model = await SemanticModelLoader.LoadFromPathAsync(Path.Combine(Root(), "Corpus", "axon-samples", "views"), null, "AxonViews");
         _request = new(model.Model, model.Plan, AxonRendering.CreateProfile(), new(ArtifactRenderScopeKind.Application, model.Model.Application.Id))
         {
             ImplementationRequirements = model.ImplementationRequirements,

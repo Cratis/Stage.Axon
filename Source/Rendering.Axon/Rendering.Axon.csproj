@@ -8,7 +8,7 @@
         <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
     </PropertyGroup>
     <ItemGroup>
-        <ProjectReference Include="../Contracts/Contracts.csproj" />
+        <PackageReference Include="Cratis.Stage.Contracts" />
         <EmbeddedResource Include="Emitters/Runtime/Templates/**/*.java" />
         <EmbeddedResource Include="Emitters/Scaffold/Assets/*" />
     </ItemGroup>

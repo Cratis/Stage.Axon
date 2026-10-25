@@ -17,7 +17,7 @@ public class a_render_request : Specification
     public static string Root([CallerFilePath] string path = "")
     {
         var directory = Directory.GetParent(path);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Stage.slnx"))) directory = directory.Parent;
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Stage.Axon.slnx"))) directory = directory.Parent;
         return directory!.FullName;
     }
 
@@ -28,7 +28,7 @@ public class a_render_request : Specification
 
     async Task Establish()
     {
-        var loaded = await SemanticModelLoader.LoadFromPathAsync(Path.Combine(Root(), "Verification", "live-blueprints", "models", "orders"), null, "Sample");
+        var loaded = await SemanticModelLoader.LoadFromPathAsync(Path.Combine(Root(), "Corpus", "live-blueprints", "models", "orders"), null, "Sample");
         request = new(loaded.Model, loaded.Plan, ArtifactRenderProfile.Create("test", "1", "test", "1", []), new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id));
     }
 }
