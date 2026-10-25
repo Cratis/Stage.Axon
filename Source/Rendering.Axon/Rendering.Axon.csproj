@@ -2,7 +2,6 @@
     <PropertyGroup>
         <AssemblyName>Cratis.Stage.Rendering.Axon</AssemblyName>
         <RootNamespace>Cratis.Stage.Rendering.Axon</RootNamespace>
-        <IsPackable>true</IsPackable>
         <Description>Axon Framework JVM artifact planning from Screenplay executable semantic models</Description>
         <PackageTags>cratis;screenplay;stage;axon;java;code-generation</PackageTags>
         <PackageValidationBaselineVersion></PackageValidationBaselineVersion>

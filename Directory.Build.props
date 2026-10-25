@@ -5,6 +5,9 @@
         <LangVersion>14.0</LangVersion>
         <Nullable>enable</Nullable>
 
+        <!-- Package publishing waits on authorization (Cratis/Stage#781). -->
+        <IsPackable>false</IsPackable>
+
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
         <RunAnalyzersDuringBuild>True</RunAnalyzersDuringBuild>
