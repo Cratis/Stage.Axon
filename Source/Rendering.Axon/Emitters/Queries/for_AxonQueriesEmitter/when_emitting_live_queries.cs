@@ -1,9 +1,11 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections.for_AxonProjectionsEmitter.given;
+using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Queries.for_AxonQueriesEmitter;
@@ -14,17 +16,32 @@ public class when_emitting_live_queries : a_view_request
     string _endpoint;
     string _subscription;
     string _projector;
+    string _securedEndpoint;
 
     void Because()
     {
         _context = new(_request, new(_request.Profile));
         new AxonProjectionsEmitter().Emit(_context);
         new AxonQueriesEmitter().Emit(_context);
+        var located = ScopeSelection.Select(_request).Single(slice => slice.Slice.Queries.Any(query => query.Name == "LiveTotals"));
+        var query = located.Slice.Queries.Single(query => query.Name == "LiveTotals") with { Authorization = new SemanticPolicyReference("Unavailable") };
+        var model = located.Slice.ReadModels.Single(model => model.Id == query.ReadModel);
+        var securedContext = new AxonEmissionContext(_request, new(_request.Profile));
+        var types = new ViewJavaTypes(_request.Model.Application);
+        new QueryEndpoint(securedContext, types, located, query, types.Package(located) + "." + model.Name, new(query, model, types)).Emit();
+        _securedEndpoint = Text(securedContext.Artifacts.Single());
         _endpoint = Source("LiveTotalsEndpoint.java");
         _subscription = Source("LiveTotalsSubscription.java");
         _projector = Source("TotalProjectionProjector.java");
     }
 
+    [Fact] void should_authorize_both_mappings() => _securedEndpoint.Split("@PreAuthorize(\"denyAll()\")", StringSplitOptions.None).Length.ShouldEqual(3);
+    [Fact] void should_map_the_stream_to_the_same_route() => _endpoint.ShouldContain("@GetMapping(value = \"/api/views/counters/live-totals\", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)");
+    [Fact] void should_offer_a_plain_json_get() => _endpoint.ShouldContain("@GetMapping(\"/api/views/counters/live-totals\")");
+    [Fact] void should_return_a_typed_list_snapshot() => _endpoint.ShouldContain("CompletableFuture<ResponseEntity<java.util.List<axonviews.views.counters.totals.Total>>>");
+    [Fact] void should_dispatch_the_snapshot_over_the_query_gateway() => _endpoint.ShouldContain("gateway.query(new LiveTotals(), LiveTotals.Result.class)");
+    [Fact] void should_return_the_raw_snapshot_rows() => _endpoint.ShouldContain("ResponseEntity.ok(result.rows())");
+    [Fact] void should_probe_a_plain_get_without_an_accept_header() => Source("LiveTotalsSseTest.java").ShouldContain("HttpRequest.newBuilder(request.uri()).GET().build()");
     [Fact] void should_return_an_sse_stream() => _endpoint.ShouldContain("streams.open(LiveTotalsSubscription.values(gateway, query))");
     [Fact] void should_use_an_axon_subscription_query() => _subscription.ShouldContain("gateway.subscriptionQuery(query, LiveTotals.Result.class)");
     [Fact] void should_requery_the_original_filtered_query() => _subscription.ShouldContain("pending = gateway.query(query, LiveTotals.Result.class)");

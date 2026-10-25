@@ -155,7 +155,7 @@ Generated query records carry typed arguments. Handlers filter the store and enf
 | Zero or one | Returns an optional row; HTTP returns 404 when no row matches. |
 | One | Requires exactly one matching row. |
 | Snapshot | Exposes a one-shot HTTP GET endpoint. |
-| Live | Exposes an HTTP GET endpoint producing `text/event-stream`. |
+| Live | Exposes an HTTP GET returning JSON by default, and `text/event-stream` when the client asks for it. |
 
 Paths use `/api/<module>/<feature-path>/<query-name>` with kebab-case segments. A live endpoint sends an initial snapshot followed by updated query results containing rows, not an Axon transport envelope.
 

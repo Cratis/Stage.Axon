@@ -25,6 +25,8 @@ internal static partial class CommandEndpointEmitter
     {
         var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located);
         var name = JavaNames.Type(command.Name);
+        var responses = new CommandResponses(command, new CommandJavaTypes(context.Request.Model.Application));
+        var returnType = responses.ReturnType == "void" ? "Void" : responses.ReturnType;
         var code = new JavaCodeBuilder(package).Import("org.springframework.web.bind.annotation.RestController")
             .Import("org.springframework.web.bind.annotation.PostMapping").Import("org.springframework.web.bind.annotation.RequestBody")
             .Import("org.springframework.security.access.prepost.PreAuthorize").Import("org.axonframework.messaging.commandhandling.gateway.CommandGateway");
@@ -35,9 +37,9 @@ internal static partial class CommandEndpointEmitter
                 .Line("@PostMapping(" + JavaCodeBuilder.StringLiteral(Route(located, command)) + ")");
             var authorization = SecurityAnnotations.For(context, command.Authorization, command.Id);
             if (authorization.Length > 0) body.Line(authorization);
-            body.Block($"public java.util.concurrent.CompletableFuture<Object> execute(@RequestBody {name} request)", method =>
+            body.Block($"public java.util.concurrent.CompletableFuture<{returnType}> execute(@RequestBody {name} request)", method =>
                 method.Line("var command = " + (command.Properties.Any(property => property.IsGenerated) || source?.Allocated == true ? "request.forRequest();" : "request;"))
-                    .Line("rules.validateInput(command);").Line("return commandGateway.send(command).resultAs(Object.class);"));
+                    .Line("rules.validateInput(command);").Line($"return commandGateway.send(command, {returnType}.class);"));
         });
         context.AddJava(package, name + "Endpoint", code.Build(), sources: [command.Id]);
     }

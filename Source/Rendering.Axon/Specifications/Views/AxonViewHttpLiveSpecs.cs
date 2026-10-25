@@ -51,6 +51,11 @@ internal static class AxonViewHttpLiveSpecs
                                 org.junit.jupiter.api.Assertions.assertTrue(changed.isArray());
                                 org.junit.jupiter.api.Assertions.assertEquals(1, changed.size());
                                 org.junit.jupiter.api.Assertions.assertEquals(mapper.readTree(mapper.writeValueAsString(store.all())), changed);
+                                var snapshotRequest = java.net.http.HttpRequest.newBuilder(request.uri()).GET().build();
+                                var snapshot = client.send(snapshotRequest, java.net.http.HttpResponse.BodyHandlers.ofString());
+                                org.junit.jupiter.api.Assertions.assertEquals(200, snapshot.statusCode());
+                                org.junit.jupiter.api.Assertions.assertTrue(snapshot.headers().firstValue("Content-Type").orElse("").startsWith("application/json"));
+                                org.junit.jupiter.api.Assertions.assertEquals(mapper.readTree(mapper.writeValueAsString(store.all())), mapper.readTree(snapshot.body()));
                                 org.junit.jupiter.api.Assertions.assertEquals(1, streams.activeCount());
                                 var closing = System.nanoTime();
                                 application.close();

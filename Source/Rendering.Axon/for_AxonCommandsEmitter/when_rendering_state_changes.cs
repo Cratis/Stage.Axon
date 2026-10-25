@@ -30,6 +30,9 @@ public class when_rendering_state_changes : for_AxonArtifactRenderPlanner.given.
     [Fact] void should_use_the_shared_primary_tag() => Code("PlaceOrderStream").ShouldContain("@EventSourcedEntity(tagKey = \"orderId\")");
     [Fact] void should_mark_the_command_identity() => Code("PlaceOrder").ShouldContain("@org.axonframework.modelling.annotation.TargetEntityId");
     [Fact] void should_emit_a_post_endpoint() => Code("PlaceOrderEndpoint").ShouldContain("@PostMapping(\"/api/orders/orders/place-order\")");
+    [Fact] void should_return_a_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("CompletableFuture<Void>");
+    [Fact] void should_dispatch_with_the_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("send(command, Void.class)");
+    [Fact] void should_not_return_an_untyped_result() => Code("PlaceOrderEndpoint").ShouldNotContain("<Object>");
     [Fact] void should_validate_requests_before_dispatch() => Code("PlaceOrderEndpoint").ShouldContain("rules.validateInput(command);");
     [Fact] void should_emit_real_axon_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("AxonTestFixture.with(configuration)");
     [Fact] void should_enforce_method_security_in_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("AuthorizationManagerBeforeMethodInterceptor.preAuthorize()");

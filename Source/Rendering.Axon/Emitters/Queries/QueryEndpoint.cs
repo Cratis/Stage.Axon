@@ -35,10 +35,14 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
                     if (live) constructor.Line("this.streams = streams;");
                 });
                 var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
-                if (authorization.Length > 0) body.Line(authorization);
                 var route = Route(located, query);
-                if (query.Delivery == SemanticQueryDelivery.Live) Live(body, name, route);
-                else Snapshot(body, name, route);
+                if (authorization.Length > 0) body.Line(authorization);
+                Snapshot(body, name, route);
+                if (live)
+                {
+                    if (authorization.Length > 0) body.Line(authorization);
+                    Live(body, name, route);
+                }
             });
         ViewJavaTypes.Add(context, package, name + "Endpoint", code.Build(), query.Id);
     }
@@ -62,7 +66,7 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
     void Live(JavaCodeBuilder code, string name, string route)
     {
         code.Line($"@GetMapping(value = {JavaCodeBuilder.StringLiteral(route)}, produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)")
-            .Block($"public org.springframework.web.servlet.mvc.method.annotation.SseEmitter get({shape.Parameters})", method =>
+            .Block($"public org.springframework.web.servlet.mvc.method.annotation.SseEmitter stream({shape.Parameters})", method =>
             {
                 method.Line($"var query = new {name}({shape.Parsed});")
                     .Line($"return streams.open({name}Subscription.values(gateway, query));");
