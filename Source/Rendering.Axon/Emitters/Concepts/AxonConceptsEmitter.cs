@@ -26,7 +26,7 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
 
     internal static string Record(AxonEmissionContext context, string package, string name, IEnumerable<SemanticProperty> properties)
     {
-        var parameters = string.Join(", ", properties.Select(property => $"@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(property.Name)}) {JavaSemanticTypes.TypeFor(context, property.Type)} {JavaNames.Member(property.Name)}"));
+        var parameters = string.Join(", ", properties.Select(property => $"{JavaRecordComponents.JsonProperty(property.Name)}{JavaSemanticTypes.TypeFor(context, property.Type)} {JavaNames.Member(property.Name)}"));
         var code = new JavaCodeBuilder(package);
         return code.Line($"public record {name}({parameters}) {{}}").Build();
     }

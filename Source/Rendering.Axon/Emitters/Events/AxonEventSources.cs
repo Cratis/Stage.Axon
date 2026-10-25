@@ -67,6 +67,6 @@ internal static class AxonEventSources
     {
         var name = JavaNames.Member(property.Name);
         var tag = name == primary.ComponentName ? "@org.axonframework.eventsourcing.annotation.EventTag(key = " + EventTagsEmitter.Reference(context, contract) + ") " : string.Empty;
-        return tag + $"@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(property.Name)}) {JavaSemanticTypes.TypeFor(context, property.Type)} {name}";
+        return tag + $"{JavaRecordComponents.JsonProperty(property.Name)}{JavaSemanticTypes.TypeFor(context, property.Type)} {name}";
     }
 }

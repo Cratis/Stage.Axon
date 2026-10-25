@@ -26,7 +26,7 @@ internal sealed class CommandResponses(SemanticCommand command, CommandJavaTypes
     internal void Emit(AxonEmissionContext context, string package)
     {
         if (command.Response is not SemanticRecordCommandResponse record) return;
-        var fields = record.Fields.Select(field => $"@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(field.Name)}) {types.Type(field.Type)} {JavaNames.Member(field.Name)}");
+        var fields = record.Fields.Select(field => $"{JavaRecordComponents.JsonProperty(field.Name)}{types.Type(field.Type)} {JavaNames.Member(field.Name)}");
         context.AddJava(package, ReturnType, new JavaCodeBuilder(package).Line($"public record {ReturnType}({string.Join(", ", fields)}) {{}}").Build(), sources: [command.Id]);
     }
 

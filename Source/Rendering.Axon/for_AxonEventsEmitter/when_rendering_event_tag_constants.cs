@@ -34,7 +34,7 @@ public class when_rendering_event_tag_constants : for_AxonArtifactRenderPlanner.
     [Fact] void should_deduplicate_shared_tag_keys() => (tags.Split("public static final String ORDER_ID", StringSplitOptions.None).Length - 1).ShouldEqual(1);
     [Fact] void should_reference_the_constant_from_event_components() => events.ShouldContain($"EventTag(key = {context.BasePackage}.orders.events.EventTags.ORDER_ID)");
     [Fact] void should_not_repeat_the_tag_literal_in_events() => events.ShouldNotContain("key = \"orderId\"");
-    [Fact] void should_keep_modeled_json_names() => events.ShouldContain("@com.fasterxml.jackson.annotation.JsonProperty(\"customer\")");
+    [Fact] void should_omit_redundant_json_annotations() => events.ShouldNotContain("@com.fasterxml.jackson.annotation.JsonProperty(\"customer\")");
     [Fact] void should_keep_event_metadata() => events.ShouldContain("@org.axonframework.messaging.eventhandling.annotation.Event");
 
     [Fact]

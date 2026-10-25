@@ -43,7 +43,7 @@ public class when_rendering_command_responses : for_AxonArtifactRenderPlanner.gi
     [Fact] void should_return_the_command_value() => scalar.Value.ShouldEqual("command.orderId()");
     [Fact] void should_construct_the_typed_response_record() => record.Value.ShouldEqual("new PlaceOrderResponse(command.orderId())");
     [Fact] void should_name_the_response_after_the_command() => record.ReturnType.ShouldEqual("PlaceOrderResponse");
-    [Fact] void should_preserve_response_wire_names() => recordCode.ShouldContain("@com.fasterxml.jackson.annotation.JsonProperty(\"orderId\")");
+    [Fact] void should_use_the_unchanged_component_name_for_json() => recordCode.ShouldNotContain("@com.fasterxml.jackson.annotation.JsonProperty(\"orderId\")");
     [Fact] void should_assert_the_scalar_response() => assertionCode.ShouldContain("result.resultMessagePayload(new ");
     [Fact] void should_construct_the_expected_identity() => assertionCode.ShouldContain("UUID.fromString(\"11111111-1111-1111-1111-111111111111\")");
 }

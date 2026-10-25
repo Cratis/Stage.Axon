@@ -44,7 +44,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
     static void EmitModel(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticReadModel model)
     {
         var name = JavaNames.Type(model.Name);
-        var components = string.Join(", ", model.Properties.Select(property => $"@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(property.Name)}) {types.Type(property.Type)} {JavaNames.Member(property.Name)}"));
+        var components = string.Join(", ", model.Properties.Select(property => $"{JavaRecordComponents.JsonProperty(property.Name)}{types.Type(property.Type)} {JavaNames.Member(property.Name)}"));
         ViewJavaTypes.Add(context, package, name, new JavaCodeBuilder(package).Line($"public record {name}({components}) {{}}").Build(), model.Id);
         context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Read-model rows use volatile in-memory storage even under the persistent profile; replay is required after restart.");
         var configuration = new JavaCodeBuilder(package)
