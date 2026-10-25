@@ -10,6 +10,7 @@ internal static class AxonEmitters
         new Scaffold.AxonScaffoldEmitter(),
         new Concepts.AxonConceptsEmitter(),
         new Events.AxonEventsEmitter(),
+        new Events.EventTagsEmitter(),
         new Commands.AxonCommandsEmitter(),
         new Constraints.AxonConstraintsEmitter(),
         new Decisions.AxonDecisionsEmitter(),

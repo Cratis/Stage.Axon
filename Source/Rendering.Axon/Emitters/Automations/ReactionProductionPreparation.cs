@@ -24,7 +24,7 @@ internal sealed class ReactionProductionPreparation(AxonEmissionContext context,
         var condition = produced.When is null ? null : input.Condition(context, produced.When);
         if (produced.When is not null && condition is null) return null;
         var eventType = AxonEventsEmitter.TypeFor(context, contract.Id);
-        return new(name, new(eventType, $"new {eventType}({string.Join(", ", arguments)})", source, condition), primary);
+        return new(name, new(eventType, $"new {eventType}({string.Join(", ", arguments)})", source, condition), primary, EventTagsEmitter.Reference(context, contract));
     }
 
     bool Supported()

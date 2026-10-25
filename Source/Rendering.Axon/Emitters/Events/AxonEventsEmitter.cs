@@ -15,12 +15,16 @@ internal sealed class AxonEventsEmitter : IAxonEmitter
 
     public void Emit(AxonEmissionContext context)
     {
+        foreach (var (module, contract) in Contracts(context)) Emit(context, module, contract);
+    }
+
+    internal static IEnumerable<(SemanticModule Module, SemanticEventContract Event)> Contracts(AxonEmissionContext context)
+    {
         var selected = ScopeSelection.Select(context.Request).Select(slice => slice.Module.Id).ToHashSet();
         var applicationScope = context.Request.Scope.Kind == ArtifactRenderScopeKind.Application;
-        var events = ScopeSelection.Locate(context.Request.Model.Application)
+        return ScopeSelection.Locate(context.Request.Model.Application)
             .Where(slice => applicationScope || selected.Contains(slice.Module.Id) || slice.Module.Id == context.Request.Scope.Artifact)
             .SelectMany(slice => slice.Slice.Events.Select(@event => (slice.Module, Event: @event))).DistinctBy(pair => pair.Event.Id);
-        foreach (var (module, contract) in events) Emit(context, module, contract);
     }
 
     internal static string Package(AxonEmissionContext context, SemanticModule module) => context.BasePackage + "." + JavaNames.PackageSegment(module.Name) + ".events";
