@@ -8,7 +8,7 @@ using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
-internal sealed record ReactionProduction(string Name, ReactionProducedEvent Event, (string ComponentName, string JavaType, string TagKey) Primary)
+internal sealed record ReactionProduction(string Name, ReactionProducedEvent Event, (string ComponentName, string JavaType, string TagKey) Primary, string TagReference)
 {
     internal string Invocation => (Event.Condition is null ? string.Empty : $"if ({Event.Condition}) ") + $"commands.sendAndWait(new {Name}({Event.Source}, {Event.Expression}));";
 
@@ -39,8 +39,8 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
     {
         var contracts = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id);
         var stream = new JavaCodeBuilder(package)
-            .Line($"@org.axonframework.eventsourcing.annotation.EventSourcedEntity(tagKey = {JavaCodeBuilder.StringLiteral(Primary.TagKey)})")
-            .Line($"@org.axonframework.extension.spring.stereotype.EventSourced(idType = {Primary.JavaType}.class, tagKey = {JavaCodeBuilder.StringLiteral(Primary.TagKey)})")
+            .Line($"@org.axonframework.eventsourcing.annotation.EventSourcedEntity(tagKey = {TagReference})")
+            .Line($"@org.axonframework.extension.spring.stereotype.EventSourced(idType = {Primary.JavaType}.class, tagKey = {TagReference})")
             .Block($"public class {Name}Stream", body =>
             {
                 body.Line("@org.axonframework.eventsourcing.annotation.reflection.EntityCreator").Line($"public {Name}Stream() {{}}");

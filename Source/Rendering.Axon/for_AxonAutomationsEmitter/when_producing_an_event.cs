@@ -18,7 +18,7 @@ public class when_producing_an_event : given.a_reaction_model
     [Fact] void should_load_the_current_stream_position() => Code("SubmitOrderOn0AppendHandler").ShouldContain("@org.axonframework.modelling.annotation.InjectEntity(idProperty = \"eventSourceId\")");
     [Fact] void should_append_the_produced_event() => Code("SubmitOrderOn0AppendHandler").ShouldContain("appender.append(command.event());");
     [Fact] void should_check_the_event_identity() => Code("SubmitOrderOn0AppendHandler").ShouldContain("command.event().orderId()");
-    [Fact] void should_use_the_shared_primary_tag() => Code("SubmitOrderOn0AppendStream").ShouldContain("tagKey = \"orderId\"");
+    [Fact] void should_use_the_shared_primary_tag() => Code("SubmitOrderOn0AppendStream").ShouldContain($"tagKey = {context.BasePackage}.orders.events.EventTags.ORDER_ID");
     [Fact] void should_preserve_position_for_other_stream_events() => Code("SubmitOrderOn0AppendStream").ShouldContain("OrderMoved event");
     [Fact] void should_not_report_degradation() => context.Degradation.UnsupportedConstructs.Count.ShouldEqual(0);
 }

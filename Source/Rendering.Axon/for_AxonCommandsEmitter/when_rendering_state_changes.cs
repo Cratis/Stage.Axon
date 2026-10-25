@@ -25,13 +25,13 @@ public class when_rendering_state_changes : for_AxonArtifactRenderPlanner.given.
     void Because() => new AxonCommandsEmitter().Emit(context);
 
     [Fact] void should_enable_command_emission() => new AxonCommandsEmitter().IsImplemented.ShouldBeTrue();
-    [Fact] void should_inject_the_primary_stream_state() => Code("PlaceOrderHandler").ShouldContain("@InjectEntity(idProperty = \"orderId\") Optional<PlaceOrderStream> state");
+    [Fact] void should_inject_the_primary_stream_state() => Code("PlaceOrderHandler").ShouldContain($"@InjectEntity(idProperty = {context.BasePackage}.orders.events.EventTags.ORDER_ID) Optional<PlaceOrderStream> state");
     [Fact] void should_import_entity_injection() => Code("PlaceOrderHandler").ShouldContain("import org.axonframework.modelling.annotation.InjectEntity;");
     [Fact] void should_import_optional_state_for_first_appends() => Code("PlaceOrderHandler").ShouldContain("import java.util.Optional;");
     [Fact] void should_not_wrap_the_state() => Code("PlaceOrderHandler").ShouldNotContain("ManagedEntity");
     [Fact] void should_append_the_single_event_directly() => Code("PlaceOrderHandler").ShouldContain("appender.append(new ");
     [Fact] void should_not_collect_a_single_event() => Code("PlaceOrderHandler").ShouldNotContain("ArrayList");
-    [Fact] void should_use_the_shared_primary_tag() => Code("PlaceOrderStream").ShouldContain("@EventSourcedEntity(tagKey = \"orderId\")");
+    [Fact] void should_use_the_shared_primary_tag() => Code("PlaceOrderStream").ShouldContain($"@EventSourcedEntity(tagKey = {context.BasePackage}.orders.events.EventTags.ORDER_ID)");
     [Fact] void should_mark_the_command_identity() => Code("PlaceOrder").ShouldContain("@org.axonframework.modelling.annotation.TargetEntityId");
     [Fact] void should_emit_a_post_endpoint() => Code("PlaceOrderEndpoint").ShouldContain("@PostMapping(\"/api/orders/orders/place-order\")");
     [Fact] void should_return_a_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("CompletableFuture<Void>");

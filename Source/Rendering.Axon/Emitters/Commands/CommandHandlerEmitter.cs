@@ -70,7 +70,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         if (Constrained && source?.Generated != true) parameters += ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
         if (source is null) return parameters;
         if (source.Generated) return parameters + ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
-        return parameters + $", @InjectEntity(idProperty = {JavaCodeBuilder.StringLiteral(source.Member)}) Optional<{name}Stream> state";
+        return parameters + $", @InjectEntity(idProperty = {source.TagReference}) Optional<{name}Stream> state";
     }
 
     void Handle(JavaCodeBuilder body, CommandResponses response)

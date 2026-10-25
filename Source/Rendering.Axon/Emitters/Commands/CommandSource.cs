@@ -13,6 +13,8 @@ internal sealed record CommandSource
 
     internal required SemanticTypeReference Type { get; init; }
 
+    internal required string TagReference { get; init; }
+
     internal SemanticProperty? Input { get; init; }
 
     internal SemanticExpression? Destination { get; init; }
@@ -37,7 +39,7 @@ internal sealed record CommandSource
         var destination = command.Produces.FirstOrDefault()?.Destination ?? command.Destination?.Value;
         var input = InputProperty(command, contract, tag.ComponentName, destination);
         if (!CanIdentify(command, destination, input)) return null;
-        var source = new CommandSource { Primary = tag, Type = type, Input = input, Destination = destination };
+        var source = new CommandSource { Primary = tag, Type = type, TagReference = EventTagsEmitter.Reference(context, contract), Input = input, Destination = destination };
         if (source.ConflictsWithInput(command, types)) return null;
         return source.Value(command, types, "command") is null ? null : source;
     }

@@ -22,9 +22,9 @@ internal static class AxonEventSources
     internal static string Record(AxonEmissionContext context, string package, SemanticEventContract contract, string annotation)
     {
         var primary = PrimaryTag(context, contract);
-        var parameters = contract.Properties.Select(property => Component(context, property, primary)).ToList();
+        var parameters = contract.Properties.Select(property => Component(context, contract, property, primary)).ToList();
         if (!contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName))
-            parameters.Insert(0, $"@org.axonframework.eventsourcing.annotation.EventTag(key = {JavaCodeBuilder.StringLiteral(primary.TagKey)}) {primary.JavaType} {primary.ComponentName}");
+            parameters.Insert(0, $"@org.axonframework.eventsourcing.annotation.EventTag(key = {EventTagsEmitter.Reference(context, contract)}) {primary.JavaType} {primary.ComponentName}");
         var code = new JavaCodeBuilder(package);
         var extraTags = contract.Tags.Concat(contract.Properties.Where(property => property.IsIdentifier).Select(property => property.Name))
             .Where(tag => tag != primary.TagKey).Distinct(StringComparer.Ordinal).ToArray();
@@ -63,10 +63,10 @@ internal static class AxonEventSources
         return (name, context.BasePackage + ".concepts." + JavaNames.Type(concept.Name), name);
     }
 
-    static string Component(AxonEmissionContext context, SemanticProperty property, (string ComponentName, string JavaType, string TagKey) primary)
+    static string Component(AxonEmissionContext context, SemanticEventContract contract, SemanticProperty property, (string ComponentName, string JavaType, string TagKey) primary)
     {
         var name = JavaNames.Member(property.Name);
-        var tag = name == primary.ComponentName ? "@org.axonframework.eventsourcing.annotation.EventTag(key = " + JavaCodeBuilder.StringLiteral(primary.TagKey) + ") " : string.Empty;
+        var tag = name == primary.ComponentName ? "@org.axonframework.eventsourcing.annotation.EventTag(key = " + EventTagsEmitter.Reference(context, contract) + ") " : string.Empty;
         return tag + $"@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(property.Name)}) {JavaSemanticTypes.TypeFor(context, property.Type)} {name}";
     }
 }
