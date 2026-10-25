@@ -43,6 +43,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
         var projection = located.Slice.Projections.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
         if (projection is null) return;
         var http = new AxonViewHttpSpecs(context, types, located, model);
+        var arguments = ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id));
         var code = new JavaCodeBuilder(package).Import("org.junit.jupiter.api.Test")
             .Import(types.BasePackage + ".runtime.ReadModelStore").Import(types.BasePackage + ".runtime.InMemoryReadModelStore")
             .Import(types.BasePackage + ".runtime.EventSourceId");
@@ -73,7 +74,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                     {
                         var root = ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, JavaNames.Type(model.Name));
                         if (!root.All.Any(node => node.Scope.From.Any(from => from.EventContract == given.EventContract) || node.Scope.Joins.Any(join => join.EventContract == given.EventContract) || node.Scope.Removals.Any(removal => removal.EventContract == given.EventContract) || node.Scope.JoinRemovals.Any(removal => removal.EventContract == given.EventContract) || node.Scope.Every is { SubscribesToAllEvents: true })) continue;
-                        method.Line($"projector.on({AxonViewEvents.Expression(context, types, given)});");
+                        method.Line($"projector.on({AxonViewEvents.Expression(context, types, given)}{arguments});");
                     }
                     foreach (var expected in spec.ThenReadModels.Where(expected => expected.ReadModel == model.Id))
                         EmitExpected(context.Request.Model.Application, types, model, expected, method);

@@ -104,7 +104,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             var variable = JavaNames.Member(nested.Name);
             code.Line($"var {variable} = {Method(nested, @event)}(event, message, key, parentKey, state.{JavaNames.Member(property.Name)}());")
                 .Block($"if ({variable}.touched())", changed => changed
-                    .Line($"state = {_records.Set(node.Type, node.Properties, [property.Id], "state", variable + ".value()")};")
+                    .Line($"state = {_records.Set(node, [property.Id], variable + ".value()")};")
                     .Line("childTouched = true;").Line($"childAncestors |= {variable}.ancestors();"));
         }
         foreach (var child in node.Children) Children(code, node, child, @event);
@@ -135,7 +135,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
                 .Line($"if (added.value() != null) {variable}.add(added.value());")
                 .Line("childTouched |= added.touched();").Line("childAncestors |= added.ancestors();"));
         }
-        code.Line($"state = {_records.Set(parent.Type, parent.Properties, [property.Id], "state", "java.util.List.copyOf(" + variable + ")")};");
+        code.Line($"state = {_records.Set(parent, [property.Id], "java.util.List.copyOf(" + variable + ")")};");
     }
 
     string Matches(SemanticProjectionKey key, SemanticProjectionKey? parentKey, SemanticEventContract @event, ProjectionScopeNode node)

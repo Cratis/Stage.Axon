@@ -24,7 +24,7 @@ internal sealed class ProjectionScopeMappings(AxonEmissionContext context, ViewJ
                 code.UnsupportedIntent("map the projected property", owner.ToString(), AxonRefusalCodes.ProjectionMapping);
                 continue;
             }
-            code.Line($"state = {_records.Set(node.Type, node.Properties, mapping.Target, "state", value)};");
+            code.Line($"state = {_records.Set(node, mapping.Target, value)};");
         }
     }
 
@@ -44,6 +44,6 @@ internal sealed class ProjectionScopeMappings(AxonEmissionContext context, ViewJ
             SemanticProjectionCompositeKey key => _values.CompositeValue(key, @event),
             _ => null
         };
-        if (value is not null) code.Line($"state = {_records.Set(node.Type, node.Properties, [property.Id], "state", value)};");
+        if (value is not null) code.Line($"state = {_records.Set(node, [property.Id], value)};");
     }
 }

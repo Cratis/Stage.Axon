@@ -25,6 +25,7 @@ internal static class AxonViewLiveSpecs
         var modelType = types.Package(owner) + "." + JavaNames.Type(model.Name);
         var projector = types.Package(owner) + "." + JavaNames.Type(projection.Name) + "Projector";
         var applicationType = types.BasePackage + ".Application";
+        var arguments = ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id), "org.axonframework.messaging.queryhandling.QueryUpdateEmitter.forContext(processing)");
         var code = new JavaCodeBuilder(package).Line($$"""
             @org.springframework.boot.test.context.SpringBootTest(classes = {{applicationType}}.class)
             @org.springframework.test.annotation.DirtiesContext
@@ -74,7 +75,7 @@ internal static class AxonViewLiveSpecs
                         org.junit.jupiter.api.Assertions.assertTrue(values.getFirst().rows().isEmpty());
                         configuration.getComponent(org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory.class).create()
                             .executeWithResult(processing -> {
-                                projector.on({{AxonViewEvents.Expression(context, types, given)}}, org.axonframework.messaging.queryhandling.QueryUpdateEmitter.forContext(processing));
+                                projector.on({{AxonViewEvents.Expression(context, types, given)}}{{arguments}});
                                 return java.util.concurrent.CompletableFuture.completedFuture(null);
                             }).get(10, java.util.concurrent.TimeUnit.SECONDS);
                         org.junit.jupiter.api.Assertions.assertTrue(changed.await(10, java.util.concurrent.TimeUnit.SECONDS), "Live query update timed out");
@@ -90,6 +91,6 @@ internal static class AxonViewLiveSpecs
             }
             """).Build();
         context.Artifacts.Add(PlannedArtifact.CreateText($"src/test/java/{package.Replace('.', '/')}/{name}SubscriptionTest.java", code, [query.Id]));
-        AxonViewHttpLiveSpecs.Emit(context, types, located, query, modelType, projector, given);
+        AxonViewHttpLiveSpecs.Emit(context, types, located, query, modelType, projector, AxonViewEvents.Expression(context, types, given) + arguments);
     }
 }

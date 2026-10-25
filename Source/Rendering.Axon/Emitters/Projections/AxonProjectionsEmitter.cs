@@ -44,8 +44,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
     static void EmitModel(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticReadModel model)
     {
         var name = JavaNames.Type(model.Name);
-        var components = string.Join(", ", model.Properties.Select(property => $"{JavaRecordComponents.JsonProperty(property.Name)}{types.Type(property.Type)} {JavaNames.Member(property.Name)}"));
-        ViewJavaTypes.Add(context, package, name, new JavaCodeBuilder(package).Line($"public record {name}({components}) {{}}").Build(), model.Id);
+        ViewJavaTypes.Add(context, package, name, ReadModelRecords.Code(types, package, model), model.Id);
         context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Read-model rows use volatile in-memory storage even under the persistent profile; replay is required after restart.");
         var configuration = new JavaCodeBuilder(package)
             .Import("org.springframework.context.annotation.Configuration").Import("org.springframework.context.annotation.Bean")
@@ -62,7 +61,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
 
     static void EmitProjector(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticProjection projection, SemanticReadModel model)
     {
-        if (projection.Scope is { } scope && (scope.Every is not null || scope.Children.Length > 0 || scope.Nested.Length > 0 || scope.Joins.Length > 0 || scope.Removals.Length > 0 || scope.JoinRemovals.Length > 0 || scope.From.Any(from => from.Key is not SemanticProjectionValueKey || from.Mappings.Any(mapping => mapping.Target.Length > 1 || mapping.Source is SemanticProjectionEventContextValue))))
+        if (ProjectionHandlerShape.Scoped(projection))
         {
             new ScopedProjectionEmitter(context, types, package, projection, model).Emit();
             return;
@@ -84,7 +83,6 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
             {
                 var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == group.Key);
-                if (updates.Enabled) body.Block($"public void on({types.EventType(group.Key)} event)", method => method.Line("on(event, null);"));
                 body.Line("@EventHandler").Block($"public void on({types.EventType(group.Key)} event{updates.Parameter})", method =>
                 {
                     foreach (var from in group) EmitFrom(context, types, method, projection, model, @event, from);
@@ -118,8 +116,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
                 code.UnsupportedIntent("map the projected property", projection.Id.ToString(), AxonRefusalCodes.ProjectionMapping);
                 continue;
             }
-            var arguments = model.Properties.Select(property => property.Id == target!.Id ? expression : $"state.{JavaNames.Member(property.Name)}()");
-            code.Line($"    state = new {modelName}({string.Join(", ", arguments)});");
+            code.Line($"    state = state.with{JavaNames.Type(target!.Name)}({expression});");
         }
         code.Line("    return state;").Line("});");
     }

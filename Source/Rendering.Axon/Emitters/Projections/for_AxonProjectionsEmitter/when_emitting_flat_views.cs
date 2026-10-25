@@ -24,7 +24,9 @@ public class when_emitting_flat_views : given.a_view_request
     [Fact] void should_emit_both_event_handlers() => _projector.Split("@EventHandler", StringSplitOptions.None).Length.ShouldEqual(3);
     [Fact] void should_add_the_event_value() => _projector.ShouldContain("+ event.amount()");
     [Fact] void should_subtract_the_event_value() => _projector.ShouldContain("- event.amount()");
-    [Fact] void should_clear_the_optional_property() => _projector.ShouldContain("state.count(), null)");
+    [Fact] void should_clear_the_optional_property() => _projector.ShouldContain("state.withNote(null)");
+    [Fact] void should_update_the_model_fluently() => _projector.ShouldContain("state.withCount(");
+    [Fact] void should_emit_copy_methods() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/Total.java", StringComparison.Ordinal))).ShouldContain("public Total withCount(Long value)");
     [Fact] void should_configure_subscribing_processing() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath == "src/main/resources/axon-views.properties")).ShouldContain(".mode=subscribing");
     [Fact] void should_use_a_model_specific_store_qualifier() => _projector.ShouldContain("@Qualifier(\"axonviews.views.counters.totals.Total\")");
     [Fact] void should_keep_the_qualified_in_memory_store_in_every_profile() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/TotalStoreConfiguration.java", StringComparison.Ordinal))).ShouldNotContain("@Profile");

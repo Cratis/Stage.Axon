@@ -38,6 +38,19 @@ internal sealed class ProjectionRecords(SemanticApplication application, ViewJav
         return receiver;
     }
 
+    internal string Set(ProjectionScopeNode node, IReadOnlyList<SemanticId> path, string value)
+    {
+        var property = node.Properties.First(candidate => candidate.Id == path[0]);
+        if (path.Count > 1)
+        {
+            var composite = application.Types.First(candidate => candidate.Id == property.Type.Target);
+            value = Set(types.Type(property.Type), composite.Properties, [.. path.Skip(1)], Access(node.Properties, [property.Id], "state"), value);
+        }
+        return node.Property is null
+            ? $"state.with{JavaNames.Type(property.Name)}({value})"
+            : Set(node.Type, node.Properties, [property.Id], "state", value);
+    }
+
     internal string Set(string type, IReadOnlyList<SemanticProperty> properties, IReadOnlyList<SemanticId> path, string receiver, string value)
     {
         var property = properties.First(candidate => candidate.Id == path[0]);

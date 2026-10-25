@@ -21,6 +21,9 @@ public class when_emitting_scoped_views : given.a_view_request
         _projector = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("BoardProjectionProjector.java", StringComparison.Ordinal)));
     }
 
+    [Fact] void should_expose_only_the_annotated_handler_signature() => _projector.ShouldNotContain("public void on(");
+    [Fact] void should_update_root_properties_fluently() => _projector.ShouldContain("state.with");
+    [Fact] void should_pass_explicit_message_arguments_in_specs() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("BoardViewSpecificationsTest.java", StringComparison.Ordinal))).ShouldContain(", null);");
     [Fact] void should_copy_children_into_immutable_lists() => _projector.ShouldContain("java.util.List.copyOf(rootChild0)");
     [Fact] void should_preserve_original_deferred_event_values() => _projector.ShouldContain("pending.add(() -> projectCardAdded(event, message))");
     [Fact] void should_backfill_joins() => _projector.ShouldContain("joined.apply(state)");

@@ -12,7 +12,7 @@ namespace Cratis.Stage.Rendering.Axon.Specifications.Views;
 
 internal static class AxonViewHttpLiveSpecs
 {
-    internal static void Emit(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticKeyedQuery query, string modelType, string projector, SemanticSpecificationEvent given)
+    internal static void Emit(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticKeyedQuery query, string modelType, string projector, string eventArguments)
     {
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name) + "SseTest";
@@ -44,7 +44,7 @@ internal static class AxonViewHttpLiveSpecs
                                 org.junit.jupiter.api.Assertions.assertEquals(0, initial.size());
                                 configuration.getComponent(org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory.class).create()
                                     .executeWithResult(processing -> {
-                                        projector.on({{AxonViewEvents.Expression(context, types, given)}}, org.axonframework.messaging.queryhandling.QueryUpdateEmitter.forContext(processing));
+                                        projector.on({{eventArguments}});
                                         return java.util.concurrent.CompletableFuture.completedFuture(null);
                                     }).get(10, java.util.concurrent.TimeUnit.SECONDS);
                                 var changed = mapper.readTree(executor.submit(() -> nextData(reader)).get(10, java.util.concurrent.TimeUnit.SECONDS));
