@@ -25,8 +25,9 @@ public class when_rendering_state_changes : for_AxonArtifactRenderPlanner.given.
     void Because() => new AxonCommandsEmitter().Emit(context);
 
     [Fact] void should_enable_command_emission() => new AxonCommandsEmitter().IsImplemented.ShouldBeTrue();
-    [Fact] void should_inject_the_primary_stream_state() => Code("PlaceOrderHandler").ShouldContain("@InjectEntity(idProperty = \"orderId\") PlaceOrderStream state");
+    [Fact] void should_inject_the_primary_stream_state() => Code("PlaceOrderHandler").ShouldContain("@InjectEntity(idProperty = \"orderId\") Optional<PlaceOrderStream> state");
     [Fact] void should_import_entity_injection() => Code("PlaceOrderHandler").ShouldContain("import org.axonframework.modelling.annotation.InjectEntity;");
+    [Fact] void should_import_optional_state_for_first_appends() => Code("PlaceOrderHandler").ShouldContain("import java.util.Optional;");
     [Fact] void should_not_wrap_the_state() => Code("PlaceOrderHandler").ShouldNotContain("ManagedEntity");
     [Fact] void should_append_the_single_event_directly() => Code("PlaceOrderHandler").ShouldContain("appender.append(new ");
     [Fact] void should_not_collect_a_single_event() => Code("PlaceOrderHandler").ShouldNotContain("ArrayList");

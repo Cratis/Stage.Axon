@@ -29,7 +29,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             .Import("org.springframework.security.access.prepost.PreAuthorize")
             .Import("org.axonframework.messaging.commandhandling.annotation.CommandHandler")
             .Import("org.axonframework.messaging.eventhandling.gateway.EventAppender");
-        if (source?.Generated == false) code.Import("org.axonframework.modelling.annotation.InjectEntity");
+        if (source?.Generated == false) code.Import("org.axonframework.modelling.annotation.InjectEntity").Import("java.util.Optional");
         code.Line("@Component").Block($"public class {name}Handler", body =>
         {
             body.Line("@CommandHandler");
@@ -70,7 +70,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         if (Constrained && source?.Generated != true) parameters += ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
         if (source is null) return parameters;
         if (source.Generated) return parameters + ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
-        return parameters + $", @InjectEntity(idProperty = {JavaCodeBuilder.StringLiteral(source.Member)}) {name}Stream state";
+        return parameters + $", @InjectEntity(idProperty = {JavaCodeBuilder.StringLiteral(source.Member)}) Optional<{name}Stream> state";
     }
 
     void Handle(JavaCodeBuilder body, CommandResponses response)

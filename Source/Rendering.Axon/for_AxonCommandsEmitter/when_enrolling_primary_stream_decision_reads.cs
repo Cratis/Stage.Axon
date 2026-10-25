@@ -42,7 +42,9 @@ public class when_enrolling_primary_stream_decision_reads : given.a_protected_de
     [Fact] void should_overload_on_for_both_event_types() => stream.Split("public void on(", StringSplitOptions.None).Length.ShouldEqual(3);
     [Fact] void should_not_number_event_handlers() => stream.ShouldNotContain("public void on0(");
     [Fact] void should_expose_the_decision_state() => stream.ShouldContain("public boolean decisionRead0() { return decisionRead0; }");
-    [Fact] void should_read_the_enrolled_stream_not_a_snapshot_store() => handler.ShouldContain("state.decisionRead0()");
+    [Fact] void should_read_the_enrolled_stream_not_a_snapshot_store() => handler.ShouldContain("state.orElseGet(MoveOrderStream::new).decisionRead0()");
+    [Fact] void should_reject_absent_state_using_the_default_stream_decision() => handler.ShouldContain("if (!state.orElseGet(MoveOrderStream::new).decisionRead0()) throw new ");
+    [Fact] void should_not_treat_optional_state_as_nullable() => handler.ShouldNotContain("state == null");
     [Fact] void should_fail_before_appending_if_the_read_is_absent() => (handler.IndexOf("Required decision read 'order'", StringComparison.Ordinal) < handler.IndexOf("appender.append", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_fail_before_generated_values_or_rules() => (handler.IndexOf("Required decision read 'order'", StringComparison.Ordinal) < handler.IndexOf("rules.validate", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_reject_with_a_command_validation_error() => handler.ShouldContain("runtime.CommandValidationException");
