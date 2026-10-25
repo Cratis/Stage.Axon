@@ -32,6 +32,9 @@ public class when_emitting_a_view_named_profile : Specification
     }
 
     [Fact] void should_type_the_store_with_the_model_rather_than_the_spring_annotation() => configuration.ShouldContain("ReadModelStore<Object, templates.customers.profile.managerprofile.Profile>");
-    [Fact] void should_keep_the_store_available_under_the_persistent_profile() => configuration.ShouldNotContain("@Profile");
+    [Fact] void should_not_import_the_spring_annotation_over_the_model() => configuration.ShouldNotContain("import org.springframework.context.annotation.Profile;");
+    [Fact] void should_qualify_the_persistent_guard_annotation() => configuration.ShouldContain("@org.springframework.context.annotation.Profile(\"persistent\")");
+    [Fact] void should_emit_an_early_static_guard_with_an_unambiguous_type() => configuration.ShouldContain("public static templates.runtime.persistent.PersistentReadModelSafety persistentReadModelSafety()");
+    [Fact] void should_identify_the_offending_model() => configuration.ShouldContain("new templates.runtime.persistent.PersistentReadModelSafety(\"templates.customers.profile.managerprofile.Profile\")");
     [Fact] void should_preserve_the_qualified_store_name() => configuration.ShouldContain("@Bean(\"templates.customers.profile.managerprofile.Profile\")");
 }

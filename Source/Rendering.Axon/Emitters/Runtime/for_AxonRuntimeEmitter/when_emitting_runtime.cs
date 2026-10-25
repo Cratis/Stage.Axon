@@ -34,6 +34,10 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     void should_replace_every_package_placeholder() =>
         context.Artifacts.Exists(artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan()).Contains("__RUNTIME__", StringComparison.Ordinal)).ShouldBeFalse();
 
+    [Fact] void should_emit_the_inert_persistent_safety_helper() => context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/persistent/PersistentReadModelSafety.java", StringComparison.Ordinal)).RelativePath.ShouldContain("src/main/java/");
+    [Fact] void should_emit_ordinary_native_safety_tests() => context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentReadModelSafetyTest.java", StringComparison.Ordinal)).RelativePath.ShouldContain("src/test/java/");
+    [Fact] void should_register_installed_axon_entities_in_the_test_fixture() => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentProbeSupport.java", StringComparison.Ordinal)).Bytes.AsSpan()).ShouldContain($"@EntityScan(basePackageClasses = {{ {context.BasePackage}.runtime.persistent.UniqueClaim.class,\n            org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry.class,\n            org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry.class }})");
+
     [Fact]
     void should_not_emit_a_custom_clock() =>
         context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/Clock.java", StringComparison.Ordinal)).ShouldBeFalse();

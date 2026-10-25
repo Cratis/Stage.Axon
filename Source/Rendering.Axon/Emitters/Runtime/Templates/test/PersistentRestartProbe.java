@@ -4,7 +4,6 @@
 package __RUNTIME__;
 
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +13,9 @@ import org.axonframework.eventsourcing.eventstore.SourcingCondition;
 import org.axonframework.eventsourcing.eventstore.jpa.AggregateBasedJpaEventStorageEngine;
 import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
 import org.axonframework.messaging.eventhandling.gateway.EventAppender;
+import org.axonframework.messaging.eventhandling.processing.streaming.token.GlobalSequenceTrackingToken;
+import org.axonframework.messaging.eventhandling.processing.streaming.token.store.TokenStore;
+import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.JpaTokenStore;
 import org.axonframework.messaging.eventstreaming.EventCriteria;
 import org.axonframework.messaging.eventstreaming.Tag;
 import org.junit.jupiter.api.Test;
@@ -23,23 +25,58 @@ import org.springframework.context.ConfigurableApplicationContext;
 import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfSystemProperty(named = "stage.restart", matches = "true")
-// Named Probe rather than Test so default Surefire discovery does not skip this opt-in proof.
+// Probe is outside default Surefire discovery, so the opt-in proof adds no default skipped tests.
 class PersistentRestartProbe {
     public record Recorded(@org.axonframework.eventsourcing.annotation.EventTag(key = "owner") String owner) {}
 
     @Test
-    void eventsAndClaimsSurviveTwoApplicationBootsOnTheSameFile() throws Exception {
-        var path = Path.of("target", "persistent-restart", UUID.randomUUID().toString(), "events").toAbsolutePath();
-        Files.createDirectories(path.getParent());
-        var database = "jdbc:h2:file:" + path;
+    void viewlessFixturePreservesEventsAndClaimsAcrossTwoBoots() throws Exception {
+        survivesTwoBoots(false);
+    }
+
+    @Test
+    void selectedApplicationRefusesViewsWithoutReadinessOrDataMutation() throws Exception {
+        if (!Boolean.getBoolean("stage.expectViews")) {
+            // A successful main-app probe must genuinely have no generated views; never filter them.
+            survivesTwoBoots(true);
+            return;
+        }
+        var database = PersistentProbeSupport.database(PersistentProbeSupport.freshPath());
+        var owner = UUID.randomUUID().toString();
+        var checkpoint = "safety-checkpoint-" + UUID.randomUUID();
+        try (var seed = PersistentProbeSupport.viewless(database)) {
+            assertPersistentStores(seed);
+            append(seed, owner).get(10, TimeUnit.SECONDS);
+            assertEquals(1, count(seed, owner));
+            var tokens = seed.getBean(Configuration.class).getComponent(TokenStore.class);
+            assertInstanceOf(JpaTokenStore.class, tokens);
+            seed.getBean(Configuration.class).getComponent(UnitOfWorkFactory.class).create().executeWithResult(context ->
+                    tokens.initializeTokenSegments(checkpoint, 1, new GlobalSequenceTrackingToken(42), context))
+                    .get(10, TimeUnit.SECONDS);
+        }
+        var before = PersistentDatabaseSnapshot.read(database);
+        before.assertSeeded(owner, checkpoint);
+        for (var attempt = 1; attempt <= 2; attempt++) {
+            PersistentProbeSupport.refuses(database);
+            assertEquals(before, PersistentDatabaseSnapshot.read(database), "All event/claim/token values unchanged after refusal " + attempt);
+        }
+        var fresh = PersistentProbeSupport.freshPath();
+        PersistentProbeSupport.refuses(PersistentProbeSupport.database(fresh));
+        try (var files = Files.list(fresh.getParent())) {
+            assertEquals(0, files.count(), "Refusal must not create any fresh database files");
+        }
+    }
+
+    private void survivesTwoBoots(boolean main) throws Exception {
+        var database = PersistentProbeSupport.database(PersistentProbeSupport.freshPath());
         var owner = UUID.randomUUID().toString();
         var competitor = UUID.randomUUID().toString();
-        try (var first = boot(database)) {
+        try (var first = boot(database, main)) {
             assertPersistentStores(first);
             append(first, owner).get(10, TimeUnit.SECONDS);
             assertEquals(1, count(first, owner));
         }
-        try (var second = boot(database)) {
+        try (var second = boot(database, main)) {
             assertPersistentStores(second);
             assertEquals(1, count(second, owner));
             var failure = assertThrows(Exception.class, () -> append(second, competitor).get(10, TimeUnit.SECONDS));
@@ -47,23 +84,19 @@ class PersistentRestartProbe {
             assertEquals(0, count(second, competitor));
             assertEquals(1, count(second, owner));
         }
+        System.out.println("Viewless two-boot proof: event and unique claim survived; conflicting owner appended zero events");
     }
 
-    private ConfigurableApplicationContext boot(String database) throws Exception {
-        var application = Class.forName(getClass().getPackageName().replaceFirst("\\.runtime$", ".Application"));
-        return new SpringApplicationBuilder(application).profiles("persistent").run(
-                "--server.port=0", "--spring.datasource.url=" + database,
-                "--spring.jpa.hibernate.ddl-auto=update", "--spring.main.banner-mode=off");
+    private ConfigurableApplicationContext boot(String database, boolean main) throws Exception {
+        return main ? PersistentProbeSupport.start(new SpringApplicationBuilder(PersistentProbeSupport.application()), database)
+                : PersistentProbeSupport.viewless(database);
     }
 
     private void assertPersistentStores(ConfigurableApplicationContext application) {
         assertInstanceOf(AggregateBasedJpaEventStorageEngine.class, application.getBean(EventStorageEngine.class));
         assertInstanceOf(__RUNTIME__.persistent.JpaUniqueValueStore.class, application.getBean(UniqueValueStore.class));
-        if (Boolean.getBoolean("stage.expectViews")) {
-            var stores = application.getBeansOfType(ReadModelStore.class);
-            assertFalse(stores.isEmpty(), "The persistent-profile proof must boot an application with generated views");
-            stores.values().forEach(store -> assertInstanceOf(InMemoryReadModelStore.class, store));
-        }
+        assertTrue(application.getBeansOfType(ReadModelStore.class).isEmpty(), "Successful persistent boot must be viewless");
+        assertTrue(application.getBeansOfType(__RUNTIME__.persistent.PersistentReadModelSafety.class).isEmpty());
     }
 
     private java.util.concurrent.CompletableFuture<Void> append(ConfigurableApplicationContext application, String owner) {

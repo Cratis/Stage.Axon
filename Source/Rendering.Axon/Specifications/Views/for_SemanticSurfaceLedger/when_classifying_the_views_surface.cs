@@ -12,6 +12,9 @@ public class when_classifying_the_views_surface : Specification
     [Fact] void should_classify_live_queries_as_rendered() => SemanticSurfaceLedger.Entries["SemanticQueryDelivery.Live"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Rendered);
     [Fact] void should_account_for_volatile_read_model_storage() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Warned);
     [Fact] void should_register_the_persistence_warning_code() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Detail.ShouldContain("STAGE-AXON-0308");
+    [Fact] void should_explain_durable_checkpoint_risk() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Detail.ShouldContain("durable checkpoints may skip prior events");
+    [Fact] void should_not_promise_automatic_recovery() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Detail.ShouldContain("Automatic replay is not established recovery");
+    [Fact] void should_explain_persistent_view_refusal() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Detail.ShouldContain("persistent startup with generated views is refused");
     [Fact] void should_classify_children_as_rendered() => SemanticSurfaceLedger.Entries["SemanticProjectionScope.Children"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Rendered);
     [Fact] void should_classify_reducer_bodies_as_warned() => SemanticSurfaceLedger.Entries["SemanticReducerTransition.RequirementId"].Detail.ShouldContain("STAGE-AXON-0306");
     [Fact] void should_not_claim_query_expectations_execute() => SemanticSurfaceLedger.Entries["SemanticQueryFilterValue.Value"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Rejected);
