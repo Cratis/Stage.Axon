@@ -38,6 +38,8 @@ public class when_enlisting_property_uniqueness : for_AxonArtifactRenderPlanner.
     string Source(string name) => Encoding.UTF8.GetString(plan.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name, StringComparison.Ordinal)).Bytes.AsSpan());
 
     [Fact] void should_enlist_before_appending() => (handler.IndexOf("ModeledConstraints.apply", StringComparison.Ordinal) < handler.IndexOf("appender.append", StringComparison.Ordinal)).ShouldBeTrue();
+    [Fact] void should_collect_constrained_events() => handler.ShouldContain("for (var event : events)");
+    [Fact] void should_append_constrained_events_as_a_batch() => handler.ShouldContain("if (!events.isEmpty()) appender.append(events);");
     [Fact] void should_use_the_append_processing_context() => handler.ShouldContain("ModeledConstraints.apply(uniqueValues, event, context)");
     [Fact] void should_claim_the_modeled_property() => constraints.ShouldContain("java.util.Arrays.asList(fact.customer()), fact.orderId(), true, \"Customer is already claimed\"");
     [Fact] void should_release_by_owner_on_the_modeled_event() => constraints.ShouldContain("OrderMoved fact) store.releaseOwner");

@@ -51,6 +51,9 @@ public class when_rendering_handler_clocks : for_AxonArtifactRenderPlanner.given
     [Fact] void should_construct_clock_free_handlers_in_fixtures() => fixture.ShouldContain("new PlaceOrderHandler(new PlaceOrderRules(validators.getValidator()))");
     [Fact] void should_omit_unused_fixture_clocks() => fixture.ShouldNotContain("java.time.Clock");
     [Fact] void should_keep_the_clock_for_generation() => generated.ShouldContain("command = command.withGenerated(clock);");
+    [Fact] void should_load_the_allocated_identity_through_the_state_manager() => generated.ShouldContain("loadManagedEntity(PlaceOrderStream.class, command.orderId(), context).join();");
+    [Fact] void should_keep_the_processing_context_for_generation() => generated.ShouldContain("org.axonframework.messaging.core.unitofwork.ProcessingContext context");
+    [Fact] void should_not_inject_state_before_allocating_an_identity() => generated.ShouldNotContain("@InjectEntity");
     [Fact] void should_not_create_an_occurrence_for_generation_alone() => generated.ShouldNotContain("var occurred =");
     [Fact] void should_keep_the_clock_for_occurrence_mapping() => occurred.ShouldContain("private final java.time.Clock clock;");
     [Fact] void should_read_the_clock_for_occurrence_mapping() => occurred.ShouldContain("var occurred = java.time.OffsetDateTime.ofInstant(clock.instant(), java.time.ZoneOffset.UTC);");
