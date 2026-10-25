@@ -50,13 +50,14 @@ internal sealed class AxonViewHttpSpecs(AxonEmissionContext context, ViewJavaTyp
         var modelType = types.Package(located) + "." + JavaNames.Type(model.Name);
         var projector = types.Package(located) + "." + JavaNames.Type(projection.Name) + "Projector";
         var root = ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, modelType);
+        var arguments = ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id));
         var lines = new List<string>
         {
             $"application.getBean({JavaCodeBuilder.StringLiteral(modelType)}, {types.BasePackage}.runtime.ReadModelStore.class).clear();",
             $"var projector = application.getBean({projector}.class);"
         };
         foreach (var given in specification.GivenEvents.Where(given => root.All.Any(node => Observes(node.Scope, given.EventContract))))
-            lines.Add($"projector.on({AxonViewEvents.Expression(context, types, given)});");
+            lines.Add($"projector.on({AxonViewEvents.Expression(context, types, given)}{arguments});");
         return [.. lines];
     }
 

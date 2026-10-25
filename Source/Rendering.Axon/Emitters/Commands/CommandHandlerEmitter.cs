@@ -29,6 +29,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             .Import("org.springframework.security.access.prepost.PreAuthorize")
             .Import("org.axonframework.messaging.commandhandling.annotation.CommandHandler")
             .Import("org.axonframework.messaging.eventhandling.gateway.EventAppender");
+        if (source?.Generated == false) code.Import("org.axonframework.modelling.annotation.InjectEntity").Import("java.util.Optional");
         code.Line("@Component").Block($"public class {name}Handler", body =>
         {
             body.Line("@CommandHandler");
@@ -69,7 +70,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         if (Constrained && source?.Generated != true) parameters += ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
         if (source is null) return parameters;
         if (source.Generated) return parameters + ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
-        return parameters + $", @org.axonframework.modelling.annotation.InjectEntity(idProperty = {JavaCodeBuilder.StringLiteral(source.Member)}) org.axonframework.modelling.repository.ManagedEntity<{source.JavaType}, {name}Stream> stream";
+        return parameters + $", @InjectEntity(idProperty = {source.TagReference}) Optional<{name}Stream> state";
     }
 
     void Handle(JavaCodeBuilder body, CommandResponses response)
@@ -115,13 +116,18 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         body.Line($"context.component(org.axonframework.modelling.StateManager.class).loadManagedEntity({name}Stream.class, command.{source.Member}(), context).join();");
     }
 
-    void Append(JavaCodeBuilder body, IReadOnlyList<(string Event, string? Condition)> appends, bool usesOccurred)
+    void Append(JavaCodeBuilder body, List<(string Event, string? Condition)> appends, bool usesOccurred)
     {
         MetadataDifferences(body);
         if (usesOccurred)
         {
             _usesClock = true;
             body.Line("var occurred = java.time.OffsetDateTime.ofInstant(clock.instant(), java.time.ZoneOffset.UTC);");
+        }
+        if (!Constrained && appends is [{ Condition: null }])
+        {
+            body.Line($"appender.append({appends[0].Event});");
+            return;
         }
         body.Line("var events = new java.util.ArrayList<Object>();");
         foreach (var append in appends)

@@ -91,6 +91,8 @@ static void CheckApplication(
 
 The experimental Axon target emits Java records, Spring components, Axon command handlers, and JUnit tests. Create its profile through `AxonRendering.CreateProfile()` and plan through `AxonArtifactRenderPlanner`; do not depend on its internal emitters as extension APIs.
 
+Generated applications use `org.axonframework.extensions.spring:axon-spring-boot-starter`, managed by `org.axonframework:axon-framework-bom:5.4.1`, with `axon-spring-boot-starter-test` from the same Spring extension group for tests. This starter bundles Spring integration and Axon messaging, modeling, and event sourcing without an Axon Server connector; generated applications do not require Axon Server.
+
 Axon uses warning-based degradation by default: unsupported constructs produce intent comments and `UNSUPPORTED.md` entries, with stubs or omitted behavior. Dependent modeled tests are explicitly disabled and listed in `stage-specifications.txt`. `AxonRendering.CreateProfile(strict: true)` makes unsupported constructs errors and refusals instead. A successful default-mode plan therefore requires inspection of its diagnostics and disabled specifications.
 
 For an emitted Maven application, run its wrapper from the output directory:
@@ -107,8 +109,8 @@ The default scaffold uses in-memory storage. The emitted `persistent` Spring pro
 
 | Concern | Default in-memory application | Persistent profile and limits |
 | --- | --- | --- |
-| Event-source position | Commands load a per-source `@EventSourcedEntity` through `ManagedEntity` before appending, including repeated commands on the same source. | The same loaded-position path uses the aggregate JPA engine; blind repeated appends are not equivalent. |
-| Event tags | Each event has one primary event-source tag. Additional modeled tags produce an explicit degradation warning. | The aggregate-based JPA engine accepts at most one tag per event. |
+| Event-source position | Existing-identity commands inject the per-source `@EventSourcedEntity` as `Optional<Stream>` with `@InjectEntity` before appending, allowing first appends when the stream has no events. Required decision reads use the default empty stream state when the optional is empty. Generated identities still load through `StateManager.loadManagedEntity`. Single unconditional, unconstrained events append directly; conditional, multiple and constrained events append as a batch, including repeated commands on the same source. | The same loaded-position path uses the aggregate JPA engine; blind repeated appends are not equivalent. |
+| Event tags | Each event has one primary event-source tag. Its owning module exposes the key through `events.EventTags` constants, shared by event annotations, stream state and entity injection without changing stored tag values. Additional modeled tags produce an explicit degradation warning. | The aggregate-based JPA engine accepts at most one tag per event. |
 | Protected decisions | Required presence/removal reads can fold one admitted projection inside the command's own primary stream. Unsupported shapes fail closed with `STAGE-AXON-0106`; asynchronous snapshots are not substituted. | The protected read and append use that stream boundary. Multi-tag or cross-stream protection is not promised. |
 | Unique constraints | Supported property-based constraints reserve claims during append and clean up reservations on rollback. Unsupported constraint shapes fail closed with `STAGE-AXON-0801`. | JPA claims, releases and event append share the transaction. Native race/rollback fixtures exercise both profiles; this is not arbitrary-query uniqueness. |
 | Reactions | Supported reactions invoke commands or append one typed event. Delivery is at least once, not exactly once; reaction handlers disallow replay. | Storage does not provide exactly-once side effects or durable processor checkpoints. |

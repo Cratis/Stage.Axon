@@ -36,7 +36,7 @@ public class when_selecting_the_primary_tag : for_AxonArtifactRenderPlanner.give
     void should_add_the_missing_primary_component()
     {
         var code = AxonEventSources.Record(context, "example.events", contract, "");
-        code.ShouldContain("@org.axonframework.eventsourcing.annotation.EventTag(key = \"orderId\") " + context.BasePackage + ".concepts.OrderId orderId");
+        code.ShouldContain($"@org.axonframework.eventsourcing.annotation.EventTag(key = {context.BasePackage}.orders.events.EventTags.ORDER_ID) {context.BasePackage}.concepts.OrderId orderId");
         TagCount(code).ShouldEqual(1);
     }
 

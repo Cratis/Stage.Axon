@@ -60,9 +60,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
     {
         var eventType = types.EventType(@event.Id);
         var method = "project" + JavaNames.Type(@event.Name);
-        if (_updates.Enabled) code.Block($"public void on({eventType} event{_updates.Parameter})", body => body.Line("on(event, null, updates);"));
-        code.Block($"public void on({eventType} event)", body => body.Line($"on(event, null{_updates.DefaultArgument});"))
-            .Line("@EventHandler").Block($"public synchronized void on({eventType} event, EventMessage message{_updates.Parameter})", body =>
+        code.Line("@EventHandler").Block($"public synchronized void on({eventType} event, EventMessage message{_updates.Parameter})", body =>
             {
                 foreach (var node in _root.All) methods.Caches(body, node, @event);
                 var deferred = _root.All.Any(node => node.Identity is not null && (node.Scope.From.Any(from => from.EventContract == @event.Id) || node.Scope.Removals.Any(removal => removal.EventContract == @event.Id)));

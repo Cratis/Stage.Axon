@@ -25,8 +25,8 @@ internal static class CommandStreamEmitter
             .Import("org.axonframework.eventsourcing.annotation.reflection.EntityCreator")
             .Import("org.axonframework.eventsourcing.annotation.EventSourcingHandler")
             .Import("org.axonframework.eventsourcing.annotation.EventSourcedEntity")
-            .Line($"@EventSourcedEntity(tagKey = {JavaCodeBuilder.StringLiteral(source.TagKey)})")
-            .Line($"@EventSourced(idType = {source.JavaType}.class, tagKey = {JavaCodeBuilder.StringLiteral(source.TagKey)})")
+            .Line($"@EventSourcedEntity(tagKey = {source.TagReference})")
+            .Line($"@EventSourced(idType = {source.JavaType}.class, tagKey = {source.TagReference})")
             .Block($"public class {name}", body =>
             {
                 body.Line("@EntityCreator").Line($"public {name}() {{}}")
