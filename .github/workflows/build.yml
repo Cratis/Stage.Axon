@@ -1,0 +1,75 @@
+# Copyright (c) Cratis. All rights reserved.
+# Licensed under the MIT license. See LICENSE file in the project root for full license information.
+name: Build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build Release with warnings as errors
+        run: dotnet build Stage.Axon.slnx -c Release -warnaserror
+      - name: Build Debug including inline specifications
+        run: dotnet build Stage.Axon.slnx -c Debug
+      - name: Run all specifications and reject empty results
+        shell: bash
+        run: |
+          set -euo pipefail
+          for project in Rendering.Axon Rendering.Axon.Verification Rendering.Conformance; do
+            results="$RUNNER_TEMP/axon-results/$project"
+            dotnet test "Source/$project/$project.csproj" -c Debug --no-build --logger 'trx;LogFileName=specs.trx' --results-directory "$results"
+            python3 .github/spec-shards.py require-executed "$results/specs.trx"
+          done
+      - name: Preserve specification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-specs
+          path: ${{ runner.temp }}/axon-results/**
+          if-no-files-found: error
+          retention-days: 7
+  java:
+    needs: dotnet
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: Source/Rendering.Axon/Emitters/Scaffold/AxonMavenProject.cs
+      - name: Build the standalone verification harness
+        run: dotnet build Stage.Axon.slnx -c Debug
+      - name: Render all 23 corpus applications
+        run: >-
+          dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj
+          -c Debug --no-build -- render "${{ runner.temp }}/axon-corpus"
+      - name: Compile and execute every generated Maven module
+        working-directory: ${{ runner.temp }}/axon-corpus
+        run: sh ./mvnw -B -fae verify
+      - name: Require passing native tests and the exact disabled-test budgets
+        run: >-
+          dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj
+          -c Debug --no-build -- verify "${{ runner.temp }}/axon-corpus"
+      - name: Preserve native reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: axon-native-reports
+          path: ${{ runner.temp }}/axon-corpus/**/target/surefire-reports/**
+          if-no-files-found: error
+          retention-days: 7
