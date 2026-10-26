@@ -7,10 +7,10 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ProjectionScopeMappings(AxonEmissionContext context, ViewJavaTypes types, SemanticId owner)
+internal sealed class ProjectionScopeMappings(AxonEmissionContext context, ViewJavaTypes types, SemanticId owner, JavaCodeBuilder? code = null)
 {
-    readonly ProjectionRecords _records = new(context.Request.Model.Application, types);
-    readonly ProjectionValues _values = new(context, types);
+    readonly ProjectionRecords _records = new(context.Request.Model.Application, types, code);
+    readonly ProjectionValues _values = code is null ? new(context, types) : new(context, types, code);
 
     internal void Apply(JavaCodeBuilder code, ProjectionScopeNode node, IEnumerable<SemanticProjectionMapping> mappings, SemanticEventContract @event)
     {

@@ -12,6 +12,7 @@ internal static class PersistentViewBootstrap
 
         import jakarta.persistence.EntityManager;
         import jakarta.persistence.EntityManagerFactory;
+        import java.util.stream.Stream;
         import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;
         import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;
 
@@ -38,7 +39,7 @@ internal static class PersistentViewBootstrap
                 }
             }
             private static boolean hasRetainedData(EntityManager manager) {
-                return java.util.stream.Stream.of(AggregateEventEntry.class, TokenEntry.class, ViewRow.class)
+                return Stream.of(AggregateEventEntry.class, TokenEntry.class, ViewRow.class)
                         .anyMatch(type -> count(manager, type) != 0);
             }
             private static long count(EntityManager manager, Class<?> type) {

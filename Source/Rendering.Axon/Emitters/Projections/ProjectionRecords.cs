@@ -6,9 +6,9 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ProjectionRecords(SemanticApplication application, ViewJavaTypes types)
+internal sealed class ProjectionRecords(SemanticApplication application, ViewJavaTypes types, JavaCodeBuilder? code = null)
 {
-    internal string Empty(string type, IReadOnlyList<SemanticProperty> properties) => $"new {type}({string.Join(", ", properties.Select(property => types.Default(property.Type)))})";
+    internal string Empty(string type, IReadOnlyList<SemanticProperty> properties) => Resolve($"new {type}({string.Join(", ", properties.Select(property => types.Default(property.Type)))})");
 
     internal SemanticProperty? Property(IReadOnlyList<SemanticProperty> properties, IReadOnlyList<SemanticId> path)
     {
@@ -35,7 +35,7 @@ internal sealed class ProjectionRecords(SemanticApplication application, ViewJav
                 properties = composite.Properties;
             }
         }
-        return receiver;
+        return Resolve(receiver);
     }
 
     internal string Set(ProjectionScopeNode node, IReadOnlyList<SemanticId> path, string value)
@@ -60,6 +60,8 @@ internal sealed class ProjectionRecords(SemanticApplication application, ViewJav
             value = Set(types.Type(property.Type), composite.Properties, [.. path.Skip(1)], Access(properties, [property.Id], receiver), value);
         }
         var arguments = properties.Select(candidate => candidate.Id == property.Id ? value : $"{receiver}.{JavaNames.Member(candidate.Name)}()");
-        return $"new {type}({string.Join(", ", arguments)})";
+        return Resolve($"new {type}({string.Join(", ", arguments)})");
     }
+
+    string Resolve(string expression) => code?.ReferenceExpression(expression) ?? expression;
 }

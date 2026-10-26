@@ -26,7 +26,7 @@ internal static class PersistentProjectionStore
                 .Block($"public {store}<{body.Reference("java.lang.Object")}, {name}> store()", method => method.Line($"return new {memory}<>();"))
                 .Line($"@{body.Reference("org.springframework.context.annotation.Profile")}(\"persistent\")")
                 .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({qualifier})")
-                .Block($"public {store}<Object, {name}> persistentStore({bootstrap} generation, {body.Reference("jakarta.persistence.EntityManagerFactory")} factory, {body.Reference("tools.jackson.databind.json.JsonMapper")} mapper)", method =>
+                .Block($"public {store}<{body.Reference("java.lang.Object")}, {name}> persistentStore({bootstrap} generation, {body.Reference("jakarta.persistence.EntityManagerFactory")} factory, {body.Reference("tools.jackson.databind.json.JsonMapper")} mapper)", method =>
                     method.Line($"return new {persistent}<>(factory, mapper, {qualifier}, {name}.class);")));
         ViewJavaTypes.Add(context, package, name + "StoreConfiguration", code.Build(), model.Id);
     }

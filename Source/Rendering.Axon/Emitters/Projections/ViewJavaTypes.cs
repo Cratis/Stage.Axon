@@ -49,9 +49,9 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
     internal string Parse(SemanticTypeReference type, string text) => Wrap(type, PrimitiveOf(type) switch
     {
         SemanticPrimitiveType.Uuid => $"java.util.UUID.fromString({text})",
-        SemanticPrimitiveType.WholeNumber => $"Long.valueOf({text})",
+        SemanticPrimitiveType.WholeNumber => $"java.lang.Long.valueOf({text})",
         SemanticPrimitiveType.DecimalNumber => $"new java.math.BigDecimal({text})",
-        SemanticPrimitiveType.Boolean => $"Boolean.valueOf({text})",
+        SemanticPrimitiveType.Boolean => $"java.lang.Boolean.valueOf({text})",
         SemanticPrimitiveType.Date => $"java.time.LocalDate.parse({text})",
         SemanticPrimitiveType.DateTime => $"java.time.OffsetDateTime.parse({text})",
         _ => text
@@ -86,6 +86,8 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
         }
     }
 
+    internal void ClaimProjectionType(SemanticTypeReference type, JavaCodeBuilder code) => Claim(type, code, []);
+
     internal string Type(SemanticTypeReference type, JavaCodeBuilder code)
     {
         var scalar = type.Kind is SemanticTypeReferenceKind.Concept or SemanticTypeReferenceKind.CompositeType
@@ -97,7 +99,7 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
     internal string EventType(SemanticId id, JavaCodeBuilder code) => Import(EventType(id), code);
 
     internal string Wrap(SemanticTypeReference type, string value, JavaCodeBuilder code) => !type.IsCollection && type.Kind == SemanticTypeReferenceKind.Concept
-        ? _concepts.Wrap(type, Type(type, code), value) : value;
+        ? code.ReferenceExpression(_concepts.Wrap(type, Type(type, code), value)) : value;
 
     internal string Parse(SemanticTypeReference type, string text, JavaCodeBuilder code)
     {
@@ -145,6 +147,15 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
         SemanticPrimitiveType.DateTime => "java.time.OffsetDateTime",
         _ => "String"
     };
+
+    void Claim(SemanticTypeReference type, JavaCodeBuilder code, HashSet<SemanticId> visited)
+    {
+        if (type.Kind is not (SemanticTypeReferenceKind.Concept or SemanticTypeReferenceKind.CompositeType)) return;
+        code.Reference(Type(type with { IsCollection = false }));
+        if (type.Kind != SemanticTypeReferenceKind.CompositeType || !visited.Add(type.Target)) return;
+        foreach (var property in application.Types.Single(composite => composite.Id == type.Target).Properties)
+            Claim(property.Type, code, visited);
+    }
 
     string ScalarDefault(SemanticTypeReference type, JavaCodeBuilder code)
     {

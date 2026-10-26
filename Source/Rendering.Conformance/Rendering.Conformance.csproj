@@ -9,5 +9,6 @@
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Cratis.Stage.Contracts" />
+        <InternalsVisibleTo Include="Cratis.Stage.Rendering.Conformance.Specs" />
     </ItemGroup>
 </Project>
