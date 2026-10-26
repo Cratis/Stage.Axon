@@ -35,6 +35,8 @@ public class when_rejecting_an_unsupported_shape : given.a_native_view_request
         _java = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/CategoriesViewSpecificationsTest.java", StringComparison.Ordinal)));
     }
 
+    [Fact] void should_import_the_disabled_annotation() => _java.ShouldContain("import org.junit.jupiter.api.Disabled;");
+    [Fact] void should_emit_a_short_disabled_annotation() => _java.ShouldContain("@Disabled(\"STAGE-AXON-0501\")");
     [Fact] void should_keep_exact_expectations_disabled() => _context.Specifications[_spec.Id].DisabledCode.ShouldEqual("STAGE-AXON-0501");
     [Fact] void should_not_partially_replay_the_event() => _java.ShouldNotContain("projector.on(");
     [Fact] void should_explain_the_unsupported_complete_scenario() => _java.ShouldContain("Unsupported modeled view specification");
