@@ -15,7 +15,7 @@ import tools.jackson.databind.JacksonModule.SetupContext;
 import tools.jackson.databind.deser.Deserializers;
 import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.ser.Serializers;
-import __RUNTIME__.ConceptAs;
+import io.cratis.fundamentals.concepts.ConceptAs;
 
 public final class ConceptsModule extends SimpleModule {
     @Serial

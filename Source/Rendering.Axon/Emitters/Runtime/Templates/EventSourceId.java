@@ -4,6 +4,7 @@
 package __RUNTIME__;
 
 import java.util.Objects;
+import io.cratis.fundamentals.concepts.ConceptAs;
 
 public record EventSourceId(String value) implements ConceptAs<String> {
     public EventSourceId {

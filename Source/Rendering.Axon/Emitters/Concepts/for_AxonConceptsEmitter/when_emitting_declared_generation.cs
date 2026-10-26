@@ -15,13 +15,13 @@ public class when_emitting_declared_generation : for_AxonArtifactRenderPlanner.g
     void Establish() => context = new(request, new AxonDegradation(request.Profile));
 
     [Fact]
-    void should_emit_the_uuid_factory_using_the_agreed_runtime_name()
+    void should_emit_the_uuid_factory_using_fundamentals()
     {
         var template = loaded.Model.Application.Concepts.First(concept => concept.Primitive == SemanticPrimitiveType.Uuid);
         var concept = new SemanticConcept(template.Id, "GeneratedId", SemanticPrimitiveType.Uuid, [], []) { Generation = new("uuid") };
         var code = AxonConceptsEmitter.Scalar(context, concept);
-        code.ShouldContain("public static GeneratedId create() { return new GeneratedId(" + context.BasePackage + ".runtime.GenerateValue.uuid()); }");
-        code.ShouldContain(context.BasePackage + ".runtime.Generatable<GeneratedId>");
+        code.ShouldContain("public static GeneratedId create() { return new GeneratedId(io.cratis.fundamentals.concepts.GenerateValue.uuid()); }");
+        code.ShouldContain("io.cratis.fundamentals.concepts.Generatable<GeneratedId>");
         context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
     }
 

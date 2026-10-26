@@ -8,6 +8,7 @@ import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import io.cratis.fundamentals.concepts.ConceptAs;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

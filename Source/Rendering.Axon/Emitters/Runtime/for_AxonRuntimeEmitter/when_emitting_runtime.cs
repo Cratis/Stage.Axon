@@ -39,6 +39,18 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     [Fact] void should_register_installed_axon_entities_in_the_test_fixture() => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentProbeSupport.java", StringComparison.Ordinal)).Bytes.AsSpan()).ShouldContain($"@EntityScan(basePackageClasses = {{ {context.BasePackage}.runtime.persistent.UniqueClaim.class,\n            org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry.class,\n            org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry.class }})");
 
     [Fact]
+    void should_not_emit_hand_rolled_concept_types()
+    {
+        foreach (var name in new[] { "ConceptAs", "Generatable", "GeneratableInContext", "GenerateValue", "GenerationContext", "ValueEncoding" })
+        {
+            context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith($"/runtime/{name}.java", StringComparison.Ordinal)).ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    void should_keep_the_compat_concepts_module() => Template("ConceptsModule.java").ShouldContain("import io.cratis.fundamentals.concepts.ConceptAs;");
+
+    [Fact]
     void should_keep_the_exact_serializer_encodings()
     {
         var serializer = Template("ConceptSerializer.java");

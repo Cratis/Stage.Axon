@@ -11,6 +11,11 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
+import io.cratis.fundamentals.concepts.ConceptAs;
+import io.cratis.fundamentals.concepts.Generatable;
+import io.cratis.fundamentals.concepts.GeneratableInContext;
+import io.cratis.fundamentals.concepts.GenerateValue;
+import io.cratis.fundamentals.concepts.GenerationContext;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
 import static org.junit.jupiter.api.Assertions.*;
@@ -70,7 +75,7 @@ class RuntimeTest {
     @Test
     void generationUsesTheSelfTypedMarkers() {
         assertInstanceOf(Generatable.class, Id.create());
-        assertInstanceOf(GeneratableInContext.class, TimedId.create(GenerationContext.current()));
+        assertInstanceOf(GeneratableInContext.class, TimedId.create(new GenerationContext(java.time.Instant.now())));
         assertThrows(IllegalArgumentException.class, () -> TimedId.create(null));
     }
 

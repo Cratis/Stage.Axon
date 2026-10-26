@@ -6,7 +6,7 @@ package __RUNTIME__.json;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.ValueSerializer;
-import __RUNTIME__.ConceptAs;
+import io.cratis.fundamentals.concepts.ConceptAs;
 
 final class ConceptSerializer extends ValueSerializer<ConceptAs<?>> {
     private final boolean key;

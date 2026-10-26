@@ -30,6 +30,12 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
     }
 
     [Fact]
+    void should_depend_on_cratis_fundamentals_0_4_0() => Content("pom.xml").ShouldContain("<dependency><groupId>io.cratis</groupId><artifactId>fundamentals</artifactId><version>0.4.0</version></dependency>");
+
+    [Fact]
+    void should_not_depend_on_fundamentals_jackson() => Content("pom.xml").ShouldNotContain("fundamentals-jackson");
+
+    [Fact]
     void should_ship_both_licensed_wrapper_scripts()
     {
         Content("mvnw").ShouldContain("Apache License");

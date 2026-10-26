@@ -6,6 +6,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
+using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
@@ -15,14 +16,27 @@ public class when_preparing_generated_commands : for_AxonArtifactRenderPlanner.g
 {
     string supported;
     string unsupported;
+    string allocated;
     AxonEmissionContext unsupportedContext;
 
     void Because()
     {
         supported = Render(SemanticPrimitiveType.Uuid, out _);
         unsupported = Render(SemanticPrimitiveType.DateTime, out unsupportedContext);
+        var context = new AxonEmissionContext(request, new(request.Profile));
+        var seed = ScopeSelection.Select(request).First(slice => !slice.Slice.Commands.IsEmpty).Slice.Commands[0];
+        var source = new CommandSource
+        {
+            Primary = ("eventSourceId", context.BasePackage + ".runtime.EventSourceId", "eventSourceId"),
+            Type = SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text),
+            TagReference = "EventTags.EVENT_SOURCE_ID"
+        };
+        var body = new JavaCodeBuilder(context.BasePackage);
+        new CommandPreparation(context, seed with { Properties = [] }, source).Emit(body);
+        allocated = body.Build();
     }
 
+    [Fact] void should_allocate_identities_using_fundamentals() => allocated.ShouldContain(".runtime.EventSourceId(io.cratis.fundamentals.concepts.GenerateValue.uuid().toString())");
     [Fact] void should_exclude_generated_values_from_the_http_body() => supported.ShouldContain("@com.fasterxml.jackson.annotation.JsonIgnore java.util.UUID requestId");
     [Fact] void should_clear_values_before_the_http_handler_dispatches() => supported.ShouldContain("public PlaceOrder forRequest() { return new PlaceOrder(null); }");
     [Fact] void should_generate_uuid_inputs_in_the_handler_preparation() => supported.ShouldContain("requestId() == null ? java.util.UUID.randomUUID() : requestId()");
