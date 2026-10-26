@@ -87,5 +87,21 @@ public class when_emitting_an_idempotent_set_view : Projections.for_AxonProjecti
     [Fact] void should_prove_default_streaming_is_refused() => _dispatch.ShouldContain("void refusesStreamingDefaultViewsBeforeReadiness()");
     [Fact] void should_keep_jpa_opt_in() => _dispatch.ShouldContain("\"spring.profiles.active\", \"default\"");
 
+    [Fact] void should_import_default_map() => _dispatch.ShouldContain("import java.util.Map;");
+    [Fact] void should_use_short_default_map() => _dispatch.ShouldContain("spring.setDefaultProperties(Map.of(");
+    [Fact] void should_import_default_arrays() => _dispatch.ShouldContain("import java.util.Arrays;");
+    [Fact] void should_use_short_default_arrays() => _dispatch.ShouldContain("assertFalse(Arrays.asList(");
+    [Fact] void should_import_default_set() => _dispatch.ShouldContain("import java.util.Set;");
+    [Fact] void should_use_short_default_set() => _dispatch.ShouldContain("DefaultViewProcessorGuard.verify(configuration, Set.of(");
+    [Fact] void should_import_default_singleton() => _dispatch.ShouldContain("import org.springframework.beans.factory.SmartInitializingSingleton;");
+    [Fact] void should_use_short_default_singleton() => _dispatch.ShouldContain("@Bean SmartInitializingSingleton defaultFixtureProcessorGuard(");
+    [Fact] void should_import_default_axon_configuration() => _dispatch.ShouldContain("import org.axonframework.common.configuration.Configuration;");
+    [Fact] void should_use_short_default_axon_configuration() => _dispatch.ShouldContain("application.getBean(Configuration.class)");
+    [Fact] void should_import_default_event_processor() => _dispatch.ShouldContain("import org.axonframework.messaging.eventhandling.processing.EventProcessor;");
+    [Fact] void should_use_short_default_event_processor() => _dispatch.ShouldContain("configuration.getComponents(EventProcessor.class)");
+    [Fact] void should_import_default_streaming_processor() => _dispatch.ShouldContain("import org.axonframework.messaging.eventhandling.processing.streaming.StreamingEventProcessor;");
+    [Fact] void should_use_short_default_streaming_processor() => _dispatch.ShouldContain("processor instanceof StreamingEventProcessor,");
+    [Fact] void should_use_short_default_streaming_processor_lookup() => _dispatch.ShouldContain("configuration.getComponents(StreamingEventProcessor.class)");
+
     string Code(string name) => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith('/' + name + ".java", StringComparison.Ordinal)));
 }

@@ -11,8 +11,11 @@ internal static class DefaultViewDispatchProof
         package __PACKAGE__;
 
         import __RUNTIME__.ReadModelStore;
+        import java.util.Arrays;
         import java.util.List;
+        import java.util.Map;
         import java.util.Optional;
+        import java.util.Set;
         import java.util.concurrent.CompletableFuture;
         import java.util.concurrent.CopyOnWriteArrayList;
         import java.util.concurrent.CountDownLatch;
@@ -23,9 +26,13 @@ internal static class DefaultViewDispatchProof
         import org.junit.jupiter.api.Test;
         import org.reactivestreams.Subscriber;
         import org.reactivestreams.Subscription;
+        import org.axonframework.common.configuration.Configuration;
         import org.axonframework.messaging.eventhandling.gateway.EventAppender;
+        import org.axonframework.messaging.eventhandling.processing.EventProcessor;
+        import org.axonframework.messaging.eventhandling.processing.streaming.StreamingEventProcessor;
         import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
         import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
+        import org.springframework.beans.factory.SmartInitializingSingleton;
         import org.springframework.beans.factory.config.BeanPostProcessor;
         import org.springframework.boot.SpringApplication;
         import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -40,9 +47,9 @@ internal static class DefaultViewDispatchProof
             @Import({__APPLICATION__.infrastructure.AxonConfiguration.class, __APPLICATION__.infrastructure.SecurityConfiguration.class,
                     __MODEL__StoreConfiguration.class, __PROJECTOR__.class, __LIVE_QUERY__Handler.class})
             static class DefaultFixture {
-                @Bean org.springframework.beans.factory.SmartInitializingSingleton defaultFixtureProcessorGuard(
-                        org.axonframework.common.configuration.Configuration configuration) {
-                    return () -> __APPLICATION__.infrastructure.DefaultViewProcessorGuard.verify(configuration, java.util.Set.of("__PACKAGE__"));
+                @Bean SmartInitializingSingleton defaultFixtureProcessorGuard(
+                        Configuration configuration) {
+                    return () -> __APPLICATION__.infrastructure.DefaultViewProcessorGuard.verify(configuration, Set.of("__PACKAGE__"));
                 }
                 @Bean static BeanPostProcessor observeDefaultStore() {
                     return new BeanPostProcessor() {
@@ -82,17 +89,17 @@ internal static class DefaultViewDispatchProof
 
             @Test void discoversContextualHandlerOnceAndInvalidatesDefaultQueryAfterWrite() throws Exception {
                 var spring = new SpringApplication(DefaultFixture.class);
-                spring.setDefaultProperties(java.util.Map.of(
+                spring.setDefaultProperties(Map.of(
                         "server.port", "0", "spring.profiles.active", "default",
                         "axon.eventhandling.processors[__PACKAGE__].mode", "subscribing"));
                 try (var application = spring.run()) {
-                    assertFalse(java.util.Arrays.asList(application.getEnvironment().getActiveProfiles()).contains("persistent"));
-                    var configuration = application.getBean(org.axonframework.common.configuration.Configuration.class);
-                    var processor = configuration.getComponents(org.axonframework.messaging.eventhandling.processing.EventProcessor.class).get("__PACKAGE__");
+                    assertFalse(Arrays.asList(application.getEnvironment().getActiveProfiles()).contains("persistent"));
+                    var configuration = application.getBean(Configuration.class);
+                    var processor = configuration.getComponents(EventProcessor.class).get("__PACKAGE__");
                     assertNotNull(processor, "FIXTURE: C2 default view processor must exist");
-                    assertFalse(processor instanceof org.axonframework.messaging.eventhandling.processing.streaming.StreamingEventProcessor,
+                    assertFalse(processor instanceof StreamingEventProcessor,
                             "FIXTURE: C2 default views must not use a streaming processor");
-                    assertFalse(configuration.getComponents(org.axonframework.messaging.eventhandling.processing.streaming.StreamingEventProcessor.class).containsKey("__PACKAGE__"),
+                    assertFalse(configuration.getComponents(StreamingEventProcessor.class).containsKey("__PACKAGE__"),
                             "FIXTURE: C2 default namespace must not resolve to a streaming processor");
                     var store = (ObservedStore) application.getBean("__QUALIFIER__");
                     var gateway = application.getBean(QueryGateway.class);
