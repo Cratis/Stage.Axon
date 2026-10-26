@@ -20,6 +20,7 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
         context.AddJava(package, Name, command.Build(), sources: [reaction]);
         var handler = new JavaCodeBuilder(package).Declare(Name).Declare(Name + "Handler").Declare(Name + "Stream");
         ReactionJavaReferences.Claim(handler, [Primary.JavaType]);
+        var selector = Primary.TagKey == "eventSourceId" ? "(idProperty = " + EventTagsEmitter.Reference(TagReference, handler, package) + ")" : string.Empty;
         var uniqueValues = handler.Reference(context.BasePackage + ".runtime.UniqueValueStore");
         var inMemoryUniqueValues = handler.Reference(context.BasePackage + ".runtime.InMemoryUniqueValueStore");
         var constraints = handler.Reference(context.BasePackage + ".infrastructure.ModeledConstraints");
@@ -30,7 +31,7 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
                 .Line("@" + body.Reference("org.springframework.beans.factory.annotation.Autowired"))
                 .Line($"public {Name}Handler({uniqueValues} uniqueValues) {{ this.uniqueValues = uniqueValues; }}")
                 .Line("@" + body.Reference("org.axonframework.messaging.commandhandling.annotation.CommandHandler"))
-                .Block($"public void handle({Name} command, {body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} processingContext, @{body.Reference("org.axonframework.modelling.annotation.InjectEntity")}(idProperty = \"eventSourceId\") {body.Reference("org.axonframework.modelling.repository.ManagedEntity")}<{ReactionJavaReferences.Expression(body, Primary.JavaType)}, {Name}Stream> stream)", method => method
+                .Block($"public void handle({Name} command, {body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} processingContext, @{body.Reference("org.axonframework.modelling.annotation.InjectEntity")}{selector} @{body.Reference("org.jspecify.annotations.Nullable")} {Name}Stream stream)", method => method
                     .Line($"if (!{method.Reference("java.util.Objects")}.equals(command.eventSourceId(), command.event().{Primary.ComponentName}())) throw new IllegalArgumentException(\"Event source does not match append boundary\");")
                     .Line($"{constraints}.apply(uniqueValues, command.event(), processingContext);")
                     .Line("appender.append(command.event());")));
@@ -42,8 +43,8 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
     {
         var contracts = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id).ToArray();
         var stream = new JavaCodeBuilder(package).Declare(Name + "Stream");
-        ReactionJavaReferences.Claim(stream, contracts.Select(contract => AxonEventsEmitter.TypeFor(context, contract.Id)).Concat([Primary.JavaType, TagReference]));
-        var tag = ReactionJavaReferences.Expression(stream, TagReference);
+        ReactionJavaReferences.Claim(stream, contracts.Select(contract => AxonEventsEmitter.TypeFor(context, contract.Id)).Concat([Primary.JavaType]));
+        var tag = EventTagsEmitter.Reference(TagReference, stream, package);
         stream.Line($"@{stream.Reference("org.axonframework.eventsourcing.annotation.EventSourcedEntity")}(tagKey = {tag})")
             .Line($"@{stream.Reference("org.axonframework.extension.spring.stereotype.EventSourced")}(idType = {ReactionJavaReferences.Expression(stream, Primary.JavaType)}.class, tagKey = {tag})")
             .Block($"public class {Name}Stream", body =>

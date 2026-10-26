@@ -31,6 +31,8 @@ internal sealed record CommandSource
 
     internal bool Generated => Input?.IsGenerated == true || Allocated;
 
+    internal string ReferenceTag(JavaCodeBuilder code, string package) => EventTagsEmitter.Reference(TagReference, code, package);
+
     internal static CommandSource? Create(AxonEmissionContext context, SemanticCommand command, SemanticEventContract contract)
     {
         var tag = AxonEventSources.PrimaryTag(context, contract);

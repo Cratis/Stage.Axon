@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text;
 using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Rendering.Axon.Emitters;
@@ -25,8 +26,8 @@ public class when_an_allocating_command_is_named_event_source_id : for_AxonArtif
             Type = SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text),
             TagReference = "EventTags.EVENT_SOURCE_ID"
         };
-        var package = CommandContractsEmitter.Package(new(request.Model.Application), located);
-        _code = CommandContractsEmitter.Code(context, command, package, source);
+        CommandContractsEmitter.EmitCommand(context, located, command, source);
+        _code = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/EventSourceId.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 
     [Fact] void should_keep_the_command_constructor_short() => _code.ShouldContain("return new EventSourceId(");

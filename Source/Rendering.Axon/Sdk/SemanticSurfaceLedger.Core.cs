@@ -4,7 +4,7 @@
 namespace Cratis.Stage.Rendering.Axon.Sdk;
 
 /// <summary>
-/// Explicit Screenplay 4.240.2 inventory. Phase 1 emits only scaffolding: all listed domain members
+/// Explicit Screenplay 4.250.0 inventory. Phase 1 emits only scaffolding: all listed domain members
 /// are deliberately deferred, not claimed as implemented. Later phases replace these dispositions
 /// with rendering or construct-specific refusals. Reflection is used only by the drift spec, never here.
 /// </summary>
@@ -58,8 +58,9 @@ internal static partial class SemanticSurfaceLedger
         SemanticEventContextExpression Type Value
         SemanticEventContextValueKind Occurred Unknown EventSourceIdentity CausedBySubject CausedByName CausedByUserName
         SemanticValueExpression Value
-        SemanticSpecification Id Name GivenEvents GivenReadModels GivenCaller ThenEvents ThenEventsInAnyOrder ThenReadModels ThenQueries ThenErrors ThenDenied When ThenAbsentReadModels WhenAppended ThenNoEvents WhenRedelivered GivenCaptures GivenClock WhenCapture WhenClock WhenTrigger GivenGenerated ThenReturns
+        SemanticSpecification Id Name GivenEvents GivenReadModels GivenCaller ThenEvents ThenEventsInAnyOrder ThenReadModels ThenQueries ThenErrors ThenDenied When ThenAbsentReadModels WhenAppended ThenNoEvents WhenRedelivered GivenCaptures GivenClock WhenCapture WhenClock WhenTrigger GivenGenerated ThenReturns ThenInvocations
         SemanticSpecificationAbsentReadModel Key ReadModel
+        SemanticSpecificationInvocation Command Values
         SemanticSpecificationRedelivery Reaction Given
         SemanticSpecificationCommand Command Values EventSource GeneratedValues
         SemanticSpecificationAppend EventContract EventSource Values Route
@@ -139,7 +140,7 @@ internal static partial class SemanticSurfaceLedger
         SemanticSpecificationResponseField Name Value
         SemanticEventVisibility Private Public
         SemanticProjectionTargetKind ReadModel Event
-        SemanticCaptureEventsSource Events
+        SemanticCaptureEventsSource Events KeyIsEventSource
         SemanticReactionIdentity Kind Roles
         SemanticReactionIdentityKind System
         SemanticObserverFilter Source Stream
@@ -179,6 +180,10 @@ internal static partial class SemanticSurfaceLedger
         AddMembers(entries, Members);
         AddMembers(entries, ViewsMembers);
         AddMembers(entries, ChangesMembers);
+        ClassifyImplementations(entries);
+        foreach (var member in new[] { "SemanticSpecification.ThenInvocations", "SemanticSpecificationInvocation.Command", "SemanticSpecificationInvocation.Values" })
+            entries[member] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-SPEC: expected command invocations and their argument values are not verified; scoped specification emission reports this unsupported assertion.");
+        entries["SemanticCaptureEventsSource.KeyIsEventSource"] = new(SemanticSurfaceDispositionKind.Ignored, "Not consumed by Axon emission; no execution equivalence is claimed for this capture source hint.");
         entries["ExecutableSemanticModel.LanguageVersion"] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-VERSION");
         entries["ExecutableSemanticModel.SemanticVersion"] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-VERSION");
         return entries;

@@ -16,12 +16,20 @@ internal sealed class AxonSpecificationsEmitter : IAxonEmitter
 
     public void Emit(AxonEmissionContext context)
     {
+        var specifications = ScopeSelection.Select(context.Request).SelectMany(slice => slice.Slice.Specifications).ToArray();
+        WarnUnverifiedInvocations(context, specifications);
         AxonHttpTests.Emit(context);
-        var unclaimed = ScopeSelection.Select(context.Request).SelectMany(slice => slice.Slice.Specifications).Where(spec => !context.Specifications.ContainsKey(spec.Id)).ToArray();
+        var unclaimed = specifications.Where(spec => !context.Specifications.ContainsKey(spec.Id)).ToArray();
         if (unclaimed.Length > 0) EmitUnclaimed(context, unclaimed);
         var lines = context.Specifications.Values.OrderBy(entry => entry.Id.ToString(), StringComparer.Ordinal).Select(entry =>
             entry.Id + "\t" + (entry.DisabledCode is null ? string.Empty : "disabled " + entry.DisabledCode + "\t") + entry.TestClass + "#" + entry.Method);
         context.Artifacts.Add(PlannedArtifact.CreateText("stage-specifications.txt", string.Join('\n', lines) + "\n"));
+    }
+
+    internal static void WarnUnverifiedInvocations(AxonEmissionContext context, IEnumerable<SemanticSpecification> specifications)
+    {
+        foreach (var specification in specifications.Where(specification => !specification.ThenInvocations.IsDefaultOrEmpty))
+            context.Degradation.Unsupported(UnsupportedCode, specification.Id, "ThenInvocations expectations are not verified; generated tests do not establish the expected command calls or values.", "verify the expected command invocations and argument values", specification.Id + "/thenInvocations");
     }
 
     internal static void Register(AxonEmissionContext context, SemanticId id, string testClass, string method, string? disabledCode = null) =>
