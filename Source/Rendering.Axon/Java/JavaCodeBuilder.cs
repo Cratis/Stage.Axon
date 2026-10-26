@@ -89,6 +89,13 @@ internal sealed class JavaCodeBuilder(string package)
     internal JavaCodeBuilder DiffersFromScreenplay(string difference) =>
         Line($"// Differs from Screenplay: {CommentText(difference)}");
 
+    internal JavaCodeBuilder RawBody(string body)
+    {
+        _body.Append(body);
+        if (!body.EndsWith('\n')) _body.Append('\n');
+        return this;
+    }
+
     internal JavaCodeBuilder Block(string declaration, Action<JavaCodeBuilder> body)
     {
         Line(declaration + " {");

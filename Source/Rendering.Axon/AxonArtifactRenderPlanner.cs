@@ -4,6 +4,7 @@
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters;
+using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 
 namespace Cratis.Stage.Rendering.Axon;
 
@@ -36,6 +37,7 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
     static void Emit(AxonEmissionContext context)
     {
         foreach (var emitter in AxonEmitters.Ordered.Where(emitter => emitter.IsImplemented)) emitter.Emit(context);
+        InlineImplementationDiagnostics.Emit(context);
         UnsupportedSummary.Emit(context);
         if (context.Artifacts.Count == 0)
         {
