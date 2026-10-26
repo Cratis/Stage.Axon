@@ -8,5 +8,6 @@ internal static class CratisFundamentals
     internal const string ConceptsPackage = "io.cratis.fundamentals.concepts";
     internal const string GroupId = "io.cratis";
     internal const string ArtifactId = "fundamentals";
+    internal const string JacksonArtifactId = "fundamentals-jackson";
     internal const string Version = "0.4.0";
 }

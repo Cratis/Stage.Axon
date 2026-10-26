@@ -45,7 +45,7 @@ class RuntimeHttpRoundTripTest {
 
     @Test
     void exactConceptWireFormatSurvivesHttpRoundTrip() throws Exception {
-        var json = "{\"amount\":1E+2,\"at\":\"2026-10-24T12:00:00Z\",\"byAmount\":{\"1E+2\":\"x\"}}";
+        var json = "{\"amount\":100,\"at\":\"2026-10-24T12:00:00+00:00\",\"byAmount\":{\"100\":\"x\"}}";
         http.perform(post("/_runtime/wire").contentType(MediaType.APPLICATION_JSON).content(json))
             .andExpect(status().isOk()).andExpect(content().string(json));
     }

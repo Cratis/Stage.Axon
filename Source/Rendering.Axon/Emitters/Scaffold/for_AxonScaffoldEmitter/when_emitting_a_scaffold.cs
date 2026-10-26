@@ -36,7 +36,7 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
     void should_depend_on_cratis_fundamentals_0_4_0() => Content("pom.xml").ShouldContain("<dependency><groupId>io.cratis</groupId><artifactId>fundamentals</artifactId><version>0.4.0</version></dependency>");
 
     [Fact]
-    void should_not_depend_on_fundamentals_jackson() => Content("pom.xml").ShouldNotContain("fundamentals-jackson");
+    void should_depend_on_cratis_fundamentals_jackson_0_4_0() => Content("pom.xml").ShouldContain("<dependency><groupId>io.cratis</groupId><artifactId>fundamentals-jackson</artifactId><version>0.4.0</version></dependency>");
 
     [Fact]
     void should_ship_both_licensed_wrapper_scripts()
@@ -62,7 +62,15 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
         var code = Encoding.UTF8.GetString(wiring.Bytes.AsSpan());
         code.ShouldContain("import java.time.Clock;");
         code.ShouldContain("Clock.systemUTC()");
-        code.ShouldContain(context.BasePackage + ".runtime.json.ConceptsModule");
+        foreach (var name in new[] { "ConceptsModule", "ConceptKeyFormat", "TemporalModule", "EnumModule", "TimeSpanModule" })
+        {
+            code.ShouldContain($"import io.cratis.fundamentals.jackson.{name};");
+        }
+        code.ShouldContain("JacksonModule conceptsModule() { return new ConceptsModule(ConceptKeyFormat.EMBEDDED_JSON); }");
+        code.ShouldContain("JacksonModule temporalModule() { return new TemporalModule(); }");
+        code.ShouldContain("JacksonModule enumModule() { return new EnumModule(); }");
+        code.ShouldContain("JacksonModule timeSpanModule() { return new TimeSpanModule(); }");
+        code.ShouldNotContain(".runtime.json.");
     }
 
     [Fact]
