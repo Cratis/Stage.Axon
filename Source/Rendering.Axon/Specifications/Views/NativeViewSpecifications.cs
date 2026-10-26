@@ -29,6 +29,18 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
         return method => Emit(method, spec, body);
     }
 
+    internal string Assertion(SemanticSpecificationReadModel expected, string sourceKey, JavaCodeBuilder code)
+    {
+        var matcher = new ViewExpectations(context.Request.Model.Application, types, code);
+        var predicates = expected.Values.Select(entry =>
+        {
+            var property = model.Properties.First(candidate => candidate.Id == entry.TargetProperty);
+            return matcher.Predicate(entry.Value, property.Type, $"row.{JavaNames.Member(property.Name)}()");
+        });
+        var key = ViewExpectedKeys.Expression(expected.Key, model, types, code) ?? sourceKey;
+        return $"{code.Reference("org.junit.jupiter.api.Assertions")}.assertTrue(store.get({key}).stream().anyMatch(row -> {string.Join(" && ", predicates)}), \"Expected modeled read-model properties\");";
+    }
+
     static bool Handles(ProjectionScopeNode root, SemanticSpecificationEvent given) =>
         root.Scope.From.Any(from => from.EventContract == given.EventContract && from.Key is SemanticProjectionValueKey { Value: SemanticProjectionEventSourceIdentity or SemanticProjectionLiteral { Value: SemanticTextValue } });
 
@@ -65,18 +77,6 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
             if (plan.Appended is { } appended) body.Line($"projector.on({AxonViewEvents.Expression(context, types, appended, body)}{plan.Arguments});");
             foreach (var expected in spec.ThenReadModels) body.Line(Assertion(expected, plan.SourceKey, body));
         }).Block("finally", body => body.Line($"{body.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
-    }
-
-    string Assertion(SemanticSpecificationReadModel expected, string sourceKey, JavaCodeBuilder code)
-    {
-        var matcher = new ViewExpectations(context.Request.Model.Application, types, code);
-        var predicates = expected.Values.Select(entry =>
-        {
-            var property = model.Properties.First(candidate => candidate.Id == entry.TargetProperty);
-            return matcher.Predicate(entry.Value, property.Type, $"row.{JavaNames.Member(property.Name)}()");
-        });
-        var key = ViewExpectedKeys.Expression(expected.Key, model, types, code) ?? sourceKey;
-        return $"{code.Reference("org.junit.jupiter.api.Assertions")}.assertTrue(store.get({key}).stream().anyMatch(row -> {string.Join(" && ", predicates)}), \"Expected modeled read-model properties\");";
     }
 
     bool Supported(SemanticSpecification spec) =>
