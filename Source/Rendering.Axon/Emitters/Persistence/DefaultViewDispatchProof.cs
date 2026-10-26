@@ -38,9 +38,12 @@ internal static class DefaultViewDispatchProof
             @TestConfiguration(proxyBeanMethods = false)
             @EnableAutoConfiguration
             @Import({__APPLICATION__.infrastructure.AxonConfiguration.class, __APPLICATION__.infrastructure.SecurityConfiguration.class,
-                    __APPLICATION__.infrastructure.DefaultViewProcessorGuard.class,
                     __MODEL__StoreConfiguration.class, __PROJECTOR__.class, __LIVE_QUERY__Handler.class})
             static class DefaultFixture {
+                @Bean org.springframework.beans.factory.SmartInitializingSingleton defaultFixtureProcessorGuard(
+                        org.axonframework.common.configuration.Configuration configuration) {
+                    return () -> __APPLICATION__.infrastructure.DefaultViewProcessorGuard.verify(configuration, java.util.Set.of("__PACKAGE__"));
+                }
                 @Bean static BeanPostProcessor observeDefaultStore() {
                     return new BeanPostProcessor() {
                         @Override @SuppressWarnings("unchecked")
