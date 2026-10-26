@@ -36,7 +36,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             body.Line($"@{body.Reference("org.axonframework.messaging.commandhandling.annotation.CommandHandler")}");
             var authorization = SecurityAnnotations.For(context, command.Authorization, command.Id);
             if (authorization.Length > 0) body.Line(authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal));
-            body.Block($"public {body.ReferenceExpression(response.ReturnType)} handle({Parameters(name, body, package)})", method => Handle(method, response));
+            body.Block($"public {response.ReturnTypeFor(body)} handle({Parameters(name, body, package)})", method => Handle(method, response));
             Dependencies(body, name);
         });
         context.AddJava(package, name + "Handler", code.Build(), sources: [command.Id]);
@@ -98,7 +98,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         var builder = new CommandAppends(context, command, source!);
         foreach (var produced in command.Produces)
         {
-            var append = builder.Build(produced);
+            var append = builder.Build(produced, body);
             if (append is null)
             {
                 Unsupported(body, AxonRefusalCodes.CommandMapping, "append every modeled event with its identity and complete property mappings");
@@ -174,7 +174,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         foreach (var append in appends)
         {
             if (append.Condition is null) body.Line($"events.add({body.ReferenceExpression(append.Event)});");
-            else body.Block($"if ({body.ReferenceExpression(append.Condition)})", conditional => conditional.Line($"events.add({conditional.ReferenceExpression(append.Event)});"));
+            else body.Block($"if ({append.Condition})", conditional => conditional.Line($"events.add({conditional.ReferenceExpression(append.Event)});"));
         }
         if (Constrained) body.Line($"for (var event : events) {body.Reference(context.BasePackage + ".infrastructure.ModeledConstraints")}.apply(uniqueValues, event, context);");
         body.Line("if (!events.isEmpty()) appender.append(events);");
