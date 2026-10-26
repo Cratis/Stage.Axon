@@ -4,7 +4,6 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
-using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -22,24 +21,38 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
         if (!Supported(spec)) return null;
         var root = ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, JavaNames.Type(model.Name));
         if (!Handles(root, spec.GivenEvents[0])) return null;
-        var given = Event(spec.GivenEvents[0]);
+        var given = AxonViewEvents.Normalize(context, spec.GivenEvents[0]);
         if (given is null) return null;
-        var sourceKey = JavaCodeBuilder.StringLiteral(((SemanticTextValue)spec.GivenEvents[0].EventSource!.Value).Value);
-        var body = new Body(JavaNames.Type(model.Name), JavaNames.Type(projection.Name), given, sourceKey, ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id)));
+        var appended = Appended(root, spec.WhenAppended);
+        if (spec.WhenAppended is not null && appended is null) return null;
+        var body = new Body(JavaNames.Type(model.Name), JavaNames.Type(projection.Name), given, appended, SourceKey(root, given), ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id)));
         return method => Emit(method, spec, body);
     }
 
     static bool Handles(ProjectionScopeNode root, SemanticSpecificationEvent given) =>
-        root.Scope.From.Any(from => from.EventContract == given.EventContract && from.Key is SemanticProjectionValueKey { Value: SemanticProjectionEventSourceIdentity });
+        root.Scope.From.Any(from => from.EventContract == given.EventContract && from.Key is SemanticProjectionValueKey { Value: SemanticProjectionEventSourceIdentity or SemanticProjectionLiteral { Value: SemanticTextValue } });
+
+    static string SourceKey(ProjectionScopeNode root, SemanticSpecificationEvent given)
+    {
+        var key = root.Scope.From.First(from => from.EventContract == given.EventContract).Key;
+        return JavaCodeBuilder.StringLiteral(key is SemanticProjectionValueKey { Value: SemanticProjectionLiteral { Value: SemanticTextValue text } } ? text.Value : ((SemanticTextValue)given.EventSource!.Value).Value);
+    }
 
     static bool PureGiven(SemanticSpecification spec) =>
         spec.GivenCaller is { Authenticated: true, Claims.Length: 0 } && spec.GivenClock is null && spec.GivenReadModels.IsEmpty && spec.GivenEvents.Length == 1;
 
     static bool NoWhen(SemanticSpecification spec) =>
-        spec.When is null && spec.WhenAppended is null && spec.WhenRedelivered is null && spec.WhenClock is null && spec.WhenCapture is null && spec.WhenTrigger is null;
+        spec.When is null && spec.WhenRedelivered is null && spec.WhenClock is null && spec.WhenCapture is null && spec.WhenTrigger is null;
 
     static bool PureThen(SemanticSpecification spec) =>
         !spec.ThenDenied && spec.ThenErrors.IsEmpty && spec.ThenEvents.IsEmpty && spec.ThenQueries.IsEmpty && spec.ThenAbsentReadModels.IsEmpty && spec.ThenReadModels.Length == 1;
+
+    SemanticSpecificationEvent? Appended(ProjectionScopeNode root, SemanticSpecificationAppend? append)
+    {
+        if (append is null) return null;
+        var given = new SemanticSpecificationEvent(append.EventContract, append.Values) { EventSource = append.EventSource, Route = append.Route };
+        return Handles(root, given) ? AxonViewEvents.Normalize(context, given) : null;
+    }
 
     void Emit(JavaCodeBuilder method, SemanticSpecification spec, Body plan)
     {
@@ -49,20 +62,9 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
             body.Line($"{body.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {plan.Model}> store = new {body.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
                 .Line($"var projector = new {plan.Projection}Projector(store);")
                 .Line($"projector.on({AxonViewEvents.Expression(context, types, plan.Event, body)}{plan.Arguments});");
+            if (plan.Appended is { } appended) body.Line($"projector.on({AxonViewEvents.Expression(context, types, appended, body)}{plan.Arguments});");
             foreach (var expected in spec.ThenReadModels) body.Line(Assertion(expected, plan.SourceKey, body));
         }).Block("finally", body => body.Line($"{body.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
-    }
-
-    SemanticSpecificationEvent? Event(SemanticSpecificationEvent given)
-    {
-        var contract = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == given.EventContract);
-        var primary = AxonEventSources.PrimaryTag(context, contract);
-        var identity = contract.Properties.FirstOrDefault(property => JavaNames.Member(property.Name) == primary.ComponentName);
-        if (given.EventSource?.Value is not SemanticTextValue) return null;
-
-        // The flat projector reads $eventSourceId through the event's normalized primary tag, not an EventMessage.
-        if (identity is not null) given = given with { Values = [.. given.Values.Where(value => value.TargetProperty != identity.Id), new(identity.Id, given.EventSource.Value)] };
-        return given;
     }
 
     string Assertion(SemanticSpecificationReadModel expected, string sourceKey, JavaCodeBuilder code)
@@ -84,5 +86,5 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
         expected.ReadModel == model.Id && !expected.Exactly && expected.Values.Length > 0 &&
         expected.Values.All(entry => model.Properties.Any(property => property.Id == entry.TargetProperty));
 
-    sealed record Body(string Model, string Projection, SemanticSpecificationEvent Event, string SourceKey, string Arguments);
+    sealed record Body(string Model, string Projection, SemanticSpecificationEvent Event, SemanticSpecificationEvent? Appended, string SourceKey, string Arguments);
 }

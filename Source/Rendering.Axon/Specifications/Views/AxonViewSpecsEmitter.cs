@@ -33,6 +33,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
 
                 EmitModel(context, types, located, model, specs);
             }
+            new NativeQuerySpecifications(context, types, located).Emit();
         }
     }
 

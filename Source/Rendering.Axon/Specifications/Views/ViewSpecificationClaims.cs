@@ -21,6 +21,7 @@ internal sealed class ViewSpecificationClaims(AxonEmissionContext context, ViewJ
         var projection = owner.Slice.Projections.Single(candidate => candidate.ReadModel == model.Id);
         var root = ProjectionScopeNode.Create(application, types, projection, model, JavaNames.Type(model.Name));
         foreach (var given in spec.GivenEvents.Where(given => Handles(root, given.EventContract))) Event(given, code, spec.GivenCaller is not null);
+        Appended(spec.WhenAppended, code);
         foreach (var expected in spec.ThenReadModels.Where(expected => expected.ReadModel == model.Id))
         {
             foreach (var value in expected.Values) Literal(value.Value, model.Properties.First(property => property.Id == value.TargetProperty).Type, code);
@@ -51,6 +52,11 @@ internal sealed class ViewSpecificationClaims(AxonEmissionContext context, ViewJ
             .Concat(node.Scope.Joins.Select(join => join.EventContract))
             .Concat(node.Scope.Removals.Select(removal => removal.EventContract))
             .Concat(node.Scope.JoinRemovals.Select(removal => removal.EventContract)).Contains(contract));
+
+    void Appended(SemanticSpecificationAppend? appended, JavaCodeBuilder code)
+    {
+        if (appended is not null) Event(new(appended.EventContract, appended.Values) { EventSource = appended.EventSource }, code, true);
+    }
 
     void Literal(SemanticValue? value, SemanticTypeReference type, JavaCodeBuilder code)
     {
