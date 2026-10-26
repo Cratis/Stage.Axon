@@ -61,7 +61,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             var join = node.Scope.Joins[index];
             if (join.EventContract != @event.Id) continue;
             var key = _values.Key(join.Key ?? SemanticProjectionKey.EventSourceIdentity, @event);
-            code.Line($"{ScopedProjectionEmitter.Cache(node, index)}.put(String.valueOf({key}), initial -> {{")
+            code.Line($"{ScopedProjectionEmitter.Cache(node, index)}.put({Reference("java.lang.String", "String")}.valueOf({key}), initial -> {{")
                 .Line("var state = initial;");
             _mappings.Apply(code, node, join.Mappings, @event);
             code.Line("return state;").Line("});");
@@ -93,7 +93,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             var value = $"state.{JavaNames.Member(property.Name)}()";
             var key = types.Unwrap(property.Type, value);
             code.Block($"if ({value} != null)", hydrate => hydrate
-                .Line($"var joined = {ScopedProjectionEmitter.Cache(node, index)}.get(String.valueOf({key}));")
+                .Line($"var joined = {ScopedProjectionEmitter.Cache(node, index)}.get({Reference("java.lang.String", "String")}.valueOf({key}));")
                 .Line("if (joined != null) state = joined.apply(state);"));
         }
     }
@@ -124,7 +124,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
         var variable = JavaNames.Member(child.Name);
         code.Line($"var {variable} = new {Reference("java.util.ArrayList")}<{Reference(child.Type)}>();")
             .Block($"if (state.{member}() != null)", items => items.Block($"for (var item : state.{member}())", item => item
-                .Line($"var identity = String.valueOf({types.Unwrap(identity.Type, $"item.{JavaNames.Member(identity.Name)}()")});")
+                .Line($"var identity = {Reference("java.lang.String", "String")}.valueOf({types.Unwrap(identity.Type, $"item.{JavaNames.Member(identity.Name)}()")});")
                 .Line($"var changed = {Method(child, @event)}(event, message, identity, key, item);")
                 .Line($"if (changed.value() != null) {variable}.add(changed.value());")
                 .Line("childTouched |= changed.touched();").Line("childAncestors |= changed.ancestors();")));
