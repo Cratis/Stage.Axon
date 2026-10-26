@@ -42,11 +42,11 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
             .Where(owner => owner.Slice.ReadModels.Any(model => PersistentViewAdmission.Supports(context, model.Id)))
             .Select(types.Package).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         var processors = namespaces.Select((name, index) => $$"""
-                @org.springframework.context.annotation.Bean
-                org.axonframework.extension.spring.config.EventProcessorDefinition persistentViewProcessor{{index}}() {
-                    return org.axonframework.extension.spring.config.EventProcessorDefinition.pooledStreamingMatching("{{name}}")
+                @Bean
+                EventProcessorDefinition persistentViewProcessor{{index}}() {
+                    return EventProcessorDefinition.pooledStreamingMatching("{{name}}")
                             .customized(config -> {
-                                config.errorHandler(org.axonframework.messaging.eventhandling.processing.errorhandling.PropagatingErrorHandler.INSTANCE);
+                                config.errorHandler(PropagatingErrorHandler.INSTANCE);
                                 return config;
                             });
                 }
@@ -56,9 +56,9 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
     }
 
     static string ProcessorGuard(IEnumerable<string> namespaces) => $$"""
-            @org.springframework.context.annotation.Bean
-            org.springframework.beans.factory.SmartInitializingSingleton persistentViewProcessorGuard(org.axonframework.common.configuration.Configuration configuration) {
-                return () -> PersistentViewProcessorGuard.verify(configuration, java.util.Set.of({{string.Join(", ", namespaces.Select(JavaCodeBuilder.StringLiteral))}}));
+            @Bean
+            SmartInitializingSingleton persistentViewProcessorGuard(org.axonframework.common.configuration.Configuration configuration) {
+                return () -> PersistentViewProcessorGuard.verify(configuration, Set.of({{string.Join(", ", namespaces.Select(JavaCodeBuilder.StringLiteral))}}));
             }
         """;
 
@@ -68,9 +68,14 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
         package {{package}};
 
         import jakarta.persistence.EntityManagerFactory;
+        import java.util.Set;
         import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;
+        import org.axonframework.extension.spring.config.EventProcessorDefinition;
+        import org.axonframework.messaging.eventhandling.processing.errorhandling.PropagatingErrorHandler;
         import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;
+        import org.springframework.beans.factory.SmartInitializingSingleton;
         import org.springframework.boot.persistence.autoconfigure.EntityScan;
+        import org.springframework.context.annotation.Bean;
         import org.springframework.context.annotation.Configuration;
         import org.springframework.context.annotation.Profile;
         import {{application}}.runtime.persistent.UniqueClaim;

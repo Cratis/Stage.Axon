@@ -14,6 +14,8 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
 
     internal static string Cache(ProjectionScopeNode node, int index) => "join" + node.Name + index;
 
+    internal static string ChangeType(ProjectionScopeNode root) => root.Type == "ScopeChange" ? "ScopeChangeResult" : "ScopeChange";
+
     internal void Emit()
     {
         var name = JavaNames.Type(projection.Name) + "Projector";
@@ -35,8 +37,6 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
         });
         ViewJavaTypes.Add(context, package, name, code.Build(), projection.Id);
     }
-
-    internal static string ChangeType(ProjectionScopeNode root) => root.Type == "ScopeChange" ? "ScopeChangeResult" : "ScopeChange";
 
     static IEnumerable<ProjectionScopeNode> RootAndNested(ProjectionScopeNode node) => new[] { node }.Concat(node.Nested.SelectMany(RootAndNested));
 

@@ -18,10 +18,12 @@ internal static class PersistentViewContractTests
         import java.util.List;
         import java.util.UUID;
         import java.util.concurrent.CompletableFuture;
+        import java.util.concurrent.CompletionException;
         import java.util.concurrent.TimeUnit;
         import java.util.function.Consumer;
         import org.axonframework.messaging.core.unitofwork.ProcessingContext;
         import org.junit.jupiter.api.Test;
+        import org.mockito.Mockito;
         import org.springframework.context.ConfigurableApplicationContext;
         import tools.jackson.databind.json.JsonMapper;
         import static org.junit.jupiter.api.Assertions.*;
@@ -46,14 +48,14 @@ internal static class PersistentViewContractTests
                     assertThrows(IllegalStateException.class, () -> left.remove(key));
                     assertThrows(IllegalStateException.class, left::clear);
                     assertThrows(IllegalStateException.class, () -> left.update(key, ignored -> value));
-                    var missing = JpaReadModelStore.bind(left, org.mockito.Mockito.mock(ProcessingContext.class));
+                    var missing = JpaReadModelStore.bind(left, Mockito.mock(ProcessingContext.class));
                     assertThrows(IllegalStateException.class, () -> missing.put(key, value));
                     write(application, left, bound -> {
                         assertEquals(value, bound.update(key, current -> { assertNull(current); return value; }));
                     });
                     write(application, left, bound -> {
                         var refusal = CompletableFuture.runAsync(() -> bound.put(key, value));
-                        var failure = assertThrows(java.util.concurrent.CompletionException.class, refusal::join);
+                        var failure = assertThrows(CompletionException.class, refusal::join);
                         assertInstanceOf(IllegalStateException.class, failure.getCause());
                         assertTrue(failure.getCause().getMessage().contains("handler thread"));
                     });
