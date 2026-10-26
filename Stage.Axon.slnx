@@ -3,5 +3,7 @@
     <Project Path="Source/Rendering.Axon/Rendering.Axon.csproj" />
     <Project Path="Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj" />
     <Project Path="Source/Rendering.Conformance/Rendering.Conformance.csproj" />
+    <Project Path="Source/Rendering.Conformance.Specs/Rendering.Conformance.Specs.csproj" />
+    <Project Path="Source/Samples.MinimalTarget/Samples.MinimalTarget.csproj" />
   </Folder>
 </Solution>
