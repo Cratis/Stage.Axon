@@ -25,14 +25,20 @@ internal static class AxonViewLiveSpecs
         var modelType = types.Package(owner) + "." + JavaNames.Type(model.Name);
         var projector = types.Package(owner) + "." + JavaNames.Type(projection.Name) + "Projector";
         var code = new JavaCodeBuilder(package).Declare(name + "SubscriptionTest").Declare(name).Declare(name + "Subscription")
-            .Import(types.BasePackage + ".Application").Import(types.BasePackage + ".runtime.ReadModelStore");
+            .Import(types.BasePackage + ".Application");
         foreach (var samePackageModel in located.Slice.ReadModels) code.Declare(JavaNames.Type(samePackageModel.Name));
         var modelName = JavaNames.Type(model.Name);
         var projectorName = JavaNames.Type(projection.Name) + "Projector";
         if (package == types.Package(owner)) code.Declare(projectorName);
         else code.Import(modelType).Import(projector);
         var updates = new ProjectionUpdates(context, types, model.Id);
-        string EventArguments(JavaCodeBuilder builder) => AxonViewEvents.Expression(context, types, given) + ProjectionHandlerShape.Arguments(projection, updates, updates.Enabled ? builder.Reference("org.axonframework.messaging.queryhandling.QueryUpdateEmitter") + ".forContext(processing)" : "null");
+        string EventArguments(JavaCodeBuilder builder)
+        {
+            new ViewSpecificationClaims(context, types).Event(given, builder);
+            return AxonViewEvents.Expression(context, types, given, builder) + ProjectionHandlerShape.Arguments(projection, updates, updates.Enabled ? builder.Reference("org.axonframework.messaging.queryhandling.QueryUpdateEmitter") + ".forContext(processing)" : "null");
+        }
+        var eventArguments = EventArguments(code);
+        var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
         var source = code.Line($$"""
             @{{code.Reference("org.springframework.boot.test.context.SpringBootTest")}}(classes = Application.class)
             @{{code.Reference("org.springframework.test.annotation.DirtiesContext")}}
@@ -45,7 +51,7 @@ internal static class AxonViewLiveSpecs
                 private {{projectorName}} projector;
                 @{{code.Reference("org.springframework.beans.factory.annotation.Autowired")}}
                 @{{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}}({{JavaCodeBuilder.StringLiteral(modelType)}})
-                private ReadModelStore<Object, {{modelName}}> store;
+                private {{storeType}}<Object, {{modelName}}> store;
 
                 @{{code.Reference("org.junit.jupiter.api.Test")}}
                 void shouldDeliverInitialSnapshotAndUpdateAndCancelAxonPublisher() throws Exception {
@@ -82,7 +88,7 @@ internal static class AxonViewLiveSpecs
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(values.getFirst().rows().isEmpty());
                         configuration.getComponent({{code.Reference("org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory")}}.class).create()
                             .executeWithResult(processing -> {
-                                projector.on({{EventArguments(code)}});
+                                projector.on({{eventArguments}});
                                 return {{code.Reference("java.util.concurrent.CompletableFuture")}}.completedFuture(null);
                             }).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS);
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(changed.await(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS), "Live query update timed out");

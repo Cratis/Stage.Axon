@@ -12,19 +12,27 @@ namespace Cratis.Stage.Rendering.Axon.Specifications.Views;
 
 internal static class AxonViewEvents
 {
-    internal static string Expression(AxonEmissionContext context, ViewJavaTypes types, SemanticSpecificationEvent given)
+    internal static string Expression(AxonEmissionContext context, ViewJavaTypes types, SemanticSpecificationEvent given, JavaCodeBuilder? code = null)
     {
         var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == given.EventContract);
         var source = given.EventSource?.Value is SemanticTextValue text ? JavaCodeBuilder.StringLiteral(text.Value) : "\"spec-source\"";
         var primary = AxonEventSources.PrimaryTag(context, @event);
-        var arguments = @event.Properties.Select(property => given.Values.FirstOrDefault(value => value.TargetProperty == property.Id) is { } value ? types.Literal(value.Value, property.Type) : types.Default(property.Type)).ToList();
+        var eventType = code is null ? types.EventType(given.EventContract) : types.EventType(given.EventContract, code);
+        var arguments = @event.Properties.Select(property => given.Values.FirstOrDefault(value => value.TargetProperty == property.Id) is { } value
+            ? Literal(types, code, value.Value, property.Type) : Default(types, code, property.Type)).ToList();
         if (!@event.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName))
         {
-            var identity = $"new {primary.JavaType}({source})";
+            var identity = $"new {(code is null ? primary.JavaType : code.Reference(primary.JavaType))}({source})";
             if (primary.JavaType != types.BasePackage + ".runtime.EventSourceId" && given.EventSource is { } eventSource)
-                identity = types.Literal(eventSource.Value, eventSource.Type);
+                identity = Literal(types, code, eventSource.Value, eventSource.Type);
             arguments.Insert(0, identity);
         }
-        return $"new {types.EventType(given.EventContract)}({string.Join(", ", arguments)})";
+        return $"new {eventType}({string.Join(", ", arguments)})";
     }
+
+    static string Literal(ViewJavaTypes types, JavaCodeBuilder? code, SemanticValue value, SemanticTypeReference type) =>
+        code is null ? types.Literal(value, type) : types.Literal(value, type, code);
+
+    static string Default(ViewJavaTypes types, JavaCodeBuilder? code, SemanticTypeReference type) =>
+        code is null ? types.Default(type) : types.Default(type, code);
 }

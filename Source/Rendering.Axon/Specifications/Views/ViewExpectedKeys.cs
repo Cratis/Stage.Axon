@@ -23,12 +23,12 @@ internal static class ViewExpectedKeys
     {
         var identifiers = model.Properties.Where(property => property.IsIdentifier).ToArray();
         if (identifiers is [{ Type.Kind: SemanticTypeReferenceKind.CompositeType } identifier])
-            return $"String.valueOf({types.Literal(key, identifier.Type)})";
+            return $"String.valueOf({(code is null ? types.Literal(key, identifier.Type) : types.Literal(key, identifier.Type, code))})";
         var map = code?.Reference("java.util.Map") ?? "java.util.Map";
         var entries = key.Properties.Select(entry =>
         {
             var property = model.Properties.First(candidate => candidate.Id == entry.TargetProperty);
-            return $"{map}.entry({JavaCodeBuilder.StringLiteral(property.Id.ToString())}, String.valueOf({types.Unwrap(property.Type, types.Literal(entry.Value, property.Type))}))";
+            return $"{map}.entry({JavaCodeBuilder.StringLiteral(property.Id.ToString())}, String.valueOf({types.Unwrap(property.Type, code is null ? types.Literal(entry.Value, property.Type) : types.Literal(entry.Value, property.Type, code))}))";
         });
         return $"{map}.ofEntries({string.Join(", ", entries)})";
     }

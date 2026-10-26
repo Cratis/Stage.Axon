@@ -46,13 +46,18 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
         var arguments = ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id));
         var code = new JavaCodeBuilder(package).Declare(name);
         DeclareModels(code, located);
-        code.Declare(JavaNames.Type(projection.Name) + "Projector").Block($"class {name}", body =>
+        code.Declare(JavaNames.Type(projection.Name) + "Projector");
+        var plans = specs.Select(spec =>
         {
-            foreach (var spec in specs)
+            var native = new NativeViewSpecifications(context, types, located, model).Plan(spec);
+            return (Spec: spec, Native: native, Supported: ViewSpecificationSupport.Legacy(spec, model, types) || native is not null);
+        }).ToArray();
+        var claims = new ViewSpecificationClaims(context, types);
+        foreach (var plan in plans.Where(plan => plan.Supported)) claims.Specification(plan.Spec, model, code);
+        code.Block($"class {name}", body =>
+        {
+            foreach (var (spec, native, supported) in plans)
             {
-                var native = new NativeViewSpecifications(context, types, located, model).Plan(spec);
-                var supported = spec.GivenReadModels.Length == 0 && spec.When is null && spec.WhenAppended is null && spec.WhenRedelivered is null && spec.WhenClock is null && spec.WhenCapture is null && spec.WhenTrigger is null && spec.GivenClock is null && spec.GivenCaller is null && !spec.ThenDenied && spec.ThenErrors.Length == 0 && spec.ThenEvents.Length == 0 && spec.ThenQueries.Length == 0 && spec.ThenReadModels.All(expected => !expected.Exactly) && spec.ThenReadModels.Select(expected => expected.ReadModel).Concat(spec.ThenAbsentReadModels.Select(expected => expected.ReadModel)).Distinct().Count() == 1 && spec.ThenAbsentReadModels.All(expected => ViewExpectedKeys.Expression(expected.Key, model, types, body) is not null);
-                supported |= native is not null;
                 var disabledCode = supported ? null : AxonRefusalCodes.ViewSpecification;
                 if (!supported)
                 {
@@ -69,14 +74,13 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                             .Line("throw new UnsupportedOperationException(\"Unsupported modeled view specification\");");
                         return;
                     }
-                    method.Import(types.BasePackage + ".runtime.ReadModelStore").Import(types.BasePackage + ".runtime.InMemoryReadModelStore")
-                        .Line($"ReadModelStore<Object, {JavaNames.Type(model.Name)}> store = new InMemoryReadModelStore<>();")
+                    method.Line($"{method.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {JavaNames.Type(model.Name)}> store = new {method.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
                         .Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(store);");
                     foreach (var given in spec.GivenEvents)
                     {
                         var root = ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, JavaNames.Type(model.Name));
                         if (!root.All.Any(node => node.Scope.From.Any(from => from.EventContract == given.EventContract) || node.Scope.Joins.Any(join => join.EventContract == given.EventContract) || node.Scope.Removals.Any(removal => removal.EventContract == given.EventContract) || node.Scope.JoinRemovals.Any(removal => removal.EventContract == given.EventContract) || node.Scope.Every is { SubscribesToAllEvents: true })) continue;
-                        method.Line($"projector.on({AxonViewEvents.Expression(context, types, given)}{arguments});");
+                        method.Line($"projector.on({AxonViewEvents.Expression(context, types, given, method)}{arguments});");
                     }
                     foreach (var expected in spec.ThenReadModels.Where(expected => expected.ReadModel == model.Id))
                         EmitExpected(context.Request.Model.Application, types, model, expected, method);

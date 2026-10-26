@@ -1,0 +1,23 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using Cratis.Specifications;
+using Xunit;
+
+namespace Cratis.Stage.Rendering.Axon.Specifications.Views.for_AxonViewSpecsEmitter;
+
+public class when_a_given_collection_contains_a_colliding_composite : given.a_populated_composite_collision
+{
+    void Because()
+    {
+        PrepareComposite(true);
+        new AxonViewSpecsEmitter().Emit(_context);
+        _java = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/CategoriesViewSpecificationsTest.java", StringComparison.Ordinal)));
+    }
+
+    [Fact] void should_import_the_application_composite() => _java.ShouldContain("import nativeviews.types.ReadModelStore;");
+    [Fact] void should_import_the_nested_concept() => _java.ShouldContain("import nativeviews.concepts.StatusValue;");
+    [Fact] void should_construct_the_populated_collection() => _java.ShouldContain("List.of(new ReadModelStore(new StatusValue(\"visible\")))");
+    [Fact] void should_qualify_the_runtime_store() => _java.ShouldContain("nativeviews.runtime.ReadModelStore<Object, Categories> store");
+    [Fact] void should_not_import_the_runtime_store() => _java.ShouldNotContain("import nativeviews.runtime.ReadModelStore;");
+}

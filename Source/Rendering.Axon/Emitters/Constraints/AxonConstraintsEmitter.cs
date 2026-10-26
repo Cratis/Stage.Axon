@@ -25,16 +25,17 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
             EmitIntent(context, slice, constraint);
         }
         var package = context.BasePackage + ".infrastructure";
-        var code = new JavaCodeBuilder(package).Declare("ModeledConstraints").Import(context.BasePackage + ".runtime.UniqueValueStore");
+        var code = new JavaCodeBuilder(package).Declare("ModeledConstraints");
         foreach (var contract in constraints.Where(item => ConstraintCoverage.Supported(context, item.Constraint))
             .SelectMany(item => item.Constraint.Targets.Select(target => target.EventContract).Concat(item.Constraint.ReleasedBy)).Distinct())
         {
             code.Import(AxonEventsEmitter.TypeFor(context, contract));
         }
+        var store = code.Reference(context.BasePackage + ".runtime.UniqueValueStore");
         code.Block("public final class ModeledConstraints", body =>
         {
             body.Line("private ModeledConstraints() {}")
-                .Block($"public static void apply(UniqueValueStore store, {body.Reference("java.lang.Object")} event, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context)", method =>
+                .Block($"public static void apply({store} store, {body.Reference("java.lang.Object")} event, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context)", method =>
             {
                 foreach (var (slice, constraint) in constraints.Where(item => ConstraintCoverage.Supported(context, item.Constraint))) EmitRule(context, method, slice, constraint);
             });

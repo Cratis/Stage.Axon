@@ -46,15 +46,14 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
         method.Block("try", body =>
         {
             CommandFixtureSecurity.Caller(body, spec.GivenCaller);
-            body.Import(types.BasePackage + ".runtime.ReadModelStore").Import(types.BasePackage + ".runtime.InMemoryReadModelStore")
-                .Line($"ReadModelStore<Object, {plan.Model}> store = new InMemoryReadModelStore<>();")
+            body.Line($"{body.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {plan.Model}> store = new {body.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
                 .Line($"var projector = new {plan.Projection}Projector(store);")
-                .Line($"projector.on({plan.Event}{plan.Arguments});");
+                .Line($"projector.on({AxonViewEvents.Expression(context, types, plan.Event, body)}{plan.Arguments});");
             foreach (var expected in spec.ThenReadModels) body.Line(Assertion(expected, plan.SourceKey, body));
         }).Block("finally", body => body.Line($"{body.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
     }
 
-    string? Event(SemanticSpecificationEvent given)
+    SemanticSpecificationEvent? Event(SemanticSpecificationEvent given)
     {
         var contract = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == given.EventContract);
         var primary = AxonEventSources.PrimaryTag(context, contract);
@@ -63,7 +62,7 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
 
         // The flat projector reads $eventSourceId through the event's normalized primary tag, not an EventMessage.
         if (identity is not null) given = given with { Values = [.. given.Values.Where(value => value.TargetProperty != identity.Id), new(identity.Id, given.EventSource.Value)] };
-        return AxonViewEvents.Expression(context, types, given);
+        return given;
     }
 
     string Assertion(SemanticSpecificationReadModel expected, string sourceKey, JavaCodeBuilder code)
@@ -85,5 +84,5 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
         expected.ReadModel == model.Id && !expected.Exactly && expected.Values.Length > 0 &&
         expected.Values.All(entry => model.Properties.Any(property => property.Id == entry.TargetProperty));
 
-    sealed record Body(string Model, string Projection, string Event, string SourceKey, string Arguments);
+    sealed record Body(string Model, string Projection, SemanticSpecificationEvent Event, string SourceKey, string Arguments);
 }

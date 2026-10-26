@@ -19,7 +19,7 @@ internal sealed class ViewExpectations(SemanticApplication application, ViewJava
 
     string Scalar(SemanticValue expected, SemanticTypeReference type, string actual)
     {
-        var value = types.Literal(expected, type);
+        var value = code is null ? types.Literal(expected, type) : types.Literal(expected, type, code);
         if (types.PrimitiveOf(type) == SemanticPrimitiveType.DecimalNumber)
             return $"({actual} != null && {types.Unwrap(type, actual)}.compareTo({types.Unwrap(type, value)}) == 0)";
         return $"{code?.Reference("java.util.Objects") ?? "java.util.Objects"}.equals({actual}, {value})";
