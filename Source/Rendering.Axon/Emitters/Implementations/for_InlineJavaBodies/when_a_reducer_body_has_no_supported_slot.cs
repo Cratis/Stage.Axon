@@ -20,7 +20,9 @@ public class when_a_reducer_body_has_no_supported_slot : a_view_request
     {
         _requirement = _request.ImplementationRequirements.First(candidate => candidate.Role == SemanticImplementationRole.ReducerTransition) with
         {
-            Language = "java", File = null, ContentHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Body)))
+            Language = "java",
+            File = null,
+            ContentHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Body)))
         };
         _request = _request with { ImplementationRequirements = [_requirement], ImplementationContents = _request.ImplementationContents.SetItem(_requirement.RequirementId, Body) };
         _context = new(_request, new(_request.Profile));

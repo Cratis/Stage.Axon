@@ -22,6 +22,7 @@ internal static class PersistentViewProof
         import tools.jackson.databind.json.JsonMapper;
         import static org.junit.jupiter.api.Assertions.*;
         import static __PACKAGE__.__NAME__Support.*;
+        import static __PACKAGE__.__NAME__Fixture.assertFixture;
 
         /** Default Surefire test: real emitted projector, pooled processor, durable token and two boots. */
         class __NAME__Test {
@@ -31,10 +32,13 @@ internal static class PersistentViewProof
                 var initial = expected();
                 java.util.Map<Integer, String> checkpoint;
                 try (var application = start(path)) {
+                    var before = tokens(application);
         __APPENDS__
+                    assertFixture(application, before);
                     await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
                     checkpoint = tokens(application);
                     assertFalse(checkpoint.isEmpty());
+                    assertEquals(1, checkpoint.size(), "Single-segment proof requires exactly one processor segment");
                 }
                 try (var application = start(path)) {
                     assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()));
@@ -71,10 +75,13 @@ internal static class PersistentViewProof
                 try {
                     try (var application = start(path)) {
                         assertInstanceOf(JpaReadModelStore.class, store(application));
+                        var before = tokens(application);
         __APPENDS__
+                        assertFixture(application, before);
                         await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
                         var checkpoint = tokens(application);
                         assertFalse(checkpoint.isEmpty(), "Real processor checkpoint rows must exist");
+                        assertEquals(1, checkpoint.size(), "Single-segment proof requires exactly one processor segment");
                         assertQuery(application, initial);
                         rolledBack = new java.util.concurrent.CountDownLatch(1);
                         refused = new java.util.concurrent.CountDownLatch(1);
@@ -92,6 +99,7 @@ internal static class PersistentViewProof
                             assertTrue(tokenRejected.await(20, TimeUnit.SECONDS), "Real JpaTokenStore update must reach the rejecting trigger");
                         assertEquals(__COUNT__, count(application), "Non-idempotent view change must roll back");
                         assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()), "No independently committed projection write");
+                        // Single-segment proof: native run 40395678690 showed public sequenceIdentifierFor + Segment.matches selected segment 2 while pooled routing used segment 13. Multi-segment rollback is tracked in Cratis/Stage.Axon#16; this proof does not cover it.
                         assertEquals(checkpoint, tokens(application), "Failed processing must not advance the actual checkpoint");
                     }
                     failure = Failure.NONE;
