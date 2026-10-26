@@ -12,5 +12,6 @@ internal static class AxonPersistentScaffold
         spring.datasource.password=
         spring.jpa.hibernate.ddl-auto=update
         spring.jpa.open-in-view=false
+        stage.axon.view-processor-mode=pooled
         """ + "\n";
 }

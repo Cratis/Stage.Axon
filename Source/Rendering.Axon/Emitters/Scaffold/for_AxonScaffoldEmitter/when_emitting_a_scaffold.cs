@@ -56,6 +56,9 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
     }
 
     [Fact]
+    void should_use_checkpointed_processors_for_persistent_views() => Content("src/main/resources/application-persistent.properties").ShouldContain("stage.axon.view-processor-mode=pooled");
+
+    [Fact]
     void should_wire_standard_time_and_the_runtime_json_module()
     {
         var wiring = context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/AxonConfiguration.java", StringComparison.Ordinal));

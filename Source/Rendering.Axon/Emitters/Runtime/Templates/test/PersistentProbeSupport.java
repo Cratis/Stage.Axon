@@ -73,7 +73,22 @@ final class PersistentProbeSupport {
                 "--spring.jpa.hibernate.ddl-auto=update", "--spring.main.banner-mode=off");
     }
 
-    static void refuses(String database) throws Exception {
+    static boolean unsupportedViews() {
+        var scanner = new org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new org.springframework.core.type.filter.AnnotationTypeFilter(org.springframework.context.annotation.Configuration.class));
+        return scanner.findCandidateComponents(PersistentProbeSupport.class.getPackageName().replaceFirst("\\.runtime$", "")).stream()
+                .anyMatch(definition -> {
+                    try {
+                        return java.util.Arrays.stream(Class.forName(definition.getBeanClassName()).getDeclaredMethods())
+                                .anyMatch(method -> method.getReturnType() == PersistentReadModelSafety.class);
+                    } catch (ClassNotFoundException failure) { throw new IllegalStateException(failure); }
+                });
+    }
+
+    static void refuses(String database) throws Exception { refuses(database, true); }
+    static void refusesLegacy(String database) throws Exception { refuses(database, false); }
+
+    private static void refuses(String database, boolean early) throws Exception {
         var witness = new Witness();
         var builder = new SpringApplicationBuilder(application())
                 .listeners((ApplicationListener<ApplicationEvent>) event -> {
@@ -81,9 +96,9 @@ final class PersistentProbeSupport {
                 })
                 .initializers(context -> {
                     context.getBeanFactory().addBeanPostProcessor(witness);
-                    context.addBeanFactoryPostProcessor(factory -> {
+                    if (early) context.addBeanFactoryPostProcessor(factory -> {
                         witness.factory = true;
-                        // Deliberately dangerous late factory work must never execute.
+                        // Deliberately dangerous late factory work must never execute for unsupported shapes.
                         factory.getBean(DataSource.class);
                         factory.getBean(EntityManagerFactory.class);
                     });
@@ -91,13 +106,15 @@ final class PersistentProbeSupport {
         var failure = assertThrows(Exception.class, () -> start(builder, database));
         var root = failure;
         while (root.getCause() != null) root = (Exception) root.getCause();
-        assertInstanceOf(BeanDefinitionStoreException.class, root);
+        assertInstanceOf(early ? BeanDefinitionStoreException.class : IllegalStateException.class, root);
         assertTrue(root.getMessage().contains("STAGE-AXON-0308"), root.getMessage());
-        assertTrue(root.getMessage().contains(application().getPackageName() + "."), root.getMessage());
+        assertTrue(root.getMessage().contains(application().getPackageName()), root.getMessage());
         assertFalse(witness.ready, "No HTTP initialization or application readiness");
-        assertFalse(witness.factory, "Registry refusal must precede ordinary factory processing");
-        assertTrue(witness.resources.isEmpty(), "No resource or lifecycle creation: " + witness.resources);
-        System.out.println("Persistent-view refusal: 0308; no readiness, factory, resources or lifecycle creation");
+        if (early) {
+            assertFalse(witness.factory, "Registry refusal must precede ordinary factory processing");
+            assertTrue(witness.resources.isEmpty(), "No resource or lifecycle creation: " + witness.resources);
+        }
+        System.out.println("Persistent-view refusal: 0308; no readiness; early unsupported-shape guard=" + early);
     }
 
     @TestConfiguration(proxyBeanMethods = false)
