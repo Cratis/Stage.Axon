@@ -63,7 +63,16 @@ public class when_emitting_an_idempotent_set_view : Projections.for_AxonProjecti
     [Fact] void should_require_real_token_store_rejection() => _proof.ShouldContain("assertTrue(tokenRejected.await(20, TimeUnit.SECONDS)");
     [Fact] void should_wait_for_a_changed_row_in_both_atomicity_proofs() => _proof.ShouldContain("assertTrue(viewChanged.await(20, TimeUnit.SECONDS)");
     [Fact] void should_require_exactly_once_counter_reclaim() => _proof.ShouldContain("count(application) == 1 + 1");
-    [Fact] void should_dispatch_a_real_default_profile_event() => _dispatch.ShouldContain("eventStore.appendEvent(context, new GenericEventMessage(");
+    [Fact] void should_dispatch_a_real_default_profile_event() => _dispatch.ShouldContain("EventAppender.forContext(context).append(new axonviews.views.events.Increased(");
+    [Fact] void should_import_the_pinned_default_event_appender() => _dispatch.ShouldContain("import org.axonframework.messaging.eventhandling.gateway.EventAppender;");
+    [Fact] void should_import_the_pinned_persistent_event_appender() => _support.ShouldContain("import org.axonframework.messaging.eventhandling.gateway.EventAppender;");
+    [Fact] void should_not_import_the_invalid_persistent_event_appender() => _support.ShouldNotContain("org.axonframework.eventsourcing.eventstore.EventAppender");
+    [Fact] void should_not_import_the_invalid_default_event_appender() => _dispatch.ShouldNotContain("org.axonframework.eventsourcing.eventstore.EventAppender");
+    [Fact] void should_not_append_directly_through_the_event_store() => _dispatch.ShouldNotContain("eventStore.appendEvent(");
+    [Fact] void should_not_construct_a_generic_event_message() => _dispatch.ShouldNotContain("GenericEventMessage");
+    [Fact] void should_return_a_future_from_the_default_unit_of_work() => _dispatch.ShouldContain("return CompletableFuture.<Void>completedFuture(null);");
+    [Fact] void should_import_the_default_callback_future() => _dispatch.ShouldContain("import java.util.concurrent.CompletableFuture;");
+    [Fact] void should_not_return_a_plain_string_from_the_unit_of_work() => _dispatch.ShouldNotContain("return \"appended\";");
     [Fact] void should_not_invoke_the_projector_directly_in_the_default_proof() => _dispatch.ShouldNotContain("projector.on(");
     [Fact] void should_not_invoke_the_contextual_handler_directly_in_the_default_proof() => _dispatch.ShouldNotContain(".handle(");
     [Fact] void should_keep_the_default_fixture_out_of_component_scanning() => _dispatch.ShouldContain("@TestConfiguration(proxyBeanMethods = false)");

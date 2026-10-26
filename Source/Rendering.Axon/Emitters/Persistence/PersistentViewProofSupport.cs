@@ -28,7 +28,7 @@ internal static class PersistentViewProofSupport
         import org.axonframework.common.configuration.Configuration;
         import org.axonframework.common.jpa.EntityManagerExecutor;
         import org.axonframework.messaging.core.unitofwork.transaction.jpa.JpaTransactionalExecutorProvider;
-        import org.axonframework.eventsourcing.eventstore.EventAppender;
+        import org.axonframework.messaging.eventhandling.gateway.EventAppender;
         import org.axonframework.messaging.core.unitofwork.ProcessingContext;
         import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
         import org.axonframework.messaging.eventhandling.annotation.EventHandler;

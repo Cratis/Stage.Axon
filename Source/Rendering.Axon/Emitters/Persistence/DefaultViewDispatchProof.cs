@@ -13,6 +13,7 @@ internal static class DefaultViewDispatchProof
         import __RUNTIME__.ReadModelStore;
         import java.util.List;
         import java.util.Optional;
+        import java.util.concurrent.CompletableFuture;
         import java.util.concurrent.CopyOnWriteArrayList;
         import java.util.concurrent.CountDownLatch;
         import java.util.concurrent.TimeUnit;
@@ -22,9 +23,8 @@ internal static class DefaultViewDispatchProof
         import org.junit.jupiter.api.Test;
         import org.reactivestreams.Subscriber;
         import org.reactivestreams.Subscription;
-        import org.axonframework.eventsourcing.eventstore.EventStore;
+        import org.axonframework.messaging.eventhandling.gateway.EventAppender;
         import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
-        import org.axonframework.messaging.eventhandling.GenericEventMessage;
         import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
         import org.springframework.beans.factory.config.BeanPostProcessor;
         import org.springframework.boot.SpringApplication;
@@ -95,10 +95,9 @@ internal static class DefaultViewDispatchProof
                         assertTrue(signals.getFirst().rows().isEmpty());
                         assertEquals(0, store.writes.get());
                         // Only Axon's discovered @EventHandler may dispatch this event and resolve ProcessingContext.
-                        var eventStore = application.getBean(EventStore.class);
                         application.getBean(UnitOfWorkFactory.class).create().executeWithResult(context -> {
-                            eventStore.appendEvent(context, new GenericEventMessage(__EVENT__));
-                            return "appended";
+                            EventAppender.forContext(context).append(__EVENT__);
+                            return CompletableFuture.<Void>completedFuture(null);
                         }).get(20, TimeUnit.SECONDS);
                         assertNull(failure.get());
                         assertEquals(1, store.writes.get(), "Both on and handle must not be discovered for the same event");
