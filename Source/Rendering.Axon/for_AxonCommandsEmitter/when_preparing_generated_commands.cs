@@ -36,14 +36,62 @@ public class when_preparing_generated_commands : for_AxonArtifactRenderPlanner.g
         allocated = body.Build();
     }
 
-    [Fact] void should_allocate_identities_using_fundamentals() => allocated.ShouldContain(".runtime.EventSourceId(io.cratis.fundamentals.concepts.GenerateValue.uuid().toString())");
+    [Fact] void should_allocate_identities_using_fundamentals() => allocated.ShouldContain("new EventSourceId(GenerateValue.uuid().toString())");
+    [Fact] void should_import_allocated_runtime_identities() => allocated.ShouldContain("import " + JavaNames.PackageSegment(request.Model.Application.Name) + ".runtime.EventSourceId;");
+    [Fact] void should_import_fundamentals_generation() => allocated.ShouldContain("import io.cratis.fundamentals.concepts.GenerateValue;");
+    [Fact] void should_import_the_preparation_clock() => allocated.ShouldContain("import java.time.Clock;");
     [Fact] void should_exclude_generated_values_from_the_http_body() => supported.ShouldContain("@com.fasterxml.jackson.annotation.JsonIgnore java.util.UUID requestId");
     [Fact] void should_clear_values_before_the_http_handler_dispatches() => supported.ShouldContain("public PlaceOrder forRequest() { return new PlaceOrder(null); }");
-    [Fact] void should_generate_uuid_inputs_in_the_handler_preparation() => supported.ShouldContain("requestId() == null ? java.util.UUID.randomUUID() : requestId()");
+    [Fact] void should_generate_uuid_inputs_in_the_handler_preparation() => supported.ShouldContain("requestId() == null ? UUID.randomUUID() : requestId()");
     [Fact] void should_allow_deterministic_fixture_values() => supported.ShouldContain(": requestId()");
     [Fact] void should_warn_about_unsupported_generation() => unsupportedContext.Degradation.UnsupportedConstructs.Single().Code.ShouldEqual("STAGE-AXON-GENERATION");
     [Fact] void should_explain_the_missing_generation() => unsupported.ShouldContain("// Screenplay wanted to generate the command's modeled values");
     [Fact] void should_fail_closed_instead_of_generating_an_invented_value() => unsupported.ShouldContain("throw new UnsupportedOperationException(");
+
+    [Fact]
+    void should_reserve_the_command_name_before_framework_references()
+    {
+        var command = Template("Clock", SemanticPrimitiveType.Uuid);
+        var context = new AxonEmissionContext(request, new(request.Profile));
+        var body = new JavaCodeBuilder(context.BasePackage + ".commands");
+        new CommandPreparation(context, command, null).Emit(body);
+        var code = body.Build();
+        code.ShouldContain("withGenerated(java.time.Clock clock)");
+        code.ShouldContain("UUID.randomUUID()");
+        code.ShouldNotContain("import java.time.Clock;");
+    }
+
+    [Fact]
+    void should_reserve_the_command_name_before_fundamentals_generation()
+    {
+        var command = Template("GenerateValue", SemanticPrimitiveType.Text) with { Properties = [] };
+        var context = new AxonEmissionContext(request, new(request.Profile));
+        var body = new JavaCodeBuilder(context.BasePackage + ".commands");
+        var source = new CommandSource
+        {
+            Primary = ("identity", context.BasePackage + ".runtime.EventSourceId", "identity"),
+            Type = SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text),
+            TagReference = "EventTags.EVENT_SOURCE_ID"
+        };
+        new CommandPreparation(context, command, source).Emit(body);
+        var code = body.Build();
+        code.ShouldContain("new EventSourceId(io.cratis.fundamentals.concepts.GenerateValue.uuid().toString())");
+        code.ShouldNotContain("import io.cratis.fundamentals.concepts.GenerateValue;");
+    }
+
+    [Fact]
+    void should_not_import_generators_for_an_unsupported_strategy()
+    {
+        unsupported.ShouldNotContain("import java.util.UUID;");
+        unsupported.ShouldNotContain("import io.cratis.fundamentals.concepts.GenerateValue;");
+    }
+
+    SemanticCommand Template(string name, SemanticPrimitiveType primitive)
+    {
+        var command = ScopeSelection.Select(request).First(slice => !slice.Slice.Commands.IsEmpty).Slice.Commands[0];
+        var property = command.Properties[0] with { Name = "requestId", Type = SemanticTypeReference.ForPrimitive(primitive), IsGenerated = true };
+        return command with { Name = name, Properties = [property] };
+    }
 
     string Render(SemanticPrimitiveType primitive, out AxonEmissionContext context)
     {

@@ -15,13 +15,14 @@ internal static class ConceptGeneration
         var type = JavaNames.Type(concept.Name);
         if (string.Equals(generation.Kind, "uuid", StringComparison.OrdinalIgnoreCase) && concept.Primitive == SemanticPrimitiveType.Uuid)
         {
-            body.Line($"public static {type} create() {{ return new {type}({CratisFundamentals.ConceptsPackage}.GenerateValue.uuid()); }}");
+            body.Line($"public static {type} create() {{ return new {type}({body.Reference(CratisFundamentals.ConceptsPackage + ".GenerateValue")}.uuid()); }}");
             return;
         }
         var path = concept.Id + "/generation";
         var intent = "generate " + concept.Name + " values using " + generation.Kind;
         context.Degradation.Unsupported(AxonRefusalCodes.Generation, concept.Id, "This value-generation strategy is not implemented by the Axon target.", intent, path);
+        var failure = "{\n    throw new " + body.Reference("java.lang.UnsupportedOperationException") + "(" + JavaCodeBuilder.StringLiteral($"{AxonRefusalCodes.Generation}: {intent}") + ");\n}";
         body.UnsupportedIntent(intent, path, AxonRefusalCodes.Generation)
-            .Line($"public static {type} create() {JavaStubs.ThrowingBody(AxonRefusalCodes.Generation, intent)}");
+            .Line($"public static {type} create() {failure}");
     }
 }

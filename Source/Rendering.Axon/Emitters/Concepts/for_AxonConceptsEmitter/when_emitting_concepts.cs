@@ -22,13 +22,15 @@ public class when_emitting_concepts : for_AxonArtifactRenderPlanner.given.an_axo
     void should_emit_scalar_concepts_as_canonical_records()
     {
         var id = Content("OrderId");
-        id.ShouldContain("public record OrderId(java.util.UUID value) implements io.cratis.fundamentals.concepts.ConceptAs<java.util.UUID>");
-        id.ShouldContain("java.util.Objects.requireNonNull(value, \"value\")");
+        id.ShouldContain("public record OrderId(UUID value) implements ConceptAs<UUID>");
+        id.ShouldContain("import java.util.UUID;");
+        id.ShouldContain("import io.cratis.fundamentals.concepts.ConceptAs;");
+        id.ShouldContain("Objects.requireNonNull(value, \"value\")");
         id.ShouldContain("public String toString() { return value.toString(); }");
     }
 
     [Fact]
-    void should_implement_the_fundamentals_concept_contract() => Content("Money").ShouldContain("implements io.cratis.fundamentals.concepts.ConceptAs<java.math.BigDecimal>");
+    void should_implement_the_fundamentals_concept_contract() => Content("Money").ShouldContain("implements ConceptAs<BigDecimal>");
 
     [Fact]
     void should_not_reference_runtime_concept_as() =>
@@ -47,7 +49,7 @@ public class when_emitting_concepts : for_AxonArtifactRenderPlanner.given.an_axo
     }
 
     [Fact]
-    void should_keep_decimal_concepts_exact() => Content("Money").ShouldContain("java.math.BigDecimal value");
+    void should_keep_decimal_concepts_exact() => Content("Money").ShouldContain("BigDecimal value");
 
     [Fact]
     void should_attach_the_model_identity_to_every_concept() =>
