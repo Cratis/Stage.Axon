@@ -1,0 +1,55 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System.Text;
+using Cratis.Specifications;
+using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Queries;
+using Xunit;
+
+namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence.for_AxonPersistenceEmitter;
+
+public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsEmitter.given.a_view_request
+{
+    AxonEmissionContext _context;
+
+    void Because()
+    {
+        _context = new(_request, new(_request.Profile));
+        new AxonProjectionsEmitter().Emit(_context);
+        new AxonQueriesEmitter().Emit(_context);
+        new AxonPersistenceEmitter().Emit(_context);
+    }
+
+    [Fact] void should_admit_the_flat_projection() => PersistentViewAdmission.Supports(_context, ReadModelId("Total")).ShouldBeTrue();
+    [Fact] void should_refuse_scoped_projections() => PersistentViewAdmission.Supports(_context, ReadModelId("Board")).ShouldBeFalse();
+    [Fact] void should_refuse_reducers() => PersistentViewAdmission.Supports(_context, ReadModelId("RebuiltTotal")).ShouldBeFalse();
+    [Fact] void should_preserve_early_scoped_refusal() => Code("BoardStoreConfiguration").ShouldContain("public static PersistentReadModelSafety persistentReadModelSafety()");
+    [Fact] void should_preserve_early_reducer_refusal() => Code("RebuiltTotalStoreConfiguration").ShouldContain("public static PersistentReadModelSafety persistentReadModelSafety()");
+    [Fact] void should_remove_only_the_flat_guard() => Code("TotalStoreConfiguration").ShouldNotContain("persistentReadModelSafety");
+    [Fact] void should_keep_the_direct_call_signature() => Code("TotalProjectionProjector").ShouldContain("public void on(Increased event, org.axonframework.messaging.queryhandling.QueryUpdateEmitter updates)");
+    [Fact] void should_bind_the_actual_handler_context() => Code("TotalProjectionProjector").ShouldContain("JpaReadModelStore.bind(store, context)");
+    [Fact] void should_request_the_handler_context() => Code("TotalProjectionProjector").ShouldContain("QueryUpdateEmitter updates, ProcessingContext context)");
+    [Fact] void should_defer_live_notifications_until_commit() => Code("TotalProjectionProjector").ShouldContain("context.runOnAfterCommit");
+    [Fact] void should_provide_only_qualified_persistent_stores() => Code("TotalStoreConfiguration").ShouldContain("return new JpaReadModelStore<>(factory, mapper, \"axonviews.views.counters.totals.Total\", Total.class)");
+    [Fact] void should_depend_on_generation_admission() => Code("TotalStoreConfiguration").ShouldContain("PersistentViewConfiguration generation");
+    [Fact] void should_pin_pooled_processing() => Code("PersistentViewConfiguration").ShouldContain("EventProcessorDefinition.pooledStreamingMatching(");
+    [Fact] void should_pin_propagating_errors() => Code("PersistentViewConfiguration").ShouldContain("config.errorHandler(org.axonframework.messaging.eventhandling.processing.errorhandling.PropagatingErrorHandler.INSTANCE)");
+    [Fact] void should_preserve_immediate_memory_notifications() => Code("TotalProjectionProjector").ShouldContain("if (!(store instanceof JpaReadModelStore<?>))");
+    [Fact] void should_refuse_async_writes() => Code("JpaReadModelStore").ShouldContain("Thread.currentThread() != handlerThread");
+    [Fact] void should_test_async_refusal() => Code("TotalPersistentStoreTest").ShouldContain("CompletableFuture.runAsync(() -> bound.put(key, value))");
+    [Fact] void should_refuse_contextless_writes() => Code("JpaReadModelStore").ShouldContain("if (context == null) throw new IllegalStateException");
+    [Fact] void should_never_create_an_independent_write_executor() => Code("JpaReadModelStore").ShouldContain("findTransactionalExecutor(context)");
+    [Fact] void should_never_fall_back_to_an_executor() => Code("JpaReadModelStore").ShouldNotContain("getTransactionalExecutor(");
+    [Fact] void should_serialize_row_payloads() => Code("JpaReadModelStore").ShouldContain("mapper.writeValueAsString(next)");
+    [Fact] void should_guard_both_retained_events_and_checkpoints() => Code("PersistentViewBootstrap").ShouldContain("Stream.of(AggregateEventEntry.class, TokenEntry.class, ViewRow.class)");
+    [Fact] void should_refuse_generation_changes() => Code("PersistentViewBootstrap").ShouldContain("!existing.fingerprint().equals(fingerprint)");
+    [Fact] void should_emit_a_default_native_two_boot_test() => Code("TotalPersistentTest").ShouldContain("void durableRowsAndRealCheckpointCommitAndRollbackTogether()");
+    [Fact] void should_exercise_actual_processor_failure() => Code("TotalPersistentSupport").ShouldContain("context.runOnPrepareCommit((java.util.function.Consumer<ProcessingContext>) ignored -> { throw new IllegalStateException");
+    [Fact] void should_compare_real_checkpoints_after_rollback() => Code("TotalPersistentTest").ShouldContain("assertEquals(checkpoint, tokens(application)");
+    [Fact] void should_test_retained_database_refusal() => Code("TotalPersistentLegacyTest").ShouldContain("assertEquals(before, snapshot(path)");
+    [Fact] void should_test_store_contracts() => Code("TotalPersistentStoreTest").ShouldContain("void durableStoreContractIsIsolatedAtomicAndFailsClosed()");
+    [Fact] void should_not_hide_native_proof_behind_a_property() => Code("TotalPersistentTest").ShouldNotContain("EnabledIfSystemProperty");
+
+    string Code(string name) => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith('/' + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());
+}
