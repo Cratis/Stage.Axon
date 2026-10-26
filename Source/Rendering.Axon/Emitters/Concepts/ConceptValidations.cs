@@ -42,13 +42,13 @@ internal static class ConceptValidations
 
     internal static void Emit(AxonEmissionContext context, SemanticConcept concept, JavaCodeBuilder body)
     {
-        body.Line("java.util.Objects.requireNonNull(value, \"value\");");
+        body.Line($"{body.Reference("java.util.Objects")}.requireNonNull(value, \"value\");");
         foreach (var rule in concept.Validations)
         {
-            var expression = Predicate(concept.Primitive, rule);
-            if (expression is not null && rule.Severity == SemanticValidationSeverity.Error)
+            var expression = rule.Severity == SemanticValidationSeverity.Error ? Predicate(concept.Primitive, rule, body) : null;
+            if (expression is not null)
             {
-                body.Line($"if (!({expression})) throw new IllegalArgumentException({JavaCodeBuilder.StringLiteral(rule.Message ?? ("Invalid " + concept.Name + " value"))});");
+                body.Line($"if (!({expression})) throw new {body.Reference("java.lang.IllegalArgumentException")}({JavaCodeBuilder.StringLiteral(rule.Message ?? ("Invalid " + concept.Name + " value"))});");
                 continue;
             }
             var path = concept.Id + "/validation/" + rule.Kind;
@@ -56,18 +56,20 @@ internal static class ConceptValidations
             context.Degradation.Unsupported(AxonRefusalCodes.Implementation, concept.Id, "This concept validation requires an implementation.", intent, path);
             body.UnsupportedIntent(intent, path, AxonRefusalCodes.Implementation);
             if (rule.Severity == SemanticValidationSeverity.Error)
-                body.Line("if (value != null) throw new UnsupportedOperationException(" + JavaCodeBuilder.StringLiteral(AxonRefusalCodes.Implementation + ": " + intent) + ");");
+                body.Line($"if (value != null) throw new {body.Reference("java.lang.UnsupportedOperationException")}(" + JavaCodeBuilder.StringLiteral(AxonRefusalCodes.Implementation + ": " + intent) + ");");
         }
     }
 
-    static string? Predicate(SemanticPrimitiveType primitive, SemanticValidationRule rule)
+    static string? Predicate(SemanticPrimitiveType primitive, SemanticValidationRule rule, JavaCodeBuilder body)
     {
         if (primitive == SemanticPrimitiveType.Text) return TextPredicate(rule);
         if (rule.Operand is not SemanticNumberValue number || primitive is not (SemanticPrimitiveType.DecimalNumber or SemanticPrimitiveType.WholeNumber)) return null;
         var literal = number.Value.ToString(CultureInfo.InvariantCulture);
-        var value = primitive == SemanticPrimitiveType.DecimalNumber ? "value" : "new java.math.BigDecimal(value.toString())";
         var op = _comparisons.GetValueOrDefault(rule.Kind);
-        return op is null ? null : $"{value}.compareTo(new java.math.BigDecimal(\"{literal}\")) {op} 0";
+        if (op is null) return null;
+        var decimalType = body.Reference("java.math.BigDecimal");
+        var value = primitive == SemanticPrimitiveType.DecimalNumber ? "value" : $"new {decimalType}(value.toString())";
+        return $"{value}.compareTo(new {decimalType}(\"{literal}\")) {op} 0";
     }
 
     static string? TextPredicate(SemanticValidationRule rule)

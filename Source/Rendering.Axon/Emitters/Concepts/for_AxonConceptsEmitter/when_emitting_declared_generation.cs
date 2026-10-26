@@ -20,8 +20,10 @@ public class when_emitting_declared_generation : for_AxonArtifactRenderPlanner.g
         var template = loaded.Model.Application.Concepts.First(concept => concept.Primitive == SemanticPrimitiveType.Uuid);
         var concept = new SemanticConcept(template.Id, "GeneratedId", SemanticPrimitiveType.Uuid, [], []) { Generation = new("uuid") };
         var code = AxonConceptsEmitter.Scalar(context, concept);
-        code.ShouldContain("public static GeneratedId create() { return new GeneratedId(io.cratis.fundamentals.concepts.GenerateValue.uuid()); }");
-        code.ShouldContain("io.cratis.fundamentals.concepts.Generatable<GeneratedId>");
+        code.ShouldContain("public static GeneratedId create() { return new GeneratedId(GenerateValue.uuid()); }");
+        code.ShouldContain("Generatable<GeneratedId>");
+        code.ShouldContain("import io.cratis.fundamentals.concepts.GenerateValue;");
+        code.ShouldContain("import io.cratis.fundamentals.concepts.Generatable;");
         context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
     }
 

@@ -26,18 +26,22 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
 
     internal static string Record(AxonEmissionContext context, string package, string name, IEnumerable<SemanticProperty> properties)
     {
-        var parameters = string.Join(", ", properties.Select(property => $"{JavaRecordComponents.JsonProperty(property.Name)}{JavaSemanticTypes.TypeFor(context, property.Type)} {JavaNames.Member(property.Name)}"));
-        var code = new JavaCodeBuilder(package);
+        var code = new JavaCodeBuilder(package).Declare(name);
+        foreach (var composite in context.Request.Model.Application.Types) code.Declare(JavaNames.Type(composite.Name));
+        var fields = properties.ToArray();
+        foreach (var property in fields) JavaSemanticTypes.Claim(context, property.Type, code, package);
+        var parameters = string.Join(", ", fields.Select(property => $"{JsonProperty(property.Name, code)}{JavaSemanticTypes.TypeFor(context, property.Type, code, package)} {JavaNames.Member(property.Name)}"));
         return code.Line($"public record {name}({parameters}) {{}}").Build();
     }
 
     internal static string Scalar(AxonEmissionContext context, SemanticConcept concept)
     {
         var name = JavaNames.Type(concept.Name);
-        var primitive = JavaSemanticTypes.Primitive(concept.Primitive);
-        var marker = concept.Generation is null ? string.Empty : $", {CratisFundamentals.ConceptsPackage}.Generatable<{name}>";
-        return new JavaCodeBuilder(context.BasePackage + ".concepts")
-            .Block($"public record {name}({primitive} value) implements {CratisFundamentals.ConceptsPackage}.ConceptAs<{primitive}>{marker}", body =>
+        var builder = JavaSemanticTypes.ConceptBuilder(context, name);
+        var primitive = JavaSemanticTypes.Primitive(concept.Primitive, builder);
+        var marker = concept.Generation is null ? string.Empty : $", {builder.Reference(CratisFundamentals.ConceptsPackage + ".Generatable")}<{name}>";
+        return builder
+            .Block($"public record {name}({primitive} value) implements {builder.Reference(CratisFundamentals.ConceptsPackage + ".ConceptAs")}<{primitive}>{marker}", body =>
             {
                 body.Block($"public {name}", constructor =>
                 {
@@ -49,10 +53,14 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
                         var path = concept.Id + "/compliance";
                         context.Degradation.Unsupported(code, concept.Id, "Protection at rest is not configured; constructing this concept is blocked.", intent, path);
                         constructor.UnsupportedIntent(intent, path, code)
-                            .Line("throw new UnsupportedOperationException(" + JavaCodeBuilder.StringLiteral(code + ": " + intent) + ");");
+                            .Line($"throw new {constructor.Reference("java.lang.UnsupportedOperationException")}(" + JavaCodeBuilder.StringLiteral(code + ": " + intent) + ");");
                     }
-                }).Line("@Override").Line("public String toString() { return value.toString(); }");
+                }).Line("@" + body.Reference("java.lang.Override")).Line($"public {body.Reference("java.lang.String")} toString() {{ return value.toString(); }}");
                 ConceptGeneration.Emit(context, concept, body);
             }).Build();
     }
+
+    static string JsonProperty(string name, JavaCodeBuilder builder) => JavaNames.Member(name) == name
+        ? string.Empty
+        : $"@{builder.Reference("com.fasterxml.jackson.annotation.JsonProperty")}({JavaCodeBuilder.StringLiteral(name)}) ";
 }
