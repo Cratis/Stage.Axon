@@ -29,11 +29,24 @@ Start with [Build a renderer target](https://github.com/Cratis/Stage/blob/v4.197
                      SetConfiguration="Configuration=Release" />
    ```
 
-   Stage.Axon compiles inline specifications and adds test dependencies in Debug; Release excludes them. The Debug-consumer behavior of this metadata has not yet been verified.
+   This metadata selects Release even when your consumer builds in Debug. Conformance opts out of inline specifications and test dependencies in both configurations; its specifications live in the separate `Rendering.Conformance.Specs` project.
 
 Do not copy the project folder alone: it inherits its target framework, package versions, analyzers, and specification configuration from repository-level build files. Keep the pinned checkout intact so MSBuild evaluates the referenced project with its own configuration. When updating the pin, re-read its Contracts version and rebuild.
 
-For each selected scope:
+### Run the minimal target
+
+From the pinned checkout root, run the standalone [minimal target](../../Source/Samples.MinimalTarget/Program.cs):
+
+```sh
+dotnet restore Source/Samples.MinimalTarget/Samples.MinimalTarget.csproj -p:Configuration=Debug
+dotnet run --project Source/Samples.MinimalTarget/Samples.MinimalTarget.csproj -c Debug --no-restore
+```
+
+It prints `# Sample` followed by a newline and exits successfully only when planning, semantic coverage, and repeated-plan determinism pass. It constructs an empty application and plans one UTF-8 Markdown artifact, `application.md`, in memory; it writes no generated files and needs no Java runtime or Maven.
+
+The internal planner demonstrates only the existing public Contracts API. It accepts the exact model application's scope with initialized, empty `AdditionalScopes`, and rejects foreign application identities, non-application scopes, and default or nonempty additional scopes before creating an artifact. Its only semantic source is the application root: it does not implement or claim coverage for modules, slices, or other nested constructs. Adding such constructs requires a real lowering or an attributed diagnostic; the empty fixture's clean coverage is not evidence of subtree support.
+
+For your own target, apply the following checks to each selected scope:
 
 1. Attach the originating semantic identities to `PlannedArtifact.Sources`.
 2. Attach a diagnostic to each unsupported identity. Do not account for an entire unsupported subtree with only an application-wide warning.

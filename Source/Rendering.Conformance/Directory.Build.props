@@ -1,0 +1,6 @@
+<Project>
+    <PropertyGroup>
+        <EnableInlineSpecs>false</EnableInlineSpecs>
+    </PropertyGroup>
+    <Import Project="$(MSBuildThisFileDirectory)../Directory.Build.props" />
+</Project>
