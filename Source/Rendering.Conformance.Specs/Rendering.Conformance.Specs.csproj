@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>Cratis.Stage.Rendering.Conformance.Specs</AssemblyName>
+        <RootNamespace>Cratis.Stage.Rendering.Conformance</RootNamespace>
+        <IsTestProject>true</IsTestProject>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../Rendering.Conformance/Rendering.Conformance.csproj" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="NSubstitute" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="Cratis.Specifications" />
+        <PackageReference Include="Cratis.Specifications.XUnit" />
+    </ItemGroup>
+</Project>
