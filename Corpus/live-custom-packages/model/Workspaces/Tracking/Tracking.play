@@ -1,6 +1,0 @@
-module Workspaces
-  feature Tracking
-    contribute to Navigation
-      navigate to WorkItemList
-      label "Work items"
-      order 10

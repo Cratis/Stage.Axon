@@ -2,7 +2,9 @@
 
 The Axon Framework JVM render target for Cratis Stage. It plans Java applications from Screenplay executable semantic models using the published `Cratis.Stage.Contracts` 4.197.0 package. The planner, embedded Java templates, and native verification harness retain their history from Cratis/Stage. This repository does not contain the Stage engine.
 
-`Source/Rendering.Conformance` is a vendored, Contracts-only conformance helper until it is published separately. `Corpus/` vendors the 15 live blueprints, three samples, and four individual view models (also rendered together): 23 applications. Their models remain the behavioral input contract.
+`Source/Rendering.Conformance` is a vendored, Contracts-only conformance helper until it is published separately. The verification corpus retains 15 live blueprints, three samples, and four individual view models (also rendered together): 23 applications. Their models remain the behavioral input contract.
+
+The `sample-custom-packages` application composes its nine retained local documents with the Tracking feature from `Cratis.Screenplay.CanonicalCorpus` 4.241.0. The public selector is `ScreenCompositionCorpus.V1.SourceForms.Single(form => form.Name == "folder").Documents.Single(document => document.StableKey == "workspaces-tracking-feature")`, with display path `Workspaces/Tracking/Tracking.play`. Its exact package bytes replace the covered local copy in a disposable input directory; missing or empty selection fails without a fallback. Every other corpus input and all 23 application names remain unchanged. This adopts one covered document, not the entire canonical Workspaces application; coverage of the retained inputs is not assessed here. The package is a verification dependency only, with no production renderer dependency.
 
 ## Build and specs
 
