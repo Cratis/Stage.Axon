@@ -26,7 +26,8 @@ public class when_wrapping_enumeration_values : Specification
 
     [Fact] void should_use_the_string_enum_factory() => types.Wrap(reference, "\"submitted\"").ShouldEqual("sample.concepts.RequestState.fromValue(\"submitted\")");
     [Fact] void should_not_construct_enum_instances_in_projection_literals() => types.Parse(reference, "\"submitted\"").ShouldContain("RequestState.fromValue(");
-    [Fact] void should_use_the_integer_factory_for_numbered_enums() => numeric.Wrap(reference, "20L").ShouldEqual("sample.concepts.RequestState.fromValue(Math.toIntExact(20L))");
-    [Fact] void should_parse_numbered_enum_query_arguments_as_numbers() => numeric.Parse(reference, "state").ShouldContain("Math.toIntExact(Long.valueOf(state))");
+    [Fact] void should_use_the_integer_factory_for_numbered_enums() => numeric.Wrap(reference, "20L").ShouldEqual("sample.concepts.RequestState.fromValue(java.lang.Math.toIntExact(20L))");
+    [Fact] void should_parse_numbered_enum_query_arguments_as_numbers() => numeric.Parse(reference, "state").ShouldContain("Math.toIntExact(java.lang.Long.valueOf(state))");
+    [Fact] void should_keep_uncaptured_math_references_short() => numeric.Wrap(reference, "20L", new Java.JavaCodeBuilder("example")).ShouldEqual("RequestState.fromValue(Math.toIntExact(20L))");
     [Fact] void should_not_invent_an_invalid_enum_zero_as_initial_projection_state() => numeric.Default(reference).ShouldEqual("null");
 }
