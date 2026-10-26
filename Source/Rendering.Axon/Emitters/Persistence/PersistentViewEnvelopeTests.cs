@@ -28,7 +28,7 @@ internal static class PersistentViewEnvelopeTests
             }
             private void assertRefused(Class<?> customization) {
                 var error = assertThrows(Exception.class, () -> {
-                    try (var ignored = start(database(), customization)) { fail("Unsafe processor reached readiness"); }
+                    try (var application = start(database(), customization)) { fail("Unsafe processor reached readiness: active=" + application.isActive()); }
                 });
                 var messages = new StringBuilder();
                 for (Throwable cause = error; cause != null; cause = cause.getCause()) messages.append(cause.getMessage());

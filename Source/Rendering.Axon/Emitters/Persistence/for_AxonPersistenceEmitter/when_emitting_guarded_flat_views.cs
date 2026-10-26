@@ -52,6 +52,9 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_validate_customized_processors_before_start() => Code("PersistentViewConfiguration").ShouldContain("SmartInitializingSingleton persistentViewProcessorGuard");
     [Fact] void should_refuse_swallowing_customizations() => Code("PersistentViewProcessorGuard").ShouldContain("processor.errorHandler() != PropagatingErrorHandler.INSTANCE");
     [Fact] void should_test_subscribing_replacement_refusal() => Code("TotalPersistentEnvelopeTest").ShouldContain("void refusesSubscribingReplacementBeforeReadiness()");
+    [Fact] void should_reference_the_unexpected_context_in_the_unconditional_failure() => Code("TotalPersistentEnvelopeTest").ShouldContain("try (var application = start(database(), customization)) { fail(\"Unsafe processor reached readiness: active=\" + application.isActive()); }");
+    [Fact] void should_keep_the_envelope_startup_exception_assertion() => Code("TotalPersistentEnvelopeTest").ShouldContain("var error = assertThrows(Exception.class, () -> {");
+    [Fact] void should_keep_the_envelope_refusal_reason_assertion() => Code("TotalPersistentEnvelopeTest").ShouldContain("assertTrue(messages.toString().contains(\"Persistent flat views require pooled processors with PropagatingErrorHandler\"));");
     [Fact] void should_compare_real_checkpoints_after_rollback() => Code("TotalPersistentTest").ShouldContain("assertEquals(checkpoint, tokens(application)");
     [Fact] void should_test_retained_database_refusal() => Code("TotalPersistentLegacyTest").ShouldContain("assertEquals(before, snapshot(path)");
     [Fact] void should_test_store_contracts() => Code("TotalPersistentStoreTest").ShouldContain("void durableStoreContractIsIsolatedAtomicAndFailsClosed()");
