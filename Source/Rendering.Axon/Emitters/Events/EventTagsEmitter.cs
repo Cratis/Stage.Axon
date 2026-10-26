@@ -16,7 +16,7 @@ internal sealed class EventTagsEmitter : IAxonEmitter
         foreach (var module in AxonEventsEmitter.Contracts(context).Select(pair => pair.Module).DistinctBy(module => module.Id))
         {
             var contracts = Contracts(context, module).ToArray();
-            var code = new JavaCodeBuilder(AxonEventsEmitter.Package(context, module))
+            var code = new JavaCodeBuilder(AxonEventsEmitter.Package(context, module)).Declare("EventTags")
                 .Block("public final class EventTags", body =>
                 {
                     foreach (var (key, name) in Constants(context, contracts).OrderBy(pair => pair.Value, StringComparer.Ordinal))
@@ -32,6 +32,18 @@ internal sealed class EventTagsEmitter : IAxonEmitter
         var module = ScopeSelection.Locate(context.Request.Model.Application).First(slice => slice.Slice.Events.Any(candidate => candidate.Id == contract.Id)).Module;
         var key = AxonEventSources.PrimaryTag(context, contract).TagKey;
         return AxonEventsEmitter.Package(context, module) + ".EventTags." + Constants(context, Contracts(context, module))[key];
+    }
+
+    internal static string Reference(AxonEmissionContext context, SemanticEventContract contract, JavaCodeBuilder code, string package)
+    {
+        var reference = Reference(context, contract);
+        var separator = reference.LastIndexOf('.');
+        var type = reference[..separator];
+        var typeSeparator = type.LastIndexOf('.');
+        var name = type[(typeSeparator + 1)..];
+        if (type[..typeSeparator] == package) code.Declare(name);
+        else code.Import(type);
+        return name + reference[separator..];
     }
 
     static IEnumerable<SemanticEventContract> Contracts(AxonEmissionContext context, SemanticModule module) =>

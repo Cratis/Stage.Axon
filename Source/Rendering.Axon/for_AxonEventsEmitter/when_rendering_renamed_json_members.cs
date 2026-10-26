@@ -21,6 +21,7 @@ public class when_rendering_renamed_json_members : for_AxonArtifactRenderPlanner
         code = AxonEventSources.Record(context, "example.events", contract, "");
     }
 
-    [Fact] void should_preserve_the_modeled_wire_name() => code.ShouldContain("@com.fasterxml.jackson.annotation.JsonProperty(\"class\")");
+    [Fact] void should_preserve_the_modeled_wire_name() => code.ShouldContain("@JsonProperty(\"class\")");
+    [Fact] void should_import_the_wire_name_annotation() => code.ShouldContain("import com.fasterxml.jackson.annotation.JsonProperty;");
     [Fact] void should_use_a_legal_java_member_name() => code.ShouldContain(" class_");
 }

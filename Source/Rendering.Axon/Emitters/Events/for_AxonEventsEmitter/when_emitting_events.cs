@@ -31,7 +31,8 @@ public class when_emitting_events : for_AxonArtifactRenderPlanner.given.an_axon_
     void should_emit_the_axon_namespace_name_and_revision()
     {
         var code = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/OrderPlaced.java", StringComparison.Ordinal)).Bytes.AsSpan());
-        code.ShouldContain("@org.axonframework.messaging.eventhandling.annotation.Event(namespace = \"orders\", name = \"OrderPlaced\", version = \"1\")");
+        code.ShouldContain("@Event(namespace = \"orders\", name = \"OrderPlaced\", version = \"1\")");
+        code.ShouldContain("import org.axonframework.messaging.eventhandling.annotation.Event;");
     }
 
     [Fact]

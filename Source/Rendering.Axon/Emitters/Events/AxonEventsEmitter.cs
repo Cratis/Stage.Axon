@@ -34,17 +34,28 @@ internal sealed class AxonEventsEmitter : IAxonEmitter
             .Where(pair => pair.Event.Id == contract).DistinctBy(pair => pair.Event.Id)
             .Select(pair => Package(context, pair.Module) + "." + JavaNames.Type(pair.Event.Name)).Single();
 
+    internal static string TypeFor(AxonEmissionContext context, SemanticId contract, JavaCodeBuilder code, string package)
+    {
+        var type = TypeFor(context, contract);
+        var separator = type.LastIndexOf('.');
+        var name = type[(separator + 1)..];
+        if (type[..separator] == package) code.Declare(name);
+        else code.Import(type);
+        return name;
+    }
+
     static void Emit(AxonEmissionContext context, SemanticModule module, SemanticEventContract contract)
     {
-        var annotation = "@org.axonframework.messaging.eventhandling.annotation.Event(namespace = " + JavaCodeBuilder.StringLiteral(JavaNames.PackageSegment(module.Name)) + ", name = " + JavaCodeBuilder.StringLiteral(contract.StoredName ?? contract.Name) + ", version = " + JavaCodeBuilder.StringLiteral(contract.Revision.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)) + ")";
+        var comment = string.Empty;
         if (!contract.PriorRevisions.IsDefaultOrEmpty || contract.Predecessor is not null)
         {
             const string intent = "upcast historical event revisions";
             var path = contract.Id + "/priorRevisions";
             context.Degradation.Unsupported(AxonRefusalCodes.Evolution, contract.Id, "Historical event revisions require an Axon upcaster implementation.", intent, path);
-            annotation = JavaCodeBuilder.UnsupportedComment(intent, path, AxonRefusalCodes.Evolution) + "\n" + annotation;
+            comment = JavaCodeBuilder.UnsupportedComment(intent, path, AxonRefusalCodes.Evolution) + "\n";
         }
         var name = JavaNames.Type(contract.Name);
-        context.AddJava(Package(context, module), name, AxonEventSources.Record(context, Package(context, module), contract, annotation), sources: [contract.Id]);
+        string Annotation(JavaCodeBuilder code) => comment + "@" + code.Reference("org.axonframework.messaging.eventhandling.annotation.Event") + "(namespace = " + JavaCodeBuilder.StringLiteral(JavaNames.PackageSegment(module.Name)) + ", name = " + JavaCodeBuilder.StringLiteral(contract.StoredName ?? contract.Name) + ", version = " + JavaCodeBuilder.StringLiteral(contract.Revision.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)) + ")";
+        context.AddJava(Package(context, module), name, AxonEventSources.Record(context, Package(context, module), contract, Annotation), sources: [contract.Id]);
     }
 }
