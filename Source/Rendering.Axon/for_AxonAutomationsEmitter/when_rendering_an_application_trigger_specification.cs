@@ -28,4 +28,9 @@ public class when_rendering_an_application_trigger_specification : given.a_react
     [Fact] void should_correlate_the_junit_display_name() => code.ShouldContain(specification.Id.ToString());
     [Fact] void should_claim_the_model_specification() => context.Specifications.ContainsKey(specification.Id).ShouldBeTrue();
     [Fact] void should_not_disable_supported_fixtures() => code.ShouldNotContain("@Disabled");
+    [Fact] void should_import_the_caller_security_types() => code.ShouldContain("import org.springframework.security.core.context.SecurityContextHolder;");
+    [Fact] void should_use_the_short_caller_security_names() => code.ShouldContain("SecurityContextHolder.setContext(SecurityContextHolder.createEmptyContext());");
+    [Fact] void should_not_qualify_the_caller_security_types() => code.ShouldNotContain("org.springframework.security.core.context.SecurityContextHolder.");
+    [Fact] void should_keep_the_anonymous_role_literal() => code.ShouldContain("\"ROLE_ANONYMOUS\"");
+    [Fact] void should_import_list() => code.ShouldContain("import java.util.List;");
 }

@@ -147,7 +147,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
     {
         method.Block("try", body =>
         {
-            CommandFixtureSecurity.Caller(body, spec.GivenCaller);
+            CommandFixtureSecurity.CallerReferences(body, spec.GivenCaller);
             var modelName = JavaNames.Type(model.Name);
             var updates = new ProjectionUpdates(context, types, model.Id);
             body.Line($"{body.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{body.Reference("java.lang.Object")}, {modelName}> store = new {body.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")

@@ -19,7 +19,7 @@ internal sealed class ReactionSpecificationScenario(AxonEmissionContext context,
 
     internal void Emit(JavaCodeBuilder test)
     {
-        CommandFixtureSecurity.Caller(test, specification.GivenCaller);
+        CommandFixtureSecurity.CallerReferences(test, specification.GivenCaller);
         test.Line($"{test.Reference("org.mockito.Mockito")}.when(clock.instant()).thenReturn({test.Reference("java.time.Instant")}.parse({JavaCodeBuilder.StringLiteral(specification.GivenClock ?? "1970-01-01T00:00:00Z")}));")
             .Line($"{test.Reference("org.mockito.Mockito")}.when(clock.getZone()).thenReturn({test.Reference("java.time.ZoneOffset")}.UTC);")
             .Line($"reaction.on{index}({ReactionJavaReferences.Expression(test, _input!)});")
