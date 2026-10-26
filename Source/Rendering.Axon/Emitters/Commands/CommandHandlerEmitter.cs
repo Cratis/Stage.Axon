@@ -122,6 +122,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     bool Supported(JavaCodeBuilder body, CommandResponses response)
     {
         if (ConstraintCoverage.CommandRequiresUnsupportedConstraint(context, command)) return Unsupported(body, AxonRefusalCodes.Constraint, "enforce or release modeled uniqueness in the append unit of work");
+        if (command.Handler is not null && Constrained) return Unsupported(body, AxonRefusalCodes.Constraint, "enforce or release modeled uniqueness for a native command body in the append unit of work");
         if (new CommandDecisionReads(context, command, source).Prepare() is null) return Unsupported(body, AxonRefusalCodes.ProtectedReads, "check modeled decision reads before changing state");
         if (MissingSource) return Unsupported(body, AxonRefusalCodes.CommandMapping, "resolve the command's primary event-source identity");
         return command.Handler is not null || response.Value is not null || Unsupported(body, AxonRefusalCodes.CommandMapping, "compute the complete modeled command response");

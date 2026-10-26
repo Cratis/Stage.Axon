@@ -177,7 +177,7 @@ A reducer becomes an event projector delegating to a `<ReadModel>Reducer` interf
 
 | Role | Existing native method contract |
 | --- | --- |
-| Command handler | `handle(Command command, EventAppender appender, ...)` with the modeled return type. Supported generated-value preparation, validation, security and decision guards remain. The admitted body owns effects and returns; modeled appends are not also fabricated. An unavailable required surrounding contract still fails closed. |
+| Command handler | `handle(Command command, EventAppender appender, ...)` with the modeled return type. Supported generated-value preparation, validation, security and decision guards remain. The admitted body owns effects and returns; modeled appends are not also fabricated. An unavailable required surrounding contract still fails closed. Commands that produce or release a uniqueness-constrained event cannot use a native handler: `STAGE-AXON-0801` emits a warning/comment and throwing stub (strict mode refuses) before preparation or body execution. The modeled path retains unit-of-work constraint reservations/releases; no unverified appender adapter or body containment is invented. |
 | Standalone reaction effect | Existing `onN(...)` method, with `input` when the trigger has a payload and `occurred` for an event timestamp. Supported scheduling/where guards and trusted-system identity `try/finally` remain. A native effect cannot also declare invokes/produces; unsupported identity/from combinations are not consumed. |
 | Query performer | Existing `default List<Model> perform(Query query, ReadModelStore<Object, Model> store)`. The typed handler delegation and replaceable Spring bean are unchanged. |
 
