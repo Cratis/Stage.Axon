@@ -52,4 +52,19 @@ public class when_the_canonical_selection_is_empty : Specification
         Catch.Exception(() => CanonicalCorpusInputs.Create(_repository, [form, form])).ShouldBeOfExactType<InvalidOperationException>();
         Directory.Exists(_repository).ShouldBeFalse();
     }
+
+    [Fact]
+    void should_reject_a_folder_holding_only_the_tracking_document_before_creating_output()
+    {
+        var document = ScreenCompositionCorpus.V1.SourceForms.Single(form => form.Name == "folder").Documents.Single(document => document.StableKey == "workspaces-tracking-feature");
+        Catch.Exception(() => CanonicalCorpusInputs.Create(_repository, [new() { Name = "folder", Documents = [document] }])).ShouldBeOfExactType<InvalidOperationException>();
+        Directory.Exists(_repository).ShouldBeFalse();
+    }
+
+    [Fact]
+    void should_reject_a_folder_resolving_zero_documents_before_creating_output()
+    {
+        Catch.Exception(() => CanonicalCorpusInputs.Create(_repository, [new() { Name = "folder", Documents = [] }])).ShouldBeOfExactType<InvalidOperationException>();
+        Directory.Exists(_repository).ShouldBeFalse();
+    }
 }

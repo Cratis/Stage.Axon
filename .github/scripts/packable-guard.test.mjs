@@ -139,6 +139,52 @@ function forbidden(packable = true) {
     return { packable, direct: [packageReference(forbiddenPackage, { PrivateAssets: 'all' })], packages: { [`${forbiddenPackage}/1.0.0`]: packageNode() } };
 }
 
+// SDK assets v4 use framework aliases as map keys and full monikers on project nodes.
+// Keep the real restore/framework metadata and relative project-library paths in these fixtures.
+function useVersion4(f, ...projects) {
+    for (const project of projects) {
+        f.alterAssets(assets => {
+            assets.version = 4;
+            const framework = assets.project.frameworks['net10.0'];
+            Object.assign(framework, { framework: 'net10.0', targetAlias: 'net10.0' });
+            const restore = assets.project.restore.frameworks['net10.0'];
+            Object.assign(restore, { framework: 'net10.0', targetAlias: 'net10.0' });
+            for (const library of Object.values(assets.libraries)) {
+                if (library.type === 'project') library.path = library.msbuildProject;
+            }
+        }, project);
+    }
+}
+
+test('v4 alias-keyed assets with an outgoing project reference pass', t => {
+    const f = fixture(t, { Renderer: { ...clean(), references: ['Bridge'] }, Bridge: clean(false) });
+    useVersion4(f, 'Renderer', 'Bridge');
+    assert.match(guard(f.options), /passed: 1 root matrix entries/);
+});
+
+test('v4 assets reject a direct Generation dependency', t => {
+    const f = fixture(t, { Renderer: forbidden() });
+    useVersion4(f, 'Renderer');
+    assert.throws(() => guard(f.options), /Forbidden dependency: .*Renderer.*cRaTiS\.sCrEeNpLaY\.gEnErAtIoN\.Synthetic/);
+});
+
+test('v4 assets reject a transitive Generation dependency', t => {
+    const f = fixture(t, { Renderer: {
+        packable: true,
+        direct: [packageReference('Synthetic.Adapter')],
+        packages: { 'Synthetic.Adapter/1.0.0': packageNode({ [forbiddenPackage]: '1.0.0' }), [`${forbiddenPackage}/1.0.0`]: packageNode() }
+    } });
+    useVersion4(f, 'Renderer');
+    assert.throws(() => guard(f.options), /Forbidden dependency: .*Renderer.* -> Synthetic\.Adapter -> cRaTiS/);
+});
+
+test('unknown assets version 5 fails closed', t => {
+    const f = fixture(t, { Renderer: clean() });
+    useVersion4(f, 'Renderer');
+    f.alterAssets(assets => { assets.version = 5; });
+    assert.throws(() => guard(f.options), /Unsupported assets version/);
+});
+
 test('clean packable resolved graph passes without inspecting source XML', t => {
     const f = fixture(t, { Renderer: clean() });
     assert.match(guard(f.options), /passed: 1 root matrix entries/);
