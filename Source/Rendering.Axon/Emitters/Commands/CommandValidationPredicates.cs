@@ -49,6 +49,16 @@ internal sealed class CommandValidationPredicates(CommandJavaTypes types, Semant
     readonly string _value = types.Unwrap(access, type);
     readonly SemanticPrimitiveType _primitive = types.PrimitiveOf(type);
 
+    JavaCodeBuilder? _code;
+
+    internal void Claim(JavaCodeBuilder code)
+    {
+        if (!type.IsCollection || rule.Kind is not (SemanticValidationRuleKind.AllGreaterThan or SemanticValidationRuleKind.AllGreaterThanOrEqual)) return;
+        if (rule.Operand is { } constant) types.ClaimLiteral(constant, type with { IsCollection = false }, code);
+    }
+
+    internal string? Render(JavaCodeBuilder code) => new CommandValidationPredicates(types, rule, type, access) { _code = code }.Render();
+
     internal string? Render()
     {
         if (rule.Kind == SemanticValidationRuleKind.NotEmpty) return NotEmpty();
@@ -82,9 +92,23 @@ internal sealed class CommandValidationPredicates(CommandJavaTypes types, Semant
     {
         var present = $"{access} != null";
         if (type.IsCollection) return $"({present} && !{access}.isEmpty())";
-        var content = _nonDefaults.TryGetValue(_primitive, out var predicate) ? predicate(_value) : null;
+        var content = NonDefault();
         return content is null ? present : $"({present} && {content})";
     }
+
+    string? NonDefault()
+    {
+        if (_code is null) return _nonDefaults.TryGetValue(_primitive, out var predicate) ? predicate(_value) : null;
+        return _primitive switch
+        {
+            SemanticPrimitiveType.Uuid => $"!{_value}.equals(new {_code.Reference("java.util.UUID")}(0L, 0L))",
+            SemanticPrimitiveType.Date => $"!{_value}.equals({_code.Reference("java.time.LocalDate")}.of(1, 1, 1))",
+            SemanticPrimitiveType.DateTime => $"!{_value}.toInstant().equals({_code.Reference("java.time.Instant")}.parse(\"0001-01-01T00:00:00Z\"))",
+            _ => _nonDefaults.TryGetValue(_primitive, out var fallback) ? fallback(_value) : null
+        };
+    }
+
+    string? Literal(SemanticValue value, SemanticTypeReference target) => _code is null ? types.Literal(value, target) : types.Literal(value, target, _code);
 
     string? ScalarRule()
     {
@@ -103,7 +127,7 @@ internal sealed class CommandValidationPredicates(CommandJavaTypes types, Semant
         return rule.Kind == SemanticValidationRuleKind.Equal ? equality : $"!({equality})";
     }
 
-    string? Operand() => rule.Operand is { } constant ? types.Literal(constant, type with { Kind = SemanticTypeReferenceKind.Primitive, Primitive = _primitive }) : null;
+    string? Operand() => rule.Operand is { } constant ? Literal(constant, type with { Kind = SemanticTypeReferenceKind.Primitive, Primitive = _primitive }) : null;
 
     string NullableValue() => type.Kind == SemanticTypeReferenceKind.Concept ? $"({access} == null ? null : {_value})" : access;
 
@@ -112,14 +136,14 @@ internal sealed class CommandValidationPredicates(CommandJavaTypes types, Semant
         var value = NullableValue();
         return _primitive == SemanticPrimitiveType.DecimalNumber && operand != "null"
             ? $"({value} != null && {value}.compareTo({operand}) == 0)"
-            : $"java.util.Objects.equals({value}, {operand})";
+            : $"{_code?.Reference("java.util.Objects") ?? "java.util.Objects"}.equals({value}, {operand})";
     }
 
     string? CollectionRule()
     {
         if (rule.Kind is not (SemanticValidationRuleKind.AllGreaterThan or SemanticValidationRuleKind.AllGreaterThanOrEqual)) return null;
         var scalar = type with { IsCollection = false };
-        var operand = rule.Operand is { } constant ? types.Literal(constant, scalar) : null;
+        var operand = rule.Operand is { } constant ? Literal(constant, scalar) : null;
         if (operand is null) return null;
         var operation = rule.Kind == SemanticValidationRuleKind.AllGreaterThan ? ">" : ">=";
         return $"({access} == null || {access}.stream().allMatch(item -> item != null && {types.Unwrap("item", scalar)}.compareTo({types.Unwrap(operand, scalar)}) {operation} 0))";

@@ -36,9 +36,9 @@ public class when_rendering_command_fixtures : for_AxonArtifactRenderPlanner.giv
         coded = Render(specification with { ThenErrors = [new("Required", "Not allowed.")], ThenEvents = [] });
     }
 
-    [Fact] void should_check_denial_without_events() => denial.ShouldContain("result.exception(org.springframework.security.access.AccessDeniedException.class).noEvents();");
+    [Fact] void should_check_denial_without_events() => denial.ShouldContain("result.exception(AccessDeniedException.class).noEvents();");
     [Fact] void should_enforce_the_policy_during_denial_tests() => denial.ShouldContain("AuthorizationManagerBeforeMethodInterceptor.preAuthorize()");
-    [Fact] void should_assert_the_typed_rejection() => rejection.ShouldContain(".runtime.CommandValidationException.class);");
+    [Fact] void should_assert_the_typed_rejection() => rejection.ShouldContain("CommandValidationException.class);");
     [Fact] void should_assert_rejection_messages() => rejection.ShouldContain(".contains(\"Not allowed.\");");
     [Fact] void should_assert_no_append_on_rejection() => rejection.ShouldContain("result.noEvents();");
     [Fact] void should_load_the_given_history() => replay.ShouldContain(".given().events(new ");
