@@ -40,6 +40,10 @@ internal static class DefaultViewDispatchProof
             @Import({__APPLICATION__.infrastructure.AxonConfiguration.class, __APPLICATION__.infrastructure.SecurityConfiguration.class,
                     __MODEL__StoreConfiguration.class, __PROJECTOR__.class, __LIVE_QUERY__Handler.class})
             static class DefaultFixture {
+                @Bean org.springframework.beans.factory.SmartInitializingSingleton defaultFixtureProcessorGuard(
+                        org.axonframework.common.configuration.Configuration configuration) {
+                    return () -> __APPLICATION__.infrastructure.DefaultViewProcessorGuard.verify(configuration, java.util.Set.of("__PACKAGE__"));
+                }
                 @Bean static BeanPostProcessor observeDefaultStore() {
                     return new BeanPostProcessor() {
                         @Override @SuppressWarnings("unchecked")
@@ -63,13 +67,33 @@ internal static class DefaultViewDispatchProof
                 @Override public __MODEL__ update(Object key, UnaryOperator<__MODEL__> update) { writes.incrementAndGet(); return delegate.update(key, update); }
             }
 
+            @Test void refusesStreamingDefaultViewsBeforeReadiness() {
+                var spring = new SpringApplication(DefaultFixture.class);
+                var error = assertThrows(Exception.class, () -> {
+                    try (var application = spring.run("--server.port=0", "--spring.profiles.active=default",
+                            "--axon.eventhandling.processors[__PACKAGE__].mode=pooled")) {
+                        fail("Streaming default views reached readiness: active=" + application.isActive());
+                    }
+                });
+                var messages = new StringBuilder();
+                for (Throwable cause = error; cause != null; cause = cause.getCause()) messages.append(cause.getMessage());
+                assertTrue(messages.toString().contains("must exist and must not be streaming"));
+            }
+
             @Test void discoversContextualHandlerOnceAndInvalidatesDefaultQueryAfterWrite() throws Exception {
                 var spring = new SpringApplication(DefaultFixture.class);
                 spring.setDefaultProperties(java.util.Map.of(
                         "server.port", "0", "spring.profiles.active", "default",
-                        "axon.eventhandling.processors.__PACKAGE__.mode", "subscribing"));
+                        "axon.eventhandling.processors[__PACKAGE__].mode", "subscribing"));
                 try (var application = spring.run()) {
                     assertFalse(java.util.Arrays.asList(application.getEnvironment().getActiveProfiles()).contains("persistent"));
+                    var configuration = application.getBean(org.axonframework.common.configuration.Configuration.class);
+                    var processor = configuration.getComponents(org.axonframework.messaging.eventhandling.processing.EventProcessor.class).get("__PACKAGE__");
+                    assertNotNull(processor, "FIXTURE: C2 default view processor must exist");
+                    assertFalse(processor instanceof org.axonframework.messaging.eventhandling.processing.streaming.StreamingEventProcessor,
+                            "FIXTURE: C2 default views must not use a streaming processor");
+                    assertFalse(configuration.getComponents(org.axonframework.messaging.eventhandling.processing.streaming.StreamingEventProcessor.class).containsKey("__PACKAGE__"),
+                            "FIXTURE: C2 default namespace must not resolve to a streaming processor");
                     var store = (ObservedStore) application.getBean("__QUALIFIER__");
                     var gateway = application.getBean(QueryGateway.class);
                     var signals = new CopyOnWriteArrayList<__LIVE_QUERY__.Result>();

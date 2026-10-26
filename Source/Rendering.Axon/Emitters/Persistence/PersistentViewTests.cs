@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
+using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Queries;
 using Cratis.Stage.Rendering.Axon.Java;
@@ -47,10 +48,13 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__COUNT__", spec.GivenEvents.Count(given => given.EventContract == spec.GivenEvents[0].EventContract).ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
             .Replace("__APPENDS__", string.Join('\n', events.Select(expression => $"            append(application, {expression});")), StringComparison.Ordinal)
             .Replace("__EXPECTED__", string.Join('\n', events.Select(expression => $"        projector.on({expression}{updates.DefaultArgument});")), StringComparison.Ordinal)
-            .Replace("__ARGUMENT__", updates.DefaultArgument, StringComparison.Ordinal);
+            .Replace("__ARGUMENT__", updates.DefaultArgument, StringComparison.Ordinal)
+            .Replace("__TAGS__", Tags(spec), StringComparison.Ordinal)
+            .Replace("__FIXTURE_EVENTS__", string.Join(", ", events), StringComparison.Ordinal);
         void Add(string suffix, string source) => context.Artifacts.Add(PlannedArtifact.CreateText(
             $"src/test/java/{package.Replace('.', '/')}/{name}{suffix}.java", Render(source), [model.Id, spec.Id]));
         Add("Support", PersistentViewProofSupport.Source);
+        Add("Fixture", PersistentViewFixtureContract.Source);
         Add("Test", PersistentViewProof.Source);
         Add("StoreTest", PersistentViewContractTests.Source);
         Add("LegacyTest", PersistentViewLegacyProof.Source);
@@ -59,6 +63,13 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         if (live is not null && ProjectionTransitions.From(projection).Count(from => from.EventContract == spec.GivenEvents[0].EventContract) == 1)
             Add("DefaultDispatchTest", DefaultViewDispatchProof.Source.Replace("__LIVE_QUERY__", package + "." + JavaNames.Type(live.Name), StringComparison.Ordinal));
     }
+
+    string Tags(SemanticSpecification spec) => string.Join('\n', spec.GivenEvents.Select(given => given.EventContract).Distinct().Select(id =>
+    {
+        var contract = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(contract => contract.Id == id);
+        var tag = AxonEventSources.PrimaryTag(context, contract);
+        return $"        if (event instanceof {types.EventType(id)} tagged) return new Tag({JavaCodeBuilder.StringLiteral(tag.TagKey)}, tagged.{tag.ComponentName}().toString());";
+    }));
 
     SemanticSpecification? Specification(LocatedSemanticSlice owner, SemanticReadModel model, SemanticProjection projection)
     {

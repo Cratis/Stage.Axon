@@ -13,6 +13,7 @@ internal static class PersistentViewProcessorGuard
         import java.util.HashSet;
         import java.util.Set;
         import org.axonframework.common.configuration.Configuration;
+        import org.axonframework.messaging.eventhandling.processing.EventProcessor;
         import org.axonframework.messaging.eventhandling.processing.errorhandling.PropagatingErrorHandler;
         import org.axonframework.messaging.eventhandling.processing.streaming.pooled.PooledStreamingEventProcessor;
         import org.axonframework.messaging.eventhandling.processing.streaming.pooled.PooledStreamingEventProcessorConfiguration;
@@ -26,8 +27,11 @@ internal static class PersistentViewProcessorGuard
                 inspect(configuration, required, verified);
                 if (!verified.containsAll(required)) throw refusal();
                 var processors = configuration.getComponents(StreamingEventProcessor.class);
-                for (var name : required)
+                var otherProcessors = configuration.getComponents(EventProcessor.class);
+                for (var name : required) {
                     if (!(processors.get(name) instanceof PooledStreamingEventProcessor)) throw refusal();
+                    if (otherProcessors.containsKey(name) && !(otherProcessors.get(name) instanceof PooledStreamingEventProcessor)) throw refusal();
+                }
             }
             private static void inspect(Configuration configuration, Set<String> required, Set<String> verified) {
                 configuration.getOptionalComponent(PooledStreamingEventProcessorConfiguration.class).ifPresent(processor -> {
