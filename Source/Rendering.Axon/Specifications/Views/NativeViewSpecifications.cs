@@ -70,7 +70,7 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
     {
         method.Block("try", body =>
         {
-            CommandFixtureSecurity.Caller(body, spec.GivenCaller);
+            CommandFixtureSecurity.CallerReferences(body, spec.GivenCaller);
             body.Line($"{body.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {plan.Model}> store = new {body.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
                 .Line($"var projector = new {plan.Projection}Projector(store);")
                 .Line($"projector.on({AxonViewEvents.Expression(context, types, plan.Event, body)}{plan.Arguments});");

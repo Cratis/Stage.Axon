@@ -10,6 +10,7 @@ import jakarta.persistence.EntityManagerFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
@@ -29,7 +30,10 @@ import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.SmartLifecycle;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -74,12 +78,12 @@ final class PersistentProbeSupport {
     }
 
     static boolean unsupportedViews() {
-        var scanner = new org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider(false);
-        scanner.addIncludeFilter(new org.springframework.core.type.filter.AnnotationTypeFilter(org.springframework.context.annotation.Configuration.class));
+        var scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(Configuration.class));
         return scanner.findCandidateComponents(PersistentProbeSupport.class.getPackageName().replaceFirst("\\.runtime$", "")).stream()
                 .anyMatch(definition -> {
                     try {
-                        return java.util.Arrays.stream(Class.forName(definition.getBeanClassName()).getDeclaredMethods())
+                        return Arrays.stream(Class.forName(definition.getBeanClassName()).getDeclaredMethods())
                                 .anyMatch(method -> method.getReturnType() == PersistentReadModelSafety.class);
                     } catch (ClassNotFoundException failure) { throw new IllegalStateException(failure); }
                 });
