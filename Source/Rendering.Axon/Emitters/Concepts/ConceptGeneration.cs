@@ -15,7 +15,7 @@ internal static class ConceptGeneration
         var type = JavaNames.Type(concept.Name);
         if (string.Equals(generation.Kind, "uuid", StringComparison.OrdinalIgnoreCase) && concept.Primitive == SemanticPrimitiveType.Uuid)
         {
-            body.Line($"public static {type} create() {{ return new {type}({context.BasePackage}.runtime.GenerateValue.uuid()); }}");
+            body.Line($"public static {type} create() {{ return new {type}({CratisFundamentals.ConceptsPackage}.GenerateValue.uuid()); }}");
             return;
         }
         var path = concept.Id + "/generation";

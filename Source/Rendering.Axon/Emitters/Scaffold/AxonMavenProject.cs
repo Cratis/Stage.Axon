@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Stage.Rendering.Axon.Emitters.Concepts;
+
 namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 
 internal static class AxonMavenProject
@@ -17,6 +19,7 @@ internal static class AxonMavenProject
             <dependency><groupId>org.axonframework</groupId><artifactId>axon-framework-bom</artifactId><version>5.4.1</version><type>pom</type><scope>import</scope></dependency>
           </dependencies></dependencyManagement>
           <dependencies>
+            <dependency><groupId>{{CratisFundamentals.GroupId}}</groupId><artifactId>{{CratisFundamentals.ArtifactId}}</artifactId><version>{{CratisFundamentals.Version}}</version></dependency>
             <dependency><groupId>org.axonframework.extensions.spring</groupId><artifactId>axon-spring-boot-starter</artifactId></dependency>
             <dependency><groupId>io.projectreactor</groupId><artifactId>reactor-core</artifactId></dependency>
             <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
