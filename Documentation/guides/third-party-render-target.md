@@ -3,13 +3,35 @@ title: Verify a third-party render target
 description: Check semantic coverage, deterministic output, and native specifications when building a Stage renderer, using Axon as an example.
 ---
 
+Preview: the conformance API may change ([conformance README](../../Source/Rendering.Conformance/README.md)).
+
 A generated application can compile while silently omitting a modeled rule or specification. Use `Cratis.Stage.Rendering.Conformance` to find those omissions without coupling your renderer to the Cratis target.
 
-Start with [Build a renderer target](build-renderer-target.md) for compilation, profiles, scopes, and publication. This guide assumes you already have an `IArtifactRenderPlanner`, an admitted `ArtifactRenderRequest`, and a native test runner for the generated application.
+Start with [Build a renderer target](https://github.com/Cratis/Stage/blob/v4.197.0/Documentation/guides/build-renderer-target.md), the Stage version matching the pinned Contracts, for compilation, profiles, scopes, and publication. This guide assumes you already have an `IArtifactRenderPlanner`, an admitted `ArtifactRenderRequest`, and a native test runner for the generated application.
 
 ## Account for every semantic identity
 
-Reference `Cratis.Stage.Rendering.Conformance` from your renderer verification project. The package depends on Stage Contracts and Screenplay, not on a particular renderer or generated runtime.
+`Cratis.Stage.Rendering.Conformance` is a preview API; this repository has no package publication configured. Registry availability has not been verified. It depends directly on `Cratis.Stage.Contracts` and transitively on Screenplay, not on a particular renderer or generated runtime. Consume it from a pinned checkout:
+
+1. Install the .NET 10 SDK and target `net10.0` in your verification project.
+2. Add Stage.Axon as a submodule: `git submodule add https://github.com/Cratis/Stage.Axon external/Stage.Axon`. Check out a specific commit with `git -C external/Stage.Axon checkout <sha>` and commit the submodule pointer. A clone pinned to the same SHA also works. Pin a SHA, not a branch, because Conformance is a preview API.
+3. Match the Contracts version in that checkout's `Directory.Packages.props` (currently `4.197.0`). Without central package management, add:
+
+   ```xml
+   <PackageReference Include="Cratis.Stage.Contracts" Version="4.197.0" />
+   ```
+
+   With central package management, put `<PackageVersion Include="Cratis.Stage.Contracts" Version="4.197.0" />` in your `Directory.Packages.props` and omit the version from the package reference. Compatibility with a higher Contracts version is not verified.
+4. Reference Conformance in Release, adjusting the relative path for your project:
+
+   ```xml
+   <ProjectReference Include="../external/Stage.Axon/Source/Rendering.Conformance/Rendering.Conformance.csproj"
+                     SetConfiguration="Configuration=Release" />
+   ```
+
+   Stage.Axon compiles inline specifications and adds test dependencies in Debug; Release excludes them. The Debug-consumer behavior of this metadata has not yet been verified.
+
+Do not copy the project folder alone: it inherits its target framework, package versions, analyzers, and specification configuration from repository-level build files. Keep the pinned checkout intact so MSBuild evaluates the referenced project with its own configuration. When updating the pin, re-read its Contracts version and rebuild.
 
 For each selected scope:
 
@@ -59,10 +81,11 @@ static void CheckApplication(
     string outputDirectory,
     string junitDirectory)
 {
+    var issues = new List<string>();
     var plan = planner.Plan(request);
     if (!plan.Success)
     {
-        throw new InvalidOperationException("The render plan was not successful.");
+        issues.Add("The render plan was not successful.");
     }
 
     var manifest = StageSpecificationManifest.Read(
@@ -78,9 +101,12 @@ static void CheckApplication(
     {
         foreach (var issue in report.Issues)
         {
-            throw new InvalidOperationException(
-                $"{issue.Code}: {issue.SemanticId}: {issue.Message}");
+            issues.Add($"{issue.Code}: {issue.SemanticId}: {issue.Message}");
         }
+    }
+    if (issues.Count > 0)
+    {
+        throw new InvalidOperationException(string.Join(Environment.NewLine, issues));
     }
 }
 ```
@@ -105,7 +131,7 @@ Then pass `target/surefire-reports` to the native-result check. A green Maven ru
 
 ### Current profile guarantees
 
-The default scaffold uses in-memory storage. The emitted `persistent` Spring profile provides an aggregate-based JPA event engine and a JPA uniqueness store backed by file-based H2. This supports event/uniqueness persistence only in viewless hosts. Every generated view configuration refuses `persistent` startup with `STAGE-AXON-0308` before ordinary bean-factory processing, resources, processors or readiness. Read-model rows and projector indexes remain volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery.
+The default scaffold uses in-memory storage. The emitted `persistent` Spring profile provides an aggregate-based JPA event engine, a JPA uniqueness store and flat projection view rows backed by file-based H2. Scoped and reducer-built views are refused with `STAGE-AXON-0308`. A legacy database without a view generation, or with a mismatched generation, fails closed before processors or readiness; automatic replay is not a migration strategy. Persistent flat views require pooled processors, propagating errors and context-bound writes on the handler thread. Startup validates the resolved processor envelope after customizations. Runtime row/checkpoint atomicity is proven only by the CI Maven gate; C# source assertions do not prove transaction behavior.
 
 | Concern | Default in-memory application | Persistent profile and limits |
 | --- | --- | --- |
@@ -115,8 +141,8 @@ The default scaffold uses in-memory storage. The emitted `persistent` Spring pro
 | Unique constraints | Supported property-based constraints reserve claims during append and clean up reservations on rollback. Unsupported constraint shapes fail closed with `STAGE-AXON-0801`. | JPA claims, releases and event append share the transaction. Native race/rollback fixtures exercise both profiles; this is not arbitrary-query uniqueness. |
 | Reactions | Supported reactions invoke commands or append one typed event. Delivery is at least once, not exactly once; reaction handlers disallow replay. | Processor checkpoints may persist independently of volatile view state. Storage does not establish coordinated view/reaction recovery or exactly-once side effects. |
 | Time | Injected `java.time.Clock`; UTC calendar guards and process-local Spring scheduling. Interval alignment/durability differs explicitly with `STAGE-AXON-0507`. | No durable scheduler guarantee. |
-| Restart | Events and default stores do not survive process restart. | An opt-in H2 probe exercises event and uniqueness-claim survival across two boots of an explicit test-only viewless fixture, including rejection of a second owner without another append. Select `PersistentRestartProbe` with `-Dstage.restart=true`; add `-Dstage.expectViews=true` to assert that the real generated application refuses two persistent starts without readiness or mutation of preexisting event, claim and token values. It also checks fresh-file refusal. The probe is outside default Surefire discovery, not a disabled default test. These are safety checks, not proof of view/checkpoint/reaction recovery. |
-| Read models | Qualified in-memory stores remain unchanged in the default profile. | Rendering retains the `STAGE-AXON-0308` Warning, intent-ledger entry and generated difference comment. Persistent startup with any generated view is refused, including model-only declarations and mixed profiles containing `persistent`. No JPA read-model store or automatic recovery is supplied. |
+| Restart | Events and default stores do not survive process restart. | Persistent flat-view fixtures emit two-boot row/checkpoint checks, handler-after-write rollback, real TokenStore persistence failure, handler-thread/non-joined transaction refusal and generation-refusal tests. These require CI Maven execution. The opt-in `PersistentRestartProbe` remains a separate event/uniqueness probe, not proof of coordinated reaction recovery. |
+| Read models | Qualified in-memory stores remain unchanged in the default profile. | The persistent profile supports admitted flat projection views with namespaced JPA rows and generation metadata. Scoped and reducer-built views remain refused, including mixed profiles containing `persistent`. Legacy databases without a view generation fail closed. No automatic migration, scoped-index recovery or exactly-once reaction guarantee is supplied. |
 
 Protected decision support currently covers required **presence**, not arbitrary field-value reads. Reaction JUnit lowering currently covers unambiguous application-trigger scenarios without prior state, with event assertions and a pinned clock. Other fixtures stay explicitly disabled rather than succeeding without exercising their behavior. Captures and translations remain unsupported with `STAGE-AXON-0601`; an unauthenticated collection endpoint is not a substitute for source subscription and checkpoint semantics.
 
@@ -145,7 +171,7 @@ Supported forms include flat `from` mappings; `set`, `add`, `subtract`, `increme
 
 Each generated event has one primary event-source component annotated with Axon's `@EventTag`. A projection's `$eventSourceId` reads that component, not a second identifier.
 
-Join and deferred child indexes live in the projector, not the store, and are volatile along with rows. Durable checkpoints can outlive that state and skip prior events after restart. Rows, indexes, checkpoints and reaction effects require coordinated, tested recovery, which is not supplied; automatic replay is not established recovery. Generated persistent view startup is therefore refused. Legacy affected-instance cardinality metadata does not select a bulk-update algorithm: the projector applies the event to its modeled key. An external target nomination does not replace the generated Axon projector.
+Join and deferred child indexes live in the projector, not the store, and remain volatile in the default profile. Persistent startup is refused for scoped and reducer-built views and for projections requiring those indexes. Only admitted flat projection rows share the pooled processor transaction with its checkpoint, subject to propagating errors and context-bound handler-thread writes; runtime atomicity requires CI Maven proof. Reaction effects are not covered by that guarantee, and automatic replay is not a migration strategy. Legacy affected-instance cardinality metadata does not select a bulk-update algorithm: the projector applies the event to its modeled key. An external target nomination does not replace the generated Axon projector.
 
 ### Query behavior
 
@@ -169,7 +195,9 @@ Endpoints and handlers share the renderer's Spring Security mapping. Unsupported
 
 A query performer becomes a `<Query>Performer` interface taking the typed query and store and returning rows. Handlers delegate to that interface rather than substituting an ordinary store listing. An admitted inline Java body fills the existing default method; a Spring bean can still replace it through `@ConditionalOnMissingBean`. Without an admitted body the default throws `UnsupportedOperationException`, emits `STAGE-AXON-0401` and preserves the modeled intent. Non-Java bodies are not translated.
 
-A reducer becomes an event projector delegating to a `<ReadModel>Reducer` interface with typed `reduce(event, current, message)` overloads. The projector stores the returned state and removes the row for `null`. Supply the reduction algorithm as a Spring bean; the default transitions throw. A missing body is not a no-op, and an event/result type does not specify how to calculate state or when to delete it. A reducer without transitions supplies no observed event or algorithm. This closest-equivalent path emits `STAGE-AXON-0306`; dependent specifications remain explicitly disabled.
+A reducer becomes an event projector delegating to a `<ReadModel>Reducer` interface with typed `reduce(event, current, message)` overloads. Admitted inline Java bodies are copied verbatim, not translated from another language. For example, `return new RebuiltTotal(event.id(), (current == null ? 0L : current.amount()) + event.amount());` initializes and accumulates state; `return null;` deletes it. `current` is nullable on first delivery, and `message` is Axon's `EventMessage`. Bodies must be pure by author obligation; Axon does not verify purity. No helper services are injected. Modeled initial state is advisory: authors initialize from null explicitly. A custom Spring bean may still replace the generated default bean.
+
+Unplaced transitions emit `STAGE-AXON-0306` and return `current`: **events are ignored until a supported body is authored**. A null `current` on the first event leaves the view absent; the placeholder neither creates a row nor deletes an existing one. Foreign-language bodies are not executed. Event-target, missing-model, duplicate/missing-event and unsupported key/result reducers are refused; filtered `From` reducers remain unplaced rather than ignoring their filter. A reducer without transitions supplies no observed event or algorithm.
 
 ### Target-native Java body contracts
 
@@ -183,7 +211,7 @@ A reducer becomes an event projector delegating to a `<ReadModel>Reducer` interf
 
 These target-native variables are not a universal `context` ABI. No context/result adapter is invented and no authored Java is scanned to infer identities, imports or effects. Use qualified names inside the body for additional Java types. Admitted bodies are copied exactly once without reindentation, reference shortening, synthetic results or trailing fallback throws.
 
-**Transport limit:** only LF-only bodies can be admitted. Published `PlannedArtifact.CreateText` normalizes CR/CRLF, so any body containing CR is rejected before insertion with an attributed warning and intent comment; strict mode records an error/refusal. The renderer neither rewrites that content nor labels Java as a binary artifact. Missing/stale/file-backed content, unknown revisions/capabilities and foreign languages also remain unplaced. After emission, one comment-only `runtime/UnsupportedImplementations.java` records scoped unconsumed command, reaction, performer and reducer requirements. Foreign languages use `STAGE-AXON-IMPL-LANGUAGE`; other unplaced slots use `STAGE-AXON-0403` with their feature diagnostics. Unrelated scopes and already consumed bodies are excluded. Java and C# reducers remain unsupported body slots with `STAGE-AXON-0306` degradation and disabled dependent specifications; no native execution success is implied.
+**Transport limit:** only LF-only bodies can be admitted. Published `PlannedArtifact.CreateText` normalizes CR/CRLF, so any body containing CR is rejected before insertion with an attributed warning and intent comment; strict mode records an error/refusal. The renderer neither rewrites that content nor labels Java as a binary artifact. Missing/stale/file-backed content, unknown revisions/capabilities and foreign languages also remain unplaced. After emission, one comment-only `runtime/UnsupportedImplementations.java` records scoped unconsumed command, reaction, performer and reducer requirements. Foreign languages use `STAGE-AXON-IMPL-LANGUAGE`; other unplaced slots use `STAGE-AXON-0403` with their feature diagnostics. Unrelated scopes and already consumed bodies are excluded. Reducer transition slots require the `pure` capability (other slots require `provider-defined`). Unplaced Java and foreign-language reducers retain `STAGE-AXON-0306` degradation and disabled dependent specifications; admitted Java transitions are consumed only when actually emitted.
 
 Generated surrounding code uses short imported type names. Local declarations take precedence; command application types are preclaimed in ordinal qualified-name order before framework annotations. Only colliding references fall back to qualified names. Tag constants import their owning `EventTags` type, and only use an explicit `idProperty` when the command accessor actually has that tag name; otherwise Axon's default destination inference is retained. Annotation names and stored tag values are unchanged.
 
@@ -197,6 +225,6 @@ Nonempty `ThenInvocations` assertions emit an attributed `STAGE-AXON-SPEC` warni
 
 Unsupported mappings, keys, context values and query shapes produce diagnostics. Closest equivalents carry `// Differs from Screenplay: ...` comments. Unavailable behavior carries `// Screenplay wanted to ...` comments naming its code and semantic path. Strict mode refuses unsupported behavior rather than accepting warning-based scaffolding.
 
-Generated view JUnit tests replay supported given events and assert rows, including keyed absence, composite keys, nested values and child arrays. Unsupported seeded, action-based, exact or query expectations are `@Disabled` with `STAGE-AXON-0501`, not empty passing tests; reducer-dependent specifications use `STAGE-AXON-0306`.
+Generated view JUnit tests replay supported given events and assert rows, including keyed absence, composite keys, nested values and child arrays. Unsupported seeded, action-based, exact or query expectations are `@Disabled` with `STAGE-AXON-0501`, not empty passing tests; reducer specifications with unavailable transitions use `STAGE-AXON-0306`. Fully supported reducer specifications replay ordered events through the generated projector, using `AnnotationMessageTypeResolver` and `GenericEventMessage`, then assert modeled rows or keyed absence. Unsupported shape/property/value/key assertions disable the entire specification with `STAGE-AXON-0501`; no supported subset runs. The views corpus covers initialization, accumulation through current and deletion after insertion. Native/Maven proof is pending CI, not established by .NET emission checks.
 
 Additional native tests probe subscription initial/update/cancellation behavior and real HTTP SSE initial/update behavior when an unfiltered, many-row live projection query has a usable event fixture. Supported projection specifications with an unfiltered, unauthenticated snapshot-list query also register MockMvc scenarios: given events seed the actual projector, and endpoint JSON is decoded with the application's concept-aware mapper and checked against modeled properties. Specifications without such a query retain their primary view tests; no routes or caller roles are invented. These probes supplement, rather than replace, modeled specification registrations.

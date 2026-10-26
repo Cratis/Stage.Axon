@@ -70,12 +70,14 @@ internal static class AxonHttpTests
     {
         var request = exchange.Request;
         var builder = "request(HttpMethod.valueOf(" + JavaCodeBuilder.StringLiteral(request.Method) + "), " + JavaCodeBuilder.StringLiteral(request.Path) + ")";
-        builder += ".with(" + Caller(caller) + ")";
-        if (request.JsonBody is not null) builder += ".contentType(MediaType.APPLICATION_JSON).content(" + JavaCodeBuilder.StringLiteral(request.JsonBody) + ")";
+        builder += ".with(" + Caller(code, caller) + ")";
+        if (request.JsonBody is not null) builder += $".contentType({code.Reference("org.springframework.http.MediaType")}.APPLICATION_JSON).content(" + JavaCodeBuilder.StringLiteral(request.JsonBody) + ")";
         var assertions = new List<string> { "status().is(" + exchange.Response.Status.ToString(CultureInfo.InvariantCulture) + ")" };
         if (exchange.Response.ExpectedJson is not null)
-            assertions.Add("content().json(" + JavaCodeBuilder.StringLiteral(exchange.Response.ExpectedJson) + ", JsonCompareMode.STRICT)");
+            assertions.Add("content().json(" + JavaCodeBuilder.StringLiteral(exchange.Response.ExpectedJson) + $", {code.Reference("org.springframework.test.json.JsonCompareMode")}.STRICT)");
         assertions.AddRange(exchange.Response.Assertions);
+        if (assertions.Exists(assertion => assertion.Contains("content()", StringComparison.Ordinal)))
+            code.Import("static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content");
         code.Line("perform(" + builder + ")");
         for (var index = 0; index < assertions.Count; index++)
             code.Line("    .andExpect(" + assertions[index] + ")" + (index == assertions.Count - 1 ? ";" : string.Empty));
@@ -90,9 +92,14 @@ internal static class AxonHttpTests
                 .Line("return http.perform(asyncDispatch(result));"))
             .Line("return actions;"));
 
-    static string Caller(AxonHttpCaller caller) => caller.Authenticated
-        ? "user(" + JavaCodeBuilder.StringLiteral(caller.Identity) + ").roles(" + string.Join(", ", caller.Roles.Select(JavaCodeBuilder.StringLiteral)) + ")"
-        : "anonymous()";
+    static string Caller(JavaCodeBuilder code, AxonHttpCaller caller)
+    {
+        var method = caller.Authenticated ? "user" : "anonymous";
+        code.Import("static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors." + method);
+        return caller.Authenticated
+            ? "user(" + JavaCodeBuilder.StringLiteral(caller.Identity) + ").roles(" + string.Join(", ", caller.Roles.Select(JavaCodeBuilder.StringLiteral)) + ")"
+            : "anonymous()";
+    }
 
     static JavaCodeBuilder Imports(string package, string name) => new JavaCodeBuilder(package).Declare(name)
         .Import("org.junit.jupiter.api.DisplayName")
@@ -101,16 +108,11 @@ internal static class AxonHttpTests
         .Import("org.springframework.boot.test.context.SpringBootTest")
         .Import("org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc")
         .Import("org.springframework.http.HttpMethod")
-        .Import("org.springframework.http.MediaType")
         .Import("org.springframework.test.annotation.DirtiesContext")
-        .Import("org.springframework.test.json.JsonCompareMode")
         .Import("org.springframework.test.web.servlet.MockMvc")
         .Import("org.springframework.test.web.servlet.ResultActions")
         .Import("org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder")
-        .Import("static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous")
-        .Import("static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user")
         .Import("static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch")
         .Import("static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request")
-        .Import("static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content")
         .Import("static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status");
 }

@@ -35,7 +35,6 @@ internal static class InlineImplementationDiagnostics
 
     static string Reason(AxonEmissionContext context, SemanticImplementationRequirement requirement)
     {
-        if (requirement.Role == SemanticImplementationRole.ReducerTransition) return "Reducer transition bodies have no supported Axon method-body slot.";
         return InlineJavaBodies.TryResolve(context, new(requirement.RequirementId, requirement.Role, requirement.Source.SemanticId), out _, out var reason)
             ? "No supported native method-body slot consumed this implementation."
             : reason;

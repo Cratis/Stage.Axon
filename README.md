@@ -22,7 +22,7 @@ Specs are inline in all three projects and are compiled only in Debug. The extra
 
 The renderer pins `Cratis.Screenplay` 4.250.0 while retaining Contracts 4.197.0. It can place resolved inline `java` bodies in three existing target-native methods: command handlers (`command`, `appender`, declared return type), standalone reaction effects (`input` and event `occurred` when present), and query performers (`query`, `store`, returning `List<Model>`). Native handlers for commands that produce or release a uniqueness-constrained event fail closed with `STAGE-AXON-0801`; their bodies never bypass append-time constraint enforcement. These are method slots, **not** a universal context-object ABI. Preparation, validation, supported security and reaction identity cleanup remain around the body; an admitted command body owns effects and returns instead of also executing modeled appends.
 
-Admission requires supported version-1 context/result contracts, matching owner and role, resolved unambiguous non-provisional identity, and content whose UTF-8 SHA-256 matches the requirement. Bodies must be **LF-only**: any CR, including CRLF, is rejected with attributed diagnostics/comments (strict mode refuses), not silently normalized or emitted as binary. Admitted bytes, indentation, literals and qualified names are copied unchanged; use qualified names for extra Java types. File-backed, foreign-language, missing, stale and unsupported-contract bodies remain unplaced. Scoped unplaced requirements are recorded in `runtime/UnsupportedImplementations.java` and `UNSUPPORTED.md`; foreign languages use `STAGE-AXON-IMPL-LANGUAGE`, other unsupported slots use `STAGE-AXON-0403` alongside their feature diagnostics. Reducer bodies still have no admitted slot and dependent native tests remain disabled under `STAGE-AXON-0306`.
+Admission requires supported version-1 context/result contracts, matching owner and role, resolved unambiguous non-provisional identity, and content whose UTF-8 SHA-256 matches the requirement. Bodies must be **LF-only**: any CR, including CRLF, is rejected with attributed diagnostics/comments (strict mode refuses), not silently normalized or emitted as binary. Admitted bytes, indentation, literals and qualified names are copied unchanged; use qualified names for extra Java types. File-backed, foreign-language, missing, stale and unsupported-contract bodies remain unplaced. Scoped unplaced requirements are recorded in `runtime/UnsupportedImplementations.java` and `UNSUPPORTED.md`; foreign languages use `STAGE-AXON-IMPL-LANGUAGE`, other unsupported slots use `STAGE-AXON-0403` alongside their feature diagnostics. Pure inline Java reducer transitions use the same admission checks and are placed verbatim in `reduce(event, current, message)`. Authors own purity; Axon does not verify it. Fully supported reducer view specifications execute generated JUnit tests; unplaced transitions retain `STAGE-AXON-0306` and return `current` (events are ignored until a supported body is authored; null stays absent).
 
 ### Slice 2 notes
 
@@ -34,6 +34,12 @@ Admission requires supported version-1 context/result contracts, matching owner 
 
 C# emitted-text assertions are not native execution proof. The Java fixtures and all generated applications still require the CI native gate below.
 
+## Persistent flat views
+
+The opt-in `persistent` profile supports flat projection views only, using JPA rows and generation metadata. Scoped and reducer-built views are refused. A legacy database without a matching view generation fails closed; automatic replay is not a migration strategy.
+
+The transaction envelope requires pooled processors with propagating errors and context-bound writes on the handler thread. Startup checks reject customizations that weaken the processor envelope. Runtime row/checkpoint atomicity is proven only by the CI Maven gate, not by C# emitted-text assertions. Default-profile stores remain in memory.
+
 ## Native proof
 
 Use JDK 25 and the generated Maven wrapper. The render destination must not exist.
@@ -44,7 +50,7 @@ dotnet run --project Source/Rendering.Axon.Verification -c Debug --no-build -- r
 dotnet run --project Source/Rendering.Axon.Verification -c Debug --no-build -- verify .ai-work/corpus
 ```
 
-The last command requires passing native tests in every application and validates the exact disabled-test budget: `STAGE-AXON-0501=5`, `STAGE-AXON-0306=2`, `STAGE-AXON-SPEC=3`. Missing, failing, empty, all-skipped, unknown-reason, exceeded, and stale budgets fail. Do not raise budgets to obtain a passing run. See [the harness guide](Source/Rendering.Axon.Verification/README.md) for optional restart and boot smoke checks and [the target guide](Documentation/guides/third-party-render-target.md) for renderer contracts and Axon limitations.
+The last command requires passing native tests in every application and validates the exact disabled-test budget recorded in [`disabled-tests.json`](Source/Rendering.Axon.Verification/disabled-tests.json). Missing, failing, empty, all-skipped, unknown-reason, exceeded, and stale budgets fail. Do not raise budgets to obtain a passing run. See [the harness guide](Source/Rendering.Axon.Verification/README.md) for optional restart and boot smoke checks and [the target guide](Documentation/guides/third-party-render-target.md) for renderer contracts and Axon limitations.
 
 The build workflow is an extraction skeleton, not publication automation. It runs Release/Debug builds, all three spec projects with nonempty-result guards, and the 23-app native proof. It needs no containers or Stage checkout. No package publication is configured.
 

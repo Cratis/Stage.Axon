@@ -30,13 +30,16 @@ public class when_auditing_the_executable_model : Specification
         Assert.True(missing.Length == 0, string.Join('\n', missing));
     }
 
-    [Fact] void should_not_retain_stale_members() =>
+    [Fact]
+    void should_not_retain_stale_members() =>
         SemanticSurfaceLedger.Entries.Keys.Except(_members).ShouldBeEmpty();
 
-    [Fact] void should_explain_every_ignored_member() =>
+    [Fact]
+    void should_explain_every_ignored_member() =>
         SemanticSurfaceLedger.Entries.Values.Where(entry => entry.Kind == SemanticSurfaceDispositionKind.Ignored && string.IsNullOrWhiteSpace(entry.Detail)).ShouldBeEmpty();
 
-    [Fact] void should_give_every_rejection_an_axon_code() =>
+    [Fact]
+    void should_give_every_rejection_an_axon_code() =>
         SemanticSurfaceLedger.Entries.Values.Where(entry => entry.Kind == SemanticSurfaceDispositionKind.Rejected && !entry.Detail.StartsWith("STAGE-AXON-", StringComparison.Ordinal)).ShouldBeEmpty();
 
     void Visit(Type type)
