@@ -15,7 +15,7 @@ public class when_materializing_authored_query_results : for_NativeViewSpecifica
 
     async Task Establish()
     {
-        _request = await Load("live-custom-packages/model");
+        _request = await LoadCanonicalCorpus();
         _context = new(_request, new(_request.Profile));
     }
 
