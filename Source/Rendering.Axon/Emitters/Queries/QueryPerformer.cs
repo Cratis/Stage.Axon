@@ -28,13 +28,13 @@ internal static class QueryPerformer
         var name = JavaNames.Type(query.Name);
         const string reason = "Query performer bodies are not translated; implement the generated performer interface as a Spring bean.";
         context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, reason, "answer the query with its modeled performer", query.Id.ToString());
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Performer").Import(modelType)
-            .Import(context.BasePackage + ".runtime.ReadModelStore");
-        var modelName = code.Reference(modelType);
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Performer");
+        var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Performer");
+        var store = code.Reference(context.BasePackage + ".runtime.ReadModelStore");
         code
             .DiffersFromScreenplay("the modeled performer is a typed Spring extension point; implementation bodies are not translated.")
             .Block($"public interface {name}Performer", body => body
-                .Block($"default {code.Reference("java.util.List")}<{modelName}> perform({name} query, ReadModelStore<{code.Reference("java.lang.Object")}, {modelName}> store)", method => method
+                .Block($"default {code.Reference("java.util.List")}<{modelName}> perform({name} query, {store}<{code.Reference("java.lang.Object")}, {modelName}> store)", method => method
                     .UnsupportedIntent("answer the query with its modeled performer", query.Id.ToString(), AxonRefusalCodes.QueryPerformer)
                     .Line($"throw new {method.Reference("java.lang.UnsupportedOperationException")}({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.QueryPerformer + ": " + reason)});")));
         context.AddJava(package, name + "Performer", code.Build(), sources: query.Id);

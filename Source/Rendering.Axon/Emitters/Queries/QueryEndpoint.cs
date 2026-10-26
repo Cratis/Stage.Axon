@@ -18,8 +18,9 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
     {
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name);
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Endpoint").Import(modelType);
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Endpoint");
         if (query.Delivery == SemanticQueryDelivery.Live) code.Declare(name + "Streams").Declare(name + "Subscription");
+        var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Endpoint", name + "Streams", name + "Subscription");
         shape.Claim(code);
         var gateway = code.Reference("org.axonframework.messaging.queryhandling.gateway.QueryGateway");
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.RestController")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Endpoint")})")
@@ -37,7 +38,7 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
                 if (authorization.Length > 0) authorization = authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal);
                 var route = Route(located, query);
                 if (authorization.Length > 0) body.Line(authorization);
-                Snapshot(body, name, route);
+                Snapshot(body, name, route, modelName);
                 if (live)
                 {
                     if (authorization.Length > 0) body.Line(authorization);
@@ -50,10 +51,9 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
     static string RouteSegment(string name) => string.Concat(name.Select((character, index) =>
         char.IsUpper(character) && index > 0 && char.IsLower(name[index - 1]) ? "-" + char.ToLowerInvariant(character) : char.ToLowerInvariant(character).ToString())).Replace('_', '-');
 
-    void Snapshot(JavaCodeBuilder code, string name, string route)
+    void Snapshot(JavaCodeBuilder code, string name, string route, string modelName)
     {
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}({JavaCodeBuilder.StringLiteral(route)})");
-        var modelName = code.Reference(modelType);
         var response = code.Reference("org.springframework.http.ResponseEntity");
         var result = query.Cardinality == SemanticQueryCardinality.Many ? $"{code.Reference("java.util.List")}<{modelName}>" : modelName;
         code.Block($"public {code.Reference("java.util.concurrent.CompletableFuture")}<{response}<{result}>> get({shape.Parameters(code)})", method =>

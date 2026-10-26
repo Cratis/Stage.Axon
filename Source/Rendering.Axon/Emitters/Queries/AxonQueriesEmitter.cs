@@ -50,9 +50,9 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
     static void EmitRecord(AxonEmissionContext context, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
     {
         var live = query.Delivery == SemanticQueryDelivery.Live;
-        var code = new JavaCodeBuilder(package).Declare(name).Declare("Result").Import(modelType);
+        var code = new JavaCodeBuilder(package).Declare(name).Declare("Result");
+        var modelName = QueryModelReference.Claim(code, package, modelType, name, "Result");
         shape.Claim(code);
-        var modelName = code.Reference(modelType);
         var list = code.Reference("java.util.List");
         code.Block($"public record {name}({shape.Components(code)})", body =>
         {
@@ -72,16 +72,16 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
 
     static void EmitHandler(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
     {
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Handler").Declare(name + "Performer").Import(modelType)
-            .Import(types.BasePackage + ".runtime.ReadModelStore");
-        var modelName = code.Reference(modelType);
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Handler").Declare(name + "Performer");
+        var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Handler", name + "Performer");
+        var store = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")
             .Block($"public class {name}Handler", body =>
             {
                 var performed = QueryPerformer.Required(context, query);
-                body.Line($"private final ReadModelStore<{body.Reference("java.lang.Object")}, {modelName}> store;");
+                body.Line($"private final {store}<{body.Reference("java.lang.Object")}, {modelName}> store;");
                 if (performed) body.Line($"private final {name}Performer performer;");
-                body.Block($"public {name}Handler(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(modelType)}) ReadModelStore<{body.Reference("java.lang.Object")}, {modelName}> store{(performed ? $", {name}Performer performer" : string.Empty)})", constructor =>
+                body.Block($"public {name}Handler(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(modelType)}) {store}<{body.Reference("java.lang.Object")}, {modelName}> store{(performed ? $", {name}Performer performer" : string.Empty)})", constructor =>
                 {
                     constructor.Line("this.store = store;");
                     if (performed) constructor.Line("this.performer = performer;");

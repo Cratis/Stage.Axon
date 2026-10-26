@@ -8,6 +8,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
 internal static class ReactionScheduling
 {
+    // These generated annotations contain only framework type references and literal schedule parameters.
     internal static string? Annotation(SemanticReactionTrigger trigger) => trigger.Kind switch
     {
         SemanticReactionTriggerKind.Interval => Interval(trigger.Every),

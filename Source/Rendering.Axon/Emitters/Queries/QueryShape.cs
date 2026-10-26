@@ -42,7 +42,7 @@ internal sealed class QueryShape(SemanticKeyedQuery query, SemanticReadModel mod
         foreach (var argument in Arguments)
         {
             if (argument.Type.Kind == SemanticTypeReferenceKind.Primitive) continue;
-            code.Import(types.Type(argument.Type with { IsCollection = false }));
+            code.Reference(types.Type(argument.Type with { IsCollection = false }));
         }
     }
 

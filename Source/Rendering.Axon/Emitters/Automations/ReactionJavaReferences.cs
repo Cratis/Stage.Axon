@@ -9,6 +9,12 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 /// <summary>Registers types in renderer-produced expressions, without changing string literals.</summary>
 internal static partial class ReactionJavaReferences
 {
+    static readonly string[] _frameworkPrefixes =
+    [
+        "java.", "javax.", "jakarta.", "org.axonframework.", "org.springframework.",
+        "org.reactivestreams.", "org.junit.", "org.mockito.", "org.assertj.", "io.cratis.", "io.axoniq."
+    ];
+
     [GeneratedRegex("\"(?:\\\\.|[^\"\\\\])*\"|(?<![A-Za-z0-9_$.])(?:[a-z][a-z0-9_]*\\.)+[A-Z][A-Za-z0-9_]*", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex Tokens { get; }
 
@@ -19,7 +25,7 @@ internal static partial class ReactionJavaReferences
             foreach (Match match in Tokens.Matches(expression))
             {
                 if (match.Value.StartsWith('"') || IsFramework(match.Value)) continue;
-                code.Import(match.Value);
+                code.Reference(match.Value);
             }
         }
     }
@@ -27,7 +33,5 @@ internal static partial class ReactionJavaReferences
     internal static string Expression(JavaCodeBuilder code, string expression) => Tokens.Replace(expression, match =>
         match.Value.StartsWith('"') ? match.Value : code.Reference(match.Value));
 
-    static bool IsFramework(string type) => type.StartsWith("java.", StringComparison.Ordinal) ||
-        type.StartsWith("org.", StringComparison.Ordinal) || type.StartsWith("jakarta.", StringComparison.Ordinal) ||
-        type.StartsWith("io.", StringComparison.Ordinal);
+    static bool IsFramework(string type) => _frameworkPrefixes.Any(prefix => type.StartsWith(prefix, StringComparison.Ordinal));
 }
