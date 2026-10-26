@@ -3,6 +3,9 @@
 
 package __RUNTIME__;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -32,6 +36,16 @@ class RuntimeHttpRoundTripTest {
 
     public record Id(UUID value) implements ConceptAs<UUID> {}
     public record Payload(Id id) {}
+    public record Number(BigDecimal value) implements ConceptAs<BigDecimal> {}
+    public record Time(OffsetDateTime value) implements ConceptAs<OffsetDateTime> {}
+    public record Wire(Number amount, Time at, Map<Number, String> byAmount) {}
+
+    @Test
+    void exactConceptWireFormatSurvivesHttpRoundTrip() throws Exception {
+        var json = "{\"amount\":1E+2,\"at\":\"2026-10-24T12:00:00Z\",\"byAmount\":{\"1E+2\":\"x\"}}";
+        http.perform(post("/_runtime/wire").contentType(MediaType.APPLICATION_JSON).content(json))
+            .andExpect(status().isOk()).andExpect(content().string(json));
+    }
 
     @Test
     void conceptIdsStayPrimitiveAcrossHttpAndStorage() throws Exception {
@@ -63,6 +77,9 @@ class RuntimeHttpRoundTripTest {
 
         @GetMapping("/_runtime/echo")
         Payload read() { return stored.get(); }
+
+        @PostMapping("/_runtime/wire")
+        Wire wire(@RequestBody Wire payload) { return payload; }
 
         @GetMapping("/_runtime/echo-async")
         java.util.concurrent.CompletableFuture<Payload> readAsync() {

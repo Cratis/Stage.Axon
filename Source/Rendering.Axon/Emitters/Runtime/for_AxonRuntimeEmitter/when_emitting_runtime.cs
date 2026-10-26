@@ -39,6 +39,38 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     [Fact] void should_register_installed_axon_entities_in_the_test_fixture() => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentProbeSupport.java", StringComparison.Ordinal)).Bytes.AsSpan()).ShouldContain($"@EntityScan(basePackageClasses = {{ {context.BasePackage}.runtime.persistent.UniqueClaim.class,\n            org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry.class,\n            org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry.class }})");
 
     [Fact]
+    void should_keep_the_exact_serializer_encodings()
+    {
+        var serializer = Template("ConceptSerializer.java");
+        serializer.ShouldContain("String.valueOf(concept.value())");
+        serializer.ShouldContain("context.writeValue(generator, concept.value())");
+    }
+
+    [Fact]
+    void should_pin_exact_wire_tests()
+    {
+        var tests = Template("RuntimeTest.java");
+        tests.ShouldContain("void exponentDecimalValueKeepsItsText()");
+        tests.ShouldContain("void exponentDecimalMapKeyKeepsItsText()");
+        tests.ShouldContain("void decimalKeysRoundTrip()");
+        tests.ShouldContain("void utcTimestampsKeepZ()");
+        tests.ShouldContain("1E+2");
+        tests.ShouldContain("2026-10-24T12:00:00Z");
+    }
+
+    [Fact]
+    void should_pin_the_application_mapper_wire_test()
+    {
+        var tests = Template("RuntimeHttpRoundTripTest.java");
+        tests.ShouldContain("void exactConceptWireFormatSurvivesHttpRoundTrip()");
+        tests.ShouldContain("1E+2");
+        tests.ShouldContain("2026-10-24T12:00:00Z");
+        tests.ShouldContain("content().string(json)");
+    }
+
+    string Template(string name) => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith($"/{name}", StringComparison.Ordinal)).Bytes.AsSpan());
+
+    [Fact]
     void should_not_emit_a_custom_clock() =>
         context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/Clock.java", StringComparison.Ordinal)).ShouldBeFalse();
 }

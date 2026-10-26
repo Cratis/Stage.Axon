@@ -95,6 +95,42 @@ class RuntimeTest {
     }
 
     @Test
+    void exponentDecimalValueKeepsItsText() {
+        var mapper = TestSupport.mapper();
+        var value = new Number(new BigDecimal("1E+2"));
+        var json = mapper.writeValueAsString(value);
+        assertEquals("1E+2", json);
+        assertEquals(value, mapper.readValue(json, Number.class));
+    }
+
+    @Test
+    void exponentDecimalMapKeyKeepsItsText() {
+        var mapper = TestSupport.mapper();
+        var values = Map.of(new Number(new BigDecimal("1E+2")), "x");
+        var json = mapper.writeValueAsString(values);
+        assertEquals("{\"1E+2\":\"x\"}", json);
+        assertEquals(values, mapper.readValue(json, new TypeReference<Map<Number, String>>() {}));
+    }
+
+    @Test
+    void decimalKeysRoundTrip() {
+        var mapper = TestSupport.mapper();
+        var values = Map.of(new Number(new BigDecimal("1.25")), "x");
+        var json = mapper.writeValueAsString(values);
+        assertEquals("{\"1.25\":\"x\"}", json);
+        assertEquals(values, mapper.readValue(json, new TypeReference<Map<Number, String>>() {}));
+    }
+
+    @Test
+    void utcTimestampsKeepZ() {
+        var mapper = TestSupport.mapper();
+        var value = new Time(OffsetDateTime.parse("2026-10-24T12:00:00Z"));
+        var json = mapper.writeValueAsString(value);
+        assertEquals("\"2026-10-24T12:00:00Z\"", json);
+        assertEquals(value, mapper.readValue(json, Time.class));
+    }
+
+    @Test
     void storeUpdatesAreAtomicAndListsAreSnapshots() throws Exception {
         var store = new InMemoryReadModelStore<String, Integer>();
         try (var executor = Executors.newFixedThreadPool(4)) {
