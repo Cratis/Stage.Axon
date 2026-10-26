@@ -25,7 +25,7 @@ internal static class AxonHttpTests
         if (context.HttpScenarios.Count == 0) return;
         var package = context.BasePackage + ".specifications";
         const string name = "ModeledHttpRoundTripTest";
-        var code = TestClass(Imports(package), name, context.HttpScenarios.Values);
+        var code = TestClass(Imports(package, name), name, context.HttpScenarios.Values);
         context.AddJava(package, name, code.Build(), test: true, sources: [.. context.HttpScenarios.Keys]);
     }
 
@@ -38,7 +38,7 @@ internal static class AxonHttpTests
             context.Request.Model.Application.Id,
             [new(new("POST", "/_runtime/echo", payload), new(200, payload)), new(new("GET", "/_runtime/echo-async"), new(200, payload))],
             new(string.Empty, [], false));
-        var code = Imports(package).Import("org.springframework.context.annotation.Import")
+        var code = Imports(package, name).Declare("RuntimeHttpRoundTripTest").Import("org.springframework.context.annotation.Import")
             .Line("@Import(RuntimeHttpRoundTripTest.EchoEndpoint.class)");
         context.AddJava(package, name, TestClass(code, name, [scenario]).Build(), test: true);
     }
@@ -50,7 +50,7 @@ internal static class AxonHttpTests
             .Block("class " + name, body =>
             {
                 body.Line("@Autowired").Line("private MockMvc http;")
-                    .Line("@Autowired").Line("private org.springframework.context.ApplicationContext application;");
+                    .Line("@Autowired").Line($"private {body.Reference("org.springframework.context.ApplicationContext")} application;");
                 var index = 0;
                 foreach (var scenario in scenarios.OrderBy(scenario => scenario.Id.ToString(), StringComparer.Ordinal))
                 {
@@ -94,7 +94,7 @@ internal static class AxonHttpTests
         ? "user(" + JavaCodeBuilder.StringLiteral(caller.Identity) + ").roles(" + string.Join(", ", caller.Roles.Select(JavaCodeBuilder.StringLiteral)) + ")"
         : "anonymous()";
 
-    static JavaCodeBuilder Imports(string package) => new JavaCodeBuilder(package)
+    static JavaCodeBuilder Imports(string package, string name) => new JavaCodeBuilder(package).Declare(name)
         .Import("org.junit.jupiter.api.DisplayName")
         .Import("org.junit.jupiter.api.Test")
         .Import("org.springframework.beans.factory.annotation.Autowired")

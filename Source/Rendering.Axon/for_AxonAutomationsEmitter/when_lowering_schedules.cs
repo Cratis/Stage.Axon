@@ -26,6 +26,6 @@ public class when_lowering_schedules : Specification
         ReactionScheduling.CalendarGuard(code, new(SemanticReactionTriggerKind.Schedule) { At = 0, OnDayOfWeek = 0, OnDayOfMonth = 31 });
         code.Build().ShouldContain("date.getDayOfMonth() != 31");
         code.Build().ShouldContain("date.getDayOfWeek().getValue() % 7 != 0");
-        code.Build().ShouldContain("clock.withZone(java.time.ZoneOffset.UTC)");
+        code.Build().ShouldContain("clock.withZone(ZoneOffset.UTC)");
     }
 }

@@ -28,19 +28,21 @@ internal static class QueryPerformer
         var name = JavaNames.Type(query.Name);
         const string reason = "Query performer bodies are not translated; implement the generated performer interface as a Spring bean.";
         context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, reason, "answer the query with its modeled performer", query.Id.ToString());
-        var code = new JavaCodeBuilder(package)
-            .Import(context.BasePackage + ".runtime.ReadModelStore")
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Performer").Import(modelType)
+            .Import(context.BasePackage + ".runtime.ReadModelStore");
+        var modelName = code.Reference(modelType);
+        code
             .DiffersFromScreenplay("the modeled performer is a typed Spring extension point; implementation bodies are not translated.")
             .Block($"public interface {name}Performer", body => body
-                .Block($"default java.util.List<{modelType}> perform({name} query, ReadModelStore<Object, {modelType}> store)", method => method
+                .Block($"default {code.Reference("java.util.List")}<{modelName}> perform({name} query, ReadModelStore<{code.Reference("java.lang.Object")}, {modelName}> store)", method => method
                     .UnsupportedIntent("answer the query with its modeled performer", query.Id.ToString(), AxonRefusalCodes.QueryPerformer)
-                    .Line($"throw new UnsupportedOperationException({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.QueryPerformer + ": " + reason)});")));
+                    .Line($"throw new {method.Reference("java.lang.UnsupportedOperationException")}({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.QueryPerformer + ": " + reason)});")));
         context.AddJava(package, name + "Performer", code.Build(), sources: query.Id);
-        var configuration = new JavaCodeBuilder(package)
-            .Line($"@org.springframework.context.annotation.Configuration({JavaCodeBuilder.StringLiteral(package + "." + name + "PerformerConfiguration")})")
+        var configuration = new JavaCodeBuilder(package).Declare(name + "Performer").Declare(name + "PerformerConfiguration");
+        configuration.Line($"@{configuration.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "PerformerConfiguration")})")
             .Block($"public class {name}PerformerConfiguration", body => body
-                .Line($"@org.springframework.context.annotation.Bean({JavaCodeBuilder.StringLiteral(package + "." + name + "Performer")})")
-                .Line($"@org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean({name}Performer.class)")
+                .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Performer")})")
+                .Line($"@{body.Reference("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")}({name}Performer.class)")
                 .Block($"public {name}Performer {JavaNames.Member(name)}Performer()", method => method.Line($"return new {name}Performer() {{}};")));
         context.AddJava(package, name + "PerformerConfiguration", configuration.Build(), sources: query.Id);
     }

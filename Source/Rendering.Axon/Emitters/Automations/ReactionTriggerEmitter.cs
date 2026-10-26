@@ -22,16 +22,16 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
 
     internal void Emit(SemanticReactionTrigger model, PreparedReactionTrigger trigger, int index, JavaCodeBuilder body)
     {
-        if (trigger.Annotation.Length > 0) body.Line(trigger.Annotation);
-        var parameters = trigger.Input.JavaType.Length == 0 ? string.Empty : trigger.Input.JavaType + " input";
-        if (trigger.Input.Event is not null) parameters += ", @org.axonframework.messaging.eventhandling.annotation.Timestamp java.time.Instant occurred";
+        if (trigger.Annotation.Length > 0) body.Line(ReactionJavaReferences.Expression(body, trigger.Annotation));
+        var parameters = trigger.Input.JavaType.Length == 0 ? string.Empty : ReactionJavaReferences.Expression(body, trigger.Input.JavaType) + " input";
+        if (trigger.Input.Event is not null) parameters += $", @{body.Reference("org.axonframework.messaging.eventhandling.annotation.Timestamp")} {body.Reference("java.time.Instant")} occurred";
         body.Block($"public void on{index}({parameters})", method =>
         {
             ReactionScheduling.CalendarGuard(method, model);
-            if (trigger.Condition is { } condition) method.Line($"if (!({condition})) return;");
+            if (trigger.Condition is { } condition) method.Line($"if (!({ReactionJavaReferences.Expression(method, condition)})) return;");
             if (model.Kind == SemanticReactionTriggerKind.Interval)
                 method.DiffersFromScreenplay("Spring fixed-rate intervals start when this process starts, not at epoch-aligned Screenplay clock boundaries; delivery remains at least once.");
-            ReactionInvocation.Dispatch(method, reaction, trigger.Invocation);
+            ReactionInvocation.Dispatch(method, reaction, ReactionJavaReferences.Expression(method, trigger.Invocation));
         });
         if (model.Kind is SemanticReactionTriggerKind.Interval or SemanticReactionTriggerKind.Schedule)
             context.Degradation.Unsupported("STAGE-AXON-0507", reaction.Id, "Schedules use UTC and process-local Spring scheduling, not a durable scheduler; interval boundaries start with this process.");

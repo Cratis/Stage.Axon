@@ -50,17 +50,21 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
     static void EmitRecord(AxonEmissionContext context, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
     {
         var live = query.Delivery == SemanticQueryDelivery.Live;
-        var code = new JavaCodeBuilder(package).Block($"public record {name}({shape.Components})", body =>
+        var code = new JavaCodeBuilder(package).Declare(name).Declare("Result").Import(modelType);
+        shape.Claim(code);
+        var modelName = code.Reference(modelType);
+        var list = code.Reference("java.util.List");
+        code.Block($"public record {name}({shape.Components(code)})", body =>
         {
             if (live)
             {
-                body.Block($"public record Result(java.util.List<{modelType}> rows, boolean invalidated)", result => result
-                    .Block($"public Result(java.util.List<{modelType}> rows)", constructor => constructor.Line("this(rows, false);"))
-                    .Block("public static Result invalidation()", factory => factory.Line("return new Result(java.util.List.of(), true);")));
+                body.Block($"public record Result({list}<{modelName}> rows, boolean invalidated)", result => result
+                    .Block($"public Result({list}<{modelName}> rows)", constructor => constructor.Line("this(rows, false);"))
+                    .Block("public static Result invalidation()", factory => factory.Line($"return new Result({list}.of(), true);")));
             }
             else
             {
-                body.Line($"public record Result(java.util.List<{modelType}> rows) {{}}");
+                body.Line($"public record Result({list}<{modelName}> rows) {{}}");
             }
         });
         ViewJavaTypes.Add(context, package, name, code.Build(), query.Id);
@@ -68,28 +72,27 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
 
     static void EmitHandler(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
     {
-        var code = new JavaCodeBuilder(package)
-            .Import("org.springframework.stereotype.Component").Import("org.springframework.beans.factory.annotation.Qualifier")
-            .Import("org.springframework.security.access.prepost.PreAuthorize")
-            .Import("org.axonframework.messaging.queryhandling.annotation.QueryHandler").Import(types.BasePackage + ".runtime.ReadModelStore")
-            .Line($"@Component({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Handler").Declare(name + "Performer").Import(modelType)
+            .Import(types.BasePackage + ".runtime.ReadModelStore");
+        var modelName = code.Reference(modelType);
+        code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")
             .Block($"public class {name}Handler", body =>
             {
                 var performed = QueryPerformer.Required(context, query);
-                body.Line($"private final ReadModelStore<Object, {modelType}> store;");
+                body.Line($"private final ReadModelStore<{body.Reference("java.lang.Object")}, {modelName}> store;");
                 if (performed) body.Line($"private final {name}Performer performer;");
-                body.Block($"public {name}Handler(@Qualifier({JavaCodeBuilder.StringLiteral(modelType)}) ReadModelStore<Object, {modelType}> store{(performed ? $", {name}Performer performer" : string.Empty)})", constructor =>
+                body.Block($"public {name}Handler(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(modelType)}) ReadModelStore<{body.Reference("java.lang.Object")}, {modelName}> store{(performed ? $", {name}Performer performer" : string.Empty)})", constructor =>
                 {
                     constructor.Line("this.store = store;");
                     if (performed) constructor.Line("this.performer = performer;");
                 });
                 var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
-                if (authorization.Length > 0) body.Line(authorization);
-                body.Line("@QueryHandler").Block($"public {name}.Result handle({name} query)", method =>
+                if (authorization.Length > 0) body.Line(authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal));
+                body.Line("@" + body.Reference("org.axonframework.messaging.queryhandling.annotation.QueryHandler")).Block($"public {name}.Result handle({name} query)", method =>
                 {
-                    var predicate = QueryPerformer.Required(context, query) ? string.Empty : shape.Predicate;
+                    var predicate = QueryPerformer.Required(context, query) ? string.Empty : shape.Predicate(method);
                     method.Line(performed
-                        ? "var rows = java.util.List.copyOf(performer.perform(query, store));"
+                        ? $"var rows = {method.Reference("java.util.List")}.copyOf(performer.perform(query, store));"
                         : $"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
                     if (query.Cardinality == SemanticQueryCardinality.One)
                         method.Line("if (rows.size() != 1) throw new IllegalStateException(\"Expected exactly one query result\");");

@@ -19,7 +19,7 @@ internal static class ReactionScheduling
     {
         if (trigger.Kind != SemanticReactionTriggerKind.Schedule) return;
         if (trigger.OnDayOfMonth is null && trigger.OnDayOfWeek is null) return;
-        body.Line("var date = java.time.LocalDate.now(clock.withZone(java.time.ZoneOffset.UTC));");
+        body.Line($"var date = {body.Reference("java.time.LocalDate")}.now(clock.withZone({body.Reference("java.time.ZoneOffset")}.UTC));");
         if (trigger.OnDayOfMonth is { } day) body.Line($"if (date.getDayOfMonth() != {day}) return;");
         if (trigger.OnDayOfWeek is { } weekday) body.Line($"if (date.getDayOfWeek().getValue() % 7 != {weekday}) return;");
     }

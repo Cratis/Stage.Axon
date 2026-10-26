@@ -18,23 +18,23 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
     {
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name);
-        var code = new JavaCodeBuilder(package)
-            .Import("org.springframework.web.bind.annotation.RestController").Import("org.springframework.web.bind.annotation.GetMapping")
-            .Import("org.springframework.web.bind.annotation.RequestParam").Import("org.springframework.http.ResponseEntity")
-            .Import("org.springframework.security.access.prepost.PreAuthorize")
-            .Import("org.axonframework.messaging.queryhandling.gateway.QueryGateway")
-            .Line($"@RestController({JavaCodeBuilder.StringLiteral(package + "." + name + "Endpoint")})")
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Endpoint").Import(modelType);
+        if (query.Delivery == SemanticQueryDelivery.Live) code.Declare(name + "Streams").Declare(name + "Subscription");
+        shape.Claim(code);
+        var gateway = code.Reference("org.axonframework.messaging.queryhandling.gateway.QueryGateway");
+        code.Line($"@{code.Reference("org.springframework.web.bind.annotation.RestController")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Endpoint")})")
             .Block($"public class {name}Endpoint", body =>
             {
                 var live = query.Delivery == SemanticQueryDelivery.Live;
-                body.Line("private final QueryGateway gateway;");
+                body.Line($"private final {gateway} gateway;");
                 if (live) body.Line($"private final {name}Streams streams;");
-                body.Block($"public {name}Endpoint(QueryGateway gateway{(live ? $", {name}Streams streams" : string.Empty)})", constructor =>
+                body.Block($"public {name}Endpoint({gateway} gateway{(live ? $", {name}Streams streams" : string.Empty)})", constructor =>
                 {
                     constructor.Line("this.gateway = gateway;");
                     if (live) constructor.Line("this.streams = streams;");
                 });
                 var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
+                if (authorization.Length > 0) authorization = authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal);
                 var route = Route(located, query);
                 if (authorization.Length > 0) body.Line(authorization);
                 Snapshot(body, name, route);
@@ -52,23 +52,25 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
 
     void Snapshot(JavaCodeBuilder code, string name, string route)
     {
-        code.Line($"@GetMapping({JavaCodeBuilder.StringLiteral(route)})");
-        var result = query.Cardinality == SemanticQueryCardinality.Many ? $"java.util.List<{modelType}>" : modelType;
-        code.Block($"public java.util.concurrent.CompletableFuture<ResponseEntity<{result}>> get({shape.Parameters})", method =>
+        code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}({JavaCodeBuilder.StringLiteral(route)})");
+        var modelName = code.Reference(modelType);
+        var response = code.Reference("org.springframework.http.ResponseEntity");
+        var result = query.Cardinality == SemanticQueryCardinality.Many ? $"{code.Reference("java.util.List")}<{modelName}>" : modelName;
+        code.Block($"public {code.Reference("java.util.concurrent.CompletableFuture")}<{response}<{result}>> get({shape.Parameters(code)})", method =>
         {
             var mapped = query.Cardinality == SemanticQueryCardinality.Many
-                ? "ResponseEntity.ok(result.rows())"
-                : "result.rows().isEmpty() ? ResponseEntity.notFound().build() : ResponseEntity.ok(result.rows().getFirst())";
-            method.Line($"return gateway.query(new {name}({shape.Parsed}), {name}.Result.class).thenApply(result -> {mapped});");
+                ? $"{response}.ok(result.rows())"
+                : $"result.rows().isEmpty() ? {response}.notFound().build() : {response}.ok(result.rows().getFirst())";
+            method.Line($"return gateway.query(new {name}({shape.Parsed(method)}), {name}.Result.class).thenApply(result -> {mapped});");
         });
     }
 
     void Live(JavaCodeBuilder code, string name, string route)
     {
-        code.Line($"@GetMapping(value = {JavaCodeBuilder.StringLiteral(route)}, produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)")
-            .Block($"public org.springframework.web.servlet.mvc.method.annotation.SseEmitter stream({shape.Parameters})", method =>
+        code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}(value = {JavaCodeBuilder.StringLiteral(route)}, produces = {code.Reference("org.springframework.http.MediaType")}.TEXT_EVENT_STREAM_VALUE)")
+            .Block($"public {code.Reference("org.springframework.web.servlet.mvc.method.annotation.SseEmitter")} stream({shape.Parameters(code)})", method =>
             {
-                method.Line($"var query = new {name}({shape.Parsed});")
+                method.Line($"var query = new {name}({shape.Parsed(method)});")
                     .Line($"return streams.open({name}Subscription.values(gateway, query));");
             });
     }

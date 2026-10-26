@@ -36,9 +36,9 @@ public class when_emitting_live_queries : a_view_request
     }
 
     [Fact] void should_authorize_both_mappings() => _securedEndpoint.Split("@PreAuthorize(\"denyAll()\")", StringSplitOptions.None).Length.ShouldEqual(3);
-    [Fact] void should_map_the_stream_to_the_same_route() => _endpoint.ShouldContain("@GetMapping(value = \"/api/views/counters/live-totals\", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)");
+    [Fact] void should_map_the_stream_to_the_same_route() => _endpoint.ShouldContain("@GetMapping(value = \"/api/views/counters/live-totals\", produces = MediaType.TEXT_EVENT_STREAM_VALUE)");
     [Fact] void should_offer_a_plain_json_get() => _endpoint.ShouldContain("@GetMapping(\"/api/views/counters/live-totals\")");
-    [Fact] void should_return_a_typed_list_snapshot() => _endpoint.ShouldContain("CompletableFuture<ResponseEntity<java.util.List<axonviews.views.counters.totals.Total>>>");
+    [Fact] void should_return_a_typed_list_snapshot() => _endpoint.ShouldContain("CompletableFuture<ResponseEntity<List<Total>>>");
     [Fact] void should_dispatch_the_snapshot_over_the_query_gateway() => _endpoint.ShouldContain("gateway.query(new LiveTotals(), LiveTotals.Result.class)");
     [Fact] void should_return_the_raw_snapshot_rows() => _endpoint.ShouldContain("ResponseEntity.ok(result.rows())");
     [Fact] void should_probe_a_plain_get_without_an_accept_header() => Source("LiveTotalsSseTest.java").ShouldContain("HttpRequest.newBuilder(request.uri()).GET().build()");
@@ -53,7 +53,7 @@ public class when_emitting_live_queries : a_view_request
     [Fact] void should_emit_an_initial_and_update_native_test() => Source("LiveTotalsSubscriptionTest.java").ShouldContain("shouldDeliverInitialSnapshotAndUpdateAndCancelAxonPublisher");
     [Fact] void should_serialize_expected_sse_values_with_the_application_concept_mapper() => Source("LiveTotalsSseTest.java").ShouldContain("var mapper = application.getBean(tools.jackson.databind.json.JsonMapper.class);");
     [Fact] void should_emit_an_http_sse_probe() => Source("LiveTotalsSseTest.java").ShouldContain("shouldDeliverInitialDataAndOneUpdateOverHttpSse");
-    [Fact] void should_complete_active_streams_before_web_server_shutdown() => Source("LiveTotalsStreams.java").ShouldContain("ApplicationListener<org.springframework.context.event.ContextClosedEvent>");
+    [Fact] void should_complete_active_streams_before_web_server_shutdown() => Source("LiveTotalsStreams.java").ShouldContain("ApplicationListener<ContextClosedEvent>");
     [Fact] void should_close_every_session_on_context_close() => Source("LiveTotalsStreams.java").ShouldContain("sessions.forEach(Session::stop)");
     [Fact] void should_cancel_the_session_upstream_on_shutdown() => Source("LiveTotalsStreams.java").ShouldContain("if (active != null) active.cancel()");
     [Fact] void should_complete_the_session_emitter_on_shutdown() => Source("LiveTotalsStreams.java").ShouldContain("if (active != null) active.complete()");

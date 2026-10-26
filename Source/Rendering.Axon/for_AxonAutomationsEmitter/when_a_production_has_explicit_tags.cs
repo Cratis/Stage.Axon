@@ -17,7 +17,7 @@ public class when_a_production_has_explicit_tags : given.a_reaction_model
 
     void Because() => Render();
 
-    [Fact] void should_not_register_partial_effects() => Code("SubmitOrderReaction").ShouldNotContain("@org.springframework.stereotype.Component");
+    [Fact] void should_not_register_partial_effects() => Code("SubmitOrderReaction").ShouldNotContain("@Component");
     [Fact] void should_leave_the_original_intent() => Code("SubmitOrderReaction").ShouldContain("// Screenplay wanted to");
     [Fact] void should_report_the_unsupported_trigger() => context.Degradation.UnsupportedConstructs.Count.ShouldEqual(1);
     [Fact] void should_not_emit_an_append_handler() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("AppendHandler.java", StringComparison.Ordinal)).ShouldBeFalse();
