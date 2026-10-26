@@ -17,13 +17,13 @@ internal static class ReducerViewSpecifications
     {
         var package = types.Package(located);
         var name = JavaNames.Type(model.Name) + "ViewSpecificationsTest";
-        var code = new JavaCodeBuilder(package).Block($"class {name}", body =>
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(JavaNames.Type(model.Name)).Block($"class {name}", body =>
         {
             foreach (var spec in specs)
             {
                 var method = JavaNames.Member(spec.Name);
-                body.Line("@org.junit.jupiter.api.Test")
-                    .Line($"@org.junit.jupiter.api.Disabled({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.Reduction + ": reducer implementation is a throwing extension point")})")
+                body.Line($"@{body.Reference("org.junit.jupiter.api.Test")}")
+                    .Line($"@{body.Reference("org.junit.jupiter.api.Disabled")}({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.Reduction + ": reducer implementation is a throwing extension point")})")
                     .Block($"void {method}()", test => test
                         .UnsupportedIntent("execute the read model specification using its reducer", spec.Id.ToString(), AxonRefusalCodes.Reduction)
                         .Line("throw new UnsupportedOperationException(\"Reducer implementation required\");"));

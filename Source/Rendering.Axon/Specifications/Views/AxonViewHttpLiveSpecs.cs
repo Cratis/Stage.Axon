@@ -12,56 +12,62 @@ namespace Cratis.Stage.Rendering.Axon.Specifications.Views;
 
 internal static class AxonViewHttpLiveSpecs
 {
-    internal static void Emit(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticKeyedQuery query, string modelType, string projector, string eventArguments)
+    internal static void Emit(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticKeyedQuery query, string modelType, string projector, Func<JavaCodeBuilder, string> eventArguments)
     {
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name) + "SseTest";
-        var code = new JavaCodeBuilder(package).Line($$"""
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(JavaNames.Type(query.Name)).Declare(JavaNames.Type(query.Name) + "Streams")
+            .Import(types.BasePackage + ".Application").Import(types.BasePackage + ".runtime.ReadModelStore");
+        foreach (var model in located.Slice.ReadModels) code.Declare(JavaNames.Type(model.Name));
+        var projectorName = projector[(projector.LastIndexOf('.') + 1)..];
+        if (projector[..projector.LastIndexOf('.')] == package) code.Declare(projectorName);
+        else code.Import(projector);
+        code.Line($$"""
             class {{name}} {
-                @org.junit.jupiter.api.Test
+                @{{code.Reference("org.junit.jupiter.api.Test")}}
                 void shouldDeliverInitialDataAndOneUpdateOverHttpSseAndCloseContextPromptly() throws Exception {
-                    var application = new org.springframework.boot.builder.SpringApplicationBuilder({{types.BasePackage}}.Application.class).run("--server.port=0");
+                    var application = new {{code.Reference("org.springframework.boot.builder.SpringApplicationBuilder")}}(Application.class).run("--server.port=0");
                     try {
                         var port = application.getEnvironment().getProperty("local.server.port", Integer.class);
-                        var configuration = application.getBean(org.axonframework.common.configuration.Configuration.class);
-                        var projector = application.getBean({{projector}}.class);
-                        var store = application.getBean({{JavaCodeBuilder.StringLiteral(modelType)}}, {{types.BasePackage}}.runtime.ReadModelStore.class);
+                        var configuration = application.getBean({{code.Reference("org.axonframework.common.configuration.Configuration")}}.class);
+                        var projector = application.getBean({{projectorName}}.class);
+                        var store = application.getBean({{JavaCodeBuilder.StringLiteral(modelType)}}, ReadModelStore.class);
                         var streams = application.getBean({{JavaNames.Type(query.Name)}}Streams.class);
                         store.clear();
-                        try (var client = java.net.http.HttpClient.newHttpClient();
-                             var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
-                            var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:" + port + {{JavaCodeBuilder.StringLiteral(QueryEndpoint.Route(located, query))}}))
+                        try (var client = {{code.Reference("java.net.http.HttpClient")}}.newHttpClient();
+                             var executor = {{code.Reference("java.util.concurrent.Executors")}}.newVirtualThreadPerTaskExecutor()) {
+                            var request = {{code.Reference("java.net.http.HttpRequest")}}.newBuilder({{code.Reference("java.net.URI")}}.create("http://127.0.0.1:" + port + {{JavaCodeBuilder.StringLiteral(QueryEndpoint.Route(located, query))}}))
                                 .header("Accept", "text/event-stream").GET().build();
-                            var response = client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofInputStream())
-                                .get(10, java.util.concurrent.TimeUnit.SECONDS);
+                            var response = client.sendAsync(request, {{code.Reference("java.net.http.HttpResponse")}}.BodyHandlers.ofInputStream())
+                                .get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS);
                             try (var stream = response.body();
-                                 var reader = new java.io.BufferedReader(new java.io.InputStreamReader(stream, java.nio.charset.StandardCharsets.UTF_8))) {
-                                org.junit.jupiter.api.Assertions.assertEquals(200, response.statusCode());
-                                org.junit.jupiter.api.Assertions.assertTrue(response.headers().firstValue("Content-Type").orElse("").startsWith("text/event-stream"));
-                                var mapper = application.getBean(tools.jackson.databind.json.JsonMapper.class);
-                                var initial = mapper.readTree(executor.submit(() -> nextData(reader)).get(10, java.util.concurrent.TimeUnit.SECONDS));
-                                org.junit.jupiter.api.Assertions.assertTrue(initial.isArray());
-                                org.junit.jupiter.api.Assertions.assertEquals(0, initial.size());
-                                configuration.getComponent(org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory.class).create()
+                                 var reader = new {{code.Reference("java.io.BufferedReader")}}(new {{code.Reference("java.io.InputStreamReader")}}(stream, {{code.Reference("java.nio.charset.StandardCharsets")}}.UTF_8))) {
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(200, response.statusCode());
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(response.headers().firstValue("Content-Type").orElse("").startsWith("text/event-stream"));
+                                var mapper = application.getBean({{code.Reference("tools.jackson.databind.json.JsonMapper")}}.class);
+                                var initial = mapper.readTree(executor.submit(() -> nextData(reader)).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS));
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(initial.isArray());
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(0, initial.size());
+                                configuration.getComponent({{code.Reference("org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory")}}.class).create()
                                     .executeWithResult(processing -> {
-                                        projector.on({{eventArguments}});
-                                        return java.util.concurrent.CompletableFuture.completedFuture(null);
-                                    }).get(10, java.util.concurrent.TimeUnit.SECONDS);
-                                var changed = mapper.readTree(executor.submit(() -> nextData(reader)).get(10, java.util.concurrent.TimeUnit.SECONDS));
-                                org.junit.jupiter.api.Assertions.assertTrue(changed.isArray());
-                                org.junit.jupiter.api.Assertions.assertEquals(1, changed.size());
-                                org.junit.jupiter.api.Assertions.assertEquals(mapper.readTree(mapper.writeValueAsString(store.all())), changed);
-                                var snapshotRequest = java.net.http.HttpRequest.newBuilder(request.uri()).GET().build();
-                                var snapshot = client.send(snapshotRequest, java.net.http.HttpResponse.BodyHandlers.ofString());
-                                org.junit.jupiter.api.Assertions.assertEquals(200, snapshot.statusCode());
-                                org.junit.jupiter.api.Assertions.assertTrue(snapshot.headers().firstValue("Content-Type").orElse("").startsWith("application/json"));
-                                org.junit.jupiter.api.Assertions.assertEquals(mapper.readTree(mapper.writeValueAsString(store.all())), mapper.readTree(snapshot.body()));
-                                org.junit.jupiter.api.Assertions.assertEquals(1, streams.activeCount());
+                                        projector.on({{eventArguments(code)}});
+                                        return {{code.Reference("java.util.concurrent.CompletableFuture")}}.completedFuture(null);
+                                    }).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS);
+                                var changed = mapper.readTree(executor.submit(() -> nextData(reader)).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS));
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(changed.isArray());
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(1, changed.size());
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(mapper.readTree(mapper.writeValueAsString(store.all())), changed);
+                                var snapshotRequest = {{code.Reference("java.net.http.HttpRequest")}}.newBuilder(request.uri()).GET().build();
+                                var snapshot = client.send(snapshotRequest, {{code.Reference("java.net.http.HttpResponse")}}.BodyHandlers.ofString());
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(200, snapshot.statusCode());
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(snapshot.headers().firstValue("Content-Type").orElse("").startsWith("application/json"));
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(mapper.readTree(mapper.writeValueAsString(store.all())), mapper.readTree(snapshot.body()));
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(1, streams.activeCount());
                                 var closing = System.nanoTime();
                                 application.close();
-                                var elapsed = java.time.Duration.ofNanos(System.nanoTime() - closing);
-                                org.junit.jupiter.api.Assertions.assertTrue(elapsed.compareTo(java.time.Duration.ofSeconds(5)) < 0, "Context close took " + elapsed);
-                                org.junit.jupiter.api.Assertions.assertEquals(0, streams.activeCount());
+                                var elapsed = {{code.Reference("java.time.Duration")}}.ofNanos(System.nanoTime() - closing);
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(elapsed.compareTo({{code.Reference("java.time.Duration")}}.ofSeconds(5)) < 0, "Context close took " + elapsed);
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(0, streams.activeCount());
                             }
                         }
                     } finally {
@@ -69,12 +75,12 @@ internal static class AxonViewHttpLiveSpecs
                     }
                 }
 
-                private static String nextData(java.io.BufferedReader reader) throws java.io.IOException {
+                private static String nextData({{code.Reference("java.io.BufferedReader")}} reader) throws {{code.Reference("java.io.IOException")}} {
                     String line;
                     while ((line = reader.readLine()) != null) {
                         if (line.startsWith("data:")) return line.substring(5).stripLeading();
                     }
-                    throw new java.io.EOFException("SSE stream ended before data arrived");
+                    throw new {{code.Reference("java.io.EOFException")}}("SSE stream ended before data arrived");
                 }
             }
             """);
