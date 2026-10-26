@@ -20,18 +20,31 @@ public class when_framework_names_collide_with_application_types : given.a_view_
     {
         var application = _request.Model.Application;
         var source = Sdk.ScopeSelection.Locate(application).SelectMany(owner => owner.Slice.ReadModels).Single(model => model.Name == "Board").Properties.Single(property => property.Name == "source");
+        SemanticValue literal = primitive == SemanticPrimitiveType.Boolean ? new SemanticBooleanValue(true) : new SemanticNumberValue(42);
         SemanticProjectionValue value = path switch
         {
             "identity" => new SemanticProjectionEventSourceIdentity(),
             "context" => new SemanticProjectionEventContextValue("eventSourceId"),
-            _ => new SemanticProjectionLiteral(new SemanticTextValue(primitive == SemanticPrimitiveType.Boolean ? "true" : "42"))
+            _ => new SemanticProjectionLiteral(literal)
         };
         var model = Rewrite(application with { Types = [.. application.Types.Select(type => type.Name == "BoardDetails" ? type with { Name = name } : type)] },
             model => model.Name == "Board" ? model with { Properties = [.. model.Properties.Select(property => property.Id == source.Id ? property with { Type = new(SemanticTypeReferenceKind.Primitive, primitive, default, false, false) } : property)] } : model,
-            projection => projection.Name == "BoardProjection" ? projection with { Scope = projection.Scope! with { From = [.. projection.Scope.From.Select(transition => transition with { Mappings = [.. transition.Mappings.Select(mapping => mapping.Target.Contains(source.Id) ? mapping with { Source = value } : mapping)] })] } } : projection);
+            slice => slice with
+            {
+                Projections = [.. slice.Projections.Select(projection => projection.Name == "BoardProjection" ? projection with { Scope = projection.Scope! with { From = [.. projection.Scope.From.Select(transition => transition with { Mappings = [.. transition.Mappings.Select(mapping => mapping.Target.Contains(source.Id) ? mapping with { Source = value } : mapping)] })] } } : projection)],
+                Specifications = [.. slice.Specifications.Select(specification => specification with { ThenReadModels = [.. specification.ThenReadModels.Select(expected => expected with { Values = [.. expected.Values.Select(value => value.TargetProperty == source.Id ? value with { Value = literal } : value)] })] })]
+            });
         var code = Artifact(Emit(model), "BoardProjectionProjector");
         code.ShouldContain($"import axonviews.types.{name};");
-        code.ShouldContain($"state.withSource(java.lang.{name}.valueOf(");
+        if (path == "literal")
+        {
+            code.ShouldContain($"state.withSource({(primitive == SemanticPrimitiveType.Boolean ? "true" : "42L")})");
+            code.Replace($"java.lang.{name}.", string.Empty, StringComparison.Ordinal).ShouldNotContain($"{name}.");
+        }
+        else
+        {
+            code.ShouldContain($"state.withSource(java.lang.{name}.valueOf(");
+        }
         code.ShouldNotContain($"state.withSource({name}.valueOf(");
         code.ShouldNotContain($"import java.lang.{name};");
     }
@@ -40,9 +53,9 @@ public class when_framework_names_collide_with_application_types : given.a_view_
     void should_qualify_numbered_enum_wrapping()
     {
         var application = _request.Model.Application;
-        var concept = application.Concepts.Single(concept => concept.Name == "BoardId");
-        var model = Rewrite(application with { Concepts = [.. application.Concepts.Select(candidate => candidate.Id == concept.Id ? candidate with { Name = "Math", Values = ["one", "two"], Numbers = [1, 2] } : candidate)] },
-            model => model.Name == "Board" ? model with { Properties = [.. model.Properties.Select(property => property.Name == "source" ? property with { Type = new(SemanticTypeReferenceKind.Concept, SemanticPrimitiveType.WholeNumber, concept.Id, false, false) } : property)] } : model);
+        var concept = new SemanticConcept(SemanticId.Create(SemanticKind.Concept, "Math"), "Math", SemanticPrimitiveType.Text, ["b1", "b2", "b3", "b4", "b5", "b6"], []) { Numbers = [1, 2, 3, 4, 5, 6] };
+        var model = Rewrite(application with { Concepts = [.. application.Concepts, concept] },
+            model => model.Name == "Board" ? model with { Properties = [.. model.Properties.Select(property => property.Name == "source" ? property with { Type = new(SemanticTypeReferenceKind.Concept, SemanticPrimitiveType.Unknown, concept.Id, false, false) } : property)] } : model);
         var code = Artifact(Emit(model), "BoardProjectionProjector");
         code.ShouldContain("import axonviews.concepts.Math;");
         code.ShouldContain("Math.fromValue(java.lang.Math.toIntExact(Long.valueOf(String.valueOf(event.boardId().value()))))");
@@ -122,12 +135,12 @@ public class when_framework_names_collide_with_application_types : given.a_view_
         return context;
     }
 
-    static SemanticApplication Rewrite(SemanticApplication application, Func<SemanticReadModel, SemanticReadModel> model, Func<SemanticProjection, SemanticProjection>? projection = null)
+    static SemanticApplication Rewrite(SemanticApplication application, Func<SemanticReadModel, SemanticReadModel> model, Func<SemanticSlice, SemanticSlice>? transformSlice = null)
     {
         SemanticFeature Feature(SemanticFeature feature) => feature with
         {
             Features = [.. feature.Features.Select(Feature)],
-            Slices = [.. feature.Slices.Select(slice => slice with { ReadModels = [.. slice.ReadModels.Select(model)], Projections = [.. slice.Projections.Select(candidate => projection?.Invoke(candidate) ?? candidate)] })]
+            Slices = [.. feature.Slices.Select(slice => (transformSlice?.Invoke(slice) ?? slice) with { ReadModels = [.. slice.ReadModels.Select(model)] })]
         };
         return application with { Modules = [.. application.Modules.Select(module => module with { Features = [.. module.Features.Select(Feature)] })] };
     }
