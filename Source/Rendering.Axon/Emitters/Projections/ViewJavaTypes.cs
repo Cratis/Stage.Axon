@@ -86,6 +86,8 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
         }
     }
 
+    internal void ClaimProjectionType(SemanticTypeReference type, JavaCodeBuilder code) => Claim(type, code, []);
+
     internal string Type(SemanticTypeReference type, JavaCodeBuilder code)
     {
         var scalar = type.Kind is SemanticTypeReferenceKind.Concept or SemanticTypeReferenceKind.CompositeType
@@ -145,6 +147,15 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
         SemanticPrimitiveType.DateTime => "java.time.OffsetDateTime",
         _ => "String"
     };
+
+    void Claim(SemanticTypeReference type, JavaCodeBuilder code, HashSet<SemanticId> visited)
+    {
+        if (type.Kind is not (SemanticTypeReferenceKind.Concept or SemanticTypeReferenceKind.CompositeType)) return;
+        code.Reference(Type(type with { IsCollection = false }));
+        if (type.Kind != SemanticTypeReferenceKind.CompositeType || !visited.Add(type.Target)) return;
+        foreach (var property in application.Types.Single(composite => composite.Id == type.Target).Properties)
+            Claim(property.Type, code, visited);
+    }
 
     string ScalarDefault(SemanticTypeReference type, JavaCodeBuilder code)
     {

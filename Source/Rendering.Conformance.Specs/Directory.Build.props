@@ -1,0 +1,6 @@
+<Project>
+    <PropertyGroup>
+        <DedicatedSpecsProject>true</DedicatedSpecsProject>
+    </PropertyGroup>
+    <Import Project="$(MSBuildThisFileDirectory)../Directory.Build.props" />
+</Project>
