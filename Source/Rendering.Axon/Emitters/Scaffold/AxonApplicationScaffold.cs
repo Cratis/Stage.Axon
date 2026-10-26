@@ -27,7 +27,6 @@ internal static class AxonApplicationScaffold
         .Import("io.cratis.fundamentals.jackson.ConceptsModule")
         .Import("io.cratis.fundamentals.jackson.ConceptKeyFormat")
         .Import("io.cratis.fundamentals.jackson.TemporalModule")
-        .Import("io.cratis.fundamentals.jackson.EnumModule")
         .Import("io.cratis.fundamentals.jackson.TimeSpanModule")
         .Line("@Configuration")
         .Block("public class AxonConfiguration", body => body
@@ -43,8 +42,6 @@ internal static class AxonApplicationScaffold
             .Line("JacksonModule conceptsModule() { return new ConceptsModule(ConceptKeyFormat.EMBEDDED_JSON); }")
             .Line("@Bean")
             .Line("JacksonModule temporalModule() { return new TemporalModule(); }")
-            .Line("@Bean")
-            .Line("JacksonModule enumModule() { return new EnumModule(); }")
             .Line("@Bean")
             .Line("JacksonModule timeSpanModule() { return new TimeSpanModule(); }"))
         .Build();

@@ -62,13 +62,13 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
         var code = Encoding.UTF8.GetString(wiring.Bytes.AsSpan());
         code.ShouldContain("import java.time.Clock;");
         code.ShouldContain("Clock.systemUTC()");
-        foreach (var name in new[] { "ConceptsModule", "ConceptKeyFormat", "TemporalModule", "EnumModule", "TimeSpanModule" })
+        foreach (var name in new[] { "ConceptsModule", "ConceptKeyFormat", "TemporalModule", "TimeSpanModule" })
         {
             code.ShouldContain($"import io.cratis.fundamentals.jackson.{name};");
         }
         code.ShouldContain("JacksonModule conceptsModule() { return new ConceptsModule(ConceptKeyFormat.EMBEDDED_JSON); }");
         code.ShouldContain("JacksonModule temporalModule() { return new TemporalModule(); }");
-        code.ShouldContain("JacksonModule enumModule() { return new EnumModule(); }");
+        code.ShouldNotContain("EnumModule");
         code.ShouldContain("JacksonModule timeSpanModule() { return new TimeSpanModule(); }");
         code.ShouldNotContain(".runtime.json.");
     }
