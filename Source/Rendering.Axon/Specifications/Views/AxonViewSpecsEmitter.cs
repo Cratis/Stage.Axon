@@ -69,14 +69,13 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                             .Line("throw new UnsupportedOperationException(\"Unsupported modeled view specification\");");
                         return;
                     }
-                    method.Import(types.BasePackage + ".runtime.ReadModelStore").Import(types.BasePackage + ".runtime.InMemoryReadModelStore")
-                        .Line($"ReadModelStore<Object, {JavaNames.Type(model.Name)}> store = new InMemoryReadModelStore<>();")
+                    method.Line($"{method.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {JavaNames.Type(model.Name)}> store = new {method.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
                         .Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(store);");
                     foreach (var given in spec.GivenEvents)
                     {
                         var root = ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, JavaNames.Type(model.Name));
                         if (!root.All.Any(node => node.Scope.From.Any(from => from.EventContract == given.EventContract) || node.Scope.Joins.Any(join => join.EventContract == given.EventContract) || node.Scope.Removals.Any(removal => removal.EventContract == given.EventContract) || node.Scope.JoinRemovals.Any(removal => removal.EventContract == given.EventContract) || node.Scope.Every is { SubscribesToAllEvents: true })) continue;
-                        method.Line($"projector.on({AxonViewEvents.Expression(context, types, given)}{arguments});");
+                        method.Line($"projector.on({AxonViewEvents.Expression(context, types, given, method)}{arguments});");
                     }
                     foreach (var expected in spec.ThenReadModels.Where(expected => expected.ReadModel == model.Id))
                         EmitExpected(context.Request.Model.Application, types, model, expected, method);

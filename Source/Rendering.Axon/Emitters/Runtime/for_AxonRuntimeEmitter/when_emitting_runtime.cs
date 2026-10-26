@@ -88,6 +88,33 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
         tests.ShouldContain("content().string(json)");
     }
 
+    [Fact]
+    void should_sort_every_emitted_import_block_after_package_substitution()
+    {
+        foreach (var artifact in context.Artifacts)
+        {
+            var imports = Encoding.UTF8.GetString(artifact.Bytes.AsSpan()).Split('\n').Where(line => line.StartsWith("import ", StringComparison.Ordinal)).ToArray();
+            imports.SequenceEqual(imports.Order(StringComparer.Ordinal)).ShouldBeTrue();
+        }
+    }
+
+    [Fact]
+    void should_preserve_every_template_import()
+    {
+        const string prefix = "Cratis.Stage.Rendering.Axon.Emitters.Runtime.Templates.";
+        var assembly = typeof(AxonRuntimeEmitter).Assembly;
+        foreach (var resource in assembly.GetManifestResourceNames().Where(name => name.StartsWith(prefix, StringComparison.Ordinal)))
+        {
+            using var stream = assembly.GetManifestResourceStream(resource);
+            using var reader = new StreamReader(stream);
+            var imports = reader.ReadToEnd().Replace("__RUNTIME__", context.BasePackage + ".runtime", StringComparison.Ordinal)
+                .Split('\n').Where(line => line.StartsWith("import ", StringComparison.Ordinal));
+            var name = resource[(resource.LastIndexOf('.', resource.Length - ".java".Length - 1) + 1)..];
+            var emitted = Template(name).Split('\n').Where(line => line.StartsWith("import ", StringComparison.Ordinal));
+            emitted.SequenceEqual(imports.Order(StringComparer.Ordinal)).ShouldBeTrue();
+        }
+    }
+
     string Template(string name) => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith($"/{name}", StringComparison.Ordinal)).Bytes.AsSpan());
 
     [Fact]

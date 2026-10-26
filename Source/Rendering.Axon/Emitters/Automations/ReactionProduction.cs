@@ -18,21 +18,21 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
         ReactionJavaReferences.Claim(command, [Primary.JavaType, Event.Type]);
         command.Line($"public record {Name}(@{command.Reference("org.axonframework.modelling.annotation.TargetEntityId")} {ReactionJavaReferences.Expression(command, Primary.JavaType)} eventSourceId, {ReactionJavaReferences.Expression(command, Event.Type)} event) {{}}");
         context.AddJava(package, Name, command.Build(), sources: [reaction]);
-        var handler = new JavaCodeBuilder(package).Declare(Name).Declare(Name + "Handler").Declare(Name + "Stream")
-            .Import(context.BasePackage + ".runtime.UniqueValueStore")
-            .Import(context.BasePackage + ".runtime.InMemoryUniqueValueStore")
-            .Import(context.BasePackage + ".infrastructure.ModeledConstraints");
+        var handler = new JavaCodeBuilder(package).Declare(Name).Declare(Name + "Handler").Declare(Name + "Stream");
         ReactionJavaReferences.Claim(handler, [Primary.JavaType]);
+        var uniqueValues = handler.Reference(context.BasePackage + ".runtime.UniqueValueStore");
+        var inMemoryUniqueValues = handler.Reference(context.BasePackage + ".runtime.InMemoryUniqueValueStore");
+        var constraints = handler.Reference(context.BasePackage + ".infrastructure.ModeledConstraints");
         handler.Line("@" + handler.Reference("org.springframework.stereotype.Component"))
             .Block($"public class {Name}Handler", body => body
-                .Line("private final UniqueValueStore uniqueValues;")
-                .Line($"public {Name}Handler() {{ uniqueValues = new InMemoryUniqueValueStore(); }}")
+                .Line($"private final {uniqueValues} uniqueValues;")
+                .Line($"public {Name}Handler() {{ uniqueValues = new {inMemoryUniqueValues}(); }}")
                 .Line("@" + body.Reference("org.springframework.beans.factory.annotation.Autowired"))
-                .Line($"public {Name}Handler(UniqueValueStore uniqueValues) {{ this.uniqueValues = uniqueValues; }}")
+                .Line($"public {Name}Handler({uniqueValues} uniqueValues) {{ this.uniqueValues = uniqueValues; }}")
                 .Line("@" + body.Reference("org.axonframework.messaging.commandhandling.annotation.CommandHandler"))
                 .Block($"public void handle({Name} command, {body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} processingContext, @{body.Reference("org.axonframework.modelling.annotation.InjectEntity")}(idProperty = \"eventSourceId\") {body.Reference("org.axonframework.modelling.repository.ManagedEntity")}<{ReactionJavaReferences.Expression(body, Primary.JavaType)}, {Name}Stream> stream)", method => method
                     .Line($"if (!{method.Reference("java.util.Objects")}.equals(command.eventSourceId(), command.event().{Primary.ComponentName}())) throw new IllegalArgumentException(\"Event source does not match append boundary\");")
-                    .Line("ModeledConstraints.apply(uniqueValues, command.event(), processingContext);")
+                    .Line($"{constraints}.apply(uniqueValues, command.event(), processingContext);")
                     .Line("appender.append(command.event());")));
         context.AddJava(package, Name + "Handler", handler.Build(), sources: [reaction]);
         EmitStream(context, package, reaction);

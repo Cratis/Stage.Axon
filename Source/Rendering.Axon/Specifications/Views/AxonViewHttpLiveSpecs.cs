@@ -17,11 +17,12 @@ internal static class AxonViewHttpLiveSpecs
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name) + "SseTest";
         var code = new JavaCodeBuilder(package).Declare(name).Declare(JavaNames.Type(query.Name)).Declare(JavaNames.Type(query.Name) + "Streams")
-            .Import(types.BasePackage + ".Application").Import(types.BasePackage + ".runtime.ReadModelStore");
+            .Import(types.BasePackage + ".Application");
         foreach (var model in located.Slice.ReadModels) code.Declare(JavaNames.Type(model.Name));
         var projectorName = projector[(projector.LastIndexOf('.') + 1)..];
         if (projector[..projector.LastIndexOf('.')] == package) code.Declare(projectorName);
         else code.Import(projector);
+        var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
         code.Line($$"""
             class {{name}} {
                 @{{code.Reference("org.junit.jupiter.api.Test")}}
@@ -31,7 +32,7 @@ internal static class AxonViewHttpLiveSpecs
                         var port = application.getEnvironment().getProperty("local.server.port", Integer.class);
                         var configuration = application.getBean({{code.Reference("org.axonframework.common.configuration.Configuration")}}.class);
                         var projector = application.getBean({{projectorName}}.class);
-                        var store = application.getBean({{JavaCodeBuilder.StringLiteral(modelType)}}, ReadModelStore.class);
+                        var store = application.getBean({{JavaCodeBuilder.StringLiteral(modelType)}}, {{storeType}}.class);
                         var streams = application.getBean({{JavaNames.Type(query.Name)}}Streams.class);
                         store.clear();
                         try (var client = {{code.Reference("java.net.http.HttpClient")}}.newHttpClient();

@@ -29,6 +29,7 @@ internal static class AxonEventSources
         var tag = EventTagsEmitter.Reference(context, contract, code, package);
         var addPrimary = !contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName);
         if (addPrimary) code.Import(primary.JavaType);
+        foreach (var property in contract.Properties) JavaSemanticTypes.Claim(context, property.Type, code, package);
         var parameters = contract.Properties.Select(property => Component(context, property, (primary.ComponentName, tag), code)).ToList();
         if (addPrimary)
             parameters.Insert(0, $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {tag}) {primary.JavaType[(primary.JavaType.LastIndexOf('.') + 1)..]} {primary.ComponentName}");
@@ -74,6 +75,6 @@ internal static class AxonEventSources
         var name = JavaNames.Member(property.Name);
         var tag = name == primary.ComponentName ? $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {primary.Reference}) " : string.Empty;
         var json = name == property.Name ? string.Empty : $"@{code.Reference("com.fasterxml.jackson.annotation.JsonProperty")}({JavaCodeBuilder.StringLiteral(property.Name)}) ";
-        return tag + $"{json}{JavaSemanticTypes.TypeFor(context, property.Type)} {name}";
+        return tag + $"{json}{JavaSemanticTypes.TypeFor(context, property.Type, code)} {name}";
     }
 }
