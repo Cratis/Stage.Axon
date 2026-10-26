@@ -150,7 +150,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
             CommandFixtureSecurity.Caller(body, spec.GivenCaller);
             var modelName = JavaNames.Type(model.Name);
             var updates = new ProjectionUpdates(context, types, model.Id);
-            body.Line($"{body.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {modelName}> store = new {body.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
+            body.Line($"{body.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{body.Reference("java.lang.Object")}, {modelName}> store = new {body.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
                 .Line($"var projector = new {modelName}ReducerProjector(store, new {modelName}Reducer() {{}});");
             foreach (var given in plan.Events)
             {

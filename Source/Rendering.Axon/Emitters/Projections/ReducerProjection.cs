@@ -52,7 +52,7 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
                     var assertions = test.Reference("org.junit.jupiter.api.Assertions");
                     test.Line($"var reducer = new {name}Reducer() {{}};")
                         .Line($"{assertions}.assertNull(reducer.reduce(({types.EventType(transition.EventContract, test)}) null, null, null), \"A null current stays null; no row is created\");")
-                        .Line($"var current = new {name}({string.Join(", ", model.Properties.Select(property => types.Default(property.Type, test)))});")
+                        .Line($"var current = new {name}({string.Join(", ", model.Properties.Select(_ => "null"))});")
                         .Line($"{assertions}.assertSame(current, reducer.reduce(({types.EventType(transition.EventContract, test)}) null, current, null), \"An existing row is neither changed nor deleted\");");
                 });
             }
