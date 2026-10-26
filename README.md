@@ -34,6 +34,12 @@ Admission requires supported version-1 context/result contracts, matching owner 
 
 C# emitted-text assertions are not native execution proof. The Java fixtures and all generated applications still require the CI native gate below.
 
+## Persistent flat views
+
+The opt-in `persistent` profile supports flat projection views only, using JPA rows and generation metadata. Scoped and reducer-built views are refused. A legacy database without a matching view generation fails closed; automatic replay is not a migration strategy.
+
+The transaction envelope requires pooled processors with propagating errors and context-bound writes on the handler thread. Startup checks reject customizations that weaken the processor envelope. Runtime row/checkpoint atomicity is proven only by the CI Maven gate, not by C# emitted-text assertions. Default-profile stores remain in memory.
+
 ## Native proof
 
 Use JDK 25 and the generated Maven wrapper. The render destination must not exist.
