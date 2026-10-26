@@ -20,7 +20,7 @@ Specs are inline in all three projects and are compiled only in Debug. The extra
 
 ## Native proof
 
-Use JDK 21 and the generated Maven wrapper. The render destination must not exist.
+Use JDK 25 and the generated Maven wrapper. The render destination must not exist.
 
 ```sh
 dotnet run --project Source/Rendering.Axon.Verification -c Debug --no-build -- render .ai-work/corpus
