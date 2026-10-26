@@ -50,7 +50,7 @@ dotnet run --project Source/Rendering.Axon.Verification -c Debug --no-build -- r
 dotnet run --project Source/Rendering.Axon.Verification -c Debug --no-build -- verify .ai-work/corpus
 ```
 
-The last command requires passing native tests in every application and validates the exact disabled-test budget: `STAGE-AXON-0501=5`, `STAGE-AXON-0306=2`, `STAGE-AXON-SPEC=3`. Missing, failing, empty, all-skipped, unknown-reason, exceeded, and stale budgets fail. Do not raise budgets to obtain a passing run. See [the harness guide](Source/Rendering.Axon.Verification/README.md) for optional restart and boot smoke checks and [the target guide](Documentation/guides/third-party-render-target.md) for renderer contracts and Axon limitations.
+The last command requires passing native tests in every application and validates the exact disabled-test budget recorded in [`disabled-tests.json`](Source/Rendering.Axon.Verification/disabled-tests.json). Missing, failing, empty, all-skipped, unknown-reason, exceeded, and stale budgets fail. Do not raise budgets to obtain a passing run. See [the harness guide](Source/Rendering.Axon.Verification/README.md) for optional restart and boot smoke checks and [the target guide](Documentation/guides/third-party-render-target.md) for renderer contracts and Axon limitations.
 
 The build workflow is an extraction skeleton, not publication automation. It runs Release/Debug builds, all three spec projects with nonempty-result guards, and the 23-app native proof. It needs no containers or Stage checkout. No package publication is configured.
 

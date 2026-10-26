@@ -3,13 +3,35 @@ title: Verify a third-party render target
 description: Check semantic coverage, deterministic output, and native specifications when building a Stage renderer, using Axon as an example.
 ---
 
+Preview: the conformance API may change ([conformance README](../../Source/Rendering.Conformance/README.md)).
+
 A generated application can compile while silently omitting a modeled rule or specification. Use `Cratis.Stage.Rendering.Conformance` to find those omissions without coupling your renderer to the Cratis target.
 
-Start with [Build a renderer target](build-renderer-target.md) for compilation, profiles, scopes, and publication. This guide assumes you already have an `IArtifactRenderPlanner`, an admitted `ArtifactRenderRequest`, and a native test runner for the generated application.
+Start with [Build a renderer target](https://github.com/Cratis/Stage/blob/v4.197.0/Documentation/guides/build-renderer-target.md), the Stage version matching the pinned Contracts, for compilation, profiles, scopes, and publication. This guide assumes you already have an `IArtifactRenderPlanner`, an admitted `ArtifactRenderRequest`, and a native test runner for the generated application.
 
 ## Account for every semantic identity
 
-Reference `Cratis.Stage.Rendering.Conformance` from your renderer verification project. The package depends on Stage Contracts and Screenplay, not on a particular renderer or generated runtime.
+`Cratis.Stage.Rendering.Conformance` is a preview API; this repository has no package publication configured. Registry availability has not been verified. It depends directly on `Cratis.Stage.Contracts` and transitively on Screenplay, not on a particular renderer or generated runtime. Consume it from a pinned checkout:
+
+1. Install the .NET 10 SDK and target `net10.0` in your verification project.
+2. Add Stage.Axon as a submodule: `git submodule add https://github.com/Cratis/Stage.Axon external/Stage.Axon`. Check out a specific commit with `git -C external/Stage.Axon checkout <sha>` and commit the submodule pointer. A clone pinned to the same SHA also works. Pin a SHA, not a branch, because Conformance is a preview API.
+3. Match the Contracts version in that checkout's `Directory.Packages.props` (currently `4.197.0`). Without central package management, add:
+
+   ```xml
+   <PackageReference Include="Cratis.Stage.Contracts" Version="4.197.0" />
+   ```
+
+   With central package management, put `<PackageVersion Include="Cratis.Stage.Contracts" Version="4.197.0" />` in your `Directory.Packages.props` and omit the version from the package reference. Compatibility with a higher Contracts version is not verified.
+4. Reference Conformance in Release, adjusting the relative path for your project:
+
+   ```xml
+   <ProjectReference Include="../external/Stage.Axon/Source/Rendering.Conformance/Rendering.Conformance.csproj"
+                     SetConfiguration="Configuration=Release" />
+   ```
+
+   Stage.Axon compiles inline specifications and adds test dependencies in Debug; Release excludes them. The Debug-consumer behavior of this metadata has not yet been verified.
+
+Do not copy the project folder alone: it inherits its target framework, package versions, analyzers, and specification configuration from repository-level build files. Keep the pinned checkout intact so MSBuild evaluates the referenced project with its own configuration. When updating the pin, re-read its Contracts version and rebuild.
 
 For each selected scope:
 
@@ -59,10 +81,11 @@ static void CheckApplication(
     string outputDirectory,
     string junitDirectory)
 {
+    var issues = new List<string>();
     var plan = planner.Plan(request);
     if (!plan.Success)
     {
-        throw new InvalidOperationException("The render plan was not successful.");
+        issues.Add("The render plan was not successful.");
     }
 
     var manifest = StageSpecificationManifest.Read(
@@ -78,9 +101,12 @@ static void CheckApplication(
     {
         foreach (var issue in report.Issues)
         {
-            throw new InvalidOperationException(
-                $"{issue.Code}: {issue.SemanticId}: {issue.Message}");
+            issues.Add($"{issue.Code}: {issue.SemanticId}: {issue.Message}");
         }
+    }
+    if (issues.Count > 0)
+    {
+        throw new InvalidOperationException(string.Join(Environment.NewLine, issues));
     }
 }
 ```
