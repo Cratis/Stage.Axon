@@ -31,4 +31,24 @@ public class when_lowering_nullable_equality : for_AxonArtifactRenderPlanner.giv
     [Fact] void should_use_scale_insensitive_decimal_equality() => decimal_equal.ShouldContain("compareTo(new java.math.BigDecimal(\"1.00\")) == 0");
     [Fact] void should_guard_decimal_comparison_against_null() => decimal_equal.ShouldContain("command.amount() != null &&");
     [Fact] void should_not_compare_decimal_numerically_to_null() => decimal_null.ShouldEqual("java.util.Objects.equals(command.amount(), null)");
+
+    [Fact]
+    void should_import_objects_in_builder_aware_comparisons()
+    {
+        var types = new CommandJavaTypes(loaded.Model.Application);
+        var code = new Java.JavaCodeBuilder("example.rules").Declare("Rules");
+        var type = new SemanticTypeReference(SemanticTypeReferenceKind.Primitive, SemanticPrimitiveType.Text, default, false, true);
+        new CommandValidationPredicates(types, new(default, SemanticValidationRuleKind.Equal, new SemanticTextValue("expected"), null), type, "command.label()").Render(code).ShouldEqual("Objects.equals(command.label(), \"expected\")");
+        code.Build().ShouldContain("import java.util.Objects;");
+    }
+
+    [Fact]
+    void should_qualify_a_colliding_uuid_default_check()
+    {
+        var types = new CommandJavaTypes(loaded.Model.Application);
+        var code = new Java.JavaCodeBuilder("example.rules").Declare("UUID");
+        var type = new SemanticTypeReference(SemanticTypeReferenceKind.Primitive, SemanticPrimitiveType.Uuid, default, false, false);
+        new CommandValidationPredicates(types, new(default, SemanticValidationRuleKind.NotEmpty, null, null), type, "command.identity()").Render(code).ShouldEqual("(command.identity() != null && !command.identity().equals(new java.util.UUID(0L, 0L)))");
+        code.Build().ShouldNotContain("import java.util.UUID;");
+    }
 }

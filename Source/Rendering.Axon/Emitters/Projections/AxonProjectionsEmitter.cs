@@ -73,24 +73,22 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var modelName = JavaNames.Type(model.Name);
         var name = JavaNames.Type(projection.Name) + "Projector";
         var updates = new ProjectionUpdates(context, types, model.Id);
-        var code = new JavaCodeBuilder(package).Import("org.springframework.stereotype.Component")
-            .Import("org.springframework.beans.factory.annotation.Qualifier")
-            .Import("org.axonframework.messaging.core.annotation.Namespace")
-            .Import("org.axonframework.messaging.eventhandling.annotation.EventHandler")
-            .Import(types.BasePackage + ".runtime.ReadModelStore")
-            .Line($"@Component({JavaCodeBuilder.StringLiteral(package + "." + name)})")
-            .Line($"@Namespace({JavaCodeBuilder.StringLiteral(package)})");
-        code.Block($"public class {name}", body =>
+        var code = new JavaCodeBuilder(package).Declare(modelName).Declare(name).Import(types.BasePackage + ".runtime.ReadModelStore");
+        updates.Claim(code, package);
+        foreach (var from in ProjectionTransitions.From(projection)) types.EventType(from.EventContract, code);
+        code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
+            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
+            .Block($"public class {name}", body =>
         {
-            body.Line($"private final ReadModelStore<Object, {modelName}> store;")
-                .Block($"public {name}(@Qualifier({JavaCodeBuilder.StringLiteral(package + "." + modelName)}) ReadModelStore<Object, {modelName}> store)", constructor => constructor.Line("this.store = store;"));
+            body.Line($"private final ReadModelStore<{body.Reference("java.lang.Object")}, {modelName}> store;")
+                .Block($"public {name}(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + modelName)}) ReadModelStore<{body.Reference("java.lang.Object")}, {modelName}> store)", constructor => constructor.Line("this.store = store;"));
             foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
             {
                 var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == group.Key);
-                body.Line("@EventHandler").Block($"public void on({types.EventType(group.Key)} event{updates.Parameter})", method =>
+                body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}").Block($"public void on({types.EventType(group.Key, body)} event{updates.Parameter})", method =>
                 {
                     foreach (var from in group) EmitFrom(context, types, method, projection, model, @event, from);
-                    updates.Notify(method);
+                    updates.Notify(method, package);
                 });
             }
         });
@@ -99,7 +97,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
 
     static void EmitFrom(AxonEmissionContext context, ViewJavaTypes types, JavaCodeBuilder code, SemanticProjection projection, SemanticReadModel model, SemanticEventContract @event, SemanticProjectionFrom from)
     {
-        var values = new ProjectionValues(context, types);
+        var values = new ProjectionValues(context, types, code);
         var key = values.Key(from.Key, @event);
         if (key is null)
         {
