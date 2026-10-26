@@ -20,7 +20,8 @@ public class when_a_placeholder_has_a_constrained_numeric_concept : given.a_view
         var original = application.Concepts.Single(concept => concept.Name == "CounterId");
         var quantity = original with
         {
-            Name = "Quantity", Primitive = SemanticPrimitiveType.WholeNumber,
+            Name = "Quantity",
+            Primitive = SemanticPrimitiveType.WholeNumber,
             Validations = [new(default, SemanticValidationRuleKind.GreaterThan, new SemanticNumberValue(0), null)]
         };
         static SemanticFeature Feature(SemanticFeature feature) => feature with
