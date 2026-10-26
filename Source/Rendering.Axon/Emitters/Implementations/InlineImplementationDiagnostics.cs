@@ -36,17 +36,29 @@ internal static class InlineImplementationDiagnostics
     static string Reason(AxonEmissionContext context, SemanticImplementationRequirement requirement)
     {
         if (requirement.Role == SemanticImplementationRole.ReducerTransition) return "Reducer transition bodies have no supported Axon method-body slot.";
-        return InlineJavaBodies.TryResolve(context, requirement.RequirementId, requirement.Role, requirement.Source.SemanticId, out _, out var reason)
+        return InlineJavaBodies.TryResolve(context, new(requirement.RequirementId, requirement.Role, requirement.Source.SemanticId), out _, out var reason)
             ? "No supported native method-body slot consumed this implementation."
             : reason;
     }
 
     static bool Selected(SemanticImplementationRequirement requirement, LocatedSemanticSlice located) => requirement.Role switch
     {
-        SemanticImplementationRole.CommandHandler => located.Slice.Commands.Any(command => command.Id == requirement.Source.SemanticId && command.Handler?.RequirementId == requirement.RequirementId),
-        SemanticImplementationRole.ReactionEffect => located.Slice.Reactions.Any(reaction => reaction.Id == requirement.Source.SemanticId && reaction.Triggers.Any(trigger => trigger.RequirementId == requirement.RequirementId)),
-        SemanticImplementationRole.QueryPerformer => located.Slice.Queries.Any(query => query.Id == requirement.Source.SemanticId) || located.Slice.ReadModels.Any(model => model.Id == requirement.QueryShape?.ReadModel),
-        SemanticImplementationRole.ReducerTransition => located.Slice.Reducers.Any(reducer => reducer.Transitions.Any(transition => transition.RequirementId == requirement.RequirementId)),
+        SemanticImplementationRole.CommandHandler => CommandSelected(requirement, located),
+        SemanticImplementationRole.ReactionEffect => ReactionSelected(requirement, located),
+        SemanticImplementationRole.QueryPerformer => QuerySelected(requirement, located),
+        SemanticImplementationRole.ReducerTransition => ReducerSelected(requirement, located),
         _ => false
     };
+
+    static bool ReducerSelected(SemanticImplementationRequirement requirement, LocatedSemanticSlice located) =>
+        located.Slice.Reducers.Any(reducer => reducer.Transitions.Any(transition => transition.RequirementId == requirement.RequirementId));
+
+    static bool CommandSelected(SemanticImplementationRequirement requirement, LocatedSemanticSlice located) =>
+        located.Slice.Commands.Any(command => command.Id == requirement.Source.SemanticId && command.Handler?.RequirementId == requirement.RequirementId);
+
+    static bool ReactionSelected(SemanticImplementationRequirement requirement, LocatedSemanticSlice located) =>
+        located.Slice.Reactions.Any(reaction => reaction.Id == requirement.Source.SemanticId && reaction.Triggers.Any(trigger => trigger.RequirementId == requirement.RequirementId));
+
+    static bool QuerySelected(SemanticImplementationRequirement requirement, LocatedSemanticSlice located) =>
+        located.Slice.Queries.Any(query => query.Id == requirement.Source.SemanticId) || located.Slice.ReadModels.Any(model => model.Id == requirement.QueryShape?.ReadModel);
 }

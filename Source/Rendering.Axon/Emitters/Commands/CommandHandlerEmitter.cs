@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Constraints;
 using Cratis.Stage.Rendering.Axon.Emitters.Decisions;
+using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -18,6 +19,8 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     bool _usesClock;
 
     bool Constrained => ConstraintCoverage.All(context).Any(item => command.Produces.Any(produced => ConstraintCoverage.Applies(item.Constraint, produced.EventContract)));
+
+    bool MissingSource => command.Handler is null && source is null && !command.Produces.IsEmpty;
 
     internal bool Emit()
     {
@@ -76,6 +79,11 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     void Handle(JavaCodeBuilder body, CommandResponses response)
     {
         if (!Supported(body, response)) return;
+        if (command.Handler is { } handler)
+        {
+            HandleNative(body, handler);
+            return;
+        }
         var appends = new List<(string Event, string? Condition)>();
         var builder = new CommandAppends(context, command, source!);
         foreach (var produced in command.Produces)
@@ -88,20 +96,42 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             }
             appends.Add(append.Value);
         }
-        new CommandDecisionReads(context, command, source).Check(body);
-        Prepare(body);
-        body.Line("rules.validate(command);");
+        Validate(body);
         if (appends.Count > 0) Append(body, appends, builder.UsesOccurred);
         if (response.ReturnType != "void") body.Line("return " + response.Value + ";");
+    }
+
+    void HandleNative(JavaCodeBuilder body, SemanticCommandHandler handler)
+    {
+        var slot = new InlineBodySlot(handler.RequirementId, SemanticImplementationRole.CommandHandler, command.Id);
+        if (handler.ResultVersion != 1)
+        {
+            Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation with an unsupported result revision");
+            return;
+        }
+        if (!InlineJavaBodies.TryResolve(context, slot, out var content, out var reason))
+        {
+            Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation: " + reason);
+            return;
+        }
+        Validate(body);
+        body.RawBody(content);
+        context.ConsumedImplementations.Add(handler.RequirementId);
     }
 
     bool Supported(JavaCodeBuilder body, CommandResponses response)
     {
         if (ConstraintCoverage.CommandRequiresUnsupportedConstraint(context, command)) return Unsupported(body, AxonRefusalCodes.Constraint, "enforce or release modeled uniqueness in the append unit of work");
-        if (command.Handler is not null) return Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation");
         if (new CommandDecisionReads(context, command, source).Prepare() is null) return Unsupported(body, AxonRefusalCodes.ProtectedReads, "check modeled decision reads before changing state");
-        if (source is null && !command.Produces.IsEmpty) return Unsupported(body, AxonRefusalCodes.CommandMapping, "resolve the command's primary event-source identity");
-        return response.Value is not null || Unsupported(body, AxonRefusalCodes.CommandMapping, "compute the complete modeled command response");
+        if (MissingSource) return Unsupported(body, AxonRefusalCodes.CommandMapping, "resolve the command's primary event-source identity");
+        return command.Handler is not null || response.Value is not null || Unsupported(body, AxonRefusalCodes.CommandMapping, "compute the complete modeled command response");
+    }
+
+    void Validate(JavaCodeBuilder body)
+    {
+        new CommandDecisionReads(context, command, source).Check(body);
+        Prepare(body);
+        body.Line("rules.validate(command);");
     }
 
     void Prepare(JavaCodeBuilder body)

@@ -12,7 +12,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Implementations.for_InlineJavaBod
 
 public class when_resolving_a_java_body : a_view_request
 {
-    const string Body = "var text = \"java.time // \\\\ path\";\r\nvar block = \"\"\"\n  /* text */\n    java.time\n  \"\"\";\nreturn java.util.List.of();";
+    const string Body = "var text = \"java.time // \\\\ path\";\nvar block = \"\"\"\n  /* text */\n    java.time\n  \"\"\";\nreturn java.util.List.of();";
     SemanticImplementationRequirement requirement;
     AxonEmissionContext context;
 
@@ -31,7 +31,7 @@ public class when_resolving_a_java_body : a_view_request
     void should_resolve_exact_content()
     {
         Resolve(requirement).ShouldBeTrue();
-        InlineJavaBodies.TryResolve(context, requirement.RequirementId, requirement.Role, requirement.Source.SemanticId, out var body, out _).ShouldBeTrue();
+        InlineJavaBodies.TryResolve(context, new(requirement.RequirementId, requirement.Role, requirement.Source.SemanticId), out var body, out _).ShouldBeTrue();
         body.ShouldEqual(Body);
     }
 
@@ -50,15 +50,15 @@ public class when_resolving_a_java_body : a_view_request
     void should_reject_missing_content()
     {
         var request = _request with { ImplementationContents = _request.ImplementationContents.Clear() };
-        InlineJavaBodies.TryResolve(new(request, new(request.Profile)), requirement.RequirementId, requirement.Role, requirement.Source.SemanticId, out _, out _).ShouldBeFalse();
+        InlineJavaBodies.TryResolve(new(request, new(request.Profile)), new(requirement.RequirementId, requirement.Role, requirement.Source.SemanticId), out _, out _).ShouldBeFalse();
     }
 
     [Fact]
-    void should_reject_the_wrong_role() => InlineJavaBodies.TryResolve(context, requirement.RequirementId, SemanticImplementationRole.CommandHandler, requirement.Source.SemanticId, out _, out _).ShouldBeFalse();
+    void should_reject_the_wrong_role() => InlineJavaBodies.TryResolve(context, new(requirement.RequirementId, SemanticImplementationRole.CommandHandler, requirement.Source.SemanticId), out _, out _).ShouldBeFalse();
 
     bool Resolve(SemanticImplementationRequirement candidate)
     {
         var request = _request with { ImplementationRequirements = [candidate] };
-        return InlineJavaBodies.TryResolve(new(request, new(request.Profile)), candidate.RequirementId, candidate.Role, candidate.Source.SemanticId, out _, out _);
+        return InlineJavaBodies.TryResolve(new(request, new(request.Profile)), new(candidate.RequirementId, candidate.Role, candidate.Source.SemanticId), out _, out _);
     }
 }

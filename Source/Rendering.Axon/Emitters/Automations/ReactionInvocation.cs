@@ -25,10 +25,13 @@ internal static class ReactionInvocation
     }
 
     internal static void Dispatch(JavaCodeBuilder method, SemanticReaction reaction, string invocation)
+        => Dispatch(method, reaction, body => body.Line(invocation));
+
+    internal static void Dispatch(JavaCodeBuilder method, SemanticReaction reaction, Action<JavaCodeBuilder> effect)
     {
         if (reaction.RunsAs is null)
         {
-            method.Line(invocation);
+            effect(method);
             return;
         }
         var roles = reaction.RunsAs.Roles.Distinct(StringComparer.Ordinal)
@@ -37,7 +40,11 @@ internal static class ReactionInvocation
         method.Line($"var previous = {holder}.getContext();")
             .Line($"var identity = {holder}.createEmptyContext();")
             .Line($"identity.setAuthentication(new {method.Reference("org.springframework.security.authentication.UsernamePasswordAuthenticationToken")}(\"system\", null, {method.Reference("java.util.List")}.of(" + string.Join(", ", roles) + ")));")
-            .Block("try", body => body.Line($"{holder}.setContext(identity);").Line(invocation))
+            .Block("try", body =>
+            {
+                body.Line($"{holder}.setContext(identity);");
+                effect(body);
+            })
             .Block("finally", body => body.Line($"{holder}.setContext(previous);"));
     }
 
