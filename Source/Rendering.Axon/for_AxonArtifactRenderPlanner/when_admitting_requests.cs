@@ -63,8 +63,8 @@ public class when_admitting_requests : given.an_axon_request
         AssertScaffold(AxonRendering.PlanFrom(loaded, request.Scope));
 
     [Fact]
-    void should_refuse_unimplemented_specifications_in_strict_mode() =>
-        AssertStrictlyRefused(AxonRendering.PlanFrom(loaded, request.Scope, profile: AxonRendering.CreateProfile(strict: true)), AxonRefusalCodes.ViewSpecification);
+    void should_not_refuse_the_supported_catalog_view_specification_in_strict_mode() =>
+        Assert.DoesNotContain(AxonRendering.PlanFrom(loaded, request.Scope, profile: AxonRendering.CreateProfile(strict: true)).Diagnostics, diagnostic => diagnostic.Code == AxonRefusalCodes.ViewSpecification);
 
     void AssertUnmeasuredPairs(ArtifactRenderProfile profile, Action<ArtifactRenderPlan, string> assert)
     {
