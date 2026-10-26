@@ -42,10 +42,28 @@ class RuntimeHttpRoundTripTest {
     public record Number(BigDecimal value) implements ConceptAs<BigDecimal> {}
     public record Time(OffsetDateTime value) implements ConceptAs<OffsetDateTime> {}
     public record Wire(Number amount, Time at, Map<Number, String> byAmount) {}
+    public record Priorities(RuntimeTest.Priority priority, RuntimeTest.Status status, Map<RuntimeTest.Priority, String> byPriority, Map<RuntimeTest.Status, String> byStatus) {}
+
+    @Test
+    void explicitEnumValuesSurviveHttpRoundTrip() throws Exception {
+        for (var number : List.of(10, 30)) {
+            var json = "{\"priority\":" + number + ",\"status\":" + number + ",\"byPriority\":{\"" + number + "\":\"x\"},\"byStatus\":{\"" + number + "\":\"x\"}}";
+            http.perform(post("/_runtime/priorities").contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isOk()).andExpect(content().string(json));
+        }
+    }
+
+    @Test
+    void invalidEnumNumbersFailHttpBinding() throws Exception {
+        for (var number : List.of(0, 1, 20, 31)) {
+            http.perform(post("/_runtime/priorities").contentType(MediaType.APPLICATION_JSON).content("{\"priority\":" + number + "}"))
+                .andExpect(status().isBadRequest());
+        }
+    }
 
     @Test
     void exactConceptWireFormatSurvivesHttpRoundTrip() throws Exception {
-        var json = "{\"amount\":1E+2,\"at\":\"2026-10-24T12:00:00Z\",\"byAmount\":{\"1E+2\":\"x\"}}";
+        var json = "{\"amount\":100,\"at\":\"2026-10-24T12:00:00+00:00\",\"byAmount\":{\"100\":\"x\"}}";
         http.perform(post("/_runtime/wire").contentType(MediaType.APPLICATION_JSON).content(json))
             .andExpect(status().isOk()).andExpect(content().string(json));
     }
@@ -83,6 +101,9 @@ class RuntimeHttpRoundTripTest {
 
         @PostMapping("/_runtime/wire")
         Wire wire(@RequestBody Wire payload) { return payload; }
+
+        @PostMapping("/_runtime/priorities")
+        Priorities priorities(@RequestBody Priorities payload) { return payload; }
 
         @GetMapping("/_runtime/echo-async")
         CompletableFuture<Payload> readAsync() {

@@ -21,7 +21,7 @@ dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verificat
 node Source/Rendering.Axon.Verification/boot-smoke.mjs .ai-work/axon-corpus .ai-work/axon-boot-logs
 ```
 
-Every application must execute passing native tests. Missing, failed, empty, or entirely skipped reports fail verification. `disabled-tests.json` records an exact count and explanation per reason, measured independently from all 23 generated `stage-specifications.txt` files and Java `@Disabled` annotations: 63 `STAGE-AXON-0501` view gaps, two `STAGE-AXON-0306` reducer gaps and three `STAGE-AXON-SPEC` custom-package view gaps. The total is 68; this is source accounting, not a native execution result. Unknown reasons, increases, decreases, absent reasons and unexplained or zero-count entries fail. Ratchet the allowlist whenever lowering improves; do not raise it merely to obtain a passing run.
+Every application must execute passing native tests. Missing, failed, empty, or entirely skipped reports fail verification. `disabled-tests.json` records an exact count and explanation per reason, measured independently from all 23 generated `stage-specifications.txt` files and Java `@Disabled` annotations: two `STAGE-AXON-0306` reducer gaps. The total is 2; this is source accounting, not a native execution result. Unknown reasons, increases, decreases, absent reasons and unexplained or zero-count entries fail. Ratchet the allowlist whenever lowering improves; do not raise it merely to obtain a passing run.
 
 The opt-in `PersistentRestartProbe` is outside default Surefire discovery, so it adds no conditional skip to the default corpus. After the normal native checks, explicitly run it against a view application:
 
