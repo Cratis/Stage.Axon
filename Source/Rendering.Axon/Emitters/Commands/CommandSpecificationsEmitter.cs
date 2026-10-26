@@ -38,7 +38,7 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
     {
         if (source is null) return;
         code.Declare(commandName + "Stream");
-        if (source.JavaType.StartsWith(context.BasePackage + ".", StringComparison.Ordinal)) code.Import(source.JavaType);
+        if (source.JavaType.StartsWith(context.BasePackage + ".", StringComparison.Ordinal)) code.Reference(source.JavaType);
     }
 
     void ClaimAssertions(JavaCodeBuilder code, IEnumerable<SemanticSpecification> specifications)

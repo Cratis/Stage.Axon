@@ -29,7 +29,7 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
         foreach (var contract in constraints.Where(item => ConstraintCoverage.Supported(context, item.Constraint))
             .SelectMany(item => item.Constraint.Targets.Select(target => target.EventContract).Concat(item.Constraint.ReleasedBy)).Distinct())
         {
-            code.Import(AxonEventsEmitter.TypeFor(context, contract));
+            code.Reference(AxonEventsEmitter.TypeFor(context, contract));
         }
         var store = code.Reference(context.BasePackage + ".runtime.UniqueValueStore");
         code.Block("public final class ModeledConstraints", body =>

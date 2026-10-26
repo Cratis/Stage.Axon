@@ -43,7 +43,7 @@ internal static class JavaSemanticTypes
         if (type.IsCollection) return $"{builder.Reference("java.util.List")}<{TypeFor(context, type with { IsCollection = false }, builder, package)}>";
         var name = ReferenceName(context, type);
         if (name == "Object") context.Degradation.Unsupported("STAGE-AXON-TYPE", type.Target, "The property type is not known to the Axon target.", "represent the modeled property type", type.Target + "/type");
-        if (type.Kind != SemanticTypeReferenceKind.Primitive && name != "Object") return name[(name.LastIndexOf('.') + 1)..];
+        if (type.Kind != SemanticTypeReferenceKind.Primitive && name != "Object" && name[..name.LastIndexOf('.')] == package) return name[(name.LastIndexOf('.') + 1)..];
         return builder.Reference(name.Contains('.') ? name : "java.lang." + name);
     }
 
@@ -53,7 +53,7 @@ internal static class JavaSemanticTypes
         var name = ReferenceName(context, type);
         if (name == "Object") return;
         if (package is not null && name[..name.LastIndexOf('.')] == package) builder.Declare(name[(name.LastIndexOf('.') + 1)..]);
-        else builder.Import(name);
+        else builder.Reference(name);
     }
 
     internal static JavaCodeBuilder ConceptBuilder(AxonEmissionContext context, string name)

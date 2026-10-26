@@ -38,7 +38,7 @@ internal sealed class CommandJavaTypes(SemanticApplication application)
         if (type.Kind is SemanticTypeReferenceKind.Concept or SemanticTypeReferenceKind.CompositeType)
         {
             var name = Type(type with { IsCollection = false });
-            if (name.StartsWith(BasePackage + ".", StringComparison.Ordinal)) code.Import(name);
+            if (name.StartsWith(BasePackage + ".", StringComparison.Ordinal)) code.Reference(name);
         }
     }
 
@@ -55,8 +55,7 @@ internal sealed class CommandJavaTypes(SemanticApplication application)
         {
             return code.Reference(type.Contains('.', StringComparison.Ordinal) ? type : "java.lang." + type);
         }
-        code.Import(type);
-        return type[(type.LastIndexOf('.') + 1)..];
+        return code.Reference(type);
     }
 
     internal bool Cascades(SemanticTypeReference type) => type.Kind == SemanticTypeReferenceKind.CompositeType ||

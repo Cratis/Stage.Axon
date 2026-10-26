@@ -12,8 +12,7 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
     internal string Render(string package)
     {
         var name = JavaNames.Type(command.Name);
-        var builder = new JavaCodeBuilder(package).Declare(name).Declare(name + "Rules")
-            .Import(types.BasePackage + ".runtime.ValidationContext");
+        var builder = new JavaCodeBuilder(package).Declare(name).Declare(name + "Rules");
         ClaimRules(builder);
         var validator = builder.Reference("jakarta.validation.Validator");
         builder.Line($"@{builder.Reference("org.springframework.stereotype.Component")}").Block($"public final class {name}Rules", body =>
@@ -24,7 +23,7 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
         return builder.Build();
     }
 
-    static JavaCodeBuilder BeanValidation(JavaCodeBuilder builder) => builder.Line("var validation = new ValidationContext();").Line($"validator.validate(command).stream().sorted({builder.Reference("java.util.Comparator")}.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject(violation.getPropertyPath().toString(), violation.getMessage()));");
+    JavaCodeBuilder BeanValidation(JavaCodeBuilder builder) => builder.Line($"var validation = new {builder.Reference(types.BasePackage + ".runtime.ValidationContext")}();").Line($"validator.validate(command).stream().sorted({builder.Reference("java.util.Comparator")}.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject(violation.getPropertyPath().toString(), violation.getMessage()));");
 
     void ClaimRules(JavaCodeBuilder builder)
     {

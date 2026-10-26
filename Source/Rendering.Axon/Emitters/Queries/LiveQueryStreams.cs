@@ -11,7 +11,7 @@ internal static class LiveQueryStreams
     internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query)
     {
         var name = JavaNames.Type(query.Name) + "Streams";
-        var code = new JavaCodeBuilder(package).Declare(name).Declare("Session").Import(context.BasePackage + ".runtime.SseBridge");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare("Session");
         var flow = code.Reference("java.util.concurrent.Flow");
         var atomicBoolean = code.Reference("java.util.concurrent.atomic.AtomicBoolean");
         var emitter = code.Reference("org.springframework.web.servlet.mvc.method.annotation.SseEmitter");
@@ -26,7 +26,7 @@ internal static class LiveQueryStreams
                     var session = new Session();
                     sessions.add(session);
                     if (closing.get()) session.stop();
-                    var emitter = SseBridge.stream(downstream -> publisher.subscribe(session.forwardTo(downstream)));
+                    var emitter = {{code.Reference(context.BasePackage + ".runtime.SseBridge")}}.stream(downstream -> publisher.subscribe(session.forwardTo(downstream)));
                     session.attach(emitter);
                     return emitter;
                 }

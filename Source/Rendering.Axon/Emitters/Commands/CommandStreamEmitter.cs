@@ -23,7 +23,7 @@ internal static class CommandStreamEmitter
         var code = new JavaCodeBuilder(package).Declare(name);
         var tag = source.TagReference;
         var events = contracts.ToDictionary(contract => contract.Id, contract => AxonEventsEmitter.TypeFor(context, contract.Id, code, package));
-        if (source.JavaType.StartsWith(context.BasePackage + ".", StringComparison.Ordinal)) code.Import(source.JavaType);
+        if (source.JavaType.StartsWith(context.BasePackage + ".", StringComparison.Ordinal)) code.Reference(source.JavaType);
         var sourceType = new CommandJavaTypes(context.Request.Model.Application).Reference(source.JavaType, code);
         code.Line($"@{code.Reference("org.axonframework.eventsourcing.annotation.EventSourcedEntity")}(tagKey = {tag})")
             .Line($"@{code.Reference("org.axonframework.extension.spring.stereotype.EventSourced")}(idType = {sourceType}.class, tagKey = {tag})")

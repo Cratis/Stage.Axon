@@ -36,7 +36,7 @@ internal sealed class ViewSpecificationClaims(AxonEmissionContext context, ViewJ
         types.EventType(given.EventContract, code);
         foreach (var property in contract.Properties) Literal(Value(given, property, primary.ComponentName, normalized), property.Type, code);
         if (contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName)) return;
-        if (!primary.JavaType.StartsWith(types.BasePackage + ".runtime.", StringComparison.Ordinal)) code.Import(primary.JavaType);
+        if (!primary.JavaType.StartsWith(types.BasePackage + ".runtime.", StringComparison.Ordinal)) code.Reference(primary.JavaType);
         if (given.EventSource is { } source && primary.JavaType != types.BasePackage + ".runtime.EventSourceId") Literal(source.Value, source.Type, code);
     }
 

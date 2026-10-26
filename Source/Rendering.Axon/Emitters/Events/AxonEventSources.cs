@@ -28,11 +28,11 @@ internal static class AxonEventSources
         var code = new JavaCodeBuilder(package).Declare(JavaNames.Type(contract.Name));
         var tag = EventTagsEmitter.Reference(context, contract, code, package);
         var addPrimary = !contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName);
-        if (addPrimary) code.Import(primary.JavaType);
+        var primaryType = addPrimary ? code.Reference(primary.JavaType) : string.Empty;
         foreach (var property in contract.Properties) JavaSemanticTypes.Claim(context, property.Type, code, package);
         var parameters = contract.Properties.Select(property => Component(context, property, (primary.ComponentName, tag), code)).ToList();
         if (addPrimary)
-            parameters.Insert(0, $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {tag}) {primary.JavaType[(primary.JavaType.LastIndexOf('.') + 1)..]} {primary.ComponentName}");
+            parameters.Insert(0, $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {tag}) {primaryType} {primary.ComponentName}");
         var extraTags = contract.Tags.Concat(contract.Properties.Where(property => property.IsIdentifier).Select(property => property.Name))
             .Where(tag => tag != primary.TagKey).Distinct(StringComparer.Ordinal).ToArray();
         if (extraTags.Length > 0)

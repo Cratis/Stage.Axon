@@ -16,19 +16,19 @@ internal static class AxonViewHttpLiveSpecs
     {
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name) + "SseTest";
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(JavaNames.Type(query.Name)).Declare(JavaNames.Type(query.Name) + "Streams")
-            .Import(types.BasePackage + ".Application");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(JavaNames.Type(query.Name)).Declare(JavaNames.Type(query.Name) + "Streams");
         foreach (var model in located.Slice.ReadModels) code.Declare(JavaNames.Type(model.Name));
         var projectorName = projector[(projector.LastIndexOf('.') + 1)..];
         if (projector[..projector.LastIndexOf('.')] == package) code.Declare(projectorName);
-        else code.Import(projector);
+        else projectorName = code.Reference(projector);
         var arguments = eventArguments(code);
         var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var applicationType = code.Reference(types.BasePackage + ".Application");
         code.Line($$"""
             class {{name}} {
                 @{{code.Reference("org.junit.jupiter.api.Test")}}
                 void shouldDeliverInitialDataAndOneUpdateOverHttpSseAndCloseContextPromptly() throws Exception {
-                    var application = new {{code.Reference("org.springframework.boot.builder.SpringApplicationBuilder")}}(Application.class).run("--server.port=0");
+                    var application = new {{code.Reference("org.springframework.boot.builder.SpringApplicationBuilder")}}({{applicationType}}.class).run("--server.port=0");
                     try {
                         var port = application.getEnvironment().getProperty("local.server.port", Integer.class);
                         var configuration = application.getBean({{code.Reference("org.axonframework.common.configuration.Configuration")}}.class);
