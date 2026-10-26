@@ -15,7 +15,7 @@ public class when_producing_an_event : given.a_reaction_model
     [Fact] void should_dispatch_an_append_command() => Code("SubmitOrderReaction").ShouldContain("commands.sendAndWait(new SubmitOrderOn0Append(input.orderId(), new ");
     [Fact] void should_map_event_properties() => Code("SubmitOrderReaction").ShouldContain("input.customer()");
     [Fact] void should_identify_the_append_boundary() => Code("SubmitOrderOn0Append").ShouldContain("@TargetEntityId");
-    [Fact] void should_load_the_current_stream_position() => Code("SubmitOrderOn0AppendHandler").ShouldContain("@InjectEntity(idProperty = \"eventSourceId\")");
+    [Fact] void should_load_the_current_stream_position() => Code("SubmitOrderOn0AppendHandler").ShouldContain("@InjectEntity @Nullable SubmitOrderOn0AppendStream stream");
     [Fact] void should_append_the_produced_event() => Code("SubmitOrderOn0AppendHandler").ShouldContain("appender.append(command.event());");
     [Fact] void should_check_the_event_identity() => Code("SubmitOrderOn0AppendHandler").ShouldContain("command.event().orderId()");
     [Fact] void should_use_the_shared_primary_tag() => Code("SubmitOrderOn0AppendStream").ShouldContain("tagKey = EventTags.ORDER_ID");

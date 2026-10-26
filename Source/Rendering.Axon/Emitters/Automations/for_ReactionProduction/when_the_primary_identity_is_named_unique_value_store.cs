@@ -24,7 +24,10 @@ public class when_the_primary_identity_is_named_unique_value_store : for_AxonArt
     }
 
     [Fact] void should_import_the_application_identity() => _handler.ShouldContain("import sample.concepts.UniqueValueStore;");
-    [Fact] void should_keep_the_identity_short() => _handler.ShouldContain("ManagedEntity<UniqueValueStore, AppendProducedEventStream>");
+    [Fact] void should_inject_a_nullable_snapshot() => _handler.ShouldContain("@InjectEntity @Nullable AppendProducedEventStream stream");
+    [Fact] void should_not_wrap_the_snapshot() => _handler.ShouldNotContain("ManagedEntity");
+    [Fact] void should_not_select_a_nonexistent_command_property() => _handler.ShouldNotContain("idProperty =");
+    [Fact] void should_append_one_event_directly() => _handler.ShouldContain("appender.append(command.event());");
     [Fact] void should_qualify_the_runtime_store() => _handler.ShouldContain("private final sample.runtime.UniqueValueStore uniqueValues;");
     [Fact] void should_qualify_the_runtime_constructor_parameter() => _handler.ShouldContain("AppendProducedEventHandler(sample.runtime.UniqueValueStore uniqueValues)");
     [Fact] void should_not_import_the_runtime_store() => _handler.ShouldNotContain("import sample.runtime.UniqueValueStore;");

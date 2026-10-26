@@ -20,6 +20,8 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
 
     internal List<PlannedArtifact> Artifacts { get; } = [];
 
+    internal HashSet<string> ConsumedImplementations { get; } = new(StringComparer.Ordinal);
+
     internal Dictionary<SemanticId, AxonSpecificationEntry> Specifications { get; } = [];
 
     internal Dictionary<SemanticId, AxonHttpScenario> HttpScenarios { get; } = [];

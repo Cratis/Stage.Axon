@@ -13,7 +13,7 @@ The custom-package sample uses mixed packaged and retained input. `Cratis.Screen
 
 The six covered local documents are removed. All other inputs and all 23 application names are retained without importing the canonical Workspaces application or identity catalog; the reasons are recorded in [`Corpus/README.md`](../../Corpus/README.md). The same input helper and package are linked only into Debug renderer specs; the production renderer does not depend on CanonicalCorpus.
 
-Run the generated Maven wrapper with Java 21, then check the actual Surefire reports:
+Run the generated Maven wrapper with Java 25, then check the actual Surefire reports:
 
 ```bash
 (cd .ai-work/axon-corpus && sh ./mvnw -B -fae verify)

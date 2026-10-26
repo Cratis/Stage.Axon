@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text;
 using Cratis.Specifications;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
@@ -17,9 +18,10 @@ public class when_a_command_is_named_command : for_AxonArtifactRenderPlanner.giv
         var slice = ScopeSelection.Select(request).First(candidate => !candidate.Slice.Commands.IsEmpty);
         var command = slice.Slice.Commands[0];
         var context = new AxonEmissionContext(request, new(request.Profile));
-        var package = CommandContractsEmitter.Package(new(request.Model.Application), slice);
-        collision = CommandContractsEmitter.Code(context, command with { Name = "Command" }, package, null);
-        regular = CommandContractsEmitter.Code(context, command with { Name = "StandardCommand" }, package, null);
+        CommandContractsEmitter.EmitCommand(context, slice, command with { Name = "Command" }, null);
+        CommandContractsEmitter.EmitCommand(context, slice, command with { Name = "StandardCommand" }, null);
+        collision = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/Command.java", StringComparison.Ordinal)).Bytes.AsSpan());
+        regular = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/StandardCommand.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 
     [Fact] void should_keep_the_application_command_short() => collision.ShouldContain("public record Command(");
