@@ -42,7 +42,7 @@ internal sealed class EventTagsEmitter : IAxonEmitter
         var typeSeparator = type.LastIndexOf('.');
         var name = type[(typeSeparator + 1)..];
         if (type[..typeSeparator] == package) code.Declare(name);
-        else code.Import(type);
+        else return code.Reference(type) + reference[separator..];
         return name + reference[separator..];
     }
 

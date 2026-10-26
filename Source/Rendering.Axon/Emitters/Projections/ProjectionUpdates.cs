@@ -48,7 +48,7 @@ internal sealed class ProjectionUpdates(AxonEmissionContext context, ViewJavaTyp
         var name = JavaNames.Type(query.Name);
         var queryPackage = types.Package(owner);
         if (queryPackage == package) code.Declare(name);
-        else code.Import(queryPackage + "." + name);
+        else return code.Reference(queryPackage + "." + name);
         return name;
     }
 }

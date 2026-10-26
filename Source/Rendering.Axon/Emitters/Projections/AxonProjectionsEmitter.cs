@@ -46,20 +46,21 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var name = JavaNames.Type(model.Name);
         ViewJavaTypes.Add(context, package, name, ReadModelRecords.Code(types, package, model), model.Id);
         context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused.");
-        var configuration = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration")
-            .Import(types.BasePackage + ".runtime.ReadModelStore").Import(types.BasePackage + ".runtime.InMemoryReadModelStore")
-            .Import(types.BasePackage + ".runtime.persistent.PersistentReadModelSafety");
+        var configuration = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration");
+        var storeType = configuration.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var memoryStoreType = configuration.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore");
+        var safetyType = configuration.Reference(types.BasePackage + ".runtime.persistent.PersistentReadModelSafety");
         configuration
             .DiffersFromScreenplay($"Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused ({AxonRefusalCodes.ReadModelPersistence}).")
             .Line($"@{configuration.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
             .Line($"@{configuration.Reference("org.springframework.context.annotation.PropertySource")}(\"classpath:axon-views.properties\")")
             .Block($"public class {name}StoreConfiguration", body => body
                 .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
-                .Block($"public ReadModelStore<{body.Reference("java.lang.Object")}, {name}> store()", method => method.Line("return new InMemoryReadModelStore<>();"))
+                .Block($"public {storeType}<{body.Reference("java.lang.Object")}, {name}> store()", method => method.Line($"return new {memoryStoreType}<>();"))
                 .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name + ".persistentReadModelSafety")})")
                 .Line($"@{body.Reference("org.springframework.context.annotation.Profile")}(\"persistent\")")
-                .Block("public static PersistentReadModelSafety persistentReadModelSafety()", method =>
-                    method.Line($"return new PersistentReadModelSafety({JavaCodeBuilder.StringLiteral(package + "." + name)});")));
+                .Block($"public static {safetyType} persistentReadModelSafety()", method =>
+                    method.Line($"return new {safetyType}({JavaCodeBuilder.StringLiteral(package + "." + name)});")));
         ViewJavaTypes.Add(context, package, name + "StoreConfiguration", configuration.Build(), model.Id);
     }
 
@@ -73,15 +74,16 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var modelName = JavaNames.Type(model.Name);
         var name = JavaNames.Type(projection.Name) + "Projector";
         var updates = new ProjectionUpdates(context, types, model.Id);
-        var code = new JavaCodeBuilder(package).Declare(modelName).Declare(name).Import(types.BasePackage + ".runtime.ReadModelStore");
+        var code = new JavaCodeBuilder(package).Declare(modelName).Declare(name);
+        var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
         updates.Claim(code, package);
         foreach (var from in ProjectionTransitions.From(projection)) types.EventType(from.EventContract, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
             .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
             .Block($"public class {name}", body =>
         {
-            body.Line($"private final ReadModelStore<{body.Reference("java.lang.Object")}, {modelName}> store;")
-                .Block($"public {name}(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + modelName)}) ReadModelStore<{body.Reference("java.lang.Object")}, {modelName}> store)", constructor => constructor.Line("this.store = store;"));
+            body.Line($"private final {storeType}<{body.Reference("java.lang.Object")}, {modelName}> store;")
+                .Block($"public {name}(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + modelName)}) {storeType}<{body.Reference("java.lang.Object")}, {modelName}> store)", constructor => constructor.Line("this.store = store;"));
             foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
             {
                 var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == group.Key);

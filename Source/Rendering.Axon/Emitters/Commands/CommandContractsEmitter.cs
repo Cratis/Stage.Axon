@@ -29,7 +29,7 @@ internal static class CommandContractsEmitter
         var types = new CommandJavaTypes(context.Request.Model.Application);
         var code = new JavaCodeBuilder(package).Declare(JavaNames.Type(command.Name));
         foreach (var property in command.Properties) types.Claim(property.Type, code);
-        if (source?.JavaType.StartsWith(types.BasePackage + ".", StringComparison.Ordinal) == true) code.Import(source.JavaType);
+        if (source?.JavaType.StartsWith(types.BasePackage + ".", StringComparison.Ordinal) == true) code.Reference(source.JavaType);
         var components = command.Properties.Select(property => Component(property, types, source, code)).ToList();
         if (source?.Allocated == true) components.Insert(0, $"@{code.Reference("com.fasterxml.jackson.annotation.JsonIgnore")} @{code.Reference("org.axonframework.modelling.annotation.TargetEntityId")} {types.Reference(source.JavaType, code)} {source.Member}");
         return code.Line($"@{code.Reference("org.axonframework.messaging.commandhandling.annotation.Command")}(name = {JavaCodeBuilder.StringLiteral(command.Name)})")
@@ -45,9 +45,8 @@ internal static class CommandContractsEmitter
         var types = new CommandJavaTypes(context.Request.Model.Application);
         var components = command.Properties.Select(property => Component(property, types, source)).ToList();
         if (source?.Allocated == true) components.Insert(0, $"@com.fasterxml.jackson.annotation.JsonIgnore @org.axonframework.modelling.annotation.TargetEntityId {source.JavaType} {source.Member}");
-        return new JavaCodeBuilder(package)
-            .Import("org.axonframework.messaging.commandhandling.annotation.Command")
-            .Line($"@Command(name = {JavaCodeBuilder.StringLiteral(command.Name)})")
+        var code = new JavaCodeBuilder(package).Declare(JavaNames.Type(command.Name));
+        return code.Line($"@{code.Reference("org.axonframework.messaging.commandhandling.annotation.Command")}(name = {JavaCodeBuilder.StringLiteral(command.Name)})")
             .Block($"public record {JavaNames.Type(command.Name)}({string.Join(", ", components)})", body =>
         {
             if (source?.NeedsAccessor(command) == true) body.Line("@org.axonframework.modelling.annotation.TargetEntityId").Line($"public {source.JavaType} {source.Member}() {{ return {source.Value(command, types, "this")}; }}");

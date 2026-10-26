@@ -25,7 +25,7 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
         if (specification.ThenDenied) return;
         if (!specification.ThenErrors.IsEmpty)
         {
-            code.Import(context.BasePackage + ".runtime.CommandValidationException");
+            code.Reference(context.BasePackage + ".runtime.CommandValidationException");
             return;
         }
         ClaimResponse(code);

@@ -82,7 +82,7 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
     {
         if (type.Kind is SemanticTypeReferenceKind.Concept or SemanticTypeReferenceKind.CompositeType)
         {
-            code.Import(Type(type with { IsCollection = false }));
+            code.Reference(Type(type with { IsCollection = false }));
         }
     }
 
@@ -126,8 +126,7 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
 
     static string Import(string type, JavaCodeBuilder code)
     {
-        code.Import(type);
-        return type[(type.LastIndexOf('.') + 1)..];
+        return code.Reference(type);
     }
 
     static string Primitive(SemanticPrimitiveType primitive, JavaCodeBuilder code)

@@ -33,7 +33,7 @@ internal sealed class CommandPreparation(AxonEmissionContext context, SemanticCo
         if (!CanPrepare()) return;
         foreach (var property in command.Properties.Where(property => property.IsGenerated)) JavaSemanticTypes.Claim(context, property.Type, body);
         if (source?.Allocated != true) return;
-        if (source.RuntimeId) body.Import(source.JavaType);
+        if (source.RuntimeId) body.Reference(source.JavaType);
         else JavaSemanticTypes.Claim(context, source.Type, body);
     }
 
