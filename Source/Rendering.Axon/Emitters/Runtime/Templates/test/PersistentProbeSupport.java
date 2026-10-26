@@ -106,7 +106,11 @@ final class PersistentProbeSupport {
         var failure = assertThrows(Exception.class, () -> start(builder, database));
         var root = failure;
         while (root.getCause() != null) root = (Exception) root.getCause();
-        assertInstanceOf(early ? BeanDefinitionStoreException.class : IllegalStateException.class, root);
+        if (early) {
+            assertInstanceOf(BeanDefinitionStoreException.class, root);
+        } else {
+            assertInstanceOf(IllegalStateException.class, root);
+        }
         assertTrue(root.getMessage().contains("STAGE-AXON-0308"), root.getMessage());
         assertTrue(root.getMessage().contains(application().getPackageName()), root.getMessage());
         assertFalse(witness.ready, "No HTTP initialization or application readiness");
