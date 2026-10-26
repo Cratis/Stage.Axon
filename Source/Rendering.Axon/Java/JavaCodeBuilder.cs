@@ -8,7 +8,9 @@ namespace Cratis.Stage.Rendering.Axon.Java;
 
 internal sealed class JavaCodeBuilder(string package)
 {
+    const string LocalType = "";
     readonly SortedSet<string> _imports = new(StringComparer.Ordinal);
+    readonly Dictionary<string, string> _simpleNames = new(StringComparer.Ordinal);
     readonly StringBuilder _body = new();
     int _indent;
 
@@ -40,7 +42,34 @@ internal sealed class JavaCodeBuilder(string package)
     internal JavaCodeBuilder Import(string type)
     {
         _imports.Add(type);
+        _simpleNames.TryAdd(SimpleName(type), type);
         return this;
+    }
+
+    /// <summary>
+    /// Reserves a simple name for a type that the file declares or that lives in its own package, so <see cref="Use"/> never imports
+    /// another type under the same name. Declare names before emitting code that uses them.
+    /// </summary>
+    internal JavaCodeBuilder Declare(string simpleName)
+    {
+        _simpleNames[simpleName] = LocalType;
+        return this;
+    }
+
+    /// <summary>
+    /// Returns the name to emit for a type: the simple name with an import, or the qualified name when the simple name is already
+    /// taken by a declared type or by another imported type. The first type to claim a simple name keeps it, so emission order
+    /// decides collisions deterministically. <c>java.lang</c> types need no import.
+    /// </summary>
+    internal string Use(string qualifiedName)
+    {
+        var simpleName = SimpleName(qualifiedName);
+        if (simpleName.Length == qualifiedName.Length) return qualifiedName;
+        if (_simpleNames.TryGetValue(simpleName, out var owner)) return owner == qualifiedName ? simpleName : qualifiedName;
+
+        _simpleNames[simpleName] = qualifiedName;
+        if (!IsJavaLang(qualifiedName)) _imports.Add(qualifiedName);
+        return simpleName;
     }
 
     internal JavaCodeBuilder Line(string text = "")
@@ -73,6 +102,11 @@ internal sealed class JavaCodeBuilder(string package)
         if (_imports.Count > 0) result.Append('\n');
         return result.Append(_body).ToString();
     }
+
+    static string SimpleName(string qualifiedName) => qualifiedName[(qualifiedName.LastIndexOf('.') + 1)..];
+
+    static bool IsJavaLang(string qualifiedName) =>
+        qualifiedName.StartsWith("java.lang.", StringComparison.Ordinal) && qualifiedName.IndexOf('.', "java.lang.".Length) < 0;
 
     static string CommentText(string text) => text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace('\r', ' ').Replace('\n', ' ');
 }

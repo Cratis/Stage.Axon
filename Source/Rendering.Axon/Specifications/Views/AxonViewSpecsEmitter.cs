@@ -51,7 +51,9 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
         {
             foreach (var spec in specs)
             {
+                var native = new NativeViewSpecifications(context, types, located, model).Plan(spec);
                 var supported = spec.GivenReadModels.Length == 0 && spec.When is null && spec.WhenAppended is null && spec.WhenRedelivered is null && spec.WhenClock is null && spec.WhenCapture is null && spec.WhenTrigger is null && spec.GivenClock is null && spec.GivenCaller is null && !spec.ThenDenied && spec.ThenErrors.Length == 0 && spec.ThenEvents.Length == 0 && spec.ThenQueries.Length == 0 && spec.ThenReadModels.All(expected => !expected.Exactly) && spec.ThenReadModels.Select(expected => expected.ReadModel).Concat(spec.ThenAbsentReadModels.Select(expected => expected.ReadModel)).Distinct().Count() == 1 && spec.ThenAbsentReadModels.All(expected => ViewExpectedKeys.Expression(expected.Key, model, types) is not null);
+                supported |= native is not null;
                 var disabledCode = supported ? null : AxonRefusalCodes.ViewSpecification;
                 if (!supported)
                 {
@@ -60,7 +62,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                 }
                 AxonSpecificationsEmitter.Register(context, spec.Id, package + "." + name, JavaNames.Member(spec.Name), disabledCode);
                 http.Register(projection, spec);
-                body.Line("@Test").Line($"@org.junit.jupiter.api.DisplayName({JavaCodeBuilder.StringLiteral(spec.Id.ToString())})").Block($"void {JavaNames.Member(spec.Name)}()", method =>
+                body.Line("@Test").Line($"@org.junit.jupiter.api.DisplayName({JavaCodeBuilder.StringLiteral(spec.Id.ToString())})").Block($"void {JavaNames.Member(spec.Name)}()", NativeViewSpecifications.Dispatch(native, method =>
                 {
                     if (!supported)
                     {
@@ -80,7 +82,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                         EmitExpected(context.Request.Model.Application, types, model, expected, method);
                     foreach (var absent in spec.ThenAbsentReadModels.Where(expected => expected.ReadModel == model.Id))
                         method.Line($"org.junit.jupiter.api.Assertions.assertTrue(store.get({ViewExpectedKeys.Expression(absent.Key, model, types)}).isEmpty(), \"Expected the modeled instance to be removed\");");
-                });
+                }));
             }
         });
         context.Artifacts.Add(PlannedArtifact.CreateText($"src/test/java/{package.Replace('.', '/')}/{name}.java", code.Build(), [.. specs.Select(specification => specification.Id)]));

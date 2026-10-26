@@ -17,7 +17,13 @@ internal static class CorpusRenderer
             throw new NativeVerificationFailed("The generated corpus destination must not already exist.");
         }
 
-        var applications = CorpusApplications.Find(repository);
+        using var inputs = CanonicalCorpusInputs.Create(repository);
+        var applications = CorpusApplications.Find(repository, inputs.Root);
+        if (applications.Count == 0)
+        {
+            throw new NativeVerificationFailed("Expected at least one corpus application.");
+        }
+
         Directory.CreateDirectory(output);
         foreach (var (name, root) in applications)
         {

@@ -9,6 +9,10 @@ dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verificat
 
 The destination must not exist. The harness renders 15 live blueprints, three verification samples, four individual view models, and their combined application. Each compilation and render must succeed without refusals. The output includes a Maven reactor and an application list.
 
+The custom-package sample uses mixed packaged and retained input. `Cratis.Screenplay.CanonicalCorpus` is pinned to 4.241.0; `ScreenCompositionCorpus.V1.SourceForms.Single(form => form.Name == "folder").Documents.Single(document => document.StableKey == "workspaces-tracking-feature")` supplies the exact bytes at display path `Workspaces/Tracking/Tracking.play`. The harness copies the nine retained custom-package documents into an owned disposable directory under `.ai-work/axon5/`, adds the package document, and keeps that scope alive through compilation and rendering. Disposal removes the composed input tree, including on failure. Missing, duplicate, path-mismatched, or empty selection fails before output creation; there is no vendored fallback.
+
+The covered local Tracking document is removed. All other inputs and all 23 application names are retained without importing the canonical Workspaces application or identity catalog. This is a one-document adoption, not a coverage claim for the remaining inputs. The same input helper and package are linked only into Debug renderer specs; the production renderer does not depend on CanonicalCorpus.
+
 Run the generated Maven wrapper with Java 21, then check the actual Surefire reports:
 
 ```bash

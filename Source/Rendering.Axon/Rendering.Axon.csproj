@@ -11,4 +11,8 @@
         <EmbeddedResource Include="Emitters/Runtime/Templates/**/*.java" />
         <EmbeddedResource Include="Emitters/Scaffold/Assets/*" />
     </ItemGroup>
+    <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+        <PackageReference Include="Cratis.Screenplay.CanonicalCorpus" />
+        <Compile Include="../Rendering.Axon.Verification/CanonicalCorpusInputs.cs" Link="Specs/CanonicalCorpusInputs.cs" />
+    </ItemGroup>
 </Project>

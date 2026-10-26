@@ -4,6 +4,7 @@
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Contracts.Semantics;
+using Cratis.Stage.Rendering.Axon.Verification;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.for_AxonArtifactRenderPlanner;
@@ -13,10 +14,12 @@ public class when_rendering_the_verification_corpus : Specification
     readonly Dictionary<string, SemanticModelLoadResult> _compilations = new(StringComparer.Ordinal);
     readonly Dictionary<string, ArtifactRenderPlan> _plans = new(StringComparer.Ordinal);
     string[] blueprints;
+    CanonicalCorpusInputs _inputs;
 
     async Task Establish()
     {
         var root = given.blueprint_models.Root();
+        _inputs = CanonicalCorpusInputs.Create(root);
         blueprints = Directory.GetDirectories(Path.Combine(root, "Corpus/live-blueprints/models"));
         var samples = new[] { "live-navigation", "blueprint-templates", "live-custom-packages" }
             .Select(sample => Path.Combine(root, "Corpus", sample, "model"));
@@ -24,12 +27,15 @@ public class when_rendering_the_verification_corpus : Specification
         foreach (var path in blueprints.Concat(samples).Append(views).Concat(Directory.GetFiles(views, "*.play")).Order(StringComparer.Ordinal))
         {
             var name = Path.GetRelativePath(root, path);
-            var compilation = File.Exists(path)
-                ? await SemanticModelLoader.LoadAsync(Path.GetDirectoryName(path), [Path.GetFileName(path)], null, "Corpus" + _compilations.Count)
-                : await SemanticModelLoader.LoadAsync(path, [], null, "Corpus" + _compilations.Count);
+            var input = path == Path.Combine(root, "Corpus/live-custom-packages/model") ? _inputs.Root : path;
+            var compilation = File.Exists(input)
+                ? await SemanticModelLoader.LoadAsync(Path.GetDirectoryName(input), [Path.GetFileName(input)], null, "Corpus" + _compilations.Count)
+                : await SemanticModelLoader.LoadAsync(input, [], null, "Corpus" + _compilations.Count);
             _compilations.Add(name, compilation);
         }
     }
+
+    void Destroy() => _inputs?.Dispose();
 
     void Because()
     {

@@ -4,7 +4,7 @@
     "Reason": "Reducer-dependent specifications need supplied reduction implementations; remove this entry when those specifications are executable."
   },
   "STAGE-AXON-0501": {
-    "Count": 63,
+    "Count": 5,
     "Reason": "Seeded, action-based, exact or query view expectations are not yet lowered; ratchet this count whenever a specification becomes executable."
   },
   "STAGE-AXON-SPEC": {
