@@ -73,16 +73,20 @@ internal static class PersistentViewProofSupport
                 assertFalse(store.all().isEmpty(), "Proof must construct nonempty modeled rows");
                 return store.all();
             }
-            static List<__MODEL__> next(List<__MODEL__> previous) {
+            static List<__MODEL__> next(int replays) {
                 var store = new InMemoryReadModelStore<Object, __MODEL__>();
                 var projector = new __PROJECTOR__(store);
                 // Reconstruct the same key by replaying the modeled arrangement, not by guessing a row property.
         __EXPECTED__
-                projector.on(__EVENT____ARGUMENT__);
-                if (!new java.util.HashSet<>(store.all()).equals(new java.util.HashSet<>(previous))) return store.all();
-                projector.on(__EVENT____ARGUMENT__);
+                for (var replay = 0; replay < replays; replay++) projector.on(__EVENT____ARGUMENT__);
                 return store.all();
             }
+            // A dedicated non-idempotent view proves atomicity even when the modeled Set is idempotent.
+            static ReadModelStore<Object, Integer> counter(ConfigurableApplicationContext application) {
+                return new JpaReadModelStore<>(application.getBean(EntityManagerFactory.class), application.getBean(JsonMapper.class),
+                        "__QUALIFIER__.atomicity", Integer.class);
+            }
+            static int count(ConfigurableApplicationContext application) { return counter(application).get("count").orElse(0); }
             static Map<Integer, String> tokens(ConfigurableApplicationContext application) {
                 try (var manager = application.getBean(EntityManagerFactory.class).createEntityManager()) {
                     var tokens = new TreeMap<Integer, String>();
@@ -101,18 +105,16 @@ internal static class PersistentViewProofSupport
             static volatile Failure failure = Failure.NONE;
             static volatile CountDownLatch rolledBack = new CountDownLatch(1);
             static volatile CountDownLatch refused = new CountDownLatch(1);
+            static volatile CountDownLatch viewChanged = new CountDownLatch(1);
+            static volatile CountDownLatch tokenRejected = new CountDownLatch(1);
+            @org.axonframework.messaging.core.annotation.Namespace("__PACKAGE__")
             public static class RollbackWitness {
                 private final ConfigurableApplicationContext application;
                 RollbackWitness(ConfigurableApplicationContext application) { this.application = application; }
                 @EventHandler
                 public void handle(__EVENT_TYPE__ event, ProcessingContext context) {
-                    if (failure == Failure.NONE) return;
                     context.onError((ignored, phase, cause) -> rolledBack.countDown());
                     var bound = JpaReadModelStore.bind(store(application), context);
-                    if (failure == Failure.HANDLER) {
-                        new __PROJECTOR__(bound).on(event__ARGUMENT__);
-                        throw new IllegalStateException("deliberate handler failure after view write");
-                    }
                     if (failure == Failure.ASYNC) {
                         var cause = assertThrows(java.util.concurrent.CompletionException.class,
                                 () -> CompletableFuture.runAsync(bound::clear).join()).getCause();
@@ -134,6 +136,15 @@ internal static class PersistentViewProofSupport
                             throw new IllegalStateException("non-joined write refused", cause);
                         }
                     }
+                    var changing = JpaReadModelStore.bind(counter(application), context);
+                    var before = changing.get("count").orElse(0);
+                    changing.update("count", current -> (current == null ? 0 : current) + 1);
+                    assertEquals(before + 1, changing.get("count").orElseThrow(), "Actual handler must flush a changed view row");
+                    if (failure != Failure.NONE) viewChanged.countDown();
+                    if (failure == Failure.HANDLER) {
+                        new __PROJECTOR__(bound).on(event__ARGUMENT__);
+                        throw new IllegalStateException("deliberate handler failure after view write");
+                    }
                 }
             }
             /** Real database rejection inside JpaTokenStore.storeToken, not a prepare-commit callback. */
@@ -152,8 +163,10 @@ internal static class PersistentViewProofSupport
                 }
                 @Override public void fire(java.sql.Connection connection, Object[] before, Object[] after) throws java.sql.SQLException {
                     if (failure == Failure.TOKEN && "__PACKAGE__".equals(after[processorColumn]) &&
-                            !java.util.Arrays.equals(bytes(before[tokenColumn]), bytes(after[tokenColumn])))
+                            !java.util.Arrays.equals(bytes(before[tokenColumn]), bytes(after[tokenColumn]))) {
+                        tokenRejected.countDown();
                         throw new java.sql.SQLException("deliberate TokenStore persistence failure", "23514");
+                    }
                 }
                 private byte[] bytes(Object value) throws java.sql.SQLException {
                     return value instanceof java.sql.Blob blob ? blob.getBytes(1, Math.toIntExact(blob.length())) : (byte[]) value;

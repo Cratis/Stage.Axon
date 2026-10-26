@@ -44,6 +44,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__ROUTE__", QueryEndpoint.Route(owner, query), StringComparison.Ordinal)
             .Replace("__EVENT__", events[0], StringComparison.Ordinal)
             .Replace("__EVENT_TYPE__", types.EventType(spec.GivenEvents[0].EventContract), StringComparison.Ordinal)
+            .Replace("__COUNT__", spec.GivenEvents.Count(given => given.EventContract == spec.GivenEvents[0].EventContract).ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
             .Replace("__APPENDS__", string.Join('\n', events.Select(expression => $"            append(application, {expression});")), StringComparison.Ordinal)
             .Replace("__EXPECTED__", string.Join('\n', events.Select(expression => $"        projector.on({expression}{updates.DefaultArgument});")), StringComparison.Ordinal)
             .Replace("__ARGUMENT__", updates.DefaultArgument, StringComparison.Ordinal);
@@ -54,6 +55,9 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         Add("StoreTest", PersistentViewContractTests.Source);
         Add("LegacyTest", PersistentViewLegacyProof.Source);
         Add("EnvelopeTest", PersistentViewEnvelopeTests.Source);
+        var live = LiveQuery(owner, model);
+        if (live is not null && ProjectionTransitions.From(projection).Count(from => from.EventContract == spec.GivenEvents[0].EventContract) == 1)
+            Add("DefaultDispatchTest", DefaultViewDispatchProof.Source.Replace("__LIVE_QUERY__", package + "." + JavaNames.Type(live.Name), StringComparison.Ordinal));
     }
 
     SemanticSpecification? Specification(LocatedSemanticSlice owner, SemanticReadModel model, SemanticProjection projection)
@@ -66,6 +70,10 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
 
     SemanticKeyedQuery? Query(LocatedSemanticSlice owner, SemanticReadModel model) => owner.Slice.Queries.FirstOrDefault(query =>
         query.ReadModel == model.Id && query.Cardinality == SemanticQueryCardinality.Many && query.Delivery != SemanticQueryDelivery.Live &&
+        !QueryPerformer.Required(context, query) && !new QueryShape(query, model, types).Arguments.Any());
+
+    SemanticKeyedQuery? LiveQuery(LocatedSemanticSlice owner, SemanticReadModel model) => owner.Slice.Queries.FirstOrDefault(query =>
+        query.ReadModel == model.Id && query.Cardinality == SemanticQueryCardinality.Many && query.Delivery == SemanticQueryDelivery.Live && query.Authorization is null &&
         !QueryPerformer.Required(context, query) && !new QueryShape(query, model, types).Arguments.Any());
 
     string Imports(SemanticReadModel model, SemanticProjection projection, SemanticKeyedQuery query) => string.Join(", ", new[]
