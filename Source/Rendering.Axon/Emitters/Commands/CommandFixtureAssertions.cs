@@ -65,10 +65,11 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
 
     void Errors(JavaCodeBuilder method)
     {
+        var exceptionType = Reference(context.BasePackage + ".runtime.CommandValidationException");
         method.Block("result.exceptionSatisfies(error ->", assertion =>
         {
-            assertion.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(error).isInstanceOf({(_code is null ? context.BasePackage + ".runtime.CommandValidationException" : "CommandValidationException")}.class);")
-                .Line($"var failure = ({(_code is null ? context.BasePackage + ".runtime.CommandValidationException" : "CommandValidationException")}) error;");
+            assertion.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(error).isInstanceOf({exceptionType}.class);")
+                .Line($"var failure = ({exceptionType}) error;");
             foreach (var error in specification.ThenErrors.Where(error => error.Message is not null))
                 assertion.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(failure.errors()).extracting(validationError -> validationError.message()).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
         }).Line(");").Line("result.noEvents();");

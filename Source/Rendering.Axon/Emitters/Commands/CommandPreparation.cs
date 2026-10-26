@@ -73,7 +73,7 @@ internal sealed class CommandPreparation(AxonEmissionContext context, SemanticCo
     {
         var value = body.Reference(CratisFundamentals.ConceptsPackage + ".GenerateValue") + ".uuid()";
         if (_types.PrimitiveOf(identity.Type) == SemanticPrimitiveType.Text) value += ".toString()";
-        var type = identity.RuntimeId ? identity.JavaType[(identity.JavaType.LastIndexOf('.') + 1)..] : JavaSemanticTypes.TypeFor(context, identity.Type, body);
+        var type = identity.RuntimeId ? body.Reference(identity.JavaType) : JavaSemanticTypes.TypeFor(context, identity.Type, body);
         var wrapped = identity.RuntimeId || Concept(identity.Type).Values.IsDefaultOrEmpty ? $"new {type}({value})" : $"{type}.fromValue({value})";
         var member = identity.Member + "()";
         return $"({member} == null ? {wrapped} : {member})";
