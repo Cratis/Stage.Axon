@@ -18,6 +18,22 @@ dotnet test Stage.Axon.slnx -c Debug --no-build
 
 Specs are inline in all three projects and are compiled only in Debug. The extracted baseline is 389 planner specs, 16 verification specs, and 33 conformance specs (438 total, no skips). Repository analyzers run during both builds; Release treats warnings as errors.
 
+## Native Java method-body slots
+
+The renderer pins `Cratis.Screenplay` 4.250.0 while retaining Contracts 4.197.0. It can place resolved inline `java` bodies in three existing target-native methods: command handlers (`command`, `appender`, declared return type), standalone reaction effects (`input` and event `occurred` when present), and query performers (`query`, `store`, returning `List<Model>`). These are method slots, **not** a universal context-object ABI. Preparation, validation, supported security and reaction identity cleanup remain around the body; an admitted command body owns effects and returns instead of also executing modeled appends.
+
+Admission requires supported version-1 context/result contracts, matching owner and role, resolved unambiguous non-provisional identity, and content whose UTF-8 SHA-256 matches the requirement. Bodies must be **LF-only**: any CR, including CRLF, is rejected with attributed diagnostics/comments (strict mode refuses), not silently normalized or emitted as binary. Admitted bytes, indentation, literals and qualified names are copied unchanged; use qualified names for extra Java types. File-backed, foreign-language, missing, stale and unsupported-contract bodies remain unplaced. Scoped unplaced requirements are recorded in `runtime/UnsupportedImplementations.java` and `UNSUPPORTED.md`; foreign languages use `STAGE-AXON-IMPL-LANGUAGE`, other unsupported slots use `STAGE-AXON-0403` alongside their feature diagnostics. Reducer bodies still have no admitted slot and dependent native tests remain disabled under `STAGE-AXON-0306`.
+
+### Slice 2 notes
+
+- Generated command records now use import-aware type references with qualified collision fallback. (#10)
+- Command/reaction streams and entity selectors import the owning `EventTags` type, never the constant as a type. (#10)
+- Entity injection uses nullable stream snapshots; absent state rejects required decision reads. (part of #3)
+- Generated enum JSON retains declared values such as 10/30 through `@JsonValue`/`@JsonCreator`; broad ordinal-module registration is omitted. (part of #3)
+- Compiler pinning, native method slots and scoped unplaced-body diagnostics preserve unsupported intent rather than inventing results. (part of #3)
+
+C# emitted-text assertions are not native execution proof. The Java fixtures and all generated applications still require the CI native gate below.
+
 ## Native proof
 
 Use JDK 21 and the generated Maven wrapper. The render destination must not exist.
