@@ -26,7 +26,7 @@ internal sealed class CommandConditions(SemanticCommand command, CommandJavaType
 
     JavaCodeBuilder? _code;
 
-    internal string? Render(SemanticCondition condition, JavaCodeBuilder code) => new CommandConditions(command, types) { _code = code }.Render(condition);
+    internal string? Render(SemanticCondition condition, JavaCodeBuilder? code) => new CommandConditions(command, types) { _code = code }.Render(condition);
 
     internal string? Render(SemanticCondition condition)
     {

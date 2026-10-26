@@ -31,4 +31,8 @@ public class without_an_authenticated_caller : for_AxonArtifactRenderPlanner.giv
     [Fact] void should_not_grant_the_supplied_roles() => code.ShouldNotContain(".roles(");
     [Fact] void should_not_send_an_unmodeled_payload() => code.ShouldNotContain(".content(");
     [Fact] void should_not_invent_a_response_body_assertion() => code.ShouldNotContain(".andExpect(content()");
+    [Fact] void should_not_import_an_unused_payload_type() => code.ShouldNotContain("import org.springframework.http.MediaType;");
+    [Fact] void should_not_import_an_unused_json_comparison_type() => code.ShouldNotContain("import org.springframework.test.json.JsonCompareMode;");
+    [Fact] void should_not_import_an_unused_body_assertion() => code.ShouldNotContain("import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;");
+    [Fact] void should_not_import_an_unused_authenticated_caller() => code.ShouldNotContain("import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;");
 }

@@ -23,6 +23,10 @@ internal sealed class CommandResponses(SemanticCommand command, CommandJavaTypes
         _ => null
     };
 
+    internal string ReturnTypeFor(JavaCodeBuilder code) => command.Response is SemanticScalarCommandResponse scalar
+        ? types.Type(scalar.Type, code)
+        : ReturnType;
+
     internal void Emit(AxonEmissionContext context, string package)
     {
         if (command.Response is not SemanticRecordCommandResponse record) return;
