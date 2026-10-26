@@ -262,7 +262,7 @@ function readAssets(state) {
     text(state.props.ProjectAssetsFile, `${label(state)}: ProjectAssetsFile`);
     state.assetsPath = resolve(dirname(state.project), state.props.ProjectAssetsFile);
     const assets = jsonFile(state.assetsPath);
-    requireValue(assets.version === 3, `Unsupported assets version in ${state.assetsPath}`);
+    requireValue([3, 4].includes(assets.version), `Unsupported assets version in ${state.assetsPath}`);
     requireValue(!assets.logs || (Array.isArray(assets.logs) && assets.logs.every(log => typeof log?.level === 'string' && log.level.toLowerCase() !== 'error')),
         `Unresolved restore errors in ${state.assetsPath}`);
     const project = object(assets.project, `${state.assetsPath}: project`);

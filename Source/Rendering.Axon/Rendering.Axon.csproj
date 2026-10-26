@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <IsPackable>true</IsPackable>
         <AssemblyName>Cratis.Stage.Rendering.Axon</AssemblyName>
         <RootNamespace>Cratis.Stage.Rendering.Axon</RootNamespace>
         <Description>Axon Framework JVM artifact planning from Screenplay executable semantic models</Description>

@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <IsPackable>true</IsPackable>
         <AssemblyName>Cratis.Stage.Rendering.Conformance</AssemblyName>
         <RootNamespace>Cratis.Stage.Rendering.Conformance</RootNamespace>
         <Description>Preview target-neutral conformance checks for Screenplay artifact renderers</Description>
