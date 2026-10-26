@@ -29,16 +29,27 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
                 EmitProjector(context, types, package, projection, model);
                 namespaces.Add(package);
             }
-            foreach (var reducer in located.Slice.Reducers)
-            {
-                var model = located.Slice.ReadModels.First(candidate => candidate.Id == reducer.ReadModel);
-                new ReducerProjection(context, types).Emit(located, model, reducer);
-                namespaces.Add(package);
-            }
+            namespaces.UnionWith(EmitReducers(context, types, located));
         }
         new AxonViewSpecsEmitter().Emit(context);
         if (ScopeSelection.Select(context.Request).Any(owner => !owner.Slice.ReadModels.IsEmpty))
             context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/axon-views.properties", string.Join('\n', namespaces.Select(name => $"axon.eventhandling.processors.{name}.mode=subscribing")) + "\n", []));
+    }
+
+    static IEnumerable<string> EmitReducers(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located)
+    {
+        foreach (var reducer in located.Slice.Reducers)
+        {
+            var model = located.Slice.ReadModels.FirstOrDefault(candidate => candidate.Id == reducer.ReadModel);
+            var admission = ReducerBodies.Admission(context, located, reducer);
+            if (model is null || admission.Blocked is not null)
+            {
+                context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model?.Id ?? located.Slice.Id, admission.Blocked ?? "The reducer read model is outside its slice.");
+                continue;
+            }
+            new ReducerProjection(context, types).Emit(located, model, reducer, admission);
+            yield return types.Package(located);
+        }
     }
 
     static void EmitModel(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticReadModel model)

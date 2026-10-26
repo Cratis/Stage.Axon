@@ -10,35 +10,71 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
 internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTypes types)
 {
-    internal void Emit(LocatedSemanticSlice located, SemanticReadModel model, SemanticReducer reducer)
+    internal void Emit(LocatedSemanticSlice located, SemanticReadModel model, SemanticReducer reducer, ReducerBodies.Result? admission = null)
     {
+        admission ??= ReducerBodies.Admission(context, located, reducer);
+        if (admission.Blocked is { } blocked)
+        {
+            context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model.Id, blocked);
+            return;
+        }
         var package = types.Package(located);
         var name = JavaNames.Type(model.Name);
         if (reducer.Transitions.IsEmpty)
             context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model.Id, "This reducer declares no transition body or observed event; there is no transition to render.", "reduce events into the read model", model.Id.ToString());
         var contract = new JavaCodeBuilder(package).Declare(name).Declare(name + "Reducer")
-            .DiffersFromScreenplay("the reducer is an Axon event projector delegating to a replaceable Spring reducer bean; implementation bodies are not translated.")
+            .DiffersFromScreenplay("the reducer delegates to a replaceable Spring bean. Admitted Java bodies are placed verbatim. Purity is the author's obligation; Axon does not verify it.")
             .Block($"public interface {name}Reducer", body =>
             {
                 if (reducer.Transitions.IsEmpty) body.UnsupportedIntent("reduce events into the read model", model.Id.ToString(), AxonRefusalCodes.Reduction);
-                foreach (var transition in reducer.Transitions) EmitTransition(model, transition, body);
+                foreach (var transition in reducer.Transitions) EmitTransition(model, transition, admission.Transitions[transition.RequirementId], body);
             });
         context.AddJava(package, name + "Reducer", contract.Build(), sources: model.Id);
         EmitConfiguration(package, name, model.Id);
         EmitProjector(package, model, reducer);
+        EmitPlaceholderSpecifications(package, model, reducer, admission);
     }
 
-    void EmitTransition(SemanticReadModel model, SemanticReducerTransition transition, JavaCodeBuilder code)
+    void EmitPlaceholderSpecifications(string package, SemanticReadModel model, SemanticReducer reducer, ReducerBodies.Result admission)
     {
-        var requirement = context.Request.ImplementationRequirements.FirstOrDefault(candidate => candidate.RequirementId == transition.RequirementId);
-        var hasBody = requirement is not null && context.Request.ImplementationContents.Any(content => content.Key == transition.RequirementId && !string.IsNullOrWhiteSpace(content.Value));
-        var reason = hasBody
-            ? "Reducer implementation bodies are not translated to Java; implement the generated reducer interface as a Spring bean."
-            : "This reducer has no available transition body: an event and result type do not specify how to calculate state or deletion. Implement the generated reducer interface before delivering events.";
-        context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model.Id, reason, "reduce this event and current state into a new read model or delete it", model.Id.ToString());
-        code.Block($"default {JavaNames.Type(model.Name)} reduce({types.EventType(transition.EventContract)} event, {JavaNames.Type(model.Name)} current, org.axonframework.messaging.eventhandling.EventMessage message)", method => method
-            .UnsupportedIntent("reduce this event and current state into a new read model or delete it", model.Id.ToString(), AxonRefusalCodes.Reduction)
-            .Line($"throw new {method.Reference("java.lang.UnsupportedOperationException")}({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.Reduction + ": " + reason)});"));
+        var name = JavaNames.Type(model.Name);
+        var missing = reducer.Transitions.Where(transition => !admission.Transitions[transition.RequirementId].Placed).ToArray();
+        if (missing.Length == 0) return;
+        var testName = name + "ReducerPlaceholderTest";
+        var code = new JavaCodeBuilder(package).Declare(testName).Declare(name).Declare(name + "Reducer");
+        code.Block($"class {testName}", body =>
+        {
+            for (var index = 0; index < missing.Length; index++)
+            {
+                var transition = missing[index];
+                body.Line($"@{body.Reference("org.junit.jupiter.api.Test")}").Block($"void unimplementedTransition{index}PreservesCurrent()", test =>
+                {
+                    var assertions = test.Reference("org.junit.jupiter.api.Assertions");
+                    test.Line($"var reducer = new {name}Reducer() {{}};")
+                        .Line($"{assertions}.assertNull(reducer.reduce(({types.EventType(transition.EventContract, test)}) null, null, null), \"A null current stays null; no row is created\");")
+                        .Line($"var current = new {name}({string.Join(", ", model.Properties.Select(property => types.Default(property.Type, test)))});")
+                        .Line($"{assertions}.assertSame(current, reducer.reduce(({types.EventType(transition.EventContract, test)}) null, current, null), \"An existing row is neither changed nor deleted\");");
+                });
+            }
+        });
+        context.AddJava(package, testName, code.Build(), true, model.Id);
+    }
+
+    void EmitTransition(SemanticReadModel model, SemanticReducerTransition transition, ReducerBodies.Transition admission, JavaCodeBuilder code)
+    {
+        code.Block($"default {JavaNames.Type(model.Name)} reduce({types.EventType(transition.EventContract, code)} event, @{code.Reference("org.jspecify.annotations.Nullable")} {JavaNames.Type(model.Name)} current, {code.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message)", method =>
+        {
+            if (admission.Placed)
+            {
+                method.RawBody(admission.Body);
+                context.ConsumedImplementations.Add(transition.RequirementId);
+                return;
+            }
+            var reason = admission.Reason + " Transition not implemented: events are ignored until a supported body is authored. A null current leaves the view absent.";
+            context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model.Id, reason, "reduce this event and current state into a new read model or delete it", model.Id.ToString());
+            method.UnsupportedIntent("reduce this event and current state: " + reason, model.Id.ToString(), AxonRefusalCodes.Reduction)
+                .Line("return current;");
+        });
     }
 
     void EmitConfiguration(string package, string name, SemanticId id)

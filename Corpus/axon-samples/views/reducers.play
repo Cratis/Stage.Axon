@@ -1,36 +1,83 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+concept CounterId : String
+
 module Reduction
   feature Counters
     slice StateChange Record
       command RecordCount
-        id String
+        id CounterId identifier
         amount Int
         produces CountRecorded
           id = id
           amount = amount
       event CountRecorded
-        id String
+        id CounterId
         amount Int
+
+    slice StateChange Delete
+      command DeleteCounter
+        id CounterId identifier
+        produces CounterDeleted
+          id = id
+      event CounterDeleted
+        id CounterId
 
     slice StateView Rebuilt
       readmodel RebuiltTotal
-        id String key
+        id CounterId key
         amount Int
 
       reducer RebuildTotal => RebuiltTotal
         on CountRecorded
-          ```csharp
-          return new RebuiltTotal(context.Event.Id, context.Event.Amount);
+          ```java
+          return new RebuiltTotal(event.id(), (current == null ? 0L : current.amount()) + event.amount());
+          ```
+        on CounterDeleted
+          ```java
+          return null;
           ```
 
       query RebuiltTotals => RebuiltTotal[]
 
       specification RebuildFromEvents
         given CountRecorded
+          for "counter"
           id = "counter"
           amount = 4
         then readmodel RebuiltTotal
           id = "counter"
           amount = 4
+
+      specification InitializeFromFirstEvent
+        given CountRecorded
+          for "initial"
+          id = "initial"
+          amount = 7
+        then readmodel RebuiltTotal
+          id = "initial"
+          amount = 7
+
+      specification AccumulateThroughCurrent
+        given CountRecorded
+          for "accumulated"
+          id = "accumulated"
+          amount = 5
+        given CountRecorded
+          for "accumulated"
+          id = "accumulated"
+          amount = 8
+        then readmodel RebuiltTotal
+          id = "accumulated"
+          amount = 13
+
+      specification DeleteAfterInsert
+        given CountRecorded
+          for "deleted"
+          id = "deleted"
+          amount = 9
+        given CounterDeleted
+          for "deleted"
+          id = "deleted"
+        then no readmodel RebuiltTotal for "deleted"
