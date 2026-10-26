@@ -20,6 +20,7 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         var commandName = JavaNames.Type(command.Name);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(commandName).Declare(commandName + "Rules").Declare(commandName + "Handler");
         ClaimSource(code, commandName);
+        ClaimFixtures(code, specifications);
         ClaimAssertions(code, specifications);
         code.Block("class " + name, body =>
         {
@@ -39,6 +40,15 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         if (source is null) return;
         code.Declare(commandName + "Stream");
         if (source.JavaType.StartsWith(context.BasePackage + ".", StringComparison.Ordinal)) code.Reference(source.JavaType);
+    }
+
+    void ClaimFixtures(JavaCodeBuilder code, IEnumerable<SemanticSpecification> specifications)
+    {
+        foreach (var specification in specifications)
+        {
+            var values = new CommandFixtureValues(context, command, specification, source);
+            code.ClaimExpressions(new[] { values.Command() }.Concat(specification.GivenEvents.Concat(specification.ThenEvents).Select(values.Event)).OfType<string>());
+        }
     }
 
     void ClaimAssertions(JavaCodeBuilder code, IEnumerable<SemanticSpecification> specifications)
@@ -72,7 +82,7 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
 
     void FixtureClock(JavaCodeBuilder body)
     {
-        if (usesClock) body.Line("var clock = java.time.Clock.fixed(java.time.OffsetDateTime.parse(instant).toInstant(), java.time.ZoneOffset.UTC);");
+        if (usesClock) body.Line($"var clock = {body.Reference("java.time.Clock")}.fixed({body.Reference("java.time.OffsetDateTime")}.parse(instant).toInstant(), {body.Reference("java.time.ZoneOffset")}.UTC);");
     }
 
     void Specification(JavaCodeBuilder body, SemanticSpecification specification, string testClass, int index)
@@ -97,10 +107,10 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         body.Block("void " + method + "()", test =>
         {
             CommandFixtureSecurity.CallerReferences(test, specification.GivenCaller);
-            var activity = given.Length == 0 ? ".noPriorActivity()" : $".events({string.Join(", ", given)})";
+            var activity = given.Length == 0 ? ".noPriorActivity()" : $".events({string.Join(", ", given.Select(value => test.ReferenceExpression(value!)))})";
             test.Line($"var scenario = fixture({JavaCodeBuilder.StringLiteral(specification.GivenClock ?? "1970-01-01T00:00:00Z")}).given(){activity};")
-                .Line($"var result = scenario.when().command({input}).then();");
-            new CommandFixtureAssertions(context, command, specification).EmitReferences(test, [.. expected.Select(value => value!)]);
+                .Line($"var result = scenario.when().command({test.ReferenceExpression(input!)}).then();");
+            new CommandFixtureAssertions(context, command, specification).EmitReferences(test, [.. expected.Select(value => test.ReferenceExpression(value!))]);
         });
     }
 

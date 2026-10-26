@@ -3,16 +3,26 @@
 
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Cratis.Stage.Rendering.Axon.Java;
 
-internal sealed class JavaCodeBuilder(string package)
+internal sealed partial class JavaCodeBuilder(string package)
 {
     const string LocalType = "";
+    static readonly string[] _frameworkPrefixes =
+    [
+        "java.", "javax.", "jakarta.", "org.axonframework.", "org.springframework.",
+        "org.reactivestreams.", "org.junit.", "org.mockito.", "org.assertj.", "io.cratis.", "io.axoniq."
+    ];
+
     readonly SortedSet<string> _imports = new(StringComparer.Ordinal);
     readonly Dictionary<string, string> _simpleNames = new(StringComparer.Ordinal);
     readonly StringBuilder _body = new();
     int _indent;
+
+    [GeneratedRegex("\"(?:\\\\.|[^\"\\\\])*\"|(?<![A-Za-z0-9_$.])(?:[a-z][a-z0-9_]*\\.)+[A-Z][A-Za-z0-9_]*", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex ExpressionTypes { get; }
 
     internal static string StringLiteral(string value)
     {
@@ -69,7 +79,7 @@ internal sealed class JavaCodeBuilder(string package)
     {
         var simpleName = SimpleName(qualifiedName);
         if (simpleName.Length == qualifiedName.Length) return qualifiedName;
-        if (_simpleNames.TryGetValue(simpleName, out var owner)) return owner == qualifiedName ? simpleName : qualifiedName;
+        if (_simpleNames.TryGetValue(simpleName, out var owner) && owner != qualifiedName) return qualifiedName;
 
         _simpleNames[simpleName] = qualifiedName;
         if (!IsJavaLang(qualifiedName)) _imports.Add(qualifiedName);
@@ -96,6 +106,23 @@ internal sealed class JavaCodeBuilder(string package)
         return this;
     }
 
+    /// <summary>Reserves modeled types in renderer-produced expressions before framework references.</summary>
+    internal void ClaimExpressions(IEnumerable<string> expressions)
+    {
+        foreach (var expression in expressions)
+        {
+            foreach (Match match in ExpressionTypes.Matches(expression))
+            {
+                if (match.Value.StartsWith('"') || IsFramework(match.Value)) continue;
+                _simpleNames.TryAdd(SimpleName(match.Value), match.Value);
+            }
+        }
+    }
+
+    /// <summary>Resolves renderer-produced expressions, never authored Java bodies; string literals stay verbatim.</summary>
+    internal string ReferenceExpression(string expression) => ExpressionTypes.Replace(expression, match =>
+        match.Value.StartsWith('"') ? match.Value : Reference(match.Value));
+
     internal JavaCodeBuilder Block(string declaration, Action<JavaCodeBuilder> body)
     {
         Line(declaration + " {");
@@ -113,6 +140,8 @@ internal sealed class JavaCodeBuilder(string package)
         if (_imports.Count > 0) result.Append('\n');
         return result.Append(_body).ToString();
     }
+
+    static bool IsFramework(string type) => _frameworkPrefixes.Any(prefix => type.StartsWith(prefix, StringComparison.Ordinal));
 
     static string SimpleName(string qualifiedName) => qualifiedName[(qualifiedName.LastIndexOf('.') + 1)..];
 

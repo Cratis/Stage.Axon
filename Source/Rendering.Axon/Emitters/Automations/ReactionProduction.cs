@@ -19,7 +19,6 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
         command.Line($"public record {Name}(@{command.Reference("org.axonframework.modelling.annotation.TargetEntityId")} {ReactionJavaReferences.Expression(command, Primary.JavaType)} eventSourceId, {ReactionJavaReferences.Expression(command, Event.Type)} event) {{}}");
         context.AddJava(package, Name, command.Build(), sources: [reaction]);
         var handler = new JavaCodeBuilder(package).Declare(Name).Declare(Name + "Handler").Declare(Name + "Stream");
-        ReactionJavaReferences.Claim(handler, [Primary.JavaType]);
         var selector = Primary.TagKey == "eventSourceId" ? "(idProperty = " + EventTagsEmitter.Reference(TagReference, handler, package) + ")" : string.Empty;
         var uniqueValues = handler.Reference(context.BasePackage + ".runtime.UniqueValueStore");
         var inMemoryUniqueValues = handler.Reference(context.BasePackage + ".runtime.InMemoryUniqueValueStore");

@@ -34,8 +34,10 @@ public class when_rendering_conditional_appends : for_AxonArtifactRenderPlanner.
         }
     }
 
-    [Fact] void should_collect_conditional_events() => handler.ShouldContain("var events = new java.util.ArrayList<Object>();");
-    [Fact] void should_guard_the_event_with_the_modeled_condition() => handler.ShouldContain("if (!(java.util.Objects.equals((command.customer() == null ? null : command.customer().value()), \"blocked\")))");
+    [Fact] void should_collect_conditional_events() => handler.ShouldContain("var events = new ArrayList<Object>();");
+    [Fact] void should_import_the_batch_collection() => handler.ShouldContain("import java.util.ArrayList;");
+    [Fact] void should_import_the_condition_comparer() => handler.ShouldContain("import java.util.Objects;");
+    [Fact] void should_guard_the_event_with_the_modeled_condition() => handler.ShouldContain("if (!(Objects.equals((command.customer() == null ? null : command.customer().value()), \"blocked\")))");
     [Fact] void should_add_the_event_inside_the_condition() => handler.ShouldContain("events.add(new ");
     [Fact] void should_not_append_an_empty_batch() => handler.ShouldContain("if (!events.isEmpty()) appender.append(events);");
     [Fact] void should_keep_multiple_events_as_a_batch() => multiple.ShouldContain("if (!events.isEmpty()) appender.append(events);");
