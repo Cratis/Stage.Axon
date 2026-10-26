@@ -31,7 +31,12 @@ public class with_renderer_owned_fragments : for_AxonArtifactRenderPlanner.given
         });
         AxonHttpTests.Register(context, new(ids[1], [new(new("GET", "/two"), new(204))], new(string.Empty, [], false))
         {
-            ArrangeFragments = [new(builder => $"var modeled = application.getBean({builder.Reference("example.events.QueryUpdateEmitter")}.class);", builder => builder.Reference("example.events.QueryUpdateEmitter"))]
+            ArrangeFragments =
+            [
+                new(builder => $"var modeled = application.getBean({builder.Reference("example.events.QueryUpdateEmitter")}.class);", builder => builder.Reference("example.events.QueryUpdateEmitter")),
+                new(builder => $"var model = application.getBean({builder.Reference("example.views.Exception")}.class);", builder => builder.Reference("example.views.Exception")),
+                new(builder => $"var snapshots = {builder.Reference("java.util.List")}.of({builder.Reference("example.models.List")}.class);", builder => builder.Reference("example.models.List"))
+            ]
         });
         AxonHttpTests.Emit(context);
         code = Text(context, "ModeledHttpRoundTripTest");
@@ -49,4 +54,13 @@ public class with_renderer_owned_fragments : for_AxonArtifactRenderPlanner.given
     [Fact] void should_import_the_modeled_type() => code.ShouldContain("import example.events.QueryUpdateEmitter;");
     [Fact] void should_not_import_the_colliding_framework_type() => code.ShouldNotContain("import org.axonframework.messaging.queryhandling.QueryUpdateEmitter;");
     [Fact] void should_not_add_fragment_imports_to_the_unrelated_runtime_test() => echo.ShouldNotContain("QueryUpdateEmitter");
+    [Fact] void should_keep_the_modeled_exception_import() => code.ShouldContain("import example.views.Exception;");
+    [Fact] void should_keep_the_modeled_exception_short() => code.ShouldContain("application.getBean(Exception.class)");
+    [Fact] void should_qualify_the_scenario_exception() => code.ShouldContain("void scenario_0() throws java.lang.Exception");
+    [Fact] void should_qualify_the_perform_exception() => code.ShouldContain("perform(MockHttpServletRequestBuilder request) throws java.lang.Exception");
+    [Fact] void should_keep_the_modeled_list_import() => code.ShouldContain("import example.models.List;");
+    [Fact] void should_qualify_only_the_colliding_java_list() => code.ShouldContain("var snapshots = java.util.List.of(List.class);");
+    [Fact] void should_not_import_the_colliding_java_list() => code.ShouldNotContain("import java.util.List;");
+    [Fact] void should_leave_the_unrelated_scenario_exception_short() => echo.ShouldContain("void scenario_0() throws Exception");
+    [Fact] void should_leave_the_unrelated_perform_exception_short() => echo.ShouldContain("perform(MockHttpServletRequestBuilder request) throws Exception");
 }
