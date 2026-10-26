@@ -82,7 +82,7 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
         var code = new JavaCodeBuilder(package).Declare(name + "Reducer").Declare(name + "ReducerConfiguration");
         code.Line($"@{code.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "ReducerConfiguration")})")
             .Block($"public class {name}ReducerConfiguration", body => body
-                .Line($"@org.springframework.context.annotation.Bean({JavaCodeBuilder.StringLiteral(package + "." + name + "Reducer")})")
+                .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Reducer")})")
                 .Line($"@{body.Reference("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")}({name}Reducer.class)")
                 .Block($"public {name}Reducer {JavaNames.Member(name)}Reducer()", method => method.Line($"return new {name}Reducer() {{}};")));
         context.AddJava(package, name + "ReducerConfiguration", code.Build(), sources: id);

@@ -18,6 +18,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
     {
         var name = JavaNames.Type(projection.Name) + "Projector";
         var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare("Change");
+        foreach (var property in _root.All.SelectMany(node => node.Properties)) types.ClaimProjectionType(property.Type, code);
         _updates.Claim(code, package);
         foreach (var @event in Events()) types.EventType(@event.Id, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
@@ -48,7 +49,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
         foreach (var node in _root.All)
         {
             for (var index = 0; index < node.Scope.Joins.Length; index++)
-                code.Line($"private final {code.Reference("java.util.Map")}<{code.Reference("java.lang.String")}, {code.Reference("java.util.function.UnaryOperator")}<{node.Type}>> {Cache(node, index)} = new {code.Reference("java.util.HashMap")}<>();");
+                code.Line($"private final {code.Reference("java.util.Map")}<{code.Reference("java.lang.String")}, {code.Reference("java.util.function.UnaryOperator")}<{code.Reference(node.Type)}>> {Cache(node, index)} = new {code.Reference("java.util.HashMap")}<>();");
         }
         code.Line($"@{code.Reference("org.springframework.beans.factory.annotation.Autowired")}")
             .Block($"public {name}(@{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store, {code.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.store = store;").Line("this.clock = clock;"))
