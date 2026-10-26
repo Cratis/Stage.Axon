@@ -17,7 +17,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             foreach (var command in slice.Slice.Commands) SecurityAnnotations.For(context, command.Authorization, command.Id);
             foreach (var query in slice.Slice.Queries) SecurityAnnotations.For(context, query.Authorization, query.Id);
         }
-        var code = new JavaCodeBuilder(context.BasePackage + ".infrastructure")
+        var code = new JavaCodeBuilder(context.BasePackage + ".infrastructure").Declare("SecurityConfiguration")
             .Import("org.springframework.context.annotation.Bean")
             .Import("org.springframework.context.annotation.Configuration")
             .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")

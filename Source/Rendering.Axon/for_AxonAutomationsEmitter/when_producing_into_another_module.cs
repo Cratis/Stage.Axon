@@ -37,7 +37,8 @@ public class when_producing_into_another_module : given.a_reaction_model
         new EventTagsEmitter().Emit(context);
     }
 
-    [Fact] void should_reference_the_produced_events_module() => Code("SubmitOrderOn0AppendStream").ShouldContain($"tagKey = {ownerPackage}.EventTags.ORDER_ID");
+    [Fact] void should_reference_the_produced_events_module() => Code("SubmitOrderOn0AppendStream").ShouldContain($"import {ownerPackage}.EventTags;");
+    [Fact] void should_reference_the_short_tag_name() => Code("SubmitOrderOn0AppendStream").ShouldContain("tagKey = EventTags.ORDER_ID");
     [Fact] void should_not_reference_the_automation_module() => Code("SubmitOrderOn0AppendStream").ShouldNotContain($"{context.BasePackage}.{JavaNames.PackageSegment("Automation")}.events.EventTags");
     [Fact] void should_emit_the_target_modules_constants() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/orders/events/EventTags.java", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_not_emit_constants_for_the_eventless_automation_module() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/automation/events/EventTags.java", StringComparison.Ordinal)).ShouldBeFalse();

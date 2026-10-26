@@ -13,50 +13,51 @@ internal static class LiveQuerySubscription
     {
         var name = JavaNames.Type(query.Name);
         var payload = query.Cardinality == SemanticQueryCardinality.Many ? "result.rows()" : "result.rows().stream().findFirst()";
-        var source = new JavaCodeBuilder(package).Import("java.util.concurrent.Flow")
-            .Import("org.axonframework.messaging.queryhandling.gateway.QueryGateway")
-            .Line($$"""
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Subscription").Declare("Bridge");
+        var flow = code.Reference("java.util.concurrent.Flow");
+        var gateway = code.Reference("org.axonframework.messaging.queryhandling.gateway.QueryGateway");
+        var source = code.Line($$"""
             public final class {{name}}Subscription {
                 private {{name}}Subscription() {}
 
-                public static Flow.Publisher<{{name}}.Result> results(QueryGateway gateway, {{name}} query) {
+                public static {{flow}}.Publisher<{{name}}.Result> results({{gateway}} gateway, {{name}} query) {
                     return results(gateway, query, source -> source);
                 }
 
-                static Flow.Publisher<{{name}}.Result> results(QueryGateway gateway, {{name}} query,
-                        java.util.function.UnaryOperator<org.reactivestreams.Publisher<{{name}}.Result>> observe) {
+                static {{flow}}.Publisher<{{name}}.Result> results({{gateway}} gateway, {{name}} query,
+                        {{code.Reference("java.util.function.UnaryOperator")}}<{{code.Reference("org.reactivestreams.Publisher")}}<{{name}}.Result>> observe) {
                     return subscriber -> observe.apply(gateway.subscriptionQuery(query, {{name}}.Result.class))
                         .subscribe(new Bridge(gateway, query, subscriber));
                 }
 
-                public static Flow.Publisher<Object> values(QueryGateway gateway, {{name}} query) {
-                    return subscriber -> results(gateway, query).subscribe(new Flow.Subscriber<{{name}}.Result>() {
-                        @Override public void onSubscribe(Flow.Subscription subscription) { subscriber.onSubscribe(subscription); }
+                public static {{flow}}.Publisher<Object> values({{gateway}} gateway, {{name}} query) {
+                    return subscriber -> results(gateway, query).subscribe(new {{flow}}.Subscriber<{{name}}.Result>() {
+                        @Override public void onSubscribe({{flow}}.Subscription subscription) { subscriber.onSubscribe(subscription); }
                         @Override public void onNext({{name}}.Result result) { subscriber.onNext({{payload}}); }
                         @Override public void onError(Throwable failure) { subscriber.onError(failure); }
                         @Override public void onComplete() { subscriber.onComplete(); }
                     });
                 }
 
-                private static final class Bridge implements org.reactivestreams.Subscriber<{{name}}.Result>, Flow.Subscription {
-                    private final QueryGateway gateway;
+                private static final class Bridge implements {{code.Reference("org.reactivestreams.Subscriber")}}<{{name}}.Result>, {{flow}}.Subscription {
+                    private final {{gateway}} gateway;
                     private final {{name}} query;
-                    private final Flow.Subscriber<? super {{name}}.Result> downstream;
-                    private org.reactivestreams.Subscription upstream;
-                    private java.util.concurrent.CompletableFuture<{{name}}.Result> pending;
+                    private final {{flow}}.Subscriber<? super {{name}}.Result> downstream;
+                    private {{code.Reference("org.reactivestreams.Subscription")}} upstream;
+                    private {{code.Reference("java.util.concurrent.CompletableFuture")}}<{{name}}.Result> pending;
                     private long demand;
                     private boolean fetching;
                     private boolean closed;
                     private boolean completed;
 
-                    private Bridge(QueryGateway gateway, {{name}} query, Flow.Subscriber<? super {{name}}.Result> downstream) {
+                    private Bridge({{gateway}} gateway, {{name}} query, {{flow}}.Subscriber<? super {{name}}.Result> downstream) {
                         this.gateway = gateway;
                         this.query = query;
                         this.downstream = downstream;
                     }
 
                     @Override
-                    public synchronized void onSubscribe(org.reactivestreams.Subscription subscription) {
+                    public synchronized void onSubscribe({{code.Reference("org.reactivestreams.Subscription")}} subscription) {
                         if (upstream != null || closed) { subscription.cancel(); return; }
                         upstream = subscription;
                         downstream.onSubscribe(this);
