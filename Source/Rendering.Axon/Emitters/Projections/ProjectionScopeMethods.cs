@@ -8,15 +8,18 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
 internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJavaTypes types, ProjectionScopeNode root, SemanticId owner)
 {
-    readonly ProjectionValues _values = new(context, types);
     readonly ProjectionRecords _records = new(context.Request.Model.Application, types);
     readonly ProjectionScopeMappings _mappings = new(context, types, owner);
+    ProjectionValues _values = new(context, types);
+    JavaCodeBuilder? _code;
+
+    internal ProjectionScopeMethods WithReferences(JavaCodeBuilder code) => new(context, types, root, owner) { _code = code, _values = new(context, types, code) };
 
     internal string Method(ProjectionScopeNode node, SemanticEventContract @event) => "apply" + node.Name + JavaNames.Type(@event.Name);
 
     internal void Emit(JavaCodeBuilder code, ProjectionScopeNode node, SemanticEventContract @event)
     {
-        code.Block($"private Change<{node.Type}> {Method(node, @event)}({types.EventType(@event.Id)} event, EventMessage message, Object key, Object parentKey, {node.Type} current)", body =>
+        code.Block($"private Change<{node.Type}> {Method(node, @event)}({EventType(@event.Id)} event, {Reference("org.axonframework.messaging.eventhandling.EventMessage", "EventMessage")} message, {Reference("java.lang.Object", "Object")} key, {Reference("java.lang.Object", "Object")} parentKey, {node.Type} current)", body =>
         {
             var creates = Creation(node, @event);
             body.Line($"if (current == null && !({creates})) return new Change<>(null, false, false);")
@@ -39,7 +42,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             if (node.Identity is not null)
             {
                 foreach (var removal in node.Scope.JoinRemovals.Where(removal => removal.EventContract == @event.Id))
-                    body.Line($"if (java.util.Objects.equals(key, {_values.Key(removal.Key, @event)})) return new Change<>(null, true, false);");
+                    body.Line($"if ({Reference("java.util.Objects")}.equals(key, {_values.Key(removal.Key, @event)})) return new Change<>(null, true, false);");
             }
             Descendants(body, node, @event);
             if (node == root && node.Scope.Every is { SubscribesToAllEvents: true } && !Known(@event))
@@ -72,7 +75,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             var property = node.Properties.First(property => property.Id == (node.Identity ?? join.On));
             var on = types.Unwrap(property.Type, $"state.{JavaNames.Member(property.Name)}()");
             var key = _values.Key(join.Key ?? SemanticProjectionKey.EventSourceIdentity, @event);
-            code.Block($"if (current != null && java.util.Objects.equals(String.valueOf({on}), String.valueOf({key})))", selected =>
+            code.Block($"if (current != null && {Reference("java.util.Objects")}.equals({Reference("java.lang.String", "String")}.valueOf({on}), {Reference("java.lang.String", "String")}.valueOf({key})))", selected =>
             {
                 _mappings.Apply(selected, node, join.Mappings, @event);
                 _mappings.Apply(selected, node, node.Scope.Every?.Mappings ?? [], @event);
@@ -119,7 +122,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
         var identity = child.Properties.First(candidate => candidate.Id == child.Identity);
         var member = JavaNames.Member(property.Name);
         var variable = JavaNames.Member(child.Name);
-        code.Line($"var {variable} = new java.util.ArrayList<{child.Type}>();")
+        code.Line($"var {variable} = new {Reference("java.util.ArrayList")}<{child.Type}>();")
             .Block($"if (state.{member}() != null)", items => items.Block($"for (var item : state.{member}())", item => item
                 .Line($"var identity = String.valueOf({types.Unwrap(identity.Type, $"item.{JavaNames.Member(identity.Name)}()")});")
                 .Line($"var changed = {Method(child, @event)}(event, message, identity, key, item);")
@@ -130,19 +133,23 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             var key = _values.Key(from.Key, @event);
             var parentKey = _values.Key(from.ParentKey ?? SemanticProjectionKey.EventSourceIdentity, @event);
             if (parent.Scope.From.Any(candidate => candidate.EventContract == @event.Id)) parentKey = "key";
-            code.Block($"if (java.util.Objects.equals(key, {parentKey}) && {variable}.stream().noneMatch(item -> java.util.Objects.equals(String.valueOf({types.Unwrap(identity.Type, $"item.{JavaNames.Member(identity.Name)}()")}), String.valueOf({key}))))", create => create
+            code.Block($"if ({Reference("java.util.Objects")}.equals(key, {parentKey}) && {variable}.stream().noneMatch(item -> {Reference("java.util.Objects")}.equals({Reference("java.lang.String", "String")}.valueOf({types.Unwrap(identity.Type, $"item.{JavaNames.Member(identity.Name)}()")}), {Reference("java.lang.String", "String")}.valueOf({key}))))", create => create
                 .Line($"var added = {Method(child, @event)}(event, message, {key}, key, null);")
                 .Line($"if (added.value() != null) {variable}.add(added.value());")
                 .Line("childTouched |= added.touched();").Line("childAncestors |= added.ancestors();"));
         }
-        code.Line($"state = {_records.Set(parent, [property.Id], "java.util.List.copyOf(" + variable + ")")};");
+        code.Line($"state = {_records.Set(parent, [property.Id], Reference("java.util.List") + ".copyOf(" + variable + ")")};");
     }
+
+    string EventType(SemanticId id) => _code is null ? types.EventType(id) : types.EventType(id, _code);
+
+    string Reference(string type, string? legacy = null) => _code?.Reference(type) ?? legacy ?? type;
 
     string Matches(SemanticProjectionKey key, SemanticProjectionKey? parentKey, SemanticEventContract @event, ProjectionScopeNode node)
     {
-        var result = $"java.util.Objects.equals(key, {_values.Key(key, @event) ?? "null"})";
+        var result = $"{Reference("java.util.Objects")}.equals(key, {_values.Key(key, @event) ?? "null"})";
         if (node.Identity is not null)
-            result += $" && java.util.Objects.equals(parentKey, {_values.Key(parentKey ?? SemanticProjectionKey.EventSourceIdentity, @event) ?? "null"})";
+            result += $" && {Reference("java.util.Objects")}.equals(parentKey, {_values.Key(parentKey ?? SemanticProjectionKey.EventSourceIdentity, @event) ?? "null"})";
         return result;
     }
 

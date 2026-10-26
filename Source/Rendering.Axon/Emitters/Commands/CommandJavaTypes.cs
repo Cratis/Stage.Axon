@@ -74,6 +74,33 @@ internal sealed class CommandJavaTypes(SemanticApplication application)
         return ScalarLiteral(value, type);
     }
 
+    internal string? Literal(SemanticValue value, SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        if (Literal(value, type) is null) return null;
+        ClaimLiteral(value, type, code);
+        return RenderLiteral(value, type, code);
+    }
+
+    internal void ClaimLiteral(SemanticValue value, SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        if (value is SemanticNullValue || Literal(value, type) is null) return;
+        if (type.IsCollection && value is SemanticArrayValue array)
+        {
+            foreach (var element in array.Values) ClaimLiteral(element, type with { IsCollection = false }, code);
+            return;
+        }
+        if (type.Kind == SemanticTypeReferenceKind.Concept) Claim(type, code);
+        ClaimCompositeValue(value, type, code);
+    }
+
+    internal string? Wrap(string value, SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        var concept = Concept(type.Target);
+        if (concept.Numbers is not null) return null;
+        var name = Type(type, code);
+        return concept.Values.IsDefaultOrEmpty ? $"new {name}({value})" : $"{name}.fromValue({value})";
+    }
+
     internal string? Wrap(string value, SemanticTypeReference type)
     {
         var concept = Concept(type.Target);
@@ -108,6 +135,73 @@ internal sealed class CommandJavaTypes(SemanticApplication application)
         if (primitive == SemanticPrimitiveType.DecimalNumber) return $"new java.math.BigDecimal({JavaCodeBuilder.StringLiteral(text)})";
         if (primitive != SemanticPrimitiveType.WholeNumber) return null;
         return value == decimal.Truncate(value) && value >= long.MinValue && value <= long.MaxValue ? text + "L" : null;
+    }
+
+    static string Text(string value, SemanticPrimitiveType primitive, JavaCodeBuilder code)
+    {
+        var literal = JavaCodeBuilder.StringLiteral(value);
+        if (primitive == SemanticPrimitiveType.Text) return literal;
+        var method = primitive == SemanticPrimitiveType.Uuid ? "fromString" : "parse";
+        var type = primitive switch
+        {
+            SemanticPrimitiveType.Uuid => "java.util.UUID",
+            SemanticPrimitiveType.Date => "java.time.LocalDate",
+            _ => "java.time.OffsetDateTime"
+        };
+        return $"{code.Reference(type)}.{method}({literal})";
+    }
+
+    static string? Scalar(SemanticValue value, SemanticPrimitiveType primitive, JavaCodeBuilder code) => value switch
+    {
+        SemanticTextValue text => Text(text.Value, primitive, code),
+        SemanticNumberValue number when primitive == SemanticPrimitiveType.DecimalNumber => $"new {code.Reference("java.math.BigDecimal")}({JavaCodeBuilder.StringLiteral(number.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))})",
+        _ => Scalar(value, primitive)
+    };
+
+    string? RenderLiteral(SemanticValue value, SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        if (value is SemanticNullValue) return "null";
+        if (type.IsCollection && value is SemanticArrayValue array) return Array(array, type, code);
+        return value is SemanticCompositeValue composite && type.Kind == SemanticTypeReferenceKind.CompositeType
+            ? CompositeLiteral(composite, type, code) : ScalarLiteral(value, type, code);
+    }
+
+    string Array(SemanticArrayValue value, SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        var elements = value.Values.Select(element => RenderLiteral(element, type with { IsCollection = false }, code)).ToArray();
+        return $"{code.Reference("java.util.Arrays")}.asList({string.Join(", ", elements)})";
+    }
+
+    void ClaimCompositeValue(SemanticValue value, SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        if (value is SemanticCompositeValue composite && type.Kind == SemanticTypeReferenceKind.CompositeType) ClaimComposite(composite, type, code);
+    }
+
+    void ClaimComposite(SemanticCompositeValue value, SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        Claim(type, code);
+        foreach (var property in Composite(type.Target).Properties)
+        {
+            if (value.Properties.FirstOrDefault(field => field.TargetProperty == property.Id) is { } field) ClaimLiteral(field.Value, property.Type, code);
+        }
+    }
+
+    string CompositeLiteral(SemanticCompositeValue value, SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        var arguments = Composite(type.Target).Properties.Select(property => value.Properties.FirstOrDefault(field => field.TargetProperty == property.Id) is { } field
+            ? RenderLiteral(field.Value, property.Type, code) : "null");
+        return $"new {Type(type, code)}({string.Join(", ", arguments)})";
+    }
+
+    string? ScalarLiteral(SemanticValue value, SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        if (type.Kind == SemanticTypeReferenceKind.Concept && !Concept(type.Target).Values.IsDefaultOrEmpty)
+        {
+            var member = EnumLiteral(value, type)!;
+            return Type(type, code) + member[member.LastIndexOf('.')..];
+        }
+        var literal = Scalar(value, PrimitiveOf(type), code);
+        return literal is not null && type.Kind == SemanticTypeReferenceKind.Concept ? Wrap(literal, type, code) : literal;
     }
 
     string? Array(SemanticArrayValue array, SemanticTypeReference type)

@@ -51,5 +51,44 @@ public class when_building_type_references : for_AxonArtifactRenderPlanner.given
         source.ShouldNotContain("import java.util.UUID;");
     }
 
+    [Fact]
+    void should_import_uuid_literal_factories()
+    {
+        types.Literal(SemanticValue.Text(Guid.Empty.ToString()), Primitive(SemanticPrimitiveType.Uuid), code).ShouldEqual($"UUID.fromString({JavaCodeBuilder.StringLiteral(Guid.Empty.ToString())})");
+        code.Build().ShouldContain("import java.util.UUID;");
+    }
+
+    [Fact]
+    void should_keep_collection_literal_semantics()
+    {
+        var value = new SemanticArrayValue([new SemanticNullValue(), SemanticValue.Text("one")]);
+        types.Literal(value, Primitive(SemanticPrimitiveType.Text) with { IsCollection = true }, code).ShouldEqual("Arrays.asList(null, \"one\")");
+        code.Build().ShouldContain("import java.util.Arrays;");
+    }
+
+    [Fact]
+    void should_not_import_types_for_rejected_literals()
+    {
+        types.Literal(new SemanticNumberValue(1.5m), Primitive(SemanticPrimitiveType.WholeNumber), code).ShouldBeNull();
+        code.Build().ShouldNotContain("import ");
+    }
+
+    [Fact]
+    void should_keep_legacy_literal_output()
+    {
+        types.Literal(new SemanticNumberValue(1m), Primitive(SemanticPrimitiveType.DecimalNumber)).ShouldEqual("new java.math.BigDecimal(\"1\")");
+    }
+
+    [Fact]
+    void should_keep_a_decimal_concept_short_when_its_framework_type_collides()
+    {
+        var concept = request.Model.Application.Concepts[0] with { Name = "BigDecimal", Primitive = SemanticPrimitiveType.DecimalNumber, Values = [], Numbers = null };
+        var collision = new CommandJavaTypes(request.Model.Application with { Concepts = [concept] });
+        var type = new SemanticTypeReference(SemanticTypeReferenceKind.Concept, concept.Primitive, concept.Id, false, false);
+        collision.Literal(new SemanticNumberValue(1m), type, code).ShouldEqual("new BigDecimal(new java.math.BigDecimal(\"1\"))");
+        code.Build().ShouldContain($"import {types.BasePackage}.concepts.BigDecimal;");
+        code.Build().ShouldNotContain("import java.math.BigDecimal;");
+    }
+
     static SemanticTypeReference Primitive(SemanticPrimitiveType primitive) => new(SemanticTypeReferenceKind.Primitive, primitive, default, false, false);
 }

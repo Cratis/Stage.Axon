@@ -24,30 +24,34 @@ internal sealed class CommandConditions(SemanticCommand command, CommandJavaType
         [SemanticLogicalOperator.Or] = "||"
     };
 
+    JavaCodeBuilder? _code;
+
+    internal string? Render(SemanticCondition condition, JavaCodeBuilder code) => new CommandConditions(command, types) { _code = code }.Render(condition);
+
     internal string? Render(SemanticCondition condition)
     {
         if (condition is SemanticLogicalCondition logical) return Logical(logical);
         return condition is SemanticComparison comparison ? Comparison(comparison) : null;
     }
 
-    static string? Numeric(string left, string right, SemanticComparisonOperator comparison)
+    string? Numeric(string left, string right, SemanticComparisonOperator comparison)
     {
         var operation = _operations.GetValueOrDefault(comparison);
         if (operation is null) return null;
 
         // Object casts also box literal operands, so null checks remain legal Java for constants.
-        var present = $"(Object)({left}) != null && (Object)({right}) != null";
-        var ordered = $"new java.math.BigDecimal(String.valueOf({left})).compareTo(new java.math.BigDecimal(String.valueOf({right}))) {operation} 0";
-        if (comparison == SemanticComparisonOperator.Equal) return $"(java.util.Objects.equals({left}, {right}) || ({present} && {ordered}))";
-        if (comparison == SemanticComparisonOperator.NotEqual) return $"(!java.util.Objects.equals({left}, {right}) && (!({present}) || {ordered}))";
+        var present = $"({Reference("java.lang.Object", "Object")})({left}) != null && ({Reference("java.lang.Object", "Object")})({right}) != null";
+        var ordered = $"new {Reference("java.math.BigDecimal")}({Reference("java.lang.String", "String")}.valueOf({left})).compareTo(new {Reference("java.math.BigDecimal")}({Reference("java.lang.String", "String")}.valueOf({right}))) {operation} 0";
+        if (comparison == SemanticComparisonOperator.Equal) return $"({Reference("java.util.Objects")}.equals({left}, {right}) || ({present} && {ordered}))";
+        if (comparison == SemanticComparisonOperator.NotEqual) return $"(!{Reference("java.util.Objects")}.equals({left}, {right}) && (!({present}) || {ordered}))";
         return $"({present} && {ordered})";
     }
 
-    static string? CompareOperands(string left, string right, SemanticPrimitiveType primitive, SemanticComparisonOperator comparison)
+    string? CompareOperands(string left, string right, SemanticPrimitiveType primitive, SemanticComparisonOperator comparison)
     {
         if (primitive is SemanticPrimitiveType.DecimalNumber or SemanticPrimitiveType.WholeNumber) return Numeric(left, right, comparison);
         if (comparison is not (SemanticComparisonOperator.Equal or SemanticComparisonOperator.NotEqual)) return null;
-        var equal = $"java.util.Objects.equals({left}, {right})";
+        var equal = $"{Reference("java.util.Objects")}.equals({left}, {right})";
         return comparison == SemanticComparisonOperator.Equal ? equal : $"!({equal})";
     }
 
@@ -73,11 +77,13 @@ internal sealed class CommandConditions(SemanticCommand command, CommandJavaType
     string? Operand(SemanticConditionOperand operand, SemanticTypeReference type)
     {
         var scalar = type with { Kind = SemanticTypeReferenceKind.Primitive, Primitive = types.PrimitiveOf(type) };
-        if (operand.Value is { } constant) return types.Literal(constant, scalar);
+        if (operand.Value is { } constant) return _code is null ? types.Literal(constant, scalar) : types.Literal(constant, scalar, _code);
         if (Property(operand) is not { } property) return null;
         var access = $"command.{JavaNames.Member(property.Name)}()";
         return property.Type.Kind == SemanticTypeReferenceKind.Concept ? $"({access} == null ? null : {access}.value())" : access;
     }
+
+    string Reference(string type, string? legacy = null) => _code?.Reference(type) ?? legacy ?? type;
 
     SemanticProperty? Property(SemanticConditionOperand operand) => command.Properties.SingleOrDefault(property => property.Id == operand.Property);
 }
