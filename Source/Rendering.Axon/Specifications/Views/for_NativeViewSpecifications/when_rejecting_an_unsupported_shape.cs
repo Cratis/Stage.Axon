@@ -45,6 +45,8 @@ public class when_rejecting_an_unsupported_shape : given.a_native_view_request
     [Fact] void should_not_accept_mixed_denial_expectations() => Plan(_spec with { ThenDenied = true }).ShouldBeNull();
     [Fact] void should_not_accept_exact_expectations() => Plan(_spec with { WhenClock = null, ThenReadModels = [.. _spec.ThenReadModels.Select(expected => expected with { Exactly = true })] }).ShouldBeNull();
     [Fact] void should_not_ignore_an_unhandled_given_event() => Plan(_spec with { WhenClock = null, GivenEvents = [.. _spec.GivenEvents.Select(given => given with { EventContract = _spec.Id })] }).ShouldBeNull();
+    [Fact] void should_not_ignore_an_unhandled_appended_event() => Plan(_spec with { WhenAppended = new(_spec.Id, []) { EventSource = _spec.GivenEvents[0].EventSource } }).ShouldBeNull();
+    [Fact] void should_not_ignore_a_missing_appended_source() => Plan(_spec with { WhenAppended = new(_spec.GivenEvents[0].EventContract, _spec.GivenEvents[0].Values) }).ShouldBeNull();
     [Fact] void should_not_ignore_another_read_model() => Plan(_spec with { WhenClock = null, ThenReadModels = [.. _spec.ThenReadModels.Select(expected => expected with { ReadModel = _spec.Id })] }).ShouldBeNull();
 
     Action<Java.JavaCodeBuilder>? Plan(SemanticSpecification spec) => new NativeViewSpecifications(_context, new ViewJavaTypes(_request.Model.Application), _located, _located.Slice.ReadModels.Single(model => model.Name == "Categories")).Plan(spec);

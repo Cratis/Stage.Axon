@@ -40,7 +40,7 @@ internal sealed class AxonViewHttpSpecs(AxonEmissionContext context, ViewJavaTyp
 
     bool Supports(SemanticSpecification specification)
     {
-        if (context.Specifications[specification.Id].DisabledCode is not null) return false;
+        if (context.Specifications[specification.Id].DisabledCode is not null || specification.WhenAppended is not null) return false;
         if (specification.ThenReadModels.IsEmpty) return false;
         return specification.ThenAbsentReadModels.IsEmpty;
     }
