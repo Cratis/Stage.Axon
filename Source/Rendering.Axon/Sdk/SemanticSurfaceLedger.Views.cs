@@ -57,12 +57,12 @@ internal static partial class SemanticSurfaceLedger
 
         SetViews(entries, SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-0308: read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused.", "SemanticReadModel.Properties");
         SetViews(entries, SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-0306: typed reducer delegation is rendered, but bodies remain throwing extension points and dependent specs are disabled.", "SemanticReducer.Transitions SemanticReducer.InitialState SemanticReducer.Target SemanticReducer.From SemanticReducerTransition.RequirementId");
-        SetViews(entries, SemanticSurfaceDispositionKind.Rejected, "STAGE-AXON-0501: query expectations in view specifications remain explicitly disabled.", "SemanticQueryFilterValue.Filter SemanticQueryFilterValue.Value");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Declaration identity metadata; the generated artifact is attributed to its owning query.", "SemanticQueryKeyPart.Id SemanticQueryFilter.Id SemanticReadModelQueryArgument.Id");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "The generated reducer interface is named after its read model, not the modeled reducer name.", "SemanticReducer.Name");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Projection nomination is not consumed; Axon emits its own typed event projector.", "SemanticProjection.Target");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Legacy cardinality metadata does not select bulk behavior: the projector applies one event to its modeled key.", "SemanticAffectedInstance.Cardinality AffectedInstanceCardinality.One AffectedInstanceCardinality.Many AffectedInstanceCardinality.ZeroOrOne AffectedInstanceCardinality.Unknown");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Unknown sentinel has no supported Axon interpretation; it is not an additional executable variant.", "SemanticQueryCardinality.Unknown SemanticQueryDelivery.Unknown SemanticProjectionKeyKind.Unknown SemanticProjectionOperation.Unknown SemanticProjectionValueKind.Unknown");
+        ClassifyConditions(entries);
     }
 
     static void SetViews(Dictionary<string, SemanticSurfaceDisposition> entries, SemanticSurfaceDispositionKind kind, string detail, string members)

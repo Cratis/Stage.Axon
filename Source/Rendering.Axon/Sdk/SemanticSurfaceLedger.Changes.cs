@@ -25,7 +25,7 @@ internal static partial class SemanticSurfaceLedger
             SemanticImplementationRequirement.RequiredCapability SemanticImplementationRequirement.IsAmbiguous SemanticImplementationRequirement.IsProvisional
             SemanticImplementationRequirement.AttachmentResolution SemanticImplementationRequirement.QueryShape
             """;
-        var native = new SemanticSurfaceDisposition(SemanticSurfaceDispositionKind.Warned, "Conditional java method slots admit LF-only, SHA-256-matched inline command/reaction/query bodies with supported version-1 contracts; unplaced bodies retain STAGE-AXON-0403 or STAGE-AXON-IMPL-LANGUAGE diagnostics.");
+        var native = new SemanticSurfaceDisposition(SemanticSurfaceDispositionKind.Warned, "Conditional java method slots admit LF-only, SHA-256-matched inline command/reaction/query bodies with supported version-1 contracts. Selected unconsumed null/java requirements report STAGE-AXON-IMPL; other languages report STAGE-AXON-IMPL-LANGUAGE. Command result revision or slot resolution failure emits a throwing handler; this does not admit reducer bodies." + DegradationModes);
         foreach (var member in nativeMembers.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)) entries[member] = native;
         var reducer = new SemanticSurfaceDisposition(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-0306: reducer transitions have no native Java body slot; Java and foreign bodies remain unplaced and reducer specifications stay disabled.");
         foreach (var member in new[] { "SemanticReducerTransition.RequirementId", "SemanticImplementationRole.ReducerTransition" }) entries[member] = reducer;
