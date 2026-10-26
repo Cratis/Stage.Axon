@@ -65,7 +65,8 @@ public class when_models_claim_persistence_framework_names : Projections.for_Axo
     [Fact] void should_use_the_framework_processor_definition() => _configuration.ShouldContain("EventProcessorDefinition.pooledStreamingMatching(");
     [Fact] void should_use_the_framework_error_handler() => _configuration.ShouldContain("config.errorHandler(PropagatingErrorHandler.INSTANCE)");
     [Fact] void should_not_declare_a_colliding_type_in_the_configuration() => _configuration.ShouldNotContain("class Set");
-    [Fact] void should_import_each_framework_simple_name_once() => new[] { "Set", "Bean", "EventProcessorDefinition", "PropagatingErrorHandler" }
+    [Fact]
+    void should_import_each_framework_simple_name_once() => new[] { "Set", "Bean", "EventProcessorDefinition", "PropagatingErrorHandler" }
         .ShouldEachConformTo(name => _configuration.Split('\n').Count(line => line.StartsWith("import ", StringComparison.Ordinal) && line.EndsWith("." + name + ";", StringComparison.Ordinal)) == 1);
     [Fact] void should_keep_the_axon_configuration_qualified() => _configuration.ShouldContain("persistentViewProcessorGuard(org.axonframework.common.configuration.Configuration configuration)");
     [Fact] void should_not_import_the_axon_configuration_in_the_configuration() => _configuration.ShouldNotContain("import org.axonframework.common.configuration.Configuration;");
