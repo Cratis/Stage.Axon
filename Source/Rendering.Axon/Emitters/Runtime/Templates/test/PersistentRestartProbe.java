@@ -3,13 +3,19 @@
 
 package __RUNTIME__;
 
+import __RUNTIME__.persistent.JpaUniqueValueStore;
+import __RUNTIME__.persistent.PersistentReadModelSafety;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.axonframework.common.configuration.Configuration;
+import org.axonframework.eventsourcing.annotation.EventTag;
 import org.axonframework.eventsourcing.eventstore.EventStorageEngine;
 import org.axonframework.eventsourcing.eventstore.SourcingCondition;
+import org.axonframework.eventsourcing.eventstore.TerminalEventMessage;
 import org.axonframework.eventsourcing.eventstore.jpa.AggregateBasedJpaEventStorageEngine;
 import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
 import org.axonframework.messaging.eventhandling.gateway.EventAppender;
@@ -22,12 +28,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @EnabledIfSystemProperty(named = "stage.restart", matches = "true")
 // Probe is outside default Surefire discovery, so the opt-in proof adds no default skipped tests.
 class PersistentRestartProbe {
-    public record Recorded(@org.axonframework.eventsourcing.annotation.EventTag(key = "owner") String owner) {}
+    public record Recorded(@EventTag(key = "owner") String owner) {}
 
     @Test
     void viewlessFixturePreservesEventsAndClaimsAcrossTwoBoots() throws Exception {
@@ -94,24 +103,24 @@ class PersistentRestartProbe {
 
     private void assertPersistentStores(ConfigurableApplicationContext application) {
         assertInstanceOf(AggregateBasedJpaEventStorageEngine.class, application.getBean(EventStorageEngine.class));
-        assertInstanceOf(__RUNTIME__.persistent.JpaUniqueValueStore.class, application.getBean(UniqueValueStore.class));
+        assertInstanceOf(JpaUniqueValueStore.class, application.getBean(UniqueValueStore.class));
         assertTrue(application.getBeansOfType(ReadModelStore.class).isEmpty(), "Successful persistent boot must be viewless");
-        assertTrue(application.getBeansOfType(__RUNTIME__.persistent.PersistentReadModelSafety.class).isEmpty());
+        assertTrue(application.getBeansOfType(PersistentReadModelSafety.class).isEmpty());
     }
 
-    private java.util.concurrent.CompletableFuture<Void> append(ConfigurableApplicationContext application, String owner) {
+    private CompletableFuture<Void> append(ConfigurableApplicationContext application, String owner) {
         return application.getBean(Configuration.class).getComponent(UnitOfWorkFactory.class).create().executeWithResult(context -> {
             application.getBean(UniqueValueStore.class).assign(context, "restart", List.of("claimed"), owner, false, "already claimed");
             EventAppender.forContext(context).append(new Recorded(owner));
-            return java.util.concurrent.CompletableFuture.<Void>completedFuture(null);
+            return CompletableFuture.<Void>completedFuture(null);
         });
     }
 
     private int count(ConfigurableApplicationContext application, String owner) throws Exception {
         var stream = application.getBean(EventStorageEngine.class).source(SourcingCondition.conditionFor(EventCriteria.havingTags(Tag.of("owner", owner))));
         try {
-            return stream.filter(entry -> !(entry.message() instanceof org.axonframework.eventsourcing.eventstore.TerminalEventMessage))
-                    .collect(java.util.ArrayList<Object>::new, (all, entry) -> all.add(entry)).get(10, TimeUnit.SECONDS).size();
+            return stream.filter(entry -> !(entry.message() instanceof TerminalEventMessage))
+                    .collect(ArrayList<Object>::new, (all, entry) -> all.add(entry)).get(10, TimeUnit.SECONDS).size();
         } finally { stream.close(); }
     }
 

@@ -3,15 +3,17 @@
 
 package __RUNTIME__.persistent;
 
-import java.util.List;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
-import org.axonframework.common.function.ThrowingConsumer;
-import org.axonframework.messaging.core.unitofwork.ProcessingContext;
-import org.axonframework.messaging.core.unitofwork.transaction.jpa.JpaTransactionalExecutorProvider;
 import __RUNTIME__.UniqueValueConflict;
 import __RUNTIME__.UniqueValueStore;
 import __RUNTIME__.UniqueValues;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.PersistenceException;
+import java.sql.SQLException;
+import java.util.List;
+import org.axonframework.common.function.ThrowingConsumer;
+import org.axonframework.messaging.core.unitofwork.ProcessingContext;
+import org.axonframework.messaging.core.unitofwork.transaction.jpa.JpaTransactionalExecutorProvider;
 
 public final class JpaUniqueValueStore implements UniqueValueStore {
     private final JpaTransactionalExecutorProvider transactions;
@@ -39,7 +41,7 @@ public final class JpaUniqueValueStore implements UniqueValueStore {
             if (existing == null && !value.isEmpty()) {
                 manager.persist(new UniqueClaim(key, constraint, identity));
                 try { manager.flush(); }
-                catch (jakarta.persistence.PersistenceException failure) {
+                catch (PersistenceException failure) {
                     if (isDuplicate(failure)) throw new UniqueValueConflict(message);
                     throw failure;
                 }
@@ -66,7 +68,7 @@ public final class JpaUniqueValueStore implements UniqueValueStore {
 
     private static boolean isDuplicate(Throwable failure) {
         for (var cause = failure; cause != null; cause = cause.getCause())
-            if (cause instanceof java.sql.SQLException sql && "23505".equals(sql.getSQLState())) return true;
+            if (cause instanceof SQLException sql && "23505".equals(sql.getSQLState())) return true;
         return false;
     }
 }

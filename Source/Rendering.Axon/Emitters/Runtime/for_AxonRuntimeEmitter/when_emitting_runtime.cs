@@ -36,7 +36,15 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
 
     [Fact] void should_emit_the_inert_persistent_safety_helper() => context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/persistent/PersistentReadModelSafety.java", StringComparison.Ordinal)).RelativePath.ShouldContain("src/main/java/");
     [Fact] void should_emit_ordinary_native_safety_tests() => context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentReadModelSafetyTest.java", StringComparison.Ordinal)).RelativePath.ShouldContain("src/test/java/");
-    [Fact] void should_register_installed_axon_entities_in_the_test_fixture() => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentProbeSupport.java", StringComparison.Ordinal)).Bytes.AsSpan()).ShouldContain($"@EntityScan(basePackageClasses = {{ {context.BasePackage}.runtime.persistent.UniqueClaim.class,\n            org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry.class,\n            org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry.class }})");
+    [Fact]
+    void should_register_installed_axon_entities_in_the_test_fixture()
+    {
+        var fixture = Template("PersistentProbeSupport.java");
+        fixture.ShouldContain("@EntityScan(basePackageClasses = { UniqueClaim.class,\n            AggregateEventEntry.class,\n            TokenEntry.class })");
+        fixture.ShouldContain($"import {context.BasePackage}.runtime.persistent.UniqueClaim;");
+        fixture.ShouldContain("import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;");
+        fixture.ShouldContain("import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;");
+    }
 
     [Fact]
     void should_not_emit_hand_rolled_concept_types()
