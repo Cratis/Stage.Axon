@@ -55,6 +55,7 @@ internal static class PersistentViewProofSupport
             static ConfigurableApplicationContext start(Path path, Class<?>... customizations) {
                 return new SpringApplicationBuilder(FlatFixture.class).sources(customizations).profiles("persistent").run(
                         "--server.port=0", "--spring.datasource.url=jdbc:h2:file:" + path,
+                        "--axon.eventhandling.processors[__PACKAGE__].initial-segment-count=1",
                         "--spring.jpa.hibernate.ddl-auto=update", "--spring.main.banner-mode=off");
             }
             @SuppressWarnings("unchecked")

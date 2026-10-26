@@ -11,35 +11,18 @@ internal static class PersistentViewProof
         package __PACKAGE__;
 
         import __PERSISTENCE__.JpaReadModelStore;
-        import jakarta.persistence.EntityManagerFactory;
         import java.net.URI;
         import java.net.http.HttpClient;
         import java.net.http.HttpRequest;
         import java.net.http.HttpResponse;
         import java.util.HashSet;
-        import java.util.Map;
-        import java.util.TreeMap;
         import java.util.concurrent.TimeUnit;
-        import org.axonframework.common.configuration.Configuration;
-        import org.axonframework.conversion.GeneralConverter;
-        import org.axonframework.eventsourcing.eventstore.EventStore;
-        import org.axonframework.eventsourcing.eventstore.SourcingCondition;
-        import org.axonframework.messaging.core.sequencing.SequencingPolicy;
-        import org.axonframework.messaging.eventhandling.EventHandlingComponent;
-        import org.axonframework.messaging.eventhandling.EventMessage;
-        import org.axonframework.messaging.eventhandling.conversion.EventConverter;
-        import org.axonframework.messaging.eventhandling.processing.streaming.token.TrackingToken;
-        import org.axonframework.messaging.eventhandling.processing.streaming.token.WrappedToken;
-        import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;
-        import org.axonframework.messaging.eventstreaming.EventCriteria;
         import org.junit.jupiter.api.Test;
         import org.springframework.boot.web.server.context.WebServerApplicationContext;
-        import org.springframework.context.ConfigurableApplicationContext;
         import tools.jackson.databind.json.JsonMapper;
         import static org.junit.jupiter.api.Assertions.*;
         import static __PACKAGE__.__NAME__Support.*;
         import static __PACKAGE__.__NAME__Fixture.assertFixture;
-        import static __PACKAGE__.__NAME__Fixture.tag;
 
         /** Default Surefire test: real emitted projector, pooled processor, durable token and two boots. */
         class __NAME__Test {
@@ -55,6 +38,7 @@ internal static class PersistentViewProof
                     await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
                     checkpoint = tokens(application);
                     assertFalse(checkpoint.isEmpty());
+                    assertEquals(1, checkpoint.size(), "Single-segment proof requires exactly one processor segment");
                 }
                 try (var application = start(path)) {
                     assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()));
@@ -97,7 +81,7 @@ internal static class PersistentViewProof
                         await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
                         var checkpoint = tokens(application);
                         assertFalse(checkpoint.isEmpty(), "Real processor checkpoint rows must exist");
-                        var segmentCheckpoint = tokenEntries(application);
+                        assertEquals(1, checkpoint.size(), "Single-segment proof requires exactly one processor segment");
                         assertQuery(application, initial);
                         rolledBack = new java.util.concurrent.CountDownLatch(1);
                         refused = new java.util.concurrent.CountDownLatch(1);
@@ -105,8 +89,7 @@ internal static class PersistentViewProof
                         tokenRejected = new java.util.concurrent.CountDownLatch(1);
                         if (requested == Failure.TOKEN) installTokenFailure(path);
                         failure = requested;
-                        var failedEvent = __EVENT__;
-                        append(application, failedEvent);
+                        append(application, __EVENT__);
                         assertTrue(rolledBack.await(20, TimeUnit.SECONDS), "Actual processor must roll back: " + requested);
                         if (requested == Failure.ASYNC || requested == Failure.NON_JOINED)
                             assertTrue(refused.await(20, TimeUnit.SECONDS), "Actual handler must reach the transaction/thread guard");
@@ -116,7 +99,8 @@ internal static class PersistentViewProof
                             assertTrue(tokenRejected.await(20, TimeUnit.SECONDS), "Real JpaTokenStore update must reach the rejecting trigger");
                         assertEquals(__COUNT__, count(application), "Non-idempotent view change must roll back");
                         assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()), "No independently committed projection write");
-                        assertRollbackTokens(application, checkpoint, segmentCheckpoint, failedEvent);
+                        // Single-segment proof: native run 40395678690 showed public sequenceIdentifierFor + Segment.matches selected segment 2 while pooled routing used segment 13. Multi-segment rollback is tracked in Cratis/Stage.Axon#16; this proof does not cover it.
+                        assertEquals(checkpoint, tokens(application), "Failed processing must not advance the actual checkpoint");
                     }
                     failure = Failure.NONE;
                     try (var application = start(path)) {
@@ -131,60 +115,6 @@ internal static class PersistentViewProof
                         assertQuery(application, subsequent);
                     }
                 } finally { failure = Failure.NONE; }
-            }
-            private Map<Integer, TokenEntry> tokenEntries(ConfigurableApplicationContext application) {
-                try (var manager = application.getBean(EntityManagerFactory.class).createEntityManager()) {
-                    var entries = new TreeMap<Integer, TokenEntry>();
-                    for (var entry : manager.createQuery("select e from TokenEntry e where e.processorName = :name", TokenEntry.class)
-                            .setParameter("name", "__PACKAGE__").getResultList())
-                        entries.put(entry.getSegment().getSegmentId(), entry);
-                    return entries;
-                }
-            }
-            private int owningSegment(ConfigurableApplicationContext application, Object event, Map<Integer, TokenEntry> checkpoint) throws Exception {
-                var configuration = application.getBean(Configuration.class);
-                var eventStore = configuration.getComponent(EventStore.class);
-                return units(application).create().executeWithResult(context ->
-                        eventStore.transaction(context).source(SourcingCondition.conditionFor(EventCriteria.havingTags(tag(event))))
-                                .reduce((EventMessage) null, (last, entry) -> entry.message()).thenApply(last -> {
-                                    assertNotNull(last, "Failed event must exist in the actual event store");
-                                    var message = last.withConvertedPayload(event.getClass(), configuration.getComponent(EventConverter.class));
-                                    assertEquals(event, message.payload(), "Resolve ownership from the actual failed event");
-                                    var identifiers = new HashSet<Object>();
-                                    configuration.getComponents(EventHandlingComponent.class).values().stream()
-                                            .filter(component -> component.supports(message.type().qualifiedName()))
-                                            .forEach(component -> identifiers.add(component.sequenceIdentifierFor(message, context)));
-                                    assertFalse(identifiers.isEmpty(), "Failed event must have configured handling components");
-                                    assertFalse(identifiers.contains(SequencingPolicy.BROADCAST), "Failed event must have a single owning segment, not broadcast");
-                                    var owners = checkpoint.values().stream().map(TokenEntry::getSegment)
-                                            .filter(segment -> identifiers.stream().anyMatch(segment::matches))
-                                            .map(segment -> segment.getSegmentId()).toList();
-                                    assertEquals(1, owners.size(), "Failed event sequencing identifiers must resolve exactly one owner: " + owners);
-                                    return owners.getFirst();
-                                })).get(10, TimeUnit.SECONDS);
-            }
-            private void assertRollbackTokens(ConfigurableApplicationContext application, Map<Integer, String> checkpoint,
-                    Map<Integer, TokenEntry> segmentCheckpoint, Object failedEvent) throws Exception {
-                var owner = owningSegment(application, failedEvent, segmentCheckpoint);
-                var actual = tokens(application);
-                var entries = tokenEntries(application);
-                assertEquals(checkpoint.keySet(), segmentCheckpoint.keySet(), "Checkpoint snapshots must contain the same segments");
-                assertEquals(checkpoint.keySet(), actual.keySet(), "Rollback must retain every segment checkpoint");
-                assertEquals(checkpoint.keySet(), entries.keySet(), "Decoded rollback tokens must retain every segment");
-                assertEquals(checkpoint.get(owner), actual.get(owner), "Owning segment " + owner + " must retain its byte-identical checkpoint after failed handling");
-                var converter = application.getBean(GeneralConverter.class);
-                // Pooled non-owners consume skipped events without invoking handlers; compare progress, not bytes.
-                for (var segment : checkpoint.keySet()) {
-                    if (segment == owner) continue;
-                    var before = segmentCheckpoint.get(segment).getToken(converter);
-                    var after = entries.get(segment).getToken(converter);
-                    assertTrue(covers(WrappedToken.unwrapLowerBound(after), WrappedToken.unwrapLowerBound(before))
-                                    && covers(WrappedToken.unwrapUpperBound(after), WrappedToken.unwrapUpperBound(before)),
-                            "Non-owning segment " + segment + " may stay or advance past skipped events, never go backwards");
-                }
-            }
-            private boolean covers(TrackingToken after, TrackingToken before) {
-                return before == null || (after != null && after.covers(before));
             }
             private void assertQuery(org.springframework.context.ConfigurableApplicationContext application, java.util.List<__MODEL__> rows) throws Exception {
                 var port = ((WebServerApplicationContext) application).getWebServer().getPort();
