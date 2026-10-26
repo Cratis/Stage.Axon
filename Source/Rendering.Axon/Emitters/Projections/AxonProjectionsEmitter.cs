@@ -46,20 +46,20 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var name = JavaNames.Type(model.Name);
         ViewJavaTypes.Add(context, package, name, ReadModelRecords.Code(types, package, model), model.Id);
         context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused.");
-        var configuration = new JavaCodeBuilder(package)
-            .Import("org.springframework.context.annotation.Configuration").Import("org.springframework.context.annotation.Bean")
-            .Import("org.springframework.context.annotation.PropertySource")
+        var configuration = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration")
             .Import(types.BasePackage + ".runtime.ReadModelStore").Import(types.BasePackage + ".runtime.InMemoryReadModelStore")
+            .Import(types.BasePackage + ".runtime.persistent.PersistentReadModelSafety");
+        configuration
             .DiffersFromScreenplay($"Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused ({AxonRefusalCodes.ReadModelPersistence}).")
-            .Line($"@Configuration({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
-            .Line("@PropertySource(\"classpath:axon-views.properties\")")
+            .Line($"@{configuration.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
+            .Line($"@{configuration.Reference("org.springframework.context.annotation.PropertySource")}(\"classpath:axon-views.properties\")")
             .Block($"public class {name}StoreConfiguration", body => body
-                .Line($"@Bean({JavaCodeBuilder.StringLiteral(package + "." + name)})")
-                .Block($"public ReadModelStore<Object, {package}.{name}> store()", method => method.Line("return new InMemoryReadModelStore<>();"))
-                .Line($"@Bean({JavaCodeBuilder.StringLiteral(package + "." + name + ".persistentReadModelSafety")})")
-                .Line("@org.springframework.context.annotation.Profile(\"persistent\")")
-                .Block($"public static {types.BasePackage}.runtime.persistent.PersistentReadModelSafety persistentReadModelSafety()", method =>
-                    method.Line($"return new {types.BasePackage}.runtime.persistent.PersistentReadModelSafety({JavaCodeBuilder.StringLiteral(package + "." + name)});")));
+                .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
+                .Block($"public ReadModelStore<{body.Reference("java.lang.Object")}, {name}> store()", method => method.Line("return new InMemoryReadModelStore<>();"))
+                .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name + ".persistentReadModelSafety")})")
+                .Line($"@{body.Reference("org.springframework.context.annotation.Profile")}(\"persistent\")")
+                .Block("public static PersistentReadModelSafety persistentReadModelSafety()", method =>
+                    method.Line($"return new PersistentReadModelSafety({JavaCodeBuilder.StringLiteral(package + "." + name)});")));
         ViewJavaTypes.Add(context, package, name + "StoreConfiguration", configuration.Build(), model.Id);
     }
 

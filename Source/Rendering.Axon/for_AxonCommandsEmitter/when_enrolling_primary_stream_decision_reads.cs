@@ -38,7 +38,7 @@ public class when_enrolling_primary_stream_decision_reads : given.a_protected_de
 
     [Fact] void should_fold_the_required_view_presence_from_native_events() => stream.ShouldContain("decisionRead0 = true;");
     [Fact] void should_forget_the_view_on_its_removal_event() => stream.ShouldContain("decisionRead0 = false;");
-    [Fact] void should_handle_the_view_input_event() => stream.ShouldContain(".OrderPlaced event)");
+    [Fact] void should_handle_the_view_input_event() => stream.ShouldContain("on(OrderPlaced event)");
     [Fact] void should_overload_on_for_both_event_types() => stream.Split("public void on(", StringSplitOptions.None).Length.ShouldEqual(3);
     [Fact] void should_not_number_event_handlers() => stream.ShouldNotContain("public void on0(");
     [Fact] void should_expose_the_decision_state() => stream.ShouldContain("public boolean decisionRead0() { return decisionRead0; }");

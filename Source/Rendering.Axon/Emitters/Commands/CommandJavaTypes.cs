@@ -33,6 +33,32 @@ internal sealed class CommandJavaTypes(SemanticApplication application)
         return type.IsCollection ? $"java.util.List<{scalar}>" : scalar;
     }
 
+    internal void Claim(SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        if (type.Kind is SemanticTypeReferenceKind.Concept or SemanticTypeReferenceKind.CompositeType)
+        {
+            var name = Type(type with { IsCollection = false });
+            if (name.StartsWith(BasePackage + ".", StringComparison.Ordinal)) code.Import(name);
+        }
+    }
+
+    internal string Type(SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        var scalar = Type(type with { IsCollection = false });
+        var name = Reference(scalar, code);
+        return type.IsCollection ? $"{code.Reference("java.util.List")}<{name}>" : name;
+    }
+
+    internal string Reference(string type, JavaCodeBuilder code)
+    {
+        if (!type.StartsWith(BasePackage + ".", StringComparison.Ordinal))
+        {
+            return code.Reference(type.Contains('.', StringComparison.Ordinal) ? type : "java.lang." + type);
+        }
+        code.Import(type);
+        return type[(type.LastIndexOf('.') + 1)..];
+    }
+
     internal bool Cascades(SemanticTypeReference type) => type.Kind == SemanticTypeReferenceKind.CompositeType ||
         (type.Kind == SemanticTypeReferenceKind.Concept && Concept(type.Target).Values.IsDefaultOrEmpty);
 

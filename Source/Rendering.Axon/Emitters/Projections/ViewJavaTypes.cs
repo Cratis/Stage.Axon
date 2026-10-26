@@ -78,6 +78,14 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
         return BasePackage + "." + JavaNames.PackageSegment(owner.Module.Name) + ".events." + JavaNames.Type(owner.Slice.Events.First(@event => @event.Id == id).Name);
     }
 
+    internal void Claim(SemanticTypeReference type, JavaCodeBuilder code)
+    {
+        if (type.Kind is SemanticTypeReferenceKind.Concept or SemanticTypeReferenceKind.CompositeType)
+        {
+            code.Import(Type(type with { IsCollection = false }));
+        }
+    }
+
     internal string Type(SemanticTypeReference type, JavaCodeBuilder code)
     {
         var scalar = type.Kind is SemanticTypeReferenceKind.Concept or SemanticTypeReferenceKind.CompositeType
