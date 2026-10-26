@@ -35,8 +35,10 @@ internal sealed class EventTagsEmitter : IAxonEmitter
     }
 
     internal static string Reference(AxonEmissionContext context, SemanticEventContract contract, JavaCodeBuilder code, string package)
+        => Reference(Reference(context, contract), code, package);
+
+    internal static string Reference(string reference, JavaCodeBuilder code, string package)
     {
-        var reference = Reference(context, contract);
         var separator = reference.LastIndexOf('.');
         var type = reference[..separator];
         var typeSeparator = type.LastIndexOf('.');

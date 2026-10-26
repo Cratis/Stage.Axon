@@ -25,17 +25,16 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         var name = JavaNames.Type(command.Name);
         var response = new CommandResponses(command, _types);
         response.Emit(context, package);
-        var code = new JavaCodeBuilder(package).Import("org.springframework.stereotype.Component")
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Handler").Declare(name + "Stream").Import("org.springframework.stereotype.Component")
             .Import("org.springframework.security.access.prepost.PreAuthorize")
             .Import("org.axonframework.messaging.commandhandling.annotation.CommandHandler")
             .Import("org.axonframework.messaging.eventhandling.gateway.EventAppender");
-        if (source?.Generated == false) code.Import("org.axonframework.modelling.annotation.InjectEntity").Import("java.util.Optional");
         code.Line("@Component").Block($"public class {name}Handler", body =>
         {
             body.Line("@CommandHandler");
             var authorization = SecurityAnnotations.For(context, command.Authorization, command.Id);
             if (authorization.Length > 0) body.Line(authorization);
-            body.Block($"public {response.ReturnType} handle({Parameters(name)})", method => Handle(method, response));
+            body.Block($"public {response.ReturnType} handle({Parameters(name, body, package)})", method => Handle(method, response));
             Dependencies(body, name);
         });
         context.AddJava(package, name + "Handler", code.Build(), sources: [command.Id]);
@@ -64,13 +63,14 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             });
     }
 
-    string Parameters(string name)
+    string Parameters(string name, JavaCodeBuilder code, string package)
     {
         var parameters = name + " command, EventAppender appender";
         if (Constrained && source?.Generated != true) parameters += ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
         if (source is null) return parameters;
         if (source.Generated) return parameters + ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
-        return parameters + $", @InjectEntity(idProperty = {source.TagReference}) Optional<{name}Stream> state";
+        var selector = source.TagKey == source.Member ? "(idProperty = " + source.ReferenceTag(code, package) + ")" : string.Empty;
+        return parameters + $", @{code.Reference("org.axonframework.modelling.annotation.InjectEntity")}{selector} @{code.Reference("org.jspecify.annotations.Nullable")} {name}Stream state";
     }
 
     void Handle(JavaCodeBuilder body, CommandResponses response)
