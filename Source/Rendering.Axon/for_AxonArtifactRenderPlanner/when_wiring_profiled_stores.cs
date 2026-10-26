@@ -21,6 +21,6 @@ public class when_wiring_profiled_stores : given.an_axon_request
     }
 
     [Fact] void should_define_only_the_two_profiled_store_beans() => definitions.Length.ShouldEqual(2);
-    [Fact] void should_define_the_default_store_once() => definitions.Count(code => code.Contains("@org.springframework.context.annotation.Profile(\"!persistent\")", StringComparison.Ordinal)).ShouldEqual(1);
+    [Fact] void should_define_the_default_store_once() => definitions.Count(code => code.Contains("@Profile(\"!persistent\")", StringComparison.Ordinal)).ShouldEqual(1);
     [Fact] void should_define_the_persistent_store_once() => definitions.Count(code => code.Contains("@Profile(\"persistent\")", StringComparison.Ordinal)).ShouldEqual(1);
 }

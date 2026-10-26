@@ -3,28 +3,31 @@
 
 package __RUNTIME__;
 
-import static org.assertj.core.api.Assertions.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import org.axonframework.common.configuration.Configuration;
+import org.axonframework.eventsourcing.annotation.EventTag;
+import org.axonframework.eventsourcing.eventstore.EventStorageEngine;
+import org.axonframework.eventsourcing.eventstore.SourcingCondition;
+import org.axonframework.eventsourcing.eventstore.TerminalEventMessage;
+import org.axonframework.messaging.core.unitofwork.ProcessingContext;
+import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
+import org.axonframework.messaging.eventhandling.annotation.Event;
+import org.axonframework.messaging.eventhandling.gateway.EventAppender;
+import org.axonframework.messaging.eventstreaming.EventCriteria;
+import org.axonframework.messaging.eventstreaming.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.axonframework.common.configuration.Configuration;
-import org.axonframework.eventsourcing.eventstore.AppendCondition;
-import org.axonframework.eventsourcing.eventstore.EventStorageEngine;
-import org.axonframework.eventsourcing.eventstore.SourcingCondition;
-import org.axonframework.messaging.core.unitofwork.ProcessingContext;
-import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
-import org.axonframework.messaging.eventhandling.GenericEventMessage;
-import org.axonframework.messaging.eventhandling.annotation.Event;
-import org.axonframework.messaging.eventstreaming.EventCriteria;
-import org.axonframework.messaging.eventstreaming.Tag;
-import org.axonframework.messaging.core.annotation.AnnotationMessageTypeResolver;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -35,7 +38,7 @@ class UniqueAppendTransactionTest {
     @Autowired EventStorageEngine events;
 
     @Event(namespace = "stage-tests", name = "UniqueClaimed", version = "1")
-    record Claimed(@org.axonframework.eventsourcing.annotation.EventTag(key = "owner") String owner) {}
+    record Claimed(@EventTag(key = "owner") String owner) {}
 
     @Test
     void rollsBackTheClaimAndAppendTogether() throws Exception {
@@ -95,7 +98,7 @@ class UniqueAppendTransactionTest {
         catch (Exception failure) { assertThat(root(failure)).isInstanceOf(UniqueValueConflict.class); return false; }
     }
 
-    private CompletableFuture<Void> change(java.util.function.Consumer<ProcessingContext> operation) {
+    private CompletableFuture<Void> change(Consumer<ProcessingContext> operation) {
         return configuration.getComponent(UnitOfWorkFactory.class).create().executeWithResult(context -> {
             operation.accept(context);
             return CompletableFuture.completedFuture(null);
@@ -105,7 +108,7 @@ class UniqueAppendTransactionTest {
     private CompletableFuture<Void> append(String constraint, String value, String owner, boolean fail) {
         return configuration.getComponent(UnitOfWorkFactory.class).create().executeWithResult(context -> {
             claims.assign(context, constraint, List.of(value), owner, true, "already claimed");
-            org.axonframework.messaging.eventhandling.gateway.EventAppender.forContext(context).append(new Claimed(owner));
+            EventAppender.forContext(context).append(new Claimed(owner));
             if (fail) throw new IllegalStateException("forced append rollback");
             return CompletableFuture.completedFuture(null);
         });
@@ -113,7 +116,7 @@ class UniqueAppendTransactionTest {
 
     private long count(String owner) throws Exception {
         var stream = events.source(SourcingCondition.conditionFor(EventCriteria.havingTags(Tag.of("owner", owner))));
-        try { return stream.filter(entry -> !(entry.message() instanceof org.axonframework.eventsourcing.eventstore.TerminalEventMessage)).collect(java.util.ArrayList<Object>::new, (all, entry) -> all.add(entry)).get(5, TimeUnit.SECONDS).size(); }
+        try { return stream.filter(entry -> !(entry.message() instanceof TerminalEventMessage)).collect(ArrayList<Object>::new, (all, entry) -> all.add(entry)).get(5, TimeUnit.SECONDS).size(); }
         finally { stream.close(); }
     }
 

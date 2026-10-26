@@ -3,9 +3,10 @@
 
 package __RUNTIME__;
 
+import io.cratis.fundamentals.concepts.ConceptAs;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
-import io.cratis.fundamentals.concepts.ConceptAs;
 
 public final class UniqueValues {
     private UniqueValues() {}
@@ -24,7 +25,7 @@ public final class UniqueValues {
 
     private static String scalar(Object value, boolean ignoreCasing) {
         if (value instanceof ConceptAs<?> concept) return scalar(concept.value(), ignoreCasing);
-        if (value instanceof Number number) return "n" + new java.math.BigDecimal(number.toString()).stripTrailingZeros().toPlainString();
+        if (value instanceof Number number) return "n" + new BigDecimal(number.toString()).stripTrailingZeros().toPlainString();
         if (value instanceof CharSequence text) return "s" + (ignoreCasing ? text.toString().toLowerCase(Locale.ROOT) : text.toString());
         return value.getClass().getName() + ":" + value;
     }

@@ -3,10 +3,10 @@
 
 package __RUNTIME__;
 
+import __RUNTIME__.json.ConceptsModule;
 import org.axonframework.eventsourcing.configuration.EventSourcingConfigurer;
 import org.axonframework.test.fixture.AxonTestFixture;
 import tools.jackson.databind.json.JsonMapper;
-import __RUNTIME__.json.ConceptsModule;
 
 public final class TestSupport {
     private TestSupport() {}

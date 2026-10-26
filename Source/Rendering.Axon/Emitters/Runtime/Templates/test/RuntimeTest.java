@@ -3,22 +3,42 @@
 
 package __RUNTIME__;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.stream.IntStream;
 import io.cratis.fundamentals.concepts.ConceptAs;
 import io.cratis.fundamentals.concepts.Generatable;
 import io.cratis.fundamentals.concepts.GeneratableInContext;
 import io.cratis.fundamentals.concepts.GenerateValue;
 import io.cratis.fundamentals.concepts.GenerationContext;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.stream.IntStream;
+import org.axonframework.eventsourcing.annotation.EventTag;
+import org.axonframework.eventsourcing.eventstore.AnnotationBasedTagResolver;
+import org.axonframework.messaging.core.annotation.AnnotationMessageTypeResolver;
+import org.axonframework.messaging.eventhandling.GenericEventMessage;
+import org.axonframework.messaging.eventhandling.annotation.Event;
+import org.axonframework.messaging.eventstreaming.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import tools.jackson.core.type.TypeReference;
-import static org.junit.jupiter.api.Assertions.*;
 
 class RuntimeTest {
     public record Id(UUID value) implements ConceptAs<UUID>, Generatable<Id> {
@@ -32,10 +52,10 @@ class RuntimeTest {
             return new TimedId(GenerateValue.uuid());
         }
     }
-    @org.axonframework.messaging.eventhandling.annotation.Event(namespace = "runtime", name = "concept-tag", version = "1")
-    public record ConceptTagged(@org.axonframework.eventsourcing.annotation.EventTag(key = "id") Id id) {}
-    @org.axonframework.messaging.eventhandling.annotation.Event(namespace = "runtime", name = "fallback-tag", version = "1")
-    public record FallbackTagged(@org.axonframework.eventsourcing.annotation.EventTag(key = "eventSourceId") EventSourceId eventSourceId) {}
+    @Event(namespace = "runtime", name = "concept-tag", version = "1")
+    public record ConceptTagged(@EventTag(key = "id") Id id) {}
+    @Event(namespace = "runtime", name = "fallback-tag", version = "1")
+    public record FallbackTagged(@EventTag(key = "eventSourceId") EventSourceId eventSourceId) {}
     public record Text(String value) implements ConceptAs<String> {}
     public record Whole(Long value) implements ConceptAs<Long> {}
     public record Number(BigDecimal value) implements ConceptAs<BigDecimal> {}
@@ -51,31 +71,31 @@ class RuntimeTest {
     }
 
     private static void assertTag(Object event, String key, String value) {
-        var type = new org.axonframework.messaging.core.annotation.AnnotationMessageTypeResolver().resolve(event.getClass()).orElseThrow();
-        var message = new org.axonframework.messaging.eventhandling.GenericEventMessage(type, event);
-        var tags = new org.axonframework.eventsourcing.eventstore.AnnotationBasedTagResolver().resolve(message);
-        assertTrue(tags.contains(new org.axonframework.messaging.eventstreaming.Tag(key, value)));
+        var type = new AnnotationMessageTypeResolver().resolve(event.getClass()).orElseThrow();
+        var message = new GenericEventMessage(type, event);
+        var tags = new AnnotationBasedTagResolver().resolve(message);
+        assertTrue(tags.contains(new Tag(key, value)));
         assertEquals(1, tags.size());
     }
 
     @Test
     void callerIsResolvedFromTheCurrentSecurityContext() {
-        var context = org.springframework.security.core.context.SecurityContextHolder.getContext();
+        var context = SecurityContextHolder.getContext();
         context.setAuthentication(null);
         assertFalse(Caller.current().authenticated());
         try {
-            var authority = new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_Sales");
-            context.setAuthentication(org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("sales", null, java.util.List.of(authority)));
+            var authority = new SimpleGrantedAuthority("ROLE_Sales");
+            context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated("sales", null, List.of(authority)));
             assertTrue(Caller.current().authenticated());
             assertEquals("sales", Caller.current().identity());
-            assertEquals(java.util.Set.of("Sales"), Caller.current().roles());
-        } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+            assertEquals(Set.of("Sales"), Caller.current().roles());
+        } finally { SecurityContextHolder.clearContext(); }
     }
 
     @Test
     void generationUsesTheSelfTypedMarkers() {
         assertInstanceOf(Generatable.class, Id.create());
-        assertInstanceOf(GeneratableInContext.class, TimedId.create(new GenerationContext(java.time.Instant.now())));
+        assertInstanceOf(GeneratableInContext.class, TimedId.create(new GenerationContext(Instant.now())));
         assertThrows(IllegalArgumentException.class, () -> TimedId.create(null));
     }
 
@@ -163,10 +183,10 @@ class RuntimeTest {
 
     @Test
     void validationErrorsSurviveExceptionSerialization() throws Exception {
-        var original = new CommandValidationException(java.util.List.of(new ValidationError("amount", "Must be positive")));
-        var bytes = new java.io.ByteArrayOutputStream();
-        try (var output = new java.io.ObjectOutputStream(bytes)) { output.writeObject(original); }
-        try (var input = new java.io.ObjectInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray()))) {
+        var original = new CommandValidationException(List.of(new ValidationError("amount", "Must be positive")));
+        var bytes = new ByteArrayOutputStream();
+        try (var output = new ObjectOutputStream(bytes)) { output.writeObject(original); }
+        try (var input = new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
             var restored = (CommandValidationException) input.readObject();
             assertEquals(original.errors(), restored.errors());
         }

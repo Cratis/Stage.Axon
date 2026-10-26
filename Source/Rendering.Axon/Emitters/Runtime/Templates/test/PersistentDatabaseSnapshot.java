@@ -11,7 +11,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Logical SELECT-only inspection of all user-table values, never token fetch/claim or JPA startup. */
 record PersistentDatabaseSnapshot(Map<String, List<String>> tables) {

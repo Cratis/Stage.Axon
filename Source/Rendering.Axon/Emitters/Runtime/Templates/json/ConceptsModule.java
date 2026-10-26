@@ -3,19 +3,19 @@
 
 package __RUNTIME__.json;
 
-import java.io.Serial;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import io.cratis.fundamentals.concepts.ConceptAs;
+import java.io.Serial;
 import tools.jackson.databind.BeanDescription;
 import tools.jackson.databind.DeserializationConfig;
+import tools.jackson.databind.JacksonModule.SetupContext;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.SerializationConfig;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.ValueSerializer;
-import tools.jackson.databind.JacksonModule.SetupContext;
 import tools.jackson.databind.deser.Deserializers;
 import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.ser.Serializers;
-import io.cratis.fundamentals.concepts.ConceptAs;
 
 public final class ConceptsModule extends SimpleModule {
     @Serial

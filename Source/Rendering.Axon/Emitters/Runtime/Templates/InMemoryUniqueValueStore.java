@@ -6,6 +6,7 @@ package __RUNTIME__;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.axonframework.messaging.core.Context.ResourceKey;
 import org.axonframework.messaging.core.unitofwork.ProcessingContext;
 
@@ -14,7 +15,7 @@ public final class InMemoryUniqueValueStore implements UniqueValueStore {
     private static final class Changes {
         private final Map<Key, String> writes = new HashMap<>();
     }
-    private final ResourceKey<Changes> resource = ResourceKey.withLabel("stage-unique-" + java.util.UUID.randomUUID());
+    private final ResourceKey<Changes> resource = ResourceKey.withLabel("stage-unique-" + UUID.randomUUID());
     private final Map<Key, String> owners = new HashMap<>();
     private final Map<Key, Changes> reservations = new HashMap<>();
 
