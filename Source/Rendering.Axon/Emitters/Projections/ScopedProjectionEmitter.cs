@@ -17,7 +17,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
     internal void Emit()
     {
         var name = JavaNames.Type(projection.Name) + "Projector";
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare("Change");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare(ChangeType(_root));
         foreach (var property in _root.All.SelectMany(node => node.Properties)) types.ClaimProjectionType(property.Type, code);
         _updates.Claim(code, package);
         foreach (var @event in Events()) types.EventType(@event.Id, code);
@@ -36,6 +36,8 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
         ViewJavaTypes.Add(context, package, name, code.Build(), projection.Id);
     }
 
+    internal static string ChangeType(ProjectionScopeNode root) => root.Type == "ScopeChange" ? "ScopeChangeResult" : "ScopeChange";
+
     static IEnumerable<ProjectionScopeNode> RootAndNested(ProjectionScopeNode node) => new[] { node }.Concat(node.Nested.SelectMany(RootAndNested));
 
     void Fields(JavaCodeBuilder code, string name)
@@ -44,7 +46,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             .Line($"private final {code.Reference("java.time.Clock")} clock;")
             .Line($"private final {code.Reference("java.util.Set")}<{code.Reference("java.lang.Object")}> keys = new {code.Reference("java.util.LinkedHashSet")}<>();")
             .Line($"private final {code.Reference("java.util.List")}<{code.Reference("java.util.function.BooleanSupplier")}> pending = new {code.Reference("java.util.ArrayList")}<>();")
-            .Line("private record Change<T>(T value, boolean touched, boolean ancestors) {}")
+            .Line($"private record {ChangeType(_root)}<T>(T value, boolean touched, boolean ancestors) {{}}")
             .DiffersFromScreenplay("projection join indexes are replay-built; restore them by replaying events after restarting a persistent store.");
         foreach (var node in _root.All)
         {

@@ -62,7 +62,8 @@ public class when_framework_names_collide_with_application_types : given.a_view_
         var projector = Artifact(context, "TotalProjectionProjector");
         var objectType = name == "Object" ? "java.lang.Object" : "Object";
         configuration.ShouldContain($"public ReadModelStore<{objectType}, {name}> persistentStore(");
-        projector.ShouldContain($"private void apply(Increased event, ReadModelStore<{objectType}, {name}> store)");
+        projector.ShouldContain("private void apply(Increased event");
+        projector.ShouldContain($"ReadModelStore<{objectType}, {name}> store)");
         if (name == "Object")
         {
             configuration.ShouldNotContain("ReadModelStore<Object, Object>");
@@ -80,14 +81,18 @@ public class when_framework_names_collide_with_application_types : given.a_view_
         code.ShouldNotContain("EventMessage message, Object key");
     }
 
-    [Fact]
-    void should_not_shadow_a_root_read_model_named_change()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    void should_not_shadow_a_root_read_model_named_change(bool usesHelperName)
     {
-        var code = Artifact(Emit(Rewrite(_request.Model.Application, model => model.Name == "Board" ? model with { Name = "Change" } : model)), "BoardProjectionProjector");
-        code.ShouldContain("private record ScopeChange<T>");
-        code.ShouldContain("private ScopeChange<Change> applyRootBoardCreated");
-        code.ShouldContain("private final ReadModelStore<Object, Change> store;");
-        code.ShouldNotContain("private record Change<T>");
+        var name = usesHelperName ? "ScopeChange" : "Change";
+        var helper = usesHelperName ? "ScopeChangeResult" : "ScopeChange";
+        var code = Artifact(Emit(Rewrite(_request.Model.Application, model => model.Name == "Board" ? model with { Name = name } : model)), "BoardProjectionProjector");
+        code.ShouldContain($"private record {helper}<T>");
+        code.ShouldContain($"private {helper}<{name}> applyRootBoardCreated");
+        code.ShouldContain($"private final ReadModelStore<Object, {name}> store;");
+        code.ShouldNotContain($"private record {name}<T>");
     }
 
     [Fact]

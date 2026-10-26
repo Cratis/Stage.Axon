@@ -19,10 +19,10 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
 
     internal void Emit(JavaCodeBuilder code, ProjectionScopeNode node, SemanticEventContract @event)
     {
-        code.Block($"private Change<{Reference(node.Type)}> {Method(node, @event)}({EventType(@event.Id)} event, {Reference("org.axonframework.messaging.eventhandling.EventMessage", "EventMessage")} message, {Reference("java.lang.Object", "Object")} key, {Reference("java.lang.Object", "Object")} parentKey, {Reference(node.Type)} current)", body =>
+        code.Block($"private {ScopedProjectionEmitter.ChangeType(root)}<{Reference(node.Type)}> {Method(node, @event)}({EventType(@event.Id)} event, {Reference("org.axonframework.messaging.eventhandling.EventMessage", "EventMessage")} message, {Reference("java.lang.Object", "Object")} key, {Reference("java.lang.Object", "Object")} parentKey, {Reference(node.Type)} current)", body =>
         {
             var creates = Creation(node, @event);
-            body.Line($"if (current == null && !({creates})) return new Change<>(null, false, false);")
+            body.Line($"if (current == null && !({creates})) return new {ScopedProjectionEmitter.ChangeType(root)}<>(null, false, false);")
                 .Line($"var state = current == null ? {_records.Empty(node.Type, node.Properties)} : current;")
                 .Line("boolean touched = false;").Line("boolean ancestors = false;");
             foreach (var from in node.Scope.From.Where(from => from.EventContract == @event.Id))
@@ -38,11 +38,11 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             }
             Joins(body, node, @event);
             foreach (var removal in node.Scope.Removals.Where(removal => removal.EventContract == @event.Id))
-                body.Line($"if ({Matches(removal.Key, removal.ParentKey, @event, node)}) return new Change<>(null, true, true);");
+                body.Line($"if ({Matches(removal.Key, removal.ParentKey, @event, node)}) return new {ScopedProjectionEmitter.ChangeType(root)}<>(null, true, true);");
             if (node.Identity is not null)
             {
                 foreach (var removal in node.Scope.JoinRemovals.Where(removal => removal.EventContract == @event.Id))
-                    body.Line($"if ({Reference("java.util.Objects")}.equals(key, {_values.Key(removal.Key, @event)})) return new Change<>(null, true, false);");
+                    body.Line($"if ({Reference("java.util.Objects")}.equals(key, {_values.Key(removal.Key, @event)})) return new {ScopedProjectionEmitter.ChangeType(root)}<>(null, true, false);");
             }
             Descendants(body, node, @event);
             if (node == root && node.Scope.Every is { SubscribesToAllEvents: true } && !Known(@event))
@@ -50,7 +50,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
                 _mappings.Apply(body, node, node.Scope.Every.Mappings, @event);
                 body.Line("touched = true;");
             }
-            body.Line("return new Change<>(state, touched, ancestors);");
+            body.Line($"return new {ScopedProjectionEmitter.ChangeType(root)}<>(state, touched, ancestors);");
         });
     }
 

@@ -24,7 +24,7 @@ public class when_scope_property_types_collide_with_java_names : given.a_view_re
         code.ShouldNotContain(".put(String.valueOf(");
         code.ShouldNotContain(".get(String.valueOf(");
         code.ShouldNotContain("var identity = String.valueOf(");
-        if (original == "Card") code.ShouldContain("private Change<String> applyRootChild0");
+        if (original == "Card") code.ShouldContain("private ScopeChange<String> applyRootChild0");
         if (original == "BoardDetails") code.ShouldContain("new String(");
     }
 
@@ -44,17 +44,17 @@ public class when_scope_property_types_collide_with_java_names : given.a_view_re
         var code = Render("type", "BoardDetails", "Object");
         code.ShouldContain("import axonviews.types.Object;");
         code.ShouldContain("java.lang.Object key, java.lang.Object parentKey");
-        code.ShouldContain("private Change<Object> applyRootNested0");
+        code.ShouldContain("private ScopeChange<Object> applyRootNested0");
     }
 
     [Fact]
     void should_keep_the_local_change_helper_distinct_from_an_application_record()
     {
-        var code = Render("type", "BoardDetails", "Change");
-        code.ShouldNotContain("import axonviews.types.Change;");
-        code.ShouldContain("private record Change<T>(T value, boolean touched, boolean ancestors)");
-        code.ShouldContain("private Change<axonviews.types.Change> applyRootNested0");
-        code.ShouldContain("new axonviews.types.Change(");
+        var code = Render("type", "BoardDetails", "ScopeChange");
+        code.ShouldNotContain("import axonviews.types.ScopeChange;");
+        code.ShouldContain("private record ScopeChange<T>(T value, boolean touched, boolean ancestors)");
+        code.ShouldContain("private ScopeChange<axonviews.types.ScopeChange> applyRootNested0");
+        code.ShouldContain("new axonviews.types.ScopeChange(");
     }
 
     [Fact]

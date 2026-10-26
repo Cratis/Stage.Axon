@@ -40,7 +40,7 @@ public class when_importing_projection_types : given.a_view_request
     [Fact] void should_import_concepts_for_keys() => _projector.ShouldContain("import axonviews.concepts.BoardId;");
     [Fact] void should_preserve_unwrapped_event_keys() => _projector.ShouldContain("String.valueOf(event.boardId().value())");
     [Fact] void should_construct_short_nested_records() => _projector.ShouldContain("new BoardDetails(");
-    [Fact] void should_type_child_methods_with_short_names() => _projector.ShouldContain("private Change<Card> applyRootChild0");
+    [Fact] void should_type_child_methods_with_short_names() => _projector.ShouldContain("private ScopeChange<Card> applyRootChild0");
     [Fact] void should_type_join_caches_with_short_names() => _projector.ShouldContain("Map<String, UnaryOperator<Card>>");
     [Fact] void should_type_child_collections_with_short_names() => _projector.ShouldContain("new ArrayList<Card>()");
     [Fact] void should_not_construct_qualified_application_types() => _projector.ShouldNotContain("new axonviews.");
