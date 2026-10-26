@@ -10,6 +10,7 @@ internal static class PersistentViewProofSupport
         // Licensed under the MIT license. See LICENSE file in the project root for full license information.
         package __PACKAGE__;
 
+        import __PERSISTENCE__.JpaReadModelStore;
         import __RUNTIME__.ReadModelStore;
         import __RUNTIME__.InMemoryReadModelStore;
         import jakarta.persistence.EntityManagerFactory;
@@ -23,9 +24,10 @@ internal static class PersistentViewProofSupport
         import java.util.concurrent.CompletableFuture;
         import java.util.concurrent.CountDownLatch;
         import java.util.concurrent.TimeUnit;
-        import java.util.concurrent.atomic.AtomicBoolean;
         import java.util.function.BooleanSupplier;
         import org.axonframework.common.configuration.Configuration;
+        import org.axonframework.common.jpa.EntityManagerExecutor;
+        import org.axonframework.messaging.core.unitofwork.transaction.jpa.JpaTransactionalExecutorProvider;
         import org.axonframework.eventsourcing.eventstore.EventAppender;
         import org.axonframework.messaging.core.unitofwork.ProcessingContext;
         import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
@@ -46,8 +48,8 @@ internal static class PersistentViewProofSupport
                 Files.createDirectories(path.getParent());
                 return path;
             }
-            static ConfigurableApplicationContext start(Path path) {
-                return new SpringApplicationBuilder(FlatFixture.class).profiles("persistent").run(
+            static ConfigurableApplicationContext start(Path path, Class<?>... customizations) {
+                return new SpringApplicationBuilder(FlatFixture.class).sources(customizations).profiles("persistent").run(
                         "--server.port=0", "--spring.datasource.url=jdbc:h2:file:" + path,
                         "--spring.jpa.hibernate.ddl-auto=update", "--spring.main.banner-mode=off");
             }
@@ -95,14 +97,72 @@ internal static class PersistentViewProofSupport
                 while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(25);
                 assertTrue(condition.getAsBoolean(), "Persistent processor/query condition timed out");
             }
-            static final AtomicBoolean fail = new AtomicBoolean();
+            enum Failure { NONE, HANDLER, TOKEN, ASYNC, NON_JOINED }
+            static volatile Failure failure = Failure.NONE;
             static volatile CountDownLatch rolledBack = new CountDownLatch(1);
+            static volatile CountDownLatch refused = new CountDownLatch(1);
             public static class RollbackWitness {
+                private final ConfigurableApplicationContext application;
+                RollbackWitness(ConfigurableApplicationContext application) { this.application = application; }
                 @EventHandler
-                public void handle(Object event, ProcessingContext context) {
-                    if (!fail.get()) return;
-                    context.runOnPrepareCommit((java.util.function.Consumer<ProcessingContext>) ignored -> { throw new IllegalStateException("deliberate processor rollback"); });
-                    context.onError((ignored, phase, failure) -> rolledBack.countDown());
+                public void handle(__EVENT_TYPE__ event, ProcessingContext context) {
+                    if (failure == Failure.NONE) return;
+                    context.onError((ignored, phase, cause) -> rolledBack.countDown());
+                    var bound = JpaReadModelStore.bind(store(application), context);
+                    if (failure == Failure.HANDLER) {
+                        new __PROJECTOR__(bound).on(event__ARGUMENT__);
+                        throw new IllegalStateException("deliberate handler failure after view write");
+                    }
+                    if (failure == Failure.ASYNC) {
+                        var cause = assertThrows(java.util.concurrent.CompletionException.class,
+                                () -> CompletableFuture.runAsync(bound::clear).join()).getCause();
+                        assertInstanceOf(IllegalStateException.class, cause);
+                        assertTrue(cause.getMessage().contains("handler thread"));
+                        refused.countDown();
+                        throw new IllegalStateException("off-thread write refused", cause);
+                    }
+                    if (failure == Failure.NON_JOINED) {
+                        try (var manager = application.getBean(EntityManagerFactory.class).createEntityManager()) {
+                            assertFalse(manager.isJoinedToTransaction());
+                            var unjoined = context.withResource(JpaTransactionalExecutorProvider.SUPPLIER_KEY,
+                                    () -> new EntityManagerExecutor(() -> manager));
+                            var cause = assertThrows(java.util.concurrent.CompletionException.class,
+                                    () -> JpaReadModelStore.bind(store(application), unjoined).clear()).getCause();
+                            assertInstanceOf(IllegalStateException.class, cause);
+                            assertTrue(cause.getMessage().contains("processor's active transaction"));
+                            refused.countDown();
+                            throw new IllegalStateException("non-joined write refused", cause);
+                        }
+                    }
+                }
+            }
+            /** Real database rejection inside JpaTokenStore.storeToken, not a prepare-commit callback. */
+            public static class TokenFailure implements org.h2.api.Trigger {
+                private int tokenColumn;
+                private int processorColumn;
+                @Override public void init(java.sql.Connection connection, String schema, String trigger, String table,
+                        boolean before, int type) throws java.sql.SQLException {
+                    try (var statement = connection.createStatement(); var result = statement.executeQuery("select * from token_entry where 1=0")) {
+                        for (var index = 1; index <= result.getMetaData().getColumnCount(); index++) {
+                            var name = result.getMetaData().getColumnName(index);
+                            if (name.equalsIgnoreCase("token")) tokenColumn = index - 1;
+                            if (name.equalsIgnoreCase("processor_name")) processorColumn = index - 1;
+                        }
+                    }
+                }
+                @Override public void fire(java.sql.Connection connection, Object[] before, Object[] after) throws java.sql.SQLException {
+                    if (failure == Failure.TOKEN && "__PACKAGE__".equals(after[processorColumn]) &&
+                            !java.util.Arrays.equals(bytes(before[tokenColumn]), bytes(after[tokenColumn])))
+                        throw new java.sql.SQLException("deliberate TokenStore persistence failure", "23514");
+                }
+                private byte[] bytes(Object value) throws java.sql.SQLException {
+                    return value instanceof java.sql.Blob blob ? blob.getBytes(1, Math.toIntExact(blob.length())) : (byte[]) value;
+                }
+            }
+            static void installTokenFailure(Path path) throws Exception {
+                try (var connection = java.sql.DriverManager.getConnection("jdbc:h2:file:" + path, "sa", "");
+                     var statement = connection.createStatement()) {
+                    statement.execute("create trigger stage_token_failure before update on token_entry for each row call '__PACKAGE__.__NAME__Support$TokenFailure'");
                 }
             }
             /** Scan-free imports of the real emitted flat projector, query and persistence infrastructure. */
@@ -110,7 +170,7 @@ internal static class PersistentViewProofSupport
             @EnableAutoConfiguration
             @Import({ __IMPORTS__ })
             static class FlatFixture {
-                @Bean RollbackWitness rollbackWitness() { return new RollbackWitness(); }
+                @Bean RollbackWitness rollbackWitness(ConfigurableApplicationContext application) { return new RollbackWitness(application); }
             }
         }
         """;

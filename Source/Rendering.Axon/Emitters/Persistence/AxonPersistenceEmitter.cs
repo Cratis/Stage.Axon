@@ -4,6 +4,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
@@ -36,10 +37,11 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
         Add("ViewGeneration", PersistentViewEntities.Generation);
         Add("JpaReadModelStore", PersistentViewStore.Source);
         Add("PersistentViewBootstrap", PersistentViewBootstrap.Source);
-        var processors = ScopeSelection.Select(context.Request)
+        Add("PersistentViewProcessorGuard", PersistentViewProcessorGuard.Source);
+        var namespaces = ScopeSelection.Select(context.Request)
             .Where(owner => owner.Slice.ReadModels.Any(model => PersistentViewAdmission.Supports(context, model.Id)))
-            .Select(types.Package).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)
-            .Select((name, index) => $$"""
+            .Select(types.Package).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var processors = namespaces.Select((name, index) => $$"""
                 @org.springframework.context.annotation.Bean
                 org.axonframework.extension.spring.config.EventProcessorDefinition persistentViewProcessor{{index}}() {
                     return org.axonframework.extension.spring.config.EventProcessorDefinition.pooledStreamingMatching("{{name}}")
@@ -49,11 +51,11 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
                             });
                 }
             """);
-        Add("PersistentViewConfiguration", Configuration(package, runtime, types.BasePackage, fingerprint, string.Join('\n', processors)));
+        Add("PersistentViewConfiguration", Configuration(package, types.BasePackage, fingerprint, string.Join('\n', processors), string.Join(", ", namespaces.Select(JavaCodeBuilder.StringLiteral))));
         new PersistentViewTests(context, types, package).Emit();
     }
 
-    static string Configuration(string package, string runtime, string application, string fingerprint, string processors) => $$"""
+    static string Configuration(string package, string application, string fingerprint, string processors, string namespaces) => $$"""
         // Copyright (c) Cratis. All rights reserved.
         // Licensed under the MIT license. See LICENSE file in the project root for full license information.
         package {{package}};
@@ -64,7 +66,7 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
         import org.springframework.boot.persistence.autoconfigure.EntityScan;
         import org.springframework.context.annotation.Configuration;
         import org.springframework.context.annotation.Profile;
-        import {{runtime}}.persistent.UniqueClaim;
+        import {{application}}.runtime.persistent.UniqueClaim;
 
         @Configuration(proxyBeanMethods = false)
         @Profile("persistent")
@@ -73,6 +75,10 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
             public static final String FINGERPRINT = "{{fingerprint}}";
             public PersistentViewConfiguration(EntityManagerFactory factory) {
                 PersistentViewBootstrap.verify(factory, "{{application}}", FINGERPRINT);
+            }
+            @org.springframework.context.annotation.Bean
+            org.springframework.beans.factory.SmartInitializingSingleton persistentViewProcessorGuard(org.axonframework.common.configuration.Configuration configuration) {
+                return () -> PersistentViewProcessorGuard.verify(configuration, java.util.Set.of({{namespaces}}));
             }
         {{processors}}
         }

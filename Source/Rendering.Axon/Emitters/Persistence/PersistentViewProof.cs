@@ -48,12 +48,27 @@ internal static class PersistentViewProof
                 }
             }
             @Test
-            void durableRowsAndRealCheckpointCommitAndRollbackTogether() throws Exception {
+            void handlerThrowsAfterViewWriteAndReclaimAppliesExactlyOnce() throws Exception {
+                assertRollbackAndReclaim(Failure.HANDLER);
+            }
+            @Test
+            void realTokenStorePersistenceFailureRollsBackViewWrite() throws Exception {
+                assertRollbackAndReclaim(Failure.TOKEN);
+            }
+            @Test
+            void actualHandlerRefusesOffThreadWriteWithoutChangingRowsOrToken() throws Exception {
+                assertRollbackAndReclaim(Failure.ASYNC);
+            }
+            @Test
+            void actualHandlerRefusesNonJoinedTransactionWithoutChangingRowsOrToken() throws Exception {
+                assertRollbackAndReclaim(Failure.NON_JOINED);
+            }
+            private void assertRollbackAndReclaim(Failure requested) throws Exception {
                 var path = database();
                 var initial = expected();
                 var afterRetry = next(initial);
                 assertNotEquals(new HashSet<>(initial), new HashSet<>(afterRetry), "Proof event must change modeled state");
-                fail.set(false);
+                failure = Failure.NONE;
                 try {
                     try (var application = start(path)) {
                         assertInstanceOf(JpaReadModelStore.class, store(application));
@@ -63,13 +78,17 @@ internal static class PersistentViewProof
                         assertFalse(checkpoint.isEmpty(), "Real processor checkpoint rows must exist");
                         assertQuery(application, initial);
                         rolledBack = new java.util.concurrent.CountDownLatch(1);
-                        fail.set(true);
+                        refused = new java.util.concurrent.CountDownLatch(1);
+                        if (requested == Failure.TOKEN) installTokenFailure(path);
+                        failure = requested;
                         append(application, __EVENT__);
-                        assertTrue(rolledBack.await(20, TimeUnit.SECONDS), "Failure must occur in actual processor prepare-commit");
+                        assertTrue(rolledBack.await(20, TimeUnit.SECONDS), "Actual processor must roll back: " + requested);
+                        if (requested == Failure.ASYNC || requested == Failure.NON_JOINED)
+                            assertTrue(refused.await(20, TimeUnit.SECONDS), "Actual handler must reach the transaction/thread guard");
                         assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()), "No independently committed projection write");
                         assertEquals(checkpoint, tokens(application), "Failed processing must not advance the actual checkpoint");
                     }
-                    fail.set(false);
+                    failure = Failure.NONE;
                     try (var application = start(path)) {
                         // The failed event must resume from the retained checkpoint exactly once.
                         await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(afterRetry)));
@@ -82,7 +101,7 @@ internal static class PersistentViewProof
                         await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(subsequent)) && !tokens(application).equals(checkpoint));
                         assertQuery(application, subsequent);
                     }
-                } finally { fail.set(false); }
+                } finally { failure = Failure.NONE; }
             }
             private void assertQuery(org.springframework.context.ConfigurableApplicationContext application, java.util.List<__MODEL__> rows) throws Exception {
                 var port = ((WebServerApplicationContext) application).getWebServer().getPort();

@@ -44,8 +44,14 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_serialize_row_payloads() => Code("JpaReadModelStore").ShouldContain("mapper.writeValueAsString(next)");
     [Fact] void should_guard_both_retained_events_and_checkpoints() => Code("PersistentViewBootstrap").ShouldContain("Stream.of(AggregateEventEntry.class, TokenEntry.class, ViewRow.class)");
     [Fact] void should_refuse_generation_changes() => Code("PersistentViewBootstrap").ShouldContain("!existing.fingerprint().equals(fingerprint)");
-    [Fact] void should_emit_a_default_native_two_boot_test() => Code("TotalPersistentTest").ShouldContain("void durableRowsAndRealCheckpointCommitAndRollbackTogether()");
-    [Fact] void should_exercise_actual_processor_failure() => Code("TotalPersistentSupport").ShouldContain("context.runOnPrepareCommit((java.util.function.Consumer<ProcessingContext>) ignored -> { throw new IllegalStateException");
+    [Fact] void should_emit_a_default_native_two_boot_test() => Code("TotalPersistentTest").ShouldContain("void handlerThrowsAfterViewWriteAndReclaimAppliesExactlyOnce()");
+    [Fact] void should_exercise_handler_failure_after_view_write() => Code("TotalPersistentSupport").ShouldContain("deliberate handler failure after view write");
+    [Fact] void should_exercise_real_token_store_failure() => Code("TotalPersistentSupport").ShouldContain("create trigger stage_token_failure before update on token_entry");
+    [Fact] void should_test_non_joined_handler_transaction() => Code("TotalPersistentSupport").ShouldContain("context.withResource(JpaTransactionalExecutorProvider.SUPPLIER_KEY");
+    [Fact] void should_test_off_thread_handler_refusal() => Code("TotalPersistentTest").ShouldContain("void actualHandlerRefusesOffThreadWriteWithoutChangingRowsOrToken()");
+    [Fact] void should_validate_customized_processors_before_start() => Code("PersistentViewConfiguration").ShouldContain("SmartInitializingSingleton persistentViewProcessorGuard");
+    [Fact] void should_refuse_swallowing_customizations() => Code("PersistentViewProcessorGuard").ShouldContain("processor.errorHandler() != PropagatingErrorHandler.INSTANCE");
+    [Fact] void should_test_subscribing_replacement_refusal() => Code("TotalPersistentEnvelopeTest").ShouldContain("void refusesSubscribingReplacementBeforeReadiness()");
     [Fact] void should_compare_real_checkpoints_after_rollback() => Code("TotalPersistentTest").ShouldContain("assertEquals(checkpoint, tokens(application)");
     [Fact] void should_test_retained_database_refusal() => Code("TotalPersistentLegacyTest").ShouldContain("assertEquals(before, snapshot(path)");
     [Fact] void should_test_store_contracts() => Code("TotalPersistentStoreTest").ShouldContain("void durableStoreContractIsIsolatedAtomicAndFailsClosed()");

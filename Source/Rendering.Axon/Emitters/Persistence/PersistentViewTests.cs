@@ -43,6 +43,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__IMPORTS__", Imports(model, projection, query), StringComparison.Ordinal)
             .Replace("__ROUTE__", QueryEndpoint.Route(owner, query), StringComparison.Ordinal)
             .Replace("__EVENT__", events[0], StringComparison.Ordinal)
+            .Replace("__EVENT_TYPE__", types.EventType(spec.GivenEvents[0].EventContract), StringComparison.Ordinal)
             .Replace("__APPENDS__", string.Join('\n', events.Select(expression => $"            append(application, {expression});")), StringComparison.Ordinal)
             .Replace("__EXPECTED__", string.Join('\n', events.Select(expression => $"        projector.on({expression}{updates.DefaultArgument});")), StringComparison.Ordinal)
             .Replace("__ARGUMENT__", updates.DefaultArgument, StringComparison.Ordinal);
@@ -52,6 +53,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         Add("Test", PersistentViewProof.Source);
         Add("StoreTest", PersistentViewContractTests.Source);
         Add("LegacyTest", PersistentViewLegacyProof.Source);
+        Add("EnvelopeTest", PersistentViewEnvelopeTests.Source);
     }
 
     SemanticSpecification? Specification(LocatedSemanticSlice owner, SemanticReadModel model, SemanticProjection projection)
