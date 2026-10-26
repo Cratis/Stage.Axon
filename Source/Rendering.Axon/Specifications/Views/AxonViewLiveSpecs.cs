@@ -32,8 +32,13 @@ internal static class AxonViewLiveSpecs
         if (package == types.Package(owner)) code.Declare(projectorName);
         else code.Import(modelType).Import(projector);
         var updates = new ProjectionUpdates(context, types, model.Id);
+        string EventArguments(JavaCodeBuilder builder)
+        {
+            new ViewSpecificationClaims(context, types).Event(given, builder);
+            return AxonViewEvents.Expression(context, types, given, builder) + ProjectionHandlerShape.Arguments(projection, updates, updates.Enabled ? builder.Reference("org.axonframework.messaging.queryhandling.QueryUpdateEmitter") + ".forContext(processing)" : "null");
+        }
+        var eventArguments = EventArguments(code);
         var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
-        string EventArguments(JavaCodeBuilder builder) => AxonViewEvents.Expression(context, types, given, builder) + ProjectionHandlerShape.Arguments(projection, updates, updates.Enabled ? builder.Reference("org.axonframework.messaging.queryhandling.QueryUpdateEmitter") + ".forContext(processing)" : "null");
         var source = code.Line($$"""
             @{{code.Reference("org.springframework.boot.test.context.SpringBootTest")}}(classes = Application.class)
             @{{code.Reference("org.springframework.test.annotation.DirtiesContext")}}
@@ -83,7 +88,7 @@ internal static class AxonViewLiveSpecs
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(values.getFirst().rows().isEmpty());
                         configuration.getComponent({{code.Reference("org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory")}}.class).create()
                             .executeWithResult(processing -> {
-                                projector.on({{EventArguments(code)}});
+                                projector.on({{eventArguments}});
                                 return {{code.Reference("java.util.concurrent.CompletableFuture")}}.completedFuture(null);
                             }).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS);
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(changed.await(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS), "Live query update timed out");

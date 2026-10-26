@@ -22,6 +22,7 @@ internal static class AxonViewHttpLiveSpecs
         var projectorName = projector[(projector.LastIndexOf('.') + 1)..];
         if (projector[..projector.LastIndexOf('.')] == package) code.Declare(projectorName);
         else code.Import(projector);
+        var arguments = eventArguments(code);
         var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
         code.Line($$"""
             class {{name}} {
@@ -51,7 +52,7 @@ internal static class AxonViewHttpLiveSpecs
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(0, initial.size());
                                 configuration.getComponent({{code.Reference("org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory")}}.class).create()
                                     .executeWithResult(processing -> {
-                                        projector.on({{eventArguments(code)}});
+                                        projector.on({{arguments}});
                                         return {{code.Reference("java.util.concurrent.CompletableFuture")}}.completedFuture(null);
                                     }).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS);
                                 var changed = mapper.readTree(executor.submit(() -> nextData(reader)).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS));
