@@ -26,7 +26,10 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
         pom.ShouldContain("<version>4.1.2</version>");
         pom.ShouldContain("<version>5.4.1</version>");
         pom.ShouldContain("<arg>-Xlint:all</arg><arg>-Werror</arg>");
-        pom.ShouldContain("axon-spring-boot-starter-test");
+        pom.ShouldContain("<dependency><groupId>org.axonframework.extensions.spring</groupId><artifactId>axon-spring-boot-starter</artifactId></dependency>");
+        pom.ShouldContain("<dependency><groupId>org.axonframework</groupId><artifactId>axon-test</artifactId><scope>test</scope></dependency>");
+        pom.ShouldContain("<dependency><groupId>org.axonframework.extensions.spring</groupId><artifactId>axon-spring-boot-starter-test</artifactId><scope>test</scope></dependency>");
+        pom.ShouldNotContain("axon-server-connector");
     }
 
     [Fact]
