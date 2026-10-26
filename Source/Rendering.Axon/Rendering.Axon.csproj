@@ -9,6 +9,7 @@
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Cratis.Stage.Contracts" />
+    <PackageReference Include="Cratis.Screenplay" />
         <EmbeddedResource Include="Emitters/Runtime/Templates/**/*.java" />
         <EmbeddedResource Include="Emitters/Scaffold/Assets/*" />
     </ItemGroup>

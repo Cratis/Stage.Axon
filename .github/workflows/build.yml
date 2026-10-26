@@ -60,7 +60,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
           cache-dependency-path: Source/Rendering.Axon/Emitters/Scaffold/AxonMavenProject.cs
       - name: Build the standalone verification harness

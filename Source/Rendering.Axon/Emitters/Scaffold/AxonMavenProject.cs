@@ -14,7 +14,7 @@ internal static class AxonMavenProject
           <modelVersion>4.0.0</modelVersion>
           <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.1.2</version><relativePath/></parent>
           <groupId>{{package}}</groupId><artifactId>{{package}}-application</artifactId><version>1.0.0-SNAPSHOT</version>
-          <properties><java.version>21</java.version><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
+          <properties><java.version>25</java.version><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
           <dependencyManagement><dependencies>
             <dependency><groupId>org.axonframework</groupId><artifactId>axon-framework-bom</artifactId><version>5.4.1</version><type>pom</type><scope>import</scope></dependency>
           </dependencies></dependencyManagement>

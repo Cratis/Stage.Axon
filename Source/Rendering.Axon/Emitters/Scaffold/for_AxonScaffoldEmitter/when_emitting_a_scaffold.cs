@@ -22,7 +22,7 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
     void should_pin_the_verified_java_and_framework_versions()
     {
         var pom = Content("pom.xml");
-        pom.ShouldContain("<java.version>21</java.version>");
+        pom.ShouldContain("<java.version>25</java.version>");
         pom.ShouldContain("<version>4.1.2</version>");
         pom.ShouldContain("<version>5.4.1</version>");
         pom.ShouldContain("<arg>-Xlint:all</arg><arg>-Werror</arg>");

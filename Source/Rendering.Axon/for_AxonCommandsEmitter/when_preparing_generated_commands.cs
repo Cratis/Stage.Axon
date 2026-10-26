@@ -40,7 +40,7 @@ public class when_preparing_generated_commands : for_AxonArtifactRenderPlanner.g
     [Fact] void should_import_allocated_runtime_identities() => allocated.ShouldContain("import " + JavaNames.PackageSegment(request.Model.Application.Name) + ".runtime.EventSourceId;");
     [Fact] void should_import_fundamentals_generation() => allocated.ShouldContain("import io.cratis.fundamentals.concepts.GenerateValue;");
     [Fact] void should_import_the_preparation_clock() => allocated.ShouldContain("import java.time.Clock;");
-    [Fact] void should_exclude_generated_values_from_the_http_body() => supported.ShouldContain("@com.fasterxml.jackson.annotation.JsonIgnore java.util.UUID requestId");
+    [Fact] void should_exclude_generated_values_from_the_http_body() => supported.ShouldContain("@JsonIgnore UUID requestId");
     [Fact] void should_clear_values_before_the_http_handler_dispatches() => supported.ShouldContain("public PlaceOrder forRequest() { return new PlaceOrder(null); }");
     [Fact] void should_generate_uuid_inputs_in_the_handler_preparation() => supported.ShouldContain("requestId() == null ? UUID.randomUUID() : requestId()");
     [Fact] void should_allow_deterministic_fixture_values() => supported.ShouldContain(": requestId()");
