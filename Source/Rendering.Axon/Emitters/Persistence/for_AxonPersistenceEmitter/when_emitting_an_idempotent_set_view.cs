@@ -81,6 +81,10 @@ public class when_emitting_an_idempotent_set_view : Projections.for_AxonProjecti
     [Fact] void should_assert_one_result_row() => _dispatch.ShouldContain("assertEquals(1, store.all().size(),");
     [Fact] void should_assert_invalidation_before_append_completes() => _dispatch.ShouldContain("Subscribing default processing must invalidate before append completes");
     [Fact] void should_assert_invalidation_follows_the_write() => _dispatch.ShouldContain("assertEquals(1, writesAtInvalidation.get(),");
+    [Fact] void should_override_the_real_default_namespace() => _dispatch.ShouldContain("\"axon.eventhandling.processors[axonviews.views.counters.totals].mode\", \"subscribing\"");
+    [Fact] void should_import_the_default_processor_guard() => _dispatch.ShouldContain("axonviews.infrastructure.DefaultViewProcessorGuard.class");
+    [Fact] void should_assert_the_default_processor_is_not_streaming() => _dispatch.ShouldContain("FIXTURE: C2 default namespace must not resolve to a streaming processor");
+    [Fact] void should_prove_default_streaming_is_refused() => _dispatch.ShouldContain("void refusesStreamingDefaultViewsBeforeReadiness()");
     [Fact] void should_keep_jpa_opt_in() => _dispatch.ShouldContain("\"spring.profiles.active\", \"default\"");
 
     string Code(string name) => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith('/' + name + ".java", StringComparison.Ordinal)));

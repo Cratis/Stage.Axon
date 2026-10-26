@@ -27,6 +27,9 @@ internal static class PersistentViewProofSupport
         import java.util.function.BooleanSupplier;
         import org.axonframework.common.configuration.Configuration;
         import org.axonframework.common.jpa.EntityManagerExecutor;
+        import org.axonframework.eventsourcing.eventstore.EventStore;
+        import org.axonframework.eventsourcing.eventstore.SourcingCondition;
+        import org.axonframework.messaging.eventstreaming.EventCriteria;
         import org.axonframework.messaging.core.unitofwork.transaction.jpa.JpaTransactionalExecutorProvider;
         import org.axonframework.messaging.eventhandling.gateway.EventAppender;
         import org.axonframework.messaging.core.unitofwork.ProcessingContext;
@@ -40,6 +43,7 @@ internal static class PersistentViewProofSupport
         import org.springframework.context.annotation.Import;
         import tools.jackson.databind.json.JsonMapper;
         import static org.junit.jupiter.api.Assertions.*;
+        import static __PACKAGE__.__NAME__Fixture.tag;
 
         public final class __NAME__Support {
             private __NAME__Support() {}
@@ -61,10 +65,13 @@ internal static class PersistentViewProofSupport
                 return application.getBean(Configuration.class).getComponent(UnitOfWorkFactory.class);
             }
             static void append(ConfigurableApplicationContext application, Object event) throws Exception {
-                units(application).create().executeWithResult(context -> {
-                    EventAppender.forContext(context).append(event);
-                    return CompletableFuture.<Void>completedFuture(null);
-                }).get(10, TimeUnit.SECONDS);
+                var eventStore = application.getBean(Configuration.class).getComponent(EventStore.class);
+                units(application).create().executeWithResult(context ->
+                        eventStore.transaction(context).source(SourcingCondition.conditionFor(EventCriteria.havingTags(tag(event))))
+                                .reduce(0, (count, entry) -> count + 1).thenApply(count -> {
+                                    EventAppender.forContext(context).append(event);
+                                    return (Void) null;
+                                })).get(10, TimeUnit.SECONDS);
             }
             static List<__MODEL__> expected() {
                 var store = new InMemoryReadModelStore<Object, __MODEL__>();

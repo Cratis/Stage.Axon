@@ -58,6 +58,25 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_compare_real_checkpoints_after_rollback() => Code("TotalPersistentTest").ShouldContain("assertEquals(checkpoint, tokens(application)");
     [Fact] void should_test_retained_database_refusal() => Code("TotalPersistentLegacyTest").ShouldContain("assertEquals(before, snapshot(path)");
     [Fact] void should_test_store_contracts() => Code("TotalPersistentStoreTest").ShouldContain("void durableStoreContractIsIsolatedAtomicAndFailsClosed()");
+    [Fact] void should_source_the_same_tag_before_appending() => Code("TotalPersistentSupport").ShouldContain("eventStore.transaction(context).source(SourcingCondition.conditionFor(EventCriteria.havingTags(tag(event))))");
+    [Fact] void should_consume_the_source_in_the_append_unit_of_work() => Code("TotalPersistentSupport").ShouldContain(".reduce(0, (count, entry) -> count + 1).thenApply(count -> {");
+    [Fact] void should_emit_modeled_primary_tags() => Code("TotalPersistentFixture").ShouldContain("tagged.eventSourceId().toString()");
+    [Fact] void should_read_sequences_without_writing() => Code("TotalPersistentFixture").ShouldContain("connection.setReadOnly(true)");
+    [Fact] void should_require_contiguous_aggregate_sequences() => Code("TotalPersistentFixture").ShouldContain("FIXTURE: C1 aggregate sequences must be exactly 0..n-1");
+    [Fact] void should_compare_all_sequences_to_the_append_count() => Code("TotalPersistentFixture").ShouldContain("assertEquals(java.util.stream.LongStream.range(0, count).boxed().toList(), sequences");
+    [Fact] void should_require_the_actual_pooled_processor() => Code("TotalPersistentFixture").ShouldContain("assertInstanceOf(PooledStreamingEventProcessor.class, processor, \"FIXTURE: C2");
+    [Fact] void should_require_token_progress_and_a_view_row() => Code("TotalPersistentFixture").ShouldContain("FIXTURE: C3 token must advance and modeled view row must exist before injection");
+    [Fact]
+    void should_check_fixture_before_injecting_failure()
+    {
+        var proof = Code("TotalPersistentTest");
+        var injection = proof.IndexOf("failure = requested;", StringComparison.Ordinal);
+        var fixture = proof.LastIndexOf("assertFixture(application, before);", injection, StringComparison.Ordinal);
+        fixture.ShouldBeGreaterThan(0);
+        fixture.ShouldBeLessThan(injection);
+    }
+    [Fact] void should_reject_each_missing_persistent_processor() => Code("PersistentViewProcessorGuard").ShouldContain("if (!(processors.get(name) instanceof PooledStreamingEventProcessor)) throw refusal();");
+    [Fact] void should_reject_subscribing_persistent_processor_registrations() => Code("PersistentViewProcessorGuard").ShouldContain("otherProcessors.containsKey(name) && !(otherProcessors.get(name) instanceof PooledStreamingEventProcessor)");
     [Fact] void should_not_hide_native_proof_behind_a_property() => Code("TotalPersistentTest").ShouldNotContain("EnabledIfSystemProperty");
 
     string Code(string name) => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith('/' + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());

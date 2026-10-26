@@ -22,6 +22,7 @@ internal static class PersistentViewProof
         import tools.jackson.databind.json.JsonMapper;
         import static org.junit.jupiter.api.Assertions.*;
         import static __PACKAGE__.__NAME__Support.*;
+        import static __PACKAGE__.__NAME__Fixture.assertFixture;
 
         /** Default Surefire test: real emitted projector, pooled processor, durable token and two boots. */
         class __NAME__Test {
@@ -31,7 +32,9 @@ internal static class PersistentViewProof
                 var initial = expected();
                 java.util.Map<Integer, String> checkpoint;
                 try (var application = start(path)) {
+                    var before = tokens(application);
         __APPENDS__
+                    assertFixture(application, before);
                     await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
                     checkpoint = tokens(application);
                     assertFalse(checkpoint.isEmpty());
@@ -71,7 +74,9 @@ internal static class PersistentViewProof
                 try {
                     try (var application = start(path)) {
                         assertInstanceOf(JpaReadModelStore.class, store(application));
+                        var before = tokens(application);
         __APPENDS__
+                        assertFixture(application, before);
                         await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
                         var checkpoint = tokens(application);
                         assertFalse(checkpoint.isEmpty(), "Real processor checkpoint rows must exist");

@@ -52,8 +52,10 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
         var yaml = Content("src/main/resources/application.yml");
         yaml.ShouldContain("address: 127.0.0.1");
         yaml.ShouldContain("axonserver:\n    enabled: false");
-        yaml.ShouldContain("mode: subscribing");
     }
+
+    [Fact]
+    void should_not_configure_nonexistent_module_named_processors() => Content("src/main/resources/application.yml").ShouldNotContain("processors:");
 
     [Fact]
     void should_use_checkpointed_processors_for_persistent_views() => Content("src/main/resources/application-persistent.properties").ShouldContain("stage.axon.view-processor-mode=pooled");
