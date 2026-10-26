@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Cratis.Stage.Rendering.Axon.Specifications.Views;
@@ -29,22 +30,39 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
                 EmitProjector(context, types, package, projection, model);
                 namespaces.Add(package);
             }
-            foreach (var reducer in located.Slice.Reducers)
-            {
-                var model = located.Slice.ReadModels.First(candidate => candidate.Id == reducer.ReadModel);
-                new ReducerProjection(context, types).Emit(located, model, reducer);
-                namespaces.Add(package);
-            }
+            namespaces.UnionWith(EmitReducers(context, types, located));
         }
         new AxonViewSpecsEmitter().Emit(context);
         if (ScopeSelection.Select(context.Request).Any(owner => !owner.Slice.ReadModels.IsEmpty))
-            context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/axon-views.properties", string.Join('\n', namespaces.Select(name => $"axon.eventhandling.processors.{name}.mode=subscribing")) + "\n", []));
+            context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/axon-views.properties", string.Join('\n', namespaces.Select(name => $"axon.eventhandling.processors.{name}.mode=${{stage.axon.view-processor-mode:subscribing}}")) + "\n", []));
+    }
+
+    static IEnumerable<string> EmitReducers(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located)
+    {
+        foreach (var reducer in located.Slice.Reducers)
+        {
+            var model = located.Slice.ReadModels.FirstOrDefault(candidate => candidate.Id == reducer.ReadModel);
+            var admission = ReducerBodies.Admission(context, located, reducer);
+            if (model is null || admission.Blocked is not null)
+            {
+                context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model?.Id ?? located.Slice.Id, admission.Blocked ?? "The reducer read model is outside its slice.");
+                continue;
+            }
+            new ReducerProjection(context, types).Emit(located, model, reducer, admission);
+            yield return types.Package(located);
+        }
     }
 
     static void EmitModel(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticReadModel model)
     {
         var name = JavaNames.Type(model.Name);
         ViewJavaTypes.Add(context, package, name, ReadModelRecords.Code(types, package, model), model.Id);
+        if (PersistentViewAdmission.Supports(context, model.Id))
+        {
+            context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default read-model rows are volatile; durable checkpoints may skip prior events. The persistent profile supports guarded flat projections only, with generation checks and processor-bound transactions; scoped/reducer recovery remains refused.");
+            PersistentProjectionStore.Emit(context, types, package, model);
+            return;
+        }
         context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused.");
         var configuration = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration");
         var storeType = configuration.Reference(types.BasePackage + ".runtime.ReadModelStore");
@@ -87,10 +105,9 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
             {
                 var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == group.Key);
-                body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}").Block($"public void on({types.EventType(group.Key, body)} event{updates.Parameter})", method =>
+                new ProjectionHandlerBinding(context, types, model, package).Emit(body, types.EventType(group.Key, body), method =>
                 {
                     foreach (var from in group) EmitFrom(context, types, method, projection, model, @event, from);
-                    updates.Notify(method, package);
                 });
             }
         });

@@ -34,7 +34,7 @@ internal static class CommandFixtureSecurity
 
     static void ProxyCore(JavaCodeBuilder body, string name, bool usesClock, JavaCodeBuilder? code)
     {
-        var parameter = usesClock ? "java.time.Clock clock" : string.Empty;
+        var parameter = usesClock ? $"{Reference(code, "java.time.Clock")} clock" : string.Empty;
         var argument = usesClock ? ", clock" : string.Empty;
         body.Block($"private {name}Handler handler({parameter})", method => method
             .Line($"var factory = new {Reference(code, "org.springframework.aop.framework.ProxyFactory")}(new {name}Handler(new {name}Rules(validators.getValidator()){argument}));")

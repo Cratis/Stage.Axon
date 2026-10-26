@@ -48,6 +48,7 @@ internal static class InlineJavaBodies
         SemanticImplementationRole.CommandHandler => SemanticKind.Command,
         SemanticImplementationRole.ReactionEffect => SemanticKind.Reaction,
         SemanticImplementationRole.QueryPerformer => SemanticKind.Query,
+        SemanticImplementationRole.ReducerTransition => SemanticKind.Slice,
         _ => SemanticKind.Unknown
     };
 
@@ -62,7 +63,7 @@ internal static class InlineJavaBodies
             (requirement.ContextVersion != 1 || requirement.ResultVersion != 1, "The implementation context or result contract revision is unsupported."),
             (requirement.IsAmbiguous || requirement.IsProvisional, "Ambiguous or provisional implementation identities cannot be placed."),
             (requirement.AttachmentResolution != SemanticAttachmentResolution.Resolved, "The implementation attachment has not been resolved."),
-            (requirement.RequiredCapability != "provider-defined", "The implementation capability is not supported by this native body slot.")
+            (requirement.RequiredCapability != (role == SemanticImplementationRole.ReducerTransition ? "pure" : "provider-defined"), "The implementation capability is not supported by this native body slot.")
         ];
         return checks.FirstOrDefault(check => check.Invalid).Reason ?? string.Empty;
     }

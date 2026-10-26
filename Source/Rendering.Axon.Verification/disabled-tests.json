@@ -1,6 +1,1 @@
-{
-  "STAGE-AXON-0306": {
-    "Count": 2,
-    "Reason": "Authored reducer bodies still require the documented native Java extension point."
-  }
-}
+{}

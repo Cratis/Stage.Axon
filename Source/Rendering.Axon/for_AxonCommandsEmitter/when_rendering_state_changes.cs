@@ -42,8 +42,10 @@ public class when_rendering_state_changes : for_AxonArtifactRenderPlanner.given.
     [Fact] void should_validate_requests_before_dispatch() => Code("PlaceOrderEndpoint").ShouldContain("rules.validateInput(command);");
     [Fact] void should_emit_real_axon_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("AxonTestFixture.with(configuration)");
     [Fact] void should_enforce_method_security_in_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("AuthorizationManagerBeforeMethodInterceptor.preAuthorize()");
-    [Fact] void should_compare_the_expected_events() => Code("PlaceOrderSpecificationsTest").ShouldContain($"result.events(new {context.BasePackage}.orders.events.OrderPlaced(");
-    [Fact] void should_supply_enum_constants() => Code("PlaceOrderSpecificationsTest").ShouldContain($"{context.BasePackage}.concepts.OrderChannel.WEB");
+    [Fact] void should_compare_the_expected_events() => Code("PlaceOrderSpecificationsTest").ShouldContain("result.events(new OrderPlaced(");
+    [Fact] void should_import_the_expected_event_type() => Code("PlaceOrderSpecificationsTest").ShouldContain($"import {context.BasePackage}.orders.events.OrderPlaced;");
+    [Fact] void should_supply_enum_constants() => Code("PlaceOrderSpecificationsTest").ShouldContain("OrderChannel.WEB");
+    [Fact] void should_import_the_fixture_enum() => Code("PlaceOrderSpecificationsTest").ShouldContain($"import {context.BasePackage}.concepts.OrderChannel;");
     [Fact] void should_not_disable_the_supported_command_specification() => Code("PlaceOrderSpecificationsTest").ShouldNotContain("@Disabled(");
 
     string Code(string type) => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith('/' + type + ".java", StringComparison.Ordinal)).Bytes.AsSpan());

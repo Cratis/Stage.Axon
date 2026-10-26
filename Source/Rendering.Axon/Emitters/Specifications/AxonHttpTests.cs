@@ -25,7 +25,9 @@ internal static class AxonHttpTests
         if (context.HttpScenarios.Count == 0) return;
         var package = context.BasePackage + ".specifications";
         const string name = "ModeledHttpRoundTripTest";
-        var code = TestClass(Imports(package, name), name, context.HttpScenarios.Values);
+        var scenarios = context.HttpScenarios.Values.OrderBy(scenario => scenario.Id.ToString(), StringComparer.Ordinal).ToArray();
+        var fragments = scenarios.SelectMany(scenario => scenario.ArrangeFragments.Concat(scenario.Exchanges.SelectMany(exchange => exchange.Response.AssertionFragments)));
+        var code = TestClass(Imports(package, name, fragments), name, scenarios);
         context.AddJava(package, name, code.Build(), test: true, sources: [.. context.HttpScenarios.Keys]);
     }
 
@@ -44,21 +46,22 @@ internal static class AxonHttpTests
     }
 
     static JavaCodeBuilder TestClass(JavaCodeBuilder code, string name, IEnumerable<AxonHttpScenario> scenarios) => code
-            .Line("@SpringBootTest")
-            .Line("@AutoConfigureMockMvc")
-            .Line("@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)")
+            .Line($"@{code.Reference("org.springframework.boot.test.context.SpringBootTest")}")
+            .Line($"@{code.Reference("org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc")}")
+            .Line($"@{code.Reference("org.springframework.test.annotation.DirtiesContext")}(classMode = {code.Reference("org.springframework.test.annotation.DirtiesContext")}.ClassMode.AFTER_EACH_TEST_METHOD)")
             .Block("class " + name, body =>
             {
-                body.Line("@Autowired").Line("private MockMvc http;")
-                    .Line("@Autowired").Line($"private {body.Reference("org.springframework.context.ApplicationContext")} application;");
+                body.Line($"@{body.Reference("org.springframework.beans.factory.annotation.Autowired")}").Line($"private {body.Reference("org.springframework.test.web.servlet.MockMvc")} http;")
+                    .Line($"@{body.Reference("org.springframework.beans.factory.annotation.Autowired")}").Line($"private {body.Reference("org.springframework.context.ApplicationContext")} application;");
                 var index = 0;
                 foreach (var scenario in scenarios.OrderBy(scenario => scenario.Id.ToString(), StringComparer.Ordinal))
                 {
-                    body.Line().Line("@Test")
-                        .Line("@DisplayName(" + JavaCodeBuilder.StringLiteral("HTTP " + scenario.Id) + ")")
+                    body.Line().Line($"@{body.Reference("org.junit.jupiter.api.Test")}")
+                        .Line($"@{body.Reference("org.junit.jupiter.api.DisplayName")}(" + JavaCodeBuilder.StringLiteral("HTTP " + scenario.Id) + ")")
                         .Block("void scenario_" + index++.ToString(CultureInfo.InvariantCulture) + "() throws Exception", test =>
                         {
                             foreach (var arrange in scenario.Arrange) test.Line(arrange);
+                            foreach (var fragment in scenario.ArrangeFragments) test.Line(fragment.Render(test));
                             foreach (var exchange in scenario.Exchanges) EmitExchange(test, exchange, scenario.Caller);
                         });
                 }
@@ -69,20 +72,23 @@ internal static class AxonHttpTests
     static void EmitExchange(JavaCodeBuilder code, AxonHttpExchange exchange, AxonHttpCaller caller)
     {
         var request = exchange.Request;
-        var builder = "request(HttpMethod.valueOf(" + JavaCodeBuilder.StringLiteral(request.Method) + "), " + JavaCodeBuilder.StringLiteral(request.Path) + ")";
-        builder += ".with(" + Caller(caller) + ")";
-        if (request.JsonBody is not null) builder += ".contentType(MediaType.APPLICATION_JSON).content(" + JavaCodeBuilder.StringLiteral(request.JsonBody) + ")";
+        var builder = $"request({code.Reference("org.springframework.http.HttpMethod")}.valueOf(" + JavaCodeBuilder.StringLiteral(request.Method) + "), " + JavaCodeBuilder.StringLiteral(request.Path) + ")";
+        builder += ".with(" + Caller(code, caller) + ")";
+        if (request.JsonBody is not null) builder += $".contentType({code.Reference("org.springframework.http.MediaType")}.APPLICATION_JSON).content(" + JavaCodeBuilder.StringLiteral(request.JsonBody) + ")";
         var assertions = new List<string> { "status().is(" + exchange.Response.Status.ToString(CultureInfo.InvariantCulture) + ")" };
         if (exchange.Response.ExpectedJson is not null)
-            assertions.Add("content().json(" + JavaCodeBuilder.StringLiteral(exchange.Response.ExpectedJson) + ", JsonCompareMode.STRICT)");
+            assertions.Add("content().json(" + JavaCodeBuilder.StringLiteral(exchange.Response.ExpectedJson) + $", {code.Reference("org.springframework.test.json.JsonCompareMode")}.STRICT)");
         assertions.AddRange(exchange.Response.Assertions);
+        assertions.AddRange(exchange.Response.AssertionFragments.Select(fragment => fragment.Render(code)));
+        if (assertions.Exists(assertion => assertion.Contains("content()", StringComparison.Ordinal)))
+            code.Import("static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content");
         code.Line("perform(" + builder + ")");
         for (var index = 0; index < assertions.Count; index++)
             code.Line("    .andExpect(" + assertions[index] + ")" + (index == assertions.Count - 1 ? ";" : string.Empty));
     }
 
     static void EmitPerform(JavaCodeBuilder code) => code.Line()
-        .Block("private ResultActions perform(MockHttpServletRequestBuilder request) throws Exception", body => body
+        .Block($"private {code.Reference("org.springframework.test.web.servlet.ResultActions")} perform({code.Reference("org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder")} request) throws Exception", body => body
             .Line("var actions = http.perform(request);")
             .Line("var result = actions.andReturn();")
             .Block("if (result.getRequest().isAsyncStarted())", pending => pending
@@ -90,27 +96,34 @@ internal static class AxonHttpTests
                 .Line("return http.perform(asyncDispatch(result));"))
             .Line("return actions;"));
 
-    static string Caller(AxonHttpCaller caller) => caller.Authenticated
-        ? "user(" + JavaCodeBuilder.StringLiteral(caller.Identity) + ").roles(" + string.Join(", ", caller.Roles.Select(JavaCodeBuilder.StringLiteral)) + ")"
-        : "anonymous()";
+    static string Caller(JavaCodeBuilder code, AxonHttpCaller caller)
+    {
+        var method = caller.Authenticated ? "user" : "anonymous";
+        code.Import("static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors." + method);
+        return caller.Authenticated
+            ? "user(" + JavaCodeBuilder.StringLiteral(caller.Identity) + ").roles(" + string.Join(", ", caller.Roles.Select(JavaCodeBuilder.StringLiteral)) + ")"
+            : "anonymous()";
+    }
 
-    static JavaCodeBuilder Imports(string package, string name) => new JavaCodeBuilder(package).Declare(name)
-        .Import("org.junit.jupiter.api.DisplayName")
-        .Import("org.junit.jupiter.api.Test")
-        .Import("org.springframework.beans.factory.annotation.Autowired")
-        .Import("org.springframework.boot.test.context.SpringBootTest")
-        .Import("org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc")
-        .Import("org.springframework.http.HttpMethod")
-        .Import("org.springframework.http.MediaType")
-        .Import("org.springframework.test.annotation.DirtiesContext")
-        .Import("org.springframework.test.json.JsonCompareMode")
-        .Import("org.springframework.test.web.servlet.MockMvc")
-        .Import("org.springframework.test.web.servlet.ResultActions")
-        .Import("org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder")
-        .Import("static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous")
-        .Import("static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user")
-        .Import("static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch")
-        .Import("static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request")
-        .Import("static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content")
-        .Import("static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status");
+    static JavaCodeBuilder Imports(string package, string name, IEnumerable<Fragment>? fragments = null)
+    {
+        var code = new JavaCodeBuilder(package).Declare(name);
+        foreach (var fragment in fragments ?? []) fragment.Claim?.Invoke(code);
+        foreach (var type in new[]
+        {
+            "org.junit.jupiter.api.DisplayName", "org.junit.jupiter.api.Test",
+            "org.springframework.beans.factory.annotation.Autowired", "org.springframework.boot.test.context.SpringBootTest",
+            "org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc", "org.springframework.http.HttpMethod",
+            "org.springframework.test.annotation.DirtiesContext", "org.springframework.test.web.servlet.MockMvc",
+            "org.springframework.test.web.servlet.ResultActions", "org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder"
+        })
+        {
+            code.Reference(type);
+        }
+        return code.Import("static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch")
+            .Import("static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request")
+            .Import("static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status");
+    }
+
+    internal sealed record Fragment(Func<JavaCodeBuilder, string> Render, Action<JavaCodeBuilder>? Claim = null);
 }

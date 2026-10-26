@@ -9,4 +9,5 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 internal sealed record AxonHttpResponse(int Status, [StringSyntax(StringSyntaxAttribute.Json)] string? ExpectedJson = null)
 {
     internal ImmutableArray<string> Assertions { get; init; } = [];
+    internal ImmutableArray<AxonHttpTests.Fragment> AssertionFragments { get; init; } = [];
 }

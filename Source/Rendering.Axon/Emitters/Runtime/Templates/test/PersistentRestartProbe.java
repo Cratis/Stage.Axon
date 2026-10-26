@@ -29,6 +29,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -66,13 +67,24 @@ class PersistentRestartProbe {
         var before = PersistentDatabaseSnapshot.read(database);
         before.assertSeeded(owner, checkpoint);
         for (var attempt = 1; attempt <= 2; attempt++) {
-            PersistentProbeSupport.refuses(database);
+            if (PersistentProbeSupport.unsupportedViews()) PersistentProbeSupport.refuses(database);
+            else PersistentProbeSupport.refusesLegacy(database);
             assertEquals(before, PersistentDatabaseSnapshot.read(database), "All event/claim/token values unchanged after refusal " + attempt);
         }
         var fresh = PersistentProbeSupport.freshPath();
-        PersistentProbeSupport.refuses(PersistentProbeSupport.database(fresh));
-        try (var files = Files.list(fresh.getParent())) {
-            assertEquals(0, files.count(), "Refusal must not create any fresh database files");
+        if (PersistentProbeSupport.unsupportedViews()) {
+            PersistentProbeSupport.refuses(PersistentProbeSupport.database(fresh));
+            try (var files = Files.list(fresh.getParent())) {
+                assertEquals(0, files.count(), "Unsupported-shape refusal must not create any fresh database files");
+            }
+        } else {
+            try (var application = PersistentProbeSupport.start(new SpringApplicationBuilder(PersistentProbeSupport.application()), PersistentProbeSupport.database(fresh))) {
+                assertPersistentStores(application);
+                assertFalse(application.getBeansOfType(ReadModelStore.class).isEmpty(), "Supported flat application must provide durable views");
+            }
+            try (var files = Files.list(fresh.getParent())) {
+                assertTrue(files.count() > 0, "Supported flat startup must establish generation metadata");
+            }
         }
     }
 
@@ -104,7 +116,10 @@ class PersistentRestartProbe {
     private void assertPersistentStores(ConfigurableApplicationContext application) {
         assertInstanceOf(AggregateBasedJpaEventStorageEngine.class, application.getBean(EventStorageEngine.class));
         assertInstanceOf(JpaUniqueValueStore.class, application.getBean(UniqueValueStore.class));
-        assertTrue(application.getBeansOfType(ReadModelStore.class).isEmpty(), "Successful persistent boot must be viewless");
+        var views = application.getBeansOfType(ReadModelStore.class);
+        if (!Boolean.getBoolean("stage.expectViews")) assertTrue(views.isEmpty(), "Viewless fixture must remain viewless");
+        views.forEach((name, store) -> assertTrue(store.getClass().getName().endsWith(".persistence.JpaReadModelStore"),
+                "Persistent view must not fall back to memory: " + name));
         assertTrue(application.getBeansOfType(PersistentReadModelSafety.class).isEmpty());
     }
 

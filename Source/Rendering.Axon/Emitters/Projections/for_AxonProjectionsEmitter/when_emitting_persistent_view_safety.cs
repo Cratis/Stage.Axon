@@ -24,9 +24,13 @@ public class when_emitting_persistent_view_safety : for_AxonArtifactRenderPlanne
     }
 
     [Fact] void should_have_multiple_views_to_protect() => Configurations(_application).Count().ShouldBeGreaterThan(1);
-    [Fact] void should_emit_one_static_guard_for_each_view() => Configurations(_application).ShouldEachConformTo(code => code.Contains("public static PersistentReadModelSafety persistentReadModelSafety()", StringComparison.Ordinal));
-    [Fact] void should_name_every_guard_uniquely() => Configurations(_application).Select(code => code.Split('\n').Single(line => line.Contains(".persistentReadModelSafety\")", StringComparison.Ordinal))).Distinct().Count().ShouldEqual(Configurations(_application).Count());
-    [Fact] void should_profile_only_the_guard() => Configurations(_application).ShouldEachConformTo(code => code.Contains("@Profile(\"persistent\")\n    public static", StringComparison.Ordinal));
+    [Fact]
+    void should_guard_or_persist_every_selected_view() =>
+    Configurations(_application).ShouldEachConformTo(code =>
+    code.Contains("public static PersistentReadModelSafety persistentReadModelSafety()", StringComparison.Ordinal) ||
+    code.Contains("return new JpaReadModelStore<>", StringComparison.Ordinal));
+    [Fact] void should_name_every_guard_uniquely() => Guards(_application).Select(code => code.Split('\n').Single(line => line.Contains(".persistentReadModelSafety\")", StringComparison.Ordinal))).Distinct().Count().ShouldEqual(Guards(_application).Count());
+    [Fact] void should_profile_every_configuration() => Configurations(_application).ShouldEachConformTo(code => code.Contains("@Profile(\"persistent\")", StringComparison.Ordinal));
     [Fact] void should_guard_a_selected_view() => Configurations(_view).ShouldNotBeEmpty();
     [Fact] void should_not_emit_view_configurations_for_a_viewless_selected_slice() => Configurations(_viewless).ShouldBeEmpty();
     [Fact] void should_not_emit_a_guard_for_unselected_views() => _viewless.Artifacts.Select(Text).Any(code => code.Contains("persistentReadModelSafety", StringComparison.Ordinal)).ShouldBeFalse();
@@ -39,6 +43,8 @@ public class when_emitting_persistent_view_safety : for_AxonArtifactRenderPlanne
     }
 
     static IEnumerable<string> Configurations(AxonEmissionContext context) => context.Artifacts.Where(artifact => artifact.RelativePath.EndsWith("StoreConfiguration.java", StringComparison.Ordinal)).Select(Text);
+
+    static IEnumerable<string> Guards(AxonEmissionContext context) => Configurations(context).Where(code => code.Contains("persistentReadModelSafety()", StringComparison.Ordinal));
 
     static string Text(PlannedArtifact artifact) => Encoding.UTF8.GetString(artifact.Bytes.AsSpan());
 }

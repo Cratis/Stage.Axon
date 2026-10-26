@@ -17,7 +17,7 @@ internal sealed class CommandAppends(AxonEmissionContext context, SemanticComman
     internal static SemanticEventContract Contract(AxonEmissionContext context, SemanticId id) => ScopeSelection.Locate(context.Request.Model.Application)
         .SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id).Single(contract => contract.Id == id);
 
-    internal (string Event, string? Condition)? Build(SemanticProducedEvent produced)
+    internal (string Event, string? Condition)? Build(SemanticProducedEvent produced, JavaCodeBuilder? code = null)
     {
         var contract = Contract(context, produced.EventContract);
         var primary = AxonEventSources.PrimaryTag(context, contract);
@@ -25,7 +25,7 @@ internal sealed class CommandAppends(AxonEmissionContext context, SemanticComman
         var arguments = contract.Properties.Select(property => Argument(produced, property)).ToList();
         if (!contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName)) arguments.Insert(0, "command." + source.Member + "()");
         if (arguments.Exists(argument => argument is null)) return null;
-        var condition = produced.When is { } when ? new CommandConditions(command, _types).Render(when) : null;
+        var condition = produced.When is { } when ? new CommandConditions(command, _types).Render(when, code) : null;
         if (produced.When is not null && condition is null) return null;
         return ($"new {AxonEventsEmitter.TypeFor(context, contract.Id)}({string.Join(", ", arguments)})", condition);
     }

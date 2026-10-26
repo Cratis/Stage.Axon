@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Constraints;
 using Cratis.Stage.Rendering.Axon.Emitters.Decisions;
+using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
@@ -28,37 +29,46 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         var name = JavaNames.Type(command.Name);
         var response = new CommandResponses(command, _types);
         response.Emit(context, package);
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Handler").Declare(name + "Stream").Import("org.springframework.stereotype.Component")
-            .Import("org.springframework.security.access.prepost.PreAuthorize")
-            .Import("org.axonframework.messaging.commandhandling.annotation.CommandHandler")
-            .Import("org.axonframework.messaging.eventhandling.gateway.EventAppender");
-        code.Line("@Component").Block($"public class {name}Handler", body =>
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Handler").Declare(name + "Stream");
+        ClaimTypes(code, response);
+        code.Line($"@{code.Reference("org.springframework.stereotype.Component")}").Block($"public class {name}Handler", body =>
         {
-            body.Line("@CommandHandler");
+            body.Line($"@{body.Reference("org.axonframework.messaging.commandhandling.annotation.CommandHandler")}");
             var authorization = SecurityAnnotations.For(context, command.Authorization, command.Id);
-            if (authorization.Length > 0) body.Line(authorization);
-            body.Block($"public {response.ReturnType} handle({Parameters(name, body, package)})", method => Handle(method, response));
+            if (authorization.Length > 0) body.Line(authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal));
+            body.Block($"public {response.ReturnTypeFor(body)} handle({Parameters(name, body, package)})", method => Handle(method, response));
             Dependencies(body, name);
         });
         context.AddJava(package, name + "Handler", code.Build(), sources: [command.Id]);
         return _usesClock;
     }
 
+    void ClaimTypes(JavaCodeBuilder code, CommandResponses response)
+    {
+        code.ClaimExpressions([response.ReturnType, response.Value ?? string.Empty]);
+        if (Constrained) code.ClaimExpressions([context.BasePackage + ".runtime.UniqueValueStore", context.BasePackage + ".runtime.InMemoryUniqueValueStore", context.BasePackage + ".infrastructure.ModeledConstraints"]);
+        foreach (var produced in command.Produces)
+        {
+            var contract = CommandAppends.Contract(context, produced.EventContract);
+            code.ClaimExpressions([AxonEventsEmitter.TypeFor(context, contract.Id), .. contract.Properties.Select(property => _types.Type(property.Type))]);
+        }
+    }
+
     void Dependencies(JavaCodeBuilder body, string name)
     {
         body.Line($"private final {name}Rules rules;");
-        if (_usesClock) body.Line("private final java.time.Clock clock;");
-        if (Constrained) body.Line($"private final {context.BasePackage}.runtime.UniqueValueStore uniqueValues;");
-        var parameters = $"{name}Rules rules" + (_usesClock ? ", java.time.Clock clock" : string.Empty);
+        if (_usesClock) body.Line($"private final {body.Reference("java.time.Clock")} clock;");
+        if (Constrained) body.Line($"private final {body.Reference(context.BasePackage + ".runtime.UniqueValueStore")} uniqueValues;");
+        var parameters = $"{name}Rules rules" + (_usesClock ? $", {body.Reference("java.time.Clock")} clock" : string.Empty);
         body.Block($"public {name}Handler({parameters})", constructor =>
         {
             constructor.Line("this.rules = rules;");
             if (_usesClock) constructor.Line("this.clock = clock;");
-            if (Constrained) constructor.Line($"this.uniqueValues = new {context.BasePackage}.runtime.InMemoryUniqueValueStore();");
+            if (Constrained) constructor.Line($"this.uniqueValues = new {constructor.Reference(context.BasePackage + ".runtime.InMemoryUniqueValueStore")}();");
         });
         if (!Constrained) return;
-        body.Line("@org.springframework.beans.factory.annotation.Autowired")
-            .Block($"public {name}Handler({parameters}, {context.BasePackage}.runtime.UniqueValueStore uniqueValues)", constructor =>
+        body.Line($"@{body.Reference("org.springframework.beans.factory.annotation.Autowired")}")
+            .Block($"public {name}Handler({parameters}, {body.Reference(context.BasePackage + ".runtime.UniqueValueStore")} uniqueValues)", constructor =>
             {
                 constructor.Line("this.rules = rules;");
                 if (_usesClock) constructor.Line("this.clock = clock;");
@@ -68,10 +78,10 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
 
     string Parameters(string name, JavaCodeBuilder code, string package)
     {
-        var parameters = name + " command, EventAppender appender";
-        if (Constrained && source?.Generated != true) parameters += ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
+        var parameters = name + $" command, {code.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender";
+        if (Constrained && source?.Generated != true) parameters += $", {code.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
         if (source is null) return parameters;
-        if (source.Generated) return parameters + ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
+        if (source.Generated) return parameters + $", {code.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
         var selector = source.TagKey == source.Member ? "(idProperty = " + source.ReferenceTag(code, package) + ")" : string.Empty;
         return parameters + $", @{code.Reference("org.axonframework.modelling.annotation.InjectEntity")}{selector} @{code.Reference("org.jspecify.annotations.Nullable")} {name}Stream state";
     }
@@ -88,7 +98,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         var builder = new CommandAppends(context, command, source!);
         foreach (var produced in command.Produces)
         {
-            var append = builder.Build(produced);
+            var append = builder.Build(produced, body);
             if (append is null)
             {
                 Unsupported(body, AxonRefusalCodes.CommandMapping, "append every modeled event with its identity and complete property mappings");
@@ -98,7 +108,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         }
         Validate(body);
         if (appends.Count > 0) Append(body, appends, builder.UsesOccurred);
-        if (response.ReturnType != "void") body.Line("return " + response.Value + ";");
+        if (response.ReturnType != "void") body.Line("return " + body.ReferenceExpression(response.Value!) + ";");
     }
 
     void HandleNative(JavaCodeBuilder body, SemanticCommandHandler handler)
@@ -144,7 +154,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         }
         if (source?.Generated != true) return;
         var name = JavaNames.Type(command.Name);
-        body.Line($"context.component(org.axonframework.modelling.StateManager.class).loadManagedEntity({name}Stream.class, command.{source.Member}(), context).join();");
+        body.Line($"context.component({body.Reference("org.axonframework.modelling.StateManager")}.class).loadManagedEntity({name}Stream.class, command.{source.Member}(), context).join();");
     }
 
     void Append(JavaCodeBuilder body, List<(string Event, string? Condition)> appends, bool usesOccurred)
@@ -153,20 +163,20 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         if (usesOccurred)
         {
             _usesClock = true;
-            body.Line("var occurred = java.time.OffsetDateTime.ofInstant(clock.instant(), java.time.ZoneOffset.UTC);");
+            body.Line($"var occurred = {body.Reference("java.time.OffsetDateTime")}.ofInstant(clock.instant(), {body.Reference("java.time.ZoneOffset")}.UTC);");
         }
         if (!Constrained && appends is [{ Condition: null }])
         {
-            body.Line($"appender.append({appends[0].Event});");
+            body.Line($"appender.append({body.ReferenceExpression(appends[0].Event)});");
             return;
         }
-        body.Line("var events = new java.util.ArrayList<Object>();");
+        body.Line($"var events = new {body.Reference("java.util.ArrayList")}<{body.Reference("java.lang.Object")}>();");
         foreach (var append in appends)
         {
-            if (append.Condition is null) body.Line($"events.add({append.Event});");
-            else body.Block($"if ({append.Condition})", conditional => conditional.Line($"events.add({append.Event});"));
+            if (append.Condition is null) body.Line($"events.add({body.ReferenceExpression(append.Event)});");
+            else body.Block($"if ({append.Condition})", conditional => conditional.Line($"events.add({conditional.ReferenceExpression(append.Event)});"));
         }
-        if (Constrained) body.Line($"for (var event : events) {context.BasePackage}.infrastructure.ModeledConstraints.apply(uniqueValues, event, context);");
+        if (Constrained) body.Line($"for (var event : events) {body.Reference(context.BasePackage + ".infrastructure.ModeledConstraints")}.apply(uniqueValues, event, context);");
         body.Line("if (!events.isEmpty()) appender.append(events);");
     }
 
