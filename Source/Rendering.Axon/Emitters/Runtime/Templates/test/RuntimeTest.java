@@ -13,8 +13,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +64,10 @@ class RuntimeTest {
     public record Flag(Boolean value) implements ConceptAs<Boolean> {}
     public record Date(LocalDate value) implements ConceptAs<LocalDate> {}
     public record Time(OffsetDateTime value) implements ConceptAs<OffsetDateTime> {}
+    public record TimeOfDay(LocalTime value) implements ConceptAs<LocalTime> {}
+    public record Elapsed(Duration value) implements ConceptAs<Duration> {}
+    public enum State { First, Second }
+    public record Status(State value) implements ConceptAs<State> {}
 
     @Test
     void primaryTagsUsePrimitiveIdentityValuesNotRecordDebugStrings() {
@@ -120,21 +126,21 @@ class RuntimeTest {
     }
 
     @Test
-    void exponentDecimalValueKeepsItsText() {
+    void exponentDecimalValueUsesPlainText() {
         var mapper = TestSupport.mapper();
         var value = new Number(new BigDecimal("1E+2"));
         var json = mapper.writeValueAsString(value);
-        assertEquals("1E+2", json);
-        assertEquals(value, mapper.readValue(json, Number.class));
+        assertEquals("100", json);
+        assertEquals(new Number(new BigDecimal("100")), mapper.readValue(json, Number.class));
     }
 
     @Test
-    void exponentDecimalMapKeyKeepsItsText() {
+    void exponentDecimalMapKeyUsesPlainText() {
         var mapper = TestSupport.mapper();
         var values = Map.of(new Number(new BigDecimal("1E+2")), "x");
         var json = mapper.writeValueAsString(values);
-        assertEquals("{\"1E+2\":\"x\"}", json);
-        assertEquals(values, mapper.readValue(json, new TypeReference<Map<Number, String>>() {}));
+        assertEquals("{\"100\":\"x\"}", json);
+        assertEquals(Map.of(new Number(new BigDecimal("100")), "x"), mapper.readValue(json, new TypeReference<Map<Number, String>>() {}));
     }
 
     @Test
@@ -147,12 +153,53 @@ class RuntimeTest {
     }
 
     @Test
-    void utcTimestampsKeepZ() {
+    void utcTimestampsUseExplicitOffsets() {
         var mapper = TestSupport.mapper();
         var value = new Time(OffsetDateTime.parse("2026-10-24T12:00:00Z"));
         var json = mapper.writeValueAsString(value);
-        assertEquals("\"2026-10-24T12:00:00Z\"", json);
+        assertEquals("\"2026-10-24T12:00:00+00:00\"", json);
         assertEquals(value, mapper.readValue(json, Time.class));
+        var offset = new Time(OffsetDateTime.parse("2026-10-24T12:00:00.1234567+02:00"));
+        assertEquals("\"2026-10-24T12:00:00.1234567+02:00\"", mapper.writeValueAsString(offset));
+    }
+
+    @Test
+    void localTimesUseSevenFractionalDigits() {
+        var mapper = TestSupport.mapper();
+        var value = LocalTime.of(12, 34, 56, 123456700);
+        var json = "\"12:34:56.1234567\"";
+        assertEquals(json, mapper.writeValueAsString(value));
+        assertEquals(json, mapper.writeValueAsString(new TimeOfDay(value)));
+        assertEquals(new TimeOfDay(value), mapper.readValue(json, TimeOfDay.class));
+        assertEquals("\"12:34:56.0000000\"", mapper.writeValueAsString(new TimeOfDay(LocalTime.of(12, 34, 56))));
+    }
+
+    @Test
+    void stringConceptKeysUseEmbeddedJson() {
+        var mapper = TestSupport.mapper();
+        var values = Map.of(new Text("example"), "x");
+        var json = mapper.writeValueAsString(values);
+        assertEquals("x", mapper.readTree(json).get("\"example\"").asString());
+        assertEquals(values, mapper.readValue(json, new TypeReference<Map<Text, String>>() {}));
+        var time = new Time(OffsetDateTime.parse("2026-10-24T12:00:00Z"));
+        var times = Map.of(time, "x");
+        var timeJson = mapper.writeValueAsString(times);
+        assertEquals("x", mapper.readTree(timeJson).get("\"2026-10-24T12:00:00+00:00\"").asString());
+        assertEquals(times, mapper.readValue(timeJson, new TypeReference<Map<Time, String>>() {}));
+    }
+
+    @Test
+    void enumAndTimeSpanValuesFollowDotNet() {
+        var mapper = TestSupport.mapper();
+        assertEquals("1", mapper.writeValueAsString(State.Second));
+        assertEquals("1", mapper.writeValueAsString(new Status(State.Second)));
+        assertEquals(new Status(State.Second), mapper.readValue("1", Status.class));
+        var value = Duration.ofNanos(123456700);
+        var json = "\"00:00:00.1234567\"";
+        assertEquals(json, mapper.writeValueAsString(value));
+        assertEquals(json, mapper.writeValueAsString(new Elapsed(value)));
+        assertEquals(new Elapsed(value), mapper.readValue(json, Elapsed.class));
+        assertEquals("\"00:00:01\"", mapper.writeValueAsString(Duration.ofSeconds(1)));
     }
 
     @Test

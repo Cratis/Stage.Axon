@@ -23,8 +23,8 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
         context.Artifacts.TrueForAll(artifact => artifact.RelativePath.Contains($"/java/{context.BasePackage}/runtime/", StringComparison.Ordinal)).ShouldBeTrue();
 
     [Fact]
-    void should_emit_primitive_jackson_support_in_its_own_package() =>
-        context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/runtime/json/ConceptsModule.java", StringComparison.Ordinal)).RelativePath.ShouldContain("src/main/java/");
+    void should_not_emit_jackson_helpers_provided_by_fundamentals() =>
+        context.Artifacts.Exists(artifact => artifact.RelativePath.Contains("/runtime/json/", StringComparison.Ordinal)).ShouldBeFalse();
 
     [Fact]
     void should_keep_test_support_out_of_the_application_sources() =>
@@ -56,26 +56,45 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     }
 
     [Fact]
-    void should_keep_the_compat_concepts_module() => Template("ConceptsModule.java").ShouldContain("import io.cratis.fundamentals.concepts.ConceptAs;");
+    void should_use_fundamentals_jackson_modules_in_test_support()
+    {
+        var support = Template("TestSupport.java");
+        foreach (var name in new[] { "ConceptsModule", "ConceptKeyFormat", "TemporalModule", "EnumModule", "TimeSpanModule" })
+        {
+            support.ShouldContain($"import io.cratis.fundamentals.jackson.{name};");
+        }
+        support.ShouldContain("new ConceptsModule(ConceptKeyFormat.EMBEDDED_JSON)");
+        support.ShouldContain("new TemporalModule()");
+        support.ShouldContain("new EnumModule()");
+        support.ShouldContain("new TimeSpanModule()");
+        support.ShouldNotContain(".runtime.json.");
+    }
 
     [Fact]
-    void should_keep_the_exact_serializer_encodings()
+    void should_keep_application_specific_runtime_helpers()
     {
-        var serializer = Template("ConceptSerializer.java");
-        serializer.ShouldContain("String.valueOf(concept.value())");
-        serializer.ShouldContain("context.writeValue(generator, concept.value())");
+        foreach (var name in new[] { "EventSourceId", "ReadModelStore", "InMemoryReadModelStore", "SseBridge" })
+        {
+            context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith($"/runtime/{name}.java", StringComparison.Ordinal)).ShouldBeTrue();
+        }
     }
 
     [Fact]
     void should_pin_exact_wire_tests()
     {
         var tests = Template("RuntimeTest.java");
-        tests.ShouldContain("void exponentDecimalValueKeepsItsText()");
-        tests.ShouldContain("void exponentDecimalMapKeyKeepsItsText()");
+        tests.ShouldContain("void exponentDecimalValueUsesPlainText()");
+        tests.ShouldContain("void exponentDecimalMapKeyUsesPlainText()");
+        tests.ShouldContain("assertEquals(\"100\", json)");
+        tests.ShouldContain("assertEquals(\"{\\\"100\\\":\\\"x\\\"}\", json)");
         tests.ShouldContain("void decimalKeysRoundTrip()");
-        tests.ShouldContain("void utcTimestampsKeepZ()");
-        tests.ShouldContain("1E+2");
-        tests.ShouldContain("2026-10-24T12:00:00Z");
+        tests.ShouldContain("void utcTimestampsUseExplicitOffsets()");
+        tests.ShouldContain("2026-10-24T12:00:00+00:00");
+        tests.ShouldContain("void localTimesUseSevenFractionalDigits()");
+        tests.ShouldContain("12:34:56.1234567");
+        tests.ShouldContain("12:34:56.0000000");
+        tests.ShouldContain("void stringConceptKeysUseEmbeddedJson()");
+        tests.ShouldContain("void enumAndTimeSpanValuesFollowDotNet()");
     }
 
     [Fact]
@@ -83,8 +102,10 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     {
         var tests = Template("RuntimeHttpRoundTripTest.java");
         tests.ShouldContain("void exactConceptWireFormatSurvivesHttpRoundTrip()");
-        tests.ShouldContain("1E+2");
-        tests.ShouldContain("2026-10-24T12:00:00Z");
+        tests.ShouldContain("\\\"amount\\\":100");
+        tests.ShouldContain("\\\"byAmount\\\":{\\\"100\\\":\\\"x\\\"}");
+        tests.ShouldContain("2026-10-24T12:00:00+00:00");
+        tests.ShouldNotContain("1E+2");
         tests.ShouldContain("content().string(json)");
     }
 

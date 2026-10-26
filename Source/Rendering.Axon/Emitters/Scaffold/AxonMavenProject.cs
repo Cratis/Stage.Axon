@@ -20,6 +20,7 @@ internal static class AxonMavenProject
           </dependencies></dependencyManagement>
           <dependencies>
             <dependency><groupId>{{CratisFundamentals.GroupId}}</groupId><artifactId>{{CratisFundamentals.ArtifactId}}</artifactId><version>{{CratisFundamentals.Version}}</version></dependency>
+            <dependency><groupId>{{CratisFundamentals.GroupId}}</groupId><artifactId>{{CratisFundamentals.JacksonArtifactId}}</artifactId><version>{{CratisFundamentals.Version}}</version></dependency>
             <dependency><groupId>org.axonframework.extensions.spring</groupId><artifactId>axon-spring-boot-starter</artifactId></dependency>
             <dependency><groupId>io.projectreactor</groupId><artifactId>reactor-core</artifactId></dependency>
             <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>

@@ -24,7 +24,11 @@ internal static class AxonApplicationScaffold
         .Import("org.axonframework.messaging.eventhandling.processing.streaming.token.store.TokenStore")
         .Import("org.axonframework.messaging.eventhandling.processing.streaming.token.store.inmemory.InMemoryTokenStore")
         .Import("tools.jackson.databind.JacksonModule")
-        .Import(package + ".runtime.json.ConceptsModule")
+        .Import("io.cratis.fundamentals.jackson.ConceptsModule")
+        .Import("io.cratis.fundamentals.jackson.ConceptKeyFormat")
+        .Import("io.cratis.fundamentals.jackson.TemporalModule")
+        .Import("io.cratis.fundamentals.jackson.EnumModule")
+        .Import("io.cratis.fundamentals.jackson.TimeSpanModule")
         .Line("@Configuration")
         .Block("public class AxonConfiguration", body => body
             .Line("@Bean")
@@ -36,6 +40,12 @@ internal static class AxonApplicationScaffold
             .Line("@Bean")
             .Line("Clock clock() { return Clock.systemUTC(); }")
             .Line("@Bean")
-            .Line("JacksonModule conceptsModule() { return new ConceptsModule(); }"))
+            .Line("JacksonModule conceptsModule() { return new ConceptsModule(ConceptKeyFormat.EMBEDDED_JSON); }")
+            .Line("@Bean")
+            .Line("JacksonModule temporalModule() { return new TemporalModule(); }")
+            .Line("@Bean")
+            .Line("JacksonModule enumModule() { return new EnumModule(); }")
+            .Line("@Bean")
+            .Line("JacksonModule timeSpanModule() { return new TimeSpanModule(); }"))
         .Build();
 }
