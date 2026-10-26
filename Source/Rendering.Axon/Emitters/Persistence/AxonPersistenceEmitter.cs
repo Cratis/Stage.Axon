@@ -51,11 +51,18 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
                             });
                 }
             """);
-        Add("PersistentViewConfiguration", Configuration(package, types.BasePackage, fingerprint, string.Join('\n', processors), string.Join(", ", namespaces.Select(JavaCodeBuilder.StringLiteral))));
+        Add("PersistentViewConfiguration", Configuration(package, types.BasePackage, fingerprint, ProcessorGuard(namespaces) + '\n' + string.Join('\n', processors)));
         new PersistentViewTests(context, types, package).Emit();
     }
 
-    static string Configuration(string package, string application, string fingerprint, string processors, string namespaces) => $$"""
+    static string ProcessorGuard(IEnumerable<string> namespaces) => $$"""
+            @org.springframework.context.annotation.Bean
+            org.springframework.beans.factory.SmartInitializingSingleton persistentViewProcessorGuard(org.axonframework.common.configuration.Configuration configuration) {
+                return () -> PersistentViewProcessorGuard.verify(configuration, java.util.Set.of({{string.Join(", ", namespaces.Select(JavaCodeBuilder.StringLiteral))}}));
+            }
+        """;
+
+    static string Configuration(string package, string application, string fingerprint, string processors) => $$"""
         // Copyright (c) Cratis. All rights reserved.
         // Licensed under the MIT license. See LICENSE file in the project root for full license information.
         package {{package}};
@@ -75,10 +82,6 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
             public static final String FINGERPRINT = "{{fingerprint}}";
             public PersistentViewConfiguration(EntityManagerFactory factory) {
                 PersistentViewBootstrap.verify(factory, "{{application}}", FINGERPRINT);
-            }
-            @org.springframework.context.annotation.Bean
-            org.springframework.beans.factory.SmartInitializingSingleton persistentViewProcessorGuard(org.axonframework.common.configuration.Configuration configuration) {
-                return () -> PersistentViewProcessorGuard.verify(configuration, java.util.Set.of({{namespaces}}));
             }
         {{processors}}
         }
