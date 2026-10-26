@@ -193,6 +193,8 @@ API references: [Axon event sourcing](https://docs.axoniq.io/axon-framework-refe
 
 ### Degradation and generated specifications
 
+Nonempty `ThenInvocations` assertions emit an attributed `STAGE-AXON-SPEC` warning (strict mode refuses): generated tests do not verify those command calls or argument values. The unsupported assertion is retained in `UNSUPPORTED.md`, not silently treated as a successful check.
+
 Unsupported mappings, keys, context values and query shapes produce diagnostics. Closest equivalents carry `// Differs from Screenplay: ...` comments. Unavailable behavior carries `// Screenplay wanted to ...` comments naming its code and semantic path. Strict mode refuses unsupported behavior rather than accepting warning-based scaffolding.
 
 Generated view JUnit tests replay supported given events and assert rows, including keyed absence, composite keys, nested values and child arrays. Unsupported seeded, action-based, exact or query expectations are `@Disabled` with `STAGE-AXON-0501`, not empty passing tests; reducer-dependent specifications use `STAGE-AXON-0306`.

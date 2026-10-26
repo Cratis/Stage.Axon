@@ -11,6 +11,7 @@ using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
 using Cratis.Stage.Rendering.Axon.Emitters.Constraints;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
+using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
@@ -85,5 +86,39 @@ public class when_a_native_handler_produces_a_uniquely_constrained_event : for_A
         diagnostic.Severity.ShouldEqual(strict ? ArtifactRenderDiagnosticSeverity.Error : ArtifactRenderDiagnosticSeverity.Warning);
         context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
         Text(context.Artifacts[^1]).ShouldContain(requirementId);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void should_emit_a_complete_throwing_stub_and_audit_when_admission_fails(bool strict)
+    {
+        static SemanticFeature Feature(SemanticFeature feature) => feature with
+        {
+            Features = [.. feature.Features.Select(Feature)],
+            Slices = [.. feature.Slices.Select(slice => slice with { Constraints = [] })]
+        };
+        var application = request.Model.Application with { Modules = [.. request.Model.Application.Modules.Select(module => module with { Features = [.. module.Features.Select(Feature)] })] };
+        var scoped = request with
+        {
+            Model = ExecutableSemanticModel.Create(new(23, 0), SemanticVersion.V23, application),
+            Profile = AxonRendering.CreateProfile(strict: strict),
+            ImplementationRequirements = [request.ImplementationRequirements[0] with { ContentHash = "stale" }]
+        };
+        var context = new AxonEmissionContext(scoped, new(scoped.Profile));
+        InlineJavaBodies.TryResolve(context, new(requirementId, SemanticImplementationRole.CommandHandler, command.Id), out _, out var reason).ShouldBeFalse();
+        var source = CommandSource.Create(context, command, CommandAppends.Contract(context, command.Produces[0].EventContract));
+        new CommandHandlerEmitter(context, located, command, source).Emit();
+        InlineImplementationDiagnostics.Emit(context);
+        var code = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + command.Name + "Handler.java", StringComparison.Ordinal)));
+        var message = AxonRefusalCodes.Implementation + ": execute the attached command implementation: " + reason;
+        code.ShouldContain("throw new UnsupportedOperationException(" + JavaCodeBuilder.StringLiteral(message) + ");\n    }");
+        code.ShouldNotContain("native-constraint-body");
+        code.ShouldNotContain("rules.validate(command);");
+        code.ShouldNotContain("loadManagedEntity(");
+        context.ConsumedImplementations.ShouldBeEmpty();
+        context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == command.Id && diagnostic.Message.Contains("SHA-256", StringComparison.Ordinal)).ShouldBeTrue();
+        context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
+        Text(context.Artifacts[^1]).ShouldContain("SHA-256");
     }
 }

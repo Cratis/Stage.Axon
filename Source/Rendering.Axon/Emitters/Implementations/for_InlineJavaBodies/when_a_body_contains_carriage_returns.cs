@@ -45,5 +45,10 @@ public class when_a_body_contains_carriage_returns : a_view_request
         context.ConsumedImplementations.ShouldBeEmpty();
         foreach (var artifact in context.Artifacts) Text(artifact).ShouldNotContain("transport-secret");
         Text(context.Artifacts[^1]).ShouldContain("LF-only");
+        var performer = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("Performer.java", StringComparison.Ordinal)));
+        performer.ShouldContain("throw new UnsupportedOperationException(");
+        performer.ShouldContain("\");\n    }\n}");
+        performer.ShouldNotContain("return java.util.List.of();");
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("PerformerConfiguration.java", StringComparison.Ordinal)).ShouldBeTrue();
     }
 }
