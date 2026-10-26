@@ -55,14 +55,14 @@ internal static partial class SemanticSurfaceLedger
                 entries[$"{parts[0]}.{member}"] = new(SemanticSurfaceDispositionKind.Rendered, "Axon immutable view, event projector or typed query artifact; unsupported forms degrade at their owner.");
         }
 
-        SetViews(entries, SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-0308: read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused.", "SemanticReadModel.Properties");
+        SetViews(entries, SemanticSurfaceDispositionKind.Warned, "Conditional persistent support for admitted flat views with generation metadata and guarded pooled processors. STAGE-AXON-0308 warns for unsupported shapes during default rendering and refuses them under strict rendering or persistent startup. Retained data without compatible generation metadata is refused; automatic replay and legacy adoption are not performed.", "SemanticReadModel.Properties");
         SetViews(entries, SemanticSurfaceDispositionKind.Warned, "Conditional LF-only, SHA-256-matched pure Java transition bodies are placed verbatim. STAGE-AXON-0306 defaults return current; events are ignored until a supported body is authored. InitialState is advisory; current is null on first delivery. Unsupported target/from forms degrade explicitly; dependent specifications remain disabled unless fully supported.", "SemanticReducer.Transitions SemanticReducer.InitialState SemanticReducer.Target SemanticReducer.From SemanticReducerTransition.RequirementId");
-        SetViews(entries, SemanticSurfaceDispositionKind.Rejected, "STAGE-AXON-0501: query expectations in view specifications remain explicitly disabled.", "SemanticQueryFilterValue.Filter SemanticQueryFilterValue.Value");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Declaration identity metadata; the generated artifact is attributed to its owning query.", "SemanticQueryKeyPart.Id SemanticQueryFilter.Id SemanticReadModelQueryArgument.Id");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "The generated reducer interface is named after its read model, not the modeled reducer name.", "SemanticReducer.Name");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Projection nomination is not consumed; Axon emits its own typed event projector.", "SemanticProjection.Target");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Legacy cardinality metadata does not select bulk behavior: the projector applies one event to its modeled key.", "SemanticAffectedInstance.Cardinality AffectedInstanceCardinality.One AffectedInstanceCardinality.Many AffectedInstanceCardinality.ZeroOrOne AffectedInstanceCardinality.Unknown");
         SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Unknown sentinel has no supported Axon interpretation; it is not an additional executable variant.", "SemanticQueryCardinality.Unknown SemanticQueryDelivery.Unknown SemanticProjectionKeyKind.Unknown SemanticProjectionOperation.Unknown SemanticProjectionValueKind.Unknown");
+        ClassifyConditions(entries);
     }
 
     static void SetViews(Dictionary<string, SemanticSurfaceDisposition> entries, SemanticSurfaceDispositionKind kind, string detail, string members)

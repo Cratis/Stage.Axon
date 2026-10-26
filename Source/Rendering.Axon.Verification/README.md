@@ -25,14 +25,16 @@ Every application must execute passing native tests. Missing, failed, empty, or 
 
 The existing four-file views corpus includes native reducer initialization, accumulation and deletion scenarios.
 
-The opt-in `PersistentRestartProbe` is outside default Surefire discovery, so it adds no conditional skip to the default corpus. After the normal native checks, explicitly run it against a view application:
+Persistent startup supports admitted flat projections with durable view rows and generation metadata; scoped projections, reducers and other unsupported shapes remain guarded by `STAGE-AXON-0308`. Supported views require pooled processors with propagating error handling. Missing or incompatible generation metadata on retained data is refused: no automatic replay, reset or legacy adoption is performed.
+
+Generated default Surefire proofs cover recovery before new appends, retained checkpoints, subsequent updates, handler/token-store failure rollback and retry, and rejection of off-thread or non-joined writes. Additional cases cover generation refusal, processor customization guards and default-profile handler dispatch/query invalidation. These tests are included in the generated Maven `verify` run used by CI.
+
+The opt-in `PersistentRestartProbe` remains outside default Surefire discovery:
 
 ```bash
 (cd .ai-work/axon-corpus && sh ./mvnw -B -pl orders -Dtest=PersistentRestartProbe -Dstage.restart=true -Dstage.expectViews=true test)
 ```
 
-Two scenarios execute per selected module: a scan-free, test-only viewless fixture preserves events and uniqueness claims across two persistent boots; the actual generated view application refuses two persistent starts with `STAGE-AXON-0308`, before factory/resource/lifecycle activity, HTTP initialization or readiness. Preseeded nonempty event, claim and synthetic token rows are compared in full by SELECT-only logical snapshots after each refusal; a fresh-file attempt must also refuse without creating database files. The fixture does not remove or replace any production view. Without `stage.expectViews=true`, a successful main-application probe must explicitly be viewless.
-
-Rows and projector indexes are volatile, while durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused. The full persistence/recovery gap remains open. Default-profile native tests, including ordinary lifecycle guard tests and deliberate Given-event projection replay, do not establish startup recovery. The opt-in probe is separate safety evidence, not a replacement for the default corpus checks.
+It checks event and uniqueness-claim survival in a viewless fixture. For the selected application, unsupported views must refuse both seeded and fresh databases; supported flat views must refuse seeded legacy data without changing event, claim or token snapshots, but may start on a fresh database with generation metadata. Without `stage.expectViews=true`, successful main-application probes must be viewless. This probe supplements, rather than replaces, the default native tests.
 
 The boot smoke starts each packaged application, checks its intentional root HTTP 404, and stops every process it owns. It does not assert modeled command or query behavior; those assertions belong to the generated native tests. CI should put generated output and logs under `runner.temp`, not in the checkout.
