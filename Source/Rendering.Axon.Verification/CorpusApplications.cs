@@ -5,7 +5,10 @@ namespace Cratis.Stage.Rendering.Axon.Verification;
 
 internal static class CorpusApplications
 {
-    internal static IReadOnlyList<(string Name, string Root)> Find(string repository)
+    // Native report verification enumerates names only; render callers supply the composed input root.
+    internal static IReadOnlyList<(string Name, string Root)> Find(string repository) => Find(repository, Path.Combine(repository, "Corpus/live-custom-packages/model"));
+
+    internal static IReadOnlyList<(string Name, string Root)> Find(string repository, string customModelRoot)
     {
         var blueprints = Directory.GetDirectories(Path.Combine(repository, "Corpus/live-blueprints/models")).Order(StringComparer.Ordinal).ToArray();
         var views = Path.Combine(repository, "Corpus/axon-samples/views");
@@ -20,7 +23,7 @@ internal static class CorpusApplications
             .. blueprints.Select(path => (new DirectoryInfo(path).Name, path)),
             ("sample-navigation", Path.Combine(repository, "Corpus/live-navigation/model")),
             ("sample-templates", Path.Combine(repository, "Corpus/blueprint-templates/model")),
-            ("sample-custom-packages", Path.Combine(repository, "Corpus/live-custom-packages/model")),
+            ("sample-custom-packages", customModelRoot),
             ("views-combined", views),
             .. files.Select(path => ("view-" + Path.GetFileNameWithoutExtension(path), path))
         ];

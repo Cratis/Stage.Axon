@@ -10,6 +10,7 @@
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="../Rendering.Axon/Rendering.Axon.csproj" />
+        <PackageReference Include="Cratis.Screenplay.CanonicalCorpus" />
         <None Update="disabled-tests.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 </Project>

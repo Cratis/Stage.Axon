@@ -35,9 +35,9 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
     {
         var name = JavaNames.Type(concept.Name);
         var primitive = JavaSemanticTypes.Primitive(concept.Primitive);
-        var marker = concept.Generation is null ? string.Empty : $", {context.BasePackage}.runtime.Generatable<{name}>";
+        var marker = concept.Generation is null ? string.Empty : $", {CratisFundamentals.ConceptsPackage}.Generatable<{name}>";
         return new JavaCodeBuilder(context.BasePackage + ".concepts")
-            .Block($"public record {name}({primitive} value) implements {context.BasePackage}.runtime.ConceptAs<{primitive}>{marker}", body =>
+            .Block($"public record {name}({primitive} value) implements {CratisFundamentals.ConceptsPackage}.ConceptAs<{primitive}>{marker}", body =>
             {
                 body.Block($"public {name}", constructor =>
                 {

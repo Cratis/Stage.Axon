@@ -11,6 +11,11 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
+import io.cratis.fundamentals.concepts.ConceptAs;
+import io.cratis.fundamentals.concepts.Generatable;
+import io.cratis.fundamentals.concepts.GeneratableInContext;
+import io.cratis.fundamentals.concepts.GenerateValue;
+import io.cratis.fundamentals.concepts.GenerationContext;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.type.TypeReference;
 import static org.junit.jupiter.api.Assertions.*;
@@ -70,7 +75,7 @@ class RuntimeTest {
     @Test
     void generationUsesTheSelfTypedMarkers() {
         assertInstanceOf(Generatable.class, Id.create());
-        assertInstanceOf(GeneratableInContext.class, TimedId.create(GenerationContext.current()));
+        assertInstanceOf(GeneratableInContext.class, TimedId.create(new GenerationContext(java.time.Instant.now())));
         assertThrows(IllegalArgumentException.class, () -> TimedId.create(null));
     }
 
@@ -92,6 +97,42 @@ class RuntimeTest {
         var id = new Id(UUID.randomUUID());
         var values = Map.of(id, "entry");
         assertEquals(values, mapper.readValue(mapper.writeValueAsString(values), new TypeReference<Map<Id, String>>() {}));
+    }
+
+    @Test
+    void exponentDecimalValueKeepsItsText() {
+        var mapper = TestSupport.mapper();
+        var value = new Number(new BigDecimal("1E+2"));
+        var json = mapper.writeValueAsString(value);
+        assertEquals("1E+2", json);
+        assertEquals(value, mapper.readValue(json, Number.class));
+    }
+
+    @Test
+    void exponentDecimalMapKeyKeepsItsText() {
+        var mapper = TestSupport.mapper();
+        var values = Map.of(new Number(new BigDecimal("1E+2")), "x");
+        var json = mapper.writeValueAsString(values);
+        assertEquals("{\"1E+2\":\"x\"}", json);
+        assertEquals(values, mapper.readValue(json, new TypeReference<Map<Number, String>>() {}));
+    }
+
+    @Test
+    void decimalKeysRoundTrip() {
+        var mapper = TestSupport.mapper();
+        var values = Map.of(new Number(new BigDecimal("1.25")), "x");
+        var json = mapper.writeValueAsString(values);
+        assertEquals("{\"1.25\":\"x\"}", json);
+        assertEquals(values, mapper.readValue(json, new TypeReference<Map<Number, String>>() {}));
+    }
+
+    @Test
+    void utcTimestampsKeepZ() {
+        var mapper = TestSupport.mapper();
+        var value = new Time(OffsetDateTime.parse("2026-10-24T12:00:00Z"));
+        var json = mapper.writeValueAsString(value);
+        assertEquals("\"2026-10-24T12:00:00Z\"", json);
+        assertEquals(value, mapper.readValue(json, Time.class));
     }
 
     @Test

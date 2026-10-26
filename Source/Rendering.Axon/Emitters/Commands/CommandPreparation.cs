@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Concepts;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
@@ -47,7 +48,7 @@ internal sealed class CommandPreparation(AxonEmissionContext context, SemanticCo
     string? Allocated(CommandSource identity)
     {
         var primitive = _types.PrimitiveOf(identity.Type);
-        var value = context.BasePackage + ".runtime.GenerateValue.uuid()";
+        var value = CratisFundamentals.ConceptsPackage + ".GenerateValue.uuid()";
         if (primitive == SemanticPrimitiveType.Text) value += ".toString()";
         else if (primitive != SemanticPrimitiveType.Uuid) return null;
         var wrapped = identity.RuntimeId ? $"new {identity.JavaType}({value})" : _types.Wrap(value, identity.Type);

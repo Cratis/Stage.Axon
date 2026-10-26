@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Cratis.Stage.Contracts" Version="4.197.0" />
+    <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.241.0" />
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" NoWarn="NU5104" />
     <PackageVersion Include="Roslynator.Analyzers" Version="5.0.1" />
     <PackageVersion Include="Meziantou.Analyzer" Version="3.0.303" />
