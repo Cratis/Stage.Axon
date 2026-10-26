@@ -5,7 +5,6 @@ package __RUNTIME__;
 
 import io.cratis.fundamentals.jackson.ConceptKeyFormat;
 import io.cratis.fundamentals.jackson.ConceptsModule;
-import io.cratis.fundamentals.jackson.EnumModule;
 import io.cratis.fundamentals.jackson.TemporalModule;
 import io.cratis.fundamentals.jackson.TimeSpanModule;
 import org.axonframework.eventsourcing.configuration.EventSourcingConfigurer;
@@ -19,7 +18,6 @@ public final class TestSupport {
         return JsonMapper.builder()
             .addModule(new ConceptsModule(ConceptKeyFormat.EMBEDDED_JSON))
             .addModule(new TemporalModule())
-            .addModule(new EnumModule())
             .addModule(new TimeSpanModule())
             .build();
     }

@@ -59,13 +59,13 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     void should_use_fundamentals_jackson_modules_in_test_support()
     {
         var support = Template("TestSupport.java");
-        foreach (var name in new[] { "ConceptsModule", "ConceptKeyFormat", "TemporalModule", "EnumModule", "TimeSpanModule" })
+        foreach (var name in new[] { "ConceptsModule", "ConceptKeyFormat", "TemporalModule", "TimeSpanModule" })
         {
             support.ShouldContain($"import io.cratis.fundamentals.jackson.{name};");
         }
         support.ShouldContain("new ConceptsModule(ConceptKeyFormat.EMBEDDED_JSON)");
         support.ShouldContain("new TemporalModule()");
-        support.ShouldContain("new EnumModule()");
+        support.ShouldNotContain("EnumModule");
         support.ShouldContain("new TimeSpanModule()");
         support.ShouldNotContain(".runtime.json.");
     }
@@ -94,7 +94,13 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
         tests.ShouldContain("12:34:56.1234567");
         tests.ShouldContain("12:34:56.0000000");
         tests.ShouldContain("void stringConceptKeysUseEmbeddedJson()");
-        tests.ShouldContain("void enumAndTimeSpanValuesFollowDotNet()");
+        tests.ShouldContain("void explicitEnumValuesRoundTrip()");
+        tests.ShouldContain("LOW(10), HIGH(30)");
+        tests.ShouldContain("@JsonValue");
+        tests.ShouldContain("@JsonCreator");
+        tests.ShouldContain("void invalidEnumNumbersAreRejected()");
+        tests.ShouldContain("void enumMapKeysRoundTrip()");
+        tests.ShouldContain("void timeSpanValuesFollowDotNet()");
     }
 
     [Fact]
@@ -107,6 +113,10 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
         tests.ShouldContain("2026-10-24T12:00:00+00:00");
         tests.ShouldNotContain("1E+2");
         tests.ShouldContain("content().string(json)");
+        tests.ShouldContain("void explicitEnumValuesSurviveHttpRoundTrip()");
+        tests.ShouldContain("List.of(10, 30)");
+        tests.ShouldContain("void invalidEnumNumbersFailHttpBinding()");
+        tests.ShouldContain("List.of(0, 1, 20, 31)");
     }
 
     [Fact]

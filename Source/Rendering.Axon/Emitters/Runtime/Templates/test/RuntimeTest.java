@@ -3,6 +3,8 @@
 
 package __RUNTIME__;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import io.cratis.fundamentals.concepts.ConceptAs;
 import io.cratis.fundamentals.concepts.Generatable;
 import io.cratis.fundamentals.concepts.GeneratableInContext;
@@ -66,8 +68,22 @@ class RuntimeTest {
     public record Time(OffsetDateTime value) implements ConceptAs<OffsetDateTime> {}
     public record TimeOfDay(LocalTime value) implements ConceptAs<LocalTime> {}
     public record Elapsed(Duration value) implements ConceptAs<Duration> {}
-    public enum State { First, Second }
-    public record Status(State value) implements ConceptAs<State> {}
+    public enum Priority {
+        LOW(10), HIGH(30);
+        private final Integer value;
+        Priority(Integer value) { this.value = value; }
+        @JsonValue
+        public Integer value() { return value; }
+        @Override
+        public String toString() { return value.toString(); }
+        @JsonCreator
+        public static Priority fromValue(Integer value) {
+            for (var candidate : values()) if (candidate.value.equals(value)) return candidate;
+            throw new IllegalArgumentException("Unknown Priority value: " + value);
+        }
+    }
+    public record Status(Priority value) implements ConceptAs<Priority> {}
+    public record Prioritized(Priority priority, Status status) {}
 
     @Test
     void primaryTagsUsePrimitiveIdentityValuesNotRecordDebugStrings() {
@@ -189,11 +205,49 @@ class RuntimeTest {
     }
 
     @Test
-    void enumAndTimeSpanValuesFollowDotNet() {
+    void explicitEnumValuesRoundTrip() {
         var mapper = TestSupport.mapper();
-        assertEquals("1", mapper.writeValueAsString(State.Second));
-        assertEquals("1", mapper.writeValueAsString(new Status(State.Second)));
-        assertEquals(new Status(State.Second), mapper.readValue("1", Status.class));
+        for (var priority : Priority.values()) {
+            var json = priority.value().toString();
+            assertEquals(json, mapper.writeValueAsString(priority));
+            assertEquals(priority, mapper.readValue(json, Priority.class));
+            var status = new Status(priority);
+            assertEquals(json, mapper.writeValueAsString(status));
+            assertEquals(status, mapper.readValue(json, Status.class));
+            var nested = new Prioritized(priority, status);
+            var nestedJson = "{\"priority\":" + json + ",\"status\":" + json + "}";
+            assertEquals(nestedJson, mapper.writeValueAsString(nested));
+            assertEquals(nested, mapper.readValue(nestedJson, Prioritized.class));
+        }
+    }
+
+    @Test
+    void invalidEnumNumbersAreRejected() {
+        var mapper = TestSupport.mapper();
+        for (var invalid : List.of("0", "1", "20", "31")) {
+            assertThrows(IllegalArgumentException.class, () -> Priority.fromValue(Integer.valueOf(invalid)));
+            assertThrows(tools.jackson.core.JacksonException.class, () -> mapper.readValue(invalid, Priority.class));
+            assertThrows(tools.jackson.core.JacksonException.class, () -> mapper.readValue(invalid, Status.class));
+        }
+    }
+
+    @Test
+    void enumMapKeysRoundTrip() {
+        var mapper = TestSupport.mapper();
+        var values = Map.of(Priority.LOW, "low", Priority.HIGH, "high");
+        var json = mapper.writeValueAsString(values);
+        assertEquals("low", mapper.readTree(json).get("10").asString());
+        assertEquals("high", mapper.readTree(json).get("30").asString());
+        assertEquals(values, mapper.readValue(json, new TypeReference<Map<Priority, String>>() {}));
+        var concepts = Map.of(new Status(Priority.HIGH), "high");
+        var conceptJson = mapper.writeValueAsString(concepts);
+        assertEquals("high", mapper.readTree(conceptJson).get("30").asString());
+        assertEquals(concepts, mapper.readValue(conceptJson, new TypeReference<Map<Status, String>>() {}));
+    }
+
+    @Test
+    void timeSpanValuesFollowDotNet() {
+        var mapper = TestSupport.mapper();
         var value = Duration.ofNanos(123456700);
         var json = "\"00:00:00.1234567\"";
         assertEquals(json, mapper.writeValueAsString(value));

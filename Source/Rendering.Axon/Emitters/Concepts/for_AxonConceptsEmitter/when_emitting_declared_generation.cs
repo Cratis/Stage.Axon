@@ -35,6 +35,9 @@ public class when_emitting_declared_generation : for_AxonArtifactRenderPlanner.g
         var code = ConceptEnums.Emit(context, concept);
         code.ShouldContain("LOW(10)");
         code.ShouldContain("HIGH(30)");
-        code.ShouldContain("public Integer value()");
+        code.ShouldContain("@JsonValue\n    public Integer value()");
+        code.ShouldContain("@JsonCreator\n    public static Priority fromValue(Integer value)");
+        code.ShouldContain("candidate.value.equals(value)");
+        code.ShouldContain("throw new IllegalArgumentException(\"Unknown Priority value: \" + value)");
     }
 }
