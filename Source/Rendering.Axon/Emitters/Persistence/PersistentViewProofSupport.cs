@@ -35,6 +35,7 @@ internal static class PersistentViewProofSupport
         import org.axonframework.messaging.core.unitofwork.ProcessingContext;
         import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
         import org.axonframework.messaging.eventhandling.annotation.EventHandler;
+        import org.axonframework.messaging.eventhandling.processing.streaming.segmenting.Segment;
         import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
         import org.springframework.boot.builder.SpringApplicationBuilder;
         import org.springframework.boot.test.context.TestConfiguration;
@@ -57,6 +58,19 @@ internal static class PersistentViewProofSupport
                         "--server.port=0", "--spring.datasource.url=jdbc:h2:file:" + path,
                         "--axon.eventhandling.processors[__PACKAGE__].initial-segment-count=1",
                         "--spring.jpa.hibernate.ddl-auto=update", "--spring.main.banner-mode=off");
+            }
+            static ConfigurableApplicationContext startMultiSegment(Path path) throws Exception {
+                var application = new SpringApplicationBuilder(FlatFixture.class).profiles("persistent").run(
+                        "--server.port=0", "--spring.datasource.url=jdbc:h2:file:" + path,
+                        "--axon.eventhandling.processors[__PACKAGE__].initial-segment-count=4",
+                        "--spring.jpa.hibernate.ddl-auto=update", "--spring.main.banner-mode=off");
+                try {
+                    await(() -> tokens(application).size() == 4);
+                    return application;
+                } catch (Exception | Error cause) {
+                    application.close();
+                    throw cause;
+                }
             }
             @SuppressWarnings("unchecked")
             static ReadModelStore<Object, __MODEL__> store(ConfigurableApplicationContext application) {
@@ -111,6 +125,9 @@ internal static class PersistentViewProofSupport
             }
             enum Failure { NONE, HANDLER, TOKEN, ASYNC, NON_JOINED }
             static volatile Failure failure = Failure.NONE;
+            static volatile Integer observedOwner;
+            static final Map<org.axonframework.messaging.eventstreaming.Tag, Integer> observedOwners = new java.util.concurrent.ConcurrentHashMap<>();
+            static volatile Integer tokenFailureSegment;
             static volatile CountDownLatch rolledBack = new CountDownLatch(1);
             static volatile CountDownLatch refused = new CountDownLatch(1);
             static volatile CountDownLatch viewChanged = new CountDownLatch(1);
@@ -121,6 +138,10 @@ internal static class PersistentViewProofSupport
                 RollbackWitness(ConfigurableApplicationContext application) { this.application = application; }
                 @EventHandler
                 public void handle(__EVENT_TYPE__ event, ProcessingContext context) {
+                    var owner = Segment.fromContext(context).map(Segment::getSegmentId)
+                            .orElseThrow(() -> new AssertionError("FIXTURE: pooled witness requires an owning segment"));
+                    observedOwner = owner;
+                    observedOwners.put(tag(event), owner);
                     context.onError((ignored, phase, cause) -> rolledBack.countDown());
                     var bound = JpaReadModelStore.bind(store(application), context);
                     if (failure == Failure.ASYNC) {
@@ -159,6 +180,7 @@ internal static class PersistentViewProofSupport
             public static class TokenFailure implements org.h2.api.Trigger {
                 private int tokenColumn;
                 private int processorColumn;
+                private int segmentColumn;
                 @Override public void init(java.sql.Connection connection, String schema, String trigger, String table,
                         boolean before, int type) throws java.sql.SQLException {
                     try (var statement = connection.createStatement(); var result = statement.executeQuery("select * from token_entry where 1=0")) {
@@ -166,11 +188,13 @@ internal static class PersistentViewProofSupport
                             var name = result.getMetaData().getColumnName(index);
                             if (name.equalsIgnoreCase("token")) tokenColumn = index - 1;
                             if (name.equalsIgnoreCase("processor_name")) processorColumn = index - 1;
+                            if (name.equalsIgnoreCase("segment")) segmentColumn = index - 1;
                         }
                     }
                 }
                 @Override public void fire(java.sql.Connection connection, Object[] before, Object[] after) throws java.sql.SQLException {
                     if (failure == Failure.TOKEN && "__PACKAGE__".equals(after[processorColumn]) &&
+                            (tokenFailureSegment == null || tokenFailureSegment.equals(after[segmentColumn])) &&
                             !java.util.Arrays.equals(bytes(before[tokenColumn]), bytes(after[tokenColumn]))) {
                         tokenRejected.countDown();
                         throw new java.sql.SQLException("deliberate TokenStore persistence failure", "23514");
@@ -180,7 +204,9 @@ internal static class PersistentViewProofSupport
                     return value instanceof java.sql.Blob blob ? blob.getBytes(1, Math.toIntExact(blob.length())) : (byte[]) value;
                 }
             }
-            static void installTokenFailure(Path path) throws Exception {
+            static void installTokenFailure(Path path) throws Exception { installTokenFailure(path, null); }
+            static void installTokenFailure(Path path, Integer owner) throws Exception {
+                tokenFailureSegment = owner;
                 try (var connection = java.sql.DriverManager.getConnection("jdbc:h2:file:" + path, "sa", "");
                      var statement = connection.createStatement()) {
                     statement.execute("create trigger stage_token_failure before update on token_entry for each row call '__PACKAGE__.__NAME__Support$TokenFailure'");

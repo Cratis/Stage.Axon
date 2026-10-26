@@ -56,6 +56,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         Add("Support", PersistentViewProofSupport.Source);
         Add("Fixture", PersistentViewFixtureContract.Source);
         Add("Test", PersistentViewProof.Source);
+        Add("MultiSegmentTest", PersistentViewProof.MultiSegmentSource);
         Add("StoreTest", PersistentViewContractTests.Source);
         Add("LegacyTest", PersistentViewLegacyProof.Source);
         Add("EnvelopeTest", PersistentViewEnvelopeTests.Source);
