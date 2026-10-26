@@ -40,8 +40,8 @@ internal static class AxonHttpTests
             context.Request.Model.Application.Id,
             [new(new("POST", "/_runtime/echo", payload), new(200, payload)), new(new("GET", "/_runtime/echo-async"), new(200, payload))],
             new(string.Empty, [], false));
-        var code = Imports(package, name).Declare("RuntimeHttpRoundTripTest").Import("org.springframework.context.annotation.Import")
-            .Line("@Import(RuntimeHttpRoundTripTest.EchoEndpoint.class)");
+        var code = Imports(package, name).Declare("RuntimeHttpRoundTripTest");
+        code.Line($"@{code.Reference("org.springframework.context.annotation.Import")}(RuntimeHttpRoundTripTest.EchoEndpoint.class)");
         context.AddJava(package, name, TestClass(code, name, [scenario]).Build(), test: true);
     }
 
@@ -58,7 +58,7 @@ internal static class AxonHttpTests
                 {
                     body.Line().Line($"@{body.Reference("org.junit.jupiter.api.Test")}")
                         .Line($"@{body.Reference("org.junit.jupiter.api.DisplayName")}(" + JavaCodeBuilder.StringLiteral("HTTP " + scenario.Id) + ")")
-                        .Block("void scenario_" + index++.ToString(CultureInfo.InvariantCulture) + "() throws Exception", test =>
+                        .Block("void scenario_" + index++.ToString(CultureInfo.InvariantCulture) + $"() throws {body.Reference("java.lang.Exception")}", test =>
                         {
                             foreach (var arrange in scenario.Arrange) test.Line(arrange);
                             foreach (var fragment in scenario.ArrangeFragments) test.Line(fragment.Render(test));
@@ -88,7 +88,7 @@ internal static class AxonHttpTests
     }
 
     static void EmitPerform(JavaCodeBuilder code) => code.Line()
-        .Block($"private {code.Reference("org.springframework.test.web.servlet.ResultActions")} perform({code.Reference("org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder")} request) throws Exception", body => body
+        .Block($"private {code.Reference("org.springframework.test.web.servlet.ResultActions")} perform({code.Reference("org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder")} request) throws {code.Reference("java.lang.Exception")}", body => body
             .Line("var actions = http.perform(request);")
             .Line("var result = actions.andReturn();")
             .Block("if (result.getRequest().isAsyncStarted())", pending => pending
