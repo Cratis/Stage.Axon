@@ -15,14 +15,14 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
     internal ProjectionValues(AxonEmissionContext context, ViewJavaTypes types, JavaCodeBuilder code) : this(context, types) => _code = code;
 
     internal string Source(SemanticEventContract @event) => $"{Reference("java.lang.String", "String")}.valueOf(event.{AxonEventSources.PrimaryTag(context, @event).ComponentName}().value())";
-    internal string? Value(SemanticProjectionValue? value, SemanticTypeReference target, SemanticEventContract @event) => value switch
+    internal string? Value(SemanticProjectionValue? value, SemanticTypeReference target, SemanticEventContract @event) => Resolve(value switch
     {
         SemanticProjectionEventProperty property => EventProperty(property, target, @event),
         SemanticProjectionEventSourceIdentity => types.Parse(target, Source(@event)),
         SemanticProjectionLiteral literal when literal.Value is SemanticTextValue or SemanticNumberValue or SemanticBooleanValue or SemanticNullValue or SemanticArrayValue or SemanticCompositeValue => types.Literal(literal.Value, target),
         SemanticProjectionEventContextValue context => Context(context.Path, target, @event),
         _ => null
-    };
+    });
 
     internal string? Key(SemanticProjectionKey key, SemanticEventContract @event) => key switch
     {
@@ -60,15 +60,17 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
         }
         var subtract = mapping.Operation is SemanticProjectionOperation.Subtract or SemanticProjectionOperation.Decrement;
         var result = primitive == SemanticPrimitiveType.DecimalNumber ? $"{left}.{(subtract ? "subtract" : "add")}({right})" : $"({left} {(subtract ? "-" : "+")} {right})";
-        return types.Wrap(target.Type, result);
+        return Resolve(types.Wrap(target.Type, result));
     }
 
     internal string? CompositeValue(SemanticProjectionCompositeKey key, SemanticEventContract @event)
     {
         var composite = _application.Types.First(type => type.Id == key.Type);
         var arguments = composite.Properties.Select(property => key.Parts.FirstOrDefault(part => part.Property == property.Id) is { } part ? Value(part.Value, property.Type, @event) : null).ToArray();
-        return arguments.Any(argument => argument is null) ? null : $"new {types.BasePackage}.types.{JavaNames.Type(composite.Name)}({string.Join(", ", arguments)})";
+        return arguments.Any(argument => argument is null) ? null : Resolve($"new {types.BasePackage}.types.{JavaNames.Type(composite.Name)}({string.Join(", ", arguments)})");
     }
+
+    string? Resolve(string? expression) => expression is null ? null : _code?.ReferenceExpression(expression) ?? expression;
 
     string Reference(string type, string? legacy = null) => _code?.Reference(type) ?? legacy ?? type;
 

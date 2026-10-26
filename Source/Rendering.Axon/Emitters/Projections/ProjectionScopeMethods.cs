@@ -6,20 +6,20 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJavaTypes types, ProjectionScopeNode root, SemanticId owner)
+internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJavaTypes types, ProjectionScopeNode root, SemanticId owner, JavaCodeBuilder? references = null)
 {
-    readonly ProjectionRecords _records = new(context.Request.Model.Application, types);
-    readonly ProjectionScopeMappings _mappings = new(context, types, owner);
-    ProjectionValues _values = new(context, types);
-    JavaCodeBuilder? _code;
+    readonly ProjectionRecords _records = new(context.Request.Model.Application, types, references);
+    readonly ProjectionScopeMappings _mappings = new(context, types, owner, references);
+    readonly ProjectionValues _values = references is null ? new(context, types) : new(context, types, references);
+    readonly JavaCodeBuilder? _code = references;
 
-    internal ProjectionScopeMethods WithReferences(JavaCodeBuilder code) => new(context, types, root, owner) { _code = code, _values = new(context, types, code) };
+    internal ProjectionScopeMethods WithReferences(JavaCodeBuilder code) => new(context, types, root, owner, code);
 
     internal string Method(ProjectionScopeNode node, SemanticEventContract @event) => "apply" + node.Name + JavaNames.Type(@event.Name);
 
     internal void Emit(JavaCodeBuilder code, ProjectionScopeNode node, SemanticEventContract @event)
     {
-        code.Block($"private Change<{node.Type}> {Method(node, @event)}({EventType(@event.Id)} event, {Reference("org.axonframework.messaging.eventhandling.EventMessage", "EventMessage")} message, {Reference("java.lang.Object", "Object")} key, {Reference("java.lang.Object", "Object")} parentKey, {node.Type} current)", body =>
+        code.Block($"private Change<{Reference(node.Type)}> {Method(node, @event)}({EventType(@event.Id)} event, {Reference("org.axonframework.messaging.eventhandling.EventMessage", "EventMessage")} message, {Reference("java.lang.Object", "Object")} key, {Reference("java.lang.Object", "Object")} parentKey, {Reference(node.Type)} current)", body =>
         {
             var creates = Creation(node, @event);
             body.Line($"if (current == null && !({creates})) return new Change<>(null, false, false);")
@@ -122,7 +122,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
         var identity = child.Properties.First(candidate => candidate.Id == child.Identity);
         var member = JavaNames.Member(property.Name);
         var variable = JavaNames.Member(child.Name);
-        code.Line($"var {variable} = new {Reference("java.util.ArrayList")}<{child.Type}>();")
+        code.Line($"var {variable} = new {Reference("java.util.ArrayList")}<{Reference(child.Type)}>();")
             .Block($"if (state.{member}() != null)", items => items.Block($"for (var item : state.{member}())", item => item
                 .Line($"var identity = String.valueOf({types.Unwrap(identity.Type, $"item.{JavaNames.Member(identity.Name)}()")});")
                 .Line($"var changed = {Method(child, @event)}(event, message, identity, key, item);")
