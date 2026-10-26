@@ -3,11 +3,14 @@
 
 package __RUNTIME__;
 
+import java.util.List;
+import org.axonframework.messaging.core.unitofwork.ProcessingContext;
+
 public interface UniqueValueStore {
     boolean claim(String constraint, Object value, Object owner);
     void release(String constraint, Object value, Object owner);
-    void assign(org.axonframework.messaging.core.unitofwork.ProcessingContext context,
-                String constraint, java.util.List<?> values, Object owner, boolean ignoreCasing, String message);
-    void releaseOwner(org.axonframework.messaging.core.unitofwork.ProcessingContext context,
+    void assign(ProcessingContext context,
+                String constraint, List<?> values, Object owner, boolean ignoreCasing, String message);
+    void releaseOwner(ProcessingContext context,
                       String constraint, Object owner);
 }

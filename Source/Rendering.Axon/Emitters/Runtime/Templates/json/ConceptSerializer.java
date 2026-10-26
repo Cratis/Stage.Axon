@@ -3,10 +3,10 @@
 
 package __RUNTIME__.json;
 
+import io.cratis.fundamentals.concepts.ConceptAs;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.ValueSerializer;
-import io.cratis.fundamentals.concepts.ConceptAs;
 
 final class ConceptSerializer extends ValueSerializer<ConceptAs<?>> {
     private final boolean key;

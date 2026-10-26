@@ -3,6 +3,9 @@
 
 package __RUNTIME__;
 
+import __RUNTIME__.persistent.PersistentConfiguration;
+import __RUNTIME__.persistent.PersistentReadModelSafety;
+import __RUNTIME__.persistent.UniqueClaim;
 import jakarta.persistence.EntityManagerFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,7 +14,10 @@ import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.axonframework.eventsourcing.eventstore.EventStorageEngine;
+import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;
 import org.axonframework.messaging.eventhandling.processing.streaming.token.store.TokenStore;
+import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;
+import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -24,9 +30,11 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Import;
-import __RUNTIME__.persistent.PersistentConfiguration;
-import __RUNTIME__.persistent.PersistentReadModelSafety;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Scan-free fixtures and passive witnesses only; no production view is removed or replaced. */
 final class PersistentProbeSupport {
@@ -52,9 +60,9 @@ final class PersistentProbeSupport {
         assertTrue(context.getBeansOfType(ReadModelStore.class).isEmpty(), "Fixture must be viewless");
         assertTrue(context.getBeansOfType(PersistentReadModelSafety.class).isEmpty(), "Fixture must have no guard");
         var unit = context.getBean(EntityManagerFactory.class).getMetamodel();
-        assertNotNull(unit.entity(__RUNTIME__.persistent.UniqueClaim.class));
-        assertNotNull(unit.entity(org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry.class));
-        assertNotNull(unit.entity(org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry.class));
+        assertNotNull(unit.entity(UniqueClaim.class));
+        assertNotNull(unit.entity(AggregateEventEntry.class));
+        assertNotNull(unit.entity(TokenEntry.class));
         System.out.println("Viewless fixture entities: " + unit.getEntities().stream()
                 .map(entity -> entity.getJavaType().getName()).sorted().toList());
         return context;
@@ -83,7 +91,7 @@ final class PersistentProbeSupport {
         var failure = assertThrows(Exception.class, () -> start(builder, database));
         var root = failure;
         while (root.getCause() != null) root = (Exception) root.getCause();
-        assertInstanceOf(org.springframework.beans.factory.BeanDefinitionStoreException.class, root);
+        assertInstanceOf(BeanDefinitionStoreException.class, root);
         assertTrue(root.getMessage().contains("STAGE-AXON-0308"), root.getMessage());
         assertTrue(root.getMessage().contains(application().getPackageName() + "."), root.getMessage());
         assertFalse(witness.ready, "No HTTP initialization or application readiness");
@@ -94,9 +102,9 @@ final class PersistentProbeSupport {
 
     @TestConfiguration(proxyBeanMethods = false)
     @EnableAutoConfiguration
-    @EntityScan(basePackageClasses = { __RUNTIME__.persistent.UniqueClaim.class,
-            org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry.class,
-            org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry.class })
+    @EntityScan(basePackageClasses = { UniqueClaim.class,
+            AggregateEventEntry.class,
+            TokenEntry.class })
     @Import(PersistentConfiguration.class)
     static class Viewless {}
 

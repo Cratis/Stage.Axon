@@ -28,10 +28,13 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         }
         ApplicationTriggersEmitter.Emit(context, registered);
         if (registered.Count == 0) return;
-        context.AddJava(context.BasePackage + ".infrastructure", "ReactionConfiguration", new JavaCodeBuilder(context.BasePackage + ".infrastructure")
-            .Line("@org.springframework.context.annotation.Configuration")
-            .Line("@org.springframework.scheduling.annotation.EnableScheduling")
-            .Line("@org.springframework.context.annotation.PropertySource(\"classpath:stage-reactions.properties\")")
+        context.AddJava(context.BasePackage + ".infrastructure", "ReactionConfiguration", new JavaCodeBuilder(context.BasePackage + ".infrastructure").Declare("ReactionConfiguration")
+            .Import("org.springframework.context.annotation.Configuration")
+            .Import("org.springframework.scheduling.annotation.EnableScheduling")
+            .Import("org.springframework.context.annotation.PropertySource")
+            .Line("@Configuration")
+            .Line("@EnableScheduling")
+            .Line("@PropertySource(\"classpath:stage-reactions.properties\")")
             .Block("public class ReactionConfiguration", _ => { }).Build());
         context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/stage-reactions.properties", "axon.eventhandling.processors.reactions.mode=pooled\naxon.eventhandling.processors.reactions.initial-segment-count=1\n"));
     }
@@ -44,15 +47,16 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         var duplicateEvents = reaction.Triggers.Where(trigger => trigger.Kind == SemanticReactionTriggerKind.Event).GroupBy(trigger => trigger.Source).Any(group => group.Count() > 1);
         var triggers = reaction.Triggers.Select((trigger, index) => duplicateEvents ? null : emitter.Prepare(trigger, index)).ToArray();
         EmitProductions(context, package, reaction.Id, triggers);
-        var code = new JavaCodeBuilder(package);
-        if (triggers.All(trigger => trigger is not null)) code.Line("@org.springframework.stereotype.Component");
-        code.Line("@org.axonframework.messaging.core.annotation.Namespace(\"reactions\")")
-            .Line("@org.axonframework.messaging.eventhandling.replay.annotation.DisallowReplay")
+        var code = new JavaCodeBuilder(package).Declare(name);
+        ReactionJavaReferences.Claim(code, triggers.OfType<PreparedReactionTrigger>().SelectMany(trigger => new[] { trigger.Input.JavaType, trigger.Invocation, trigger.Condition ?? string.Empty }));
+        if (triggers.All(trigger => trigger is not null)) code.Line("@" + code.Reference("org.springframework.stereotype.Component"));
+        code.Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}(\"reactions\")")
+            .Line("@" + code.Reference("org.axonframework.messaging.eventhandling.replay.annotation.DisallowReplay"))
             .Block($"public class {name}", body =>
             {
-                body.Line("private final org.axonframework.messaging.commandhandling.gateway.CommandGateway commands;")
-                    .Line("private final java.time.Clock clock;")
-                    .Block($"public {name}(org.axonframework.messaging.commandhandling.gateway.CommandGateway commands, java.time.Clock clock)", constructor => constructor.Line("this.commands = commands;").Line("this.clock = clock;"));
+                body.Line($"private final {body.Reference("org.axonframework.messaging.commandhandling.gateway.CommandGateway")} commands;")
+                    .Line($"private final {body.Reference("java.time.Clock")} clock;")
+                    .Block($"public {name}({body.Reference("org.axonframework.messaging.commandhandling.gateway.CommandGateway")} commands, {body.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.commands = commands;").Line("this.clock = clock;"));
                 for (var index = 0; index < triggers.Length; index++)
                 {
                     if (triggers[index] is not { } trigger)

@@ -3,10 +3,8 @@
 
 package __RUNTIME__.persistent;
 
+import __RUNTIME__.UniqueValueStore;
 import jakarta.persistence.EntityManagerFactory;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.axonframework.common.configuration.ComponentDefinition;
 import org.axonframework.common.configuration.ConfigurationEnhancer;
 import org.axonframework.common.configuration.SearchScope;
@@ -15,7 +13,9 @@ import org.axonframework.eventsourcing.eventstore.EventStorageEngine;
 import org.axonframework.eventsourcing.eventstore.jpa.AggregateBasedJpaEventStorageEngine;
 import org.axonframework.messaging.core.unitofwork.transaction.jpa.JpaTransactionalExecutorProvider;
 import org.axonframework.messaging.eventhandling.conversion.EventConverter;
-import __RUNTIME__.UniqueValueStore;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 @Configuration
 @Profile("persistent")

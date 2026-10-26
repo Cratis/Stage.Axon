@@ -12,11 +12,9 @@ internal static class ConceptEnums
     {
         var name = JavaNames.Type(concept.Name);
         var numeric = concept.Numbers is { } numbers && numbers.Length == concept.Values.Length;
-        var primitive = numeric ? "Integer" : "String";
-        var code = new JavaCodeBuilder(context.BasePackage + ".concepts")
-            .Import("com.fasterxml.jackson.annotation.JsonCreator")
-            .Import("com.fasterxml.jackson.annotation.JsonValue")
-            .Block("public enum " + name, body =>
+        var code = JavaSemanticTypes.ConceptBuilder(context, name);
+        var primitive = code.Reference(numeric ? "java.lang.Integer" : "java.lang.String");
+        code.Block("public enum " + name, body =>
             {
                 for (var index = 0; index < concept.Values.Length; index++)
                 {
@@ -25,14 +23,14 @@ internal static class ConceptEnums
                 }
                 body.Line($"private final {primitive} value;")
                     .Line($"{name}({primitive} value) {{ this.value = value; }}")
-                    .Line("@JsonValue")
+                    .Line("@" + body.Reference("com.fasterxml.jackson.annotation.JsonValue"))
                     .Line($"public {primitive} value() {{ return value; }}")
-                    .Line("@Override")
-                    .Line("public String toString() { return value.toString(); }")
-                    .Line("@JsonCreator")
+                    .Line("@" + body.Reference("java.lang.Override"))
+                    .Line($"public {body.Reference("java.lang.String")} toString() {{ return value.toString(); }}")
+                    .Line("@" + body.Reference("com.fasterxml.jackson.annotation.JsonCreator"))
                     .Block($"public static {name} fromValue({primitive} value)", method => method
                         .Line("for (var candidate : values()) if (candidate.value.equals(value)) return candidate;")
-                        .Line("throw new IllegalArgumentException(\"Unknown " + name + " value: \" + value);"));
+                        .Line($"throw new {method.Reference("java.lang.IllegalArgumentException")}(\"Unknown " + name + " value: \" + value);"));
             });
         return code.Build();
     }

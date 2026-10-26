@@ -3,16 +3,19 @@
 
 package __RUNTIME__;
 
+import __RUNTIME__.persistent.PersistentReadModelSafety;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Profile;
-import __RUNTIME__.persistent.PersistentReadModelSafety;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PersistentReadModelSafetyTest {
     @Test

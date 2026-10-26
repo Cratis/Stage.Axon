@@ -8,7 +8,9 @@ namespace Cratis.Stage.Rendering.Axon.Java;
 
 internal sealed class JavaCodeBuilder(string package)
 {
+    const string LocalType = "";
     readonly SortedSet<string> _imports = new(StringComparer.Ordinal);
+    readonly Dictionary<string, string> _simpleNames = new(StringComparer.Ordinal);
     readonly StringBuilder _body = new();
     int _indent;
 
@@ -37,10 +39,41 @@ internal sealed class JavaCodeBuilder(string package)
     internal static string UnsupportedComment(string intent, string modelPath, string code) =>
         $"// Screenplay wanted to {CommentText(intent)} ({CommentText(modelPath)}), but this is not supported by the Axon target yet ({CommentText(code)}).";
 
+    /// <summary>
+    /// Imports a type and claims its simple name. Use it for generated application types from another package, before emitting
+    /// code that calls <see cref="Reference"/>, so application types keep their short names.
+    /// </summary>
     internal JavaCodeBuilder Import(string type)
     {
+        Claim(SimpleName(type), type);
         _imports.Add(type);
         return this;
+    }
+
+    /// <summary>
+    /// Claims a simple name for a generated application type that the file declares or that lives in its own package, so
+    /// <see cref="Reference"/> qualifies any framework type with the same name. Declare names before emitting code that uses them.
+    /// </summary>
+    internal JavaCodeBuilder Declare(string simpleName)
+    {
+        Claim(simpleName, LocalType);
+        return this;
+    }
+
+    /// <summary>
+    /// Returns the name to emit for a framework type: the simple name with an import, or the qualified name when an application
+    /// type or an earlier referenced type already holds the simple name. The first claim keeps a name, so emission order decides
+    /// collisions deterministically. <c>java.lang</c> types need no import.
+    /// </summary>
+    internal string Reference(string qualifiedName)
+    {
+        var simpleName = SimpleName(qualifiedName);
+        if (simpleName.Length == qualifiedName.Length) return qualifiedName;
+        if (_simpleNames.TryGetValue(simpleName, out var owner)) return owner == qualifiedName ? simpleName : qualifiedName;
+
+        _simpleNames[simpleName] = qualifiedName;
+        if (!IsJavaLang(qualifiedName)) _imports.Add(qualifiedName);
+        return simpleName;
     }
 
     internal JavaCodeBuilder Line(string text = "")
@@ -74,5 +107,17 @@ internal sealed class JavaCodeBuilder(string package)
         return result.Append(_body).ToString();
     }
 
+    static string SimpleName(string qualifiedName) => qualifiedName[(qualifiedName.LastIndexOf('.') + 1)..];
+
+    static bool IsJavaLang(string qualifiedName) =>
+        qualifiedName.StartsWith("java.lang.", StringComparison.Ordinal) && qualifiedName.IndexOf('.', "java.lang.".Length) < 0;
+
     static string CommentText(string text) => text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace('\r', ' ').Replace('\n', ' ');
+
+    void Claim(string simpleName, string owner)
+    {
+        if (_simpleNames.TryGetValue(simpleName, out var existing) && existing != owner) throw new SimpleNameAlreadyClaimed(simpleName, existing);
+
+        _simpleNames[simpleName] = owner;
+    }
 }

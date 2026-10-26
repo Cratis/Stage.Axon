@@ -19,16 +19,36 @@ internal sealed class ProjectionUpdates(AxonEmissionContext context, ViewJavaTyp
 
     internal string DefaultArgument => Enabled ? ", null" : string.Empty;
 
-    internal void Notify(JavaCodeBuilder code)
+    internal string ParameterFor(JavaCodeBuilder code) => Enabled ? $", {code.Reference("org.axonframework.messaging.queryhandling.QueryUpdateEmitter")} updates" : string.Empty;
+
+    internal void Claim(JavaCodeBuilder code, string package)
+    {
+        foreach (var (owner, query) in _queries) QueryType(owner, query, code, package);
+    }
+
+    internal void Notify(JavaCodeBuilder code, string package) => NotifyQueries(code, package);
+
+    internal void Notify(JavaCodeBuilder code) => NotifyQueries(code, null);
+
+    void NotifyQueries(JavaCodeBuilder code, string? package)
     {
         if (!Enabled) return;
         code.Block("if (updates != null)", body =>
         {
             foreach (var (owner, query) in _queries)
             {
-                var name = types.Package(owner) + "." + JavaNames.Type(query.Name);
+                var name = package is null ? types.Package(owner) + "." + JavaNames.Type(query.Name) : QueryType(owner, query, body, package);
                 body.Line($"updates.emit({name}.class, query -> true, {name}.Result::invalidation);");
             }
         });
+    }
+
+    string QueryType(LocatedSemanticSlice owner, SemanticKeyedQuery query, JavaCodeBuilder code, string package)
+    {
+        var name = JavaNames.Type(query.Name);
+        var queryPackage = types.Package(owner);
+        if (queryPackage == package) code.Declare(name);
+        else return code.Reference(queryPackage + "." + name);
+        return name;
     }
 }

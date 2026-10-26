@@ -26,8 +26,10 @@ internal sealed class CommandResponses(SemanticCommand command, CommandJavaTypes
     internal void Emit(AxonEmissionContext context, string package)
     {
         if (command.Response is not SemanticRecordCommandResponse record) return;
-        var fields = record.Fields.Select(field => $"{JavaRecordComponents.JsonProperty(field.Name)}{types.Type(field.Type)} {JavaNames.Member(field.Name)}");
-        context.AddJava(package, ReturnType, new JavaCodeBuilder(package).Line($"public record {ReturnType}({string.Join(", ", fields)}) {{}}").Build(), sources: [command.Id]);
+        var code = new JavaCodeBuilder(package).Declare(ReturnType);
+        foreach (var field in record.Fields) types.Claim(field.Type, code);
+        var fields = record.Fields.Select(field => $"{CommandContractsEmitter.JsonProperty(field.Name, code)}{types.Type(field.Type, code)} {JavaNames.Member(field.Name)}");
+        context.AddJava(package, ReturnType, code.Line($"public record {ReturnType}({string.Join(", ", fields)}) {{}}").Build(), sources: [command.Id]);
     }
 
     string? Property(SemanticId id, SemanticTypeReference type) => new CommandExpressions(command, types).Render(SemanticExpression.Property(SemanticExpressionRootKind.Command, id), type);

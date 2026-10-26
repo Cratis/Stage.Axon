@@ -17,10 +17,10 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         if (specifications.Length == 0) return;
         var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located);
         var name = JavaNames.Type(command.Name) + "SpecificationsTest";
-        var code = new JavaCodeBuilder(package).Import("org.junit.jupiter.api.Test").Import("org.junit.jupiter.api.DisplayName").Import("org.junit.jupiter.api.Disabled")
-            .Import("org.junit.jupiter.api.AfterEach").Import("org.axonframework.test.fixture.AxonTestFixture")
-            .Import("org.axonframework.eventsourcing.configuration.EventSourcingConfigurer").Import("org.axonframework.eventsourcing.configuration.EventSourcedEntityModule")
-            .Import("org.axonframework.messaging.commandhandling.configuration.CommandHandlingModule");
+        var commandName = JavaNames.Type(command.Name);
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(commandName).Declare(commandName + "Rules").Declare(commandName + "Handler");
+        ClaimSource(code, commandName);
+        ClaimAssertions(code, specifications);
         code.Block("class " + name, body =>
         {
             Setup(body);
@@ -34,21 +34,39 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
     static bool HasReadModelFixtures(SemanticSpecification specification) =>
         !specification.GivenReadModels.IsEmpty || !specification.ThenReadModels.IsEmpty || !specification.ThenQueries.IsEmpty || !specification.ThenAbsentReadModels.IsEmpty;
 
+    void ClaimSource(JavaCodeBuilder code, string commandName)
+    {
+        if (source is null) return;
+        code.Declare(commandName + "Stream");
+        if (source.JavaType.StartsWith(context.BasePackage + ".", StringComparison.Ordinal)) code.Reference(source.JavaType);
+    }
+
+    void ClaimAssertions(JavaCodeBuilder code, IEnumerable<SemanticSpecification> specifications)
+    {
+        foreach (var specification in specifications)
+        {
+            var values = new CommandFixtureValues(context, command, specification, source);
+            if (Unsupported(specification, values) is not null) continue;
+            if (MissingValues(values.Command(), [.. specification.GivenEvents.Select(values.Event)], [.. specification.ThenEvents.Select(values.Event)])) continue;
+            new CommandFixtureAssertions(context, command, specification).Claim(code);
+        }
+    }
+
     void Setup(JavaCodeBuilder body)
     {
         var name = JavaNames.Type(command.Name);
-        body.Line("private final jakarta.validation.ValidatorFactory validators = jakarta.validation.Validation.buildDefaultValidatorFactory();")
-            .Line("private AxonTestFixture fixture;").Line("@AfterEach").Block("void stop()", method => method.Line("if (fixture != null) fixture.stop();")
-                .Line("validators.close();").Line("org.springframework.security.core.context.SecurityContextHolder.clearContext();"));
-        CommandFixtureSecurity.Proxy(body, name, usesClock);
-        body.Block("private AxonTestFixture fixture(String instant)", method =>
+        body.Line($"private final {body.Reference("jakarta.validation.ValidatorFactory")} validators = {body.Reference("jakarta.validation.Validation")}.buildDefaultValidatorFactory();")
+            .Line($"private {body.Reference("org.axonframework.test.fixture.AxonTestFixture")} fixture;").Line($"@{body.Reference("org.junit.jupiter.api.AfterEach")}").Block("void stop()", method => method.Line("if (fixture != null) fixture.stop();")
+                .Line("validators.close();").Line($"{method.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
+        CommandFixtureSecurity.ProxyReferences(body, name, usesClock);
+        body.Block($"private {body.Reference("org.axonframework.test.fixture.AxonTestFixture")} fixture({body.Reference("java.lang.String")} instant)", method =>
         {
             FixtureClock(method);
-            method.Line("var configuration = EventSourcingConfigurer.create();");
-            if (source is not null) method.Line($"configuration.registerEntity(EventSourcedEntityModule.autodetected({source.JavaType}.class, {name}Stream.class));");
-            method.Line($"configuration.messaging(messaging -> messaging.registerCommandHandlingModule(CommandHandlingModule.named({JavaCodeBuilder.StringLiteral(name)})")
+            method.Line($"var configuration = {method.Reference("org.axonframework.eventsourcing.configuration.EventSourcingConfigurer")}.create();");
+            if (source is not null) method.Line($"configuration.registerEntity({method.Reference("org.axonframework.eventsourcing.configuration.EventSourcedEntityModule")}.autodetected({new CommandJavaTypes(context.Request.Model.Application).Reference(source.JavaType, method)}.class, {name}Stream.class));");
+            method.Line($"configuration.messaging(messaging -> messaging.registerCommandHandlingModule({method.Reference("org.axonframework.messaging.commandhandling.configuration.CommandHandlingModule")}.named({JavaCodeBuilder.StringLiteral(name)})")
                 .Line($"    .commandHandlers().autodetectedCommandHandlingComponent(components -> handler({(usesClock ? "clock" : string.Empty)})).build()));")
-                .Line("fixture = AxonTestFixture.with(configuration);").Line("return fixture;");
+                .Line($"fixture = {method.Reference("org.axonframework.test.fixture.AxonTestFixture")}.with(configuration);").Line("return fixture;");
         });
     }
 
@@ -68,21 +86,21 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         var method = "spec_" + JavaNames.Member(specification.Name) + "_" + index;
         var code = reason is null ? null : AxonRefusalCodes.CommandSpecification;
         AxonSpecificationsEmitter.Register(context, specification.Id, testClass, method, code);
-        body.Line("@Test").Line("@DisplayName(" + JavaCodeBuilder.StringLiteral(specification.Id.ToString()) + ")");
+        body.Line($"@{body.Reference("org.junit.jupiter.api.Test")}").Line("@" + body.Reference("org.junit.jupiter.api.DisplayName") + "(" + JavaCodeBuilder.StringLiteral(specification.Id.ToString()) + ")");
         if (reason is not null)
         {
             context.Degradation.Unsupported(code!, specification.Id, "Axon cannot yet " + reason + ".", reason, specification.Id.ToString());
-            body.Line("@Disabled(" + JavaCodeBuilder.StringLiteral(code + ": " + reason) + ")").Block("void " + method + "()", test =>
-                test.UnsupportedIntent(reason, specification.Id.ToString(), code!).Line("throw new UnsupportedOperationException(" + JavaCodeBuilder.StringLiteral(code + ": " + reason) + ");"));
+            body.Line("@" + body.Reference("org.junit.jupiter.api.Disabled") + "(" + JavaCodeBuilder.StringLiteral(code + ": " + reason) + ")").Block("void " + method + "()", test =>
+                test.UnsupportedIntent(reason, specification.Id.ToString(), code!).Line("throw new " + test.Reference("java.lang.UnsupportedOperationException") + "(" + JavaCodeBuilder.StringLiteral(code + ": " + reason) + ");"));
             return;
         }
         body.Block("void " + method + "()", test =>
         {
-            CommandFixtureSecurity.Caller(test, specification.GivenCaller);
+            CommandFixtureSecurity.CallerReferences(test, specification.GivenCaller);
             var activity = given.Length == 0 ? ".noPriorActivity()" : $".events({string.Join(", ", given)})";
             test.Line($"var scenario = fixture({JavaCodeBuilder.StringLiteral(specification.GivenClock ?? "1970-01-01T00:00:00Z")}).given(){activity};")
                 .Line($"var result = scenario.when().command({input}).then();");
-            new CommandFixtureAssertions(context, command, specification).Emit(test, [.. expected.Select(value => value!)]);
+            new CommandFixtureAssertions(context, command, specification).EmitReferences(test, [.. expected.Select(value => value!)]);
         });
     }
 

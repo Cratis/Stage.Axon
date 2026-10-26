@@ -14,40 +14,45 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
 
     internal void Emit(AxonEmissionContext context, string package, SemanticId reaction)
     {
-        var command = new JavaCodeBuilder(package)
-            .Line($"public record {Name}(@org.axonframework.modelling.annotation.TargetEntityId {Primary.JavaType} eventSourceId, {Event.Type} event) {{}}")
-            .Build();
-        context.AddJava(package, Name, command, sources: [reaction]);
-        var handler = new JavaCodeBuilder(package)
-            .Line("@org.springframework.stereotype.Component")
+        var command = new JavaCodeBuilder(package).Declare(Name);
+        ReactionJavaReferences.Claim(command, [Primary.JavaType, Event.Type]);
+        command.Line($"public record {Name}(@{command.Reference("org.axonframework.modelling.annotation.TargetEntityId")} {ReactionJavaReferences.Expression(command, Primary.JavaType)} eventSourceId, {ReactionJavaReferences.Expression(command, Event.Type)} event) {{}}");
+        context.AddJava(package, Name, command.Build(), sources: [reaction]);
+        var handler = new JavaCodeBuilder(package).Declare(Name).Declare(Name + "Handler").Declare(Name + "Stream");
+        ReactionJavaReferences.Claim(handler, [Primary.JavaType]);
+        var uniqueValues = handler.Reference(context.BasePackage + ".runtime.UniqueValueStore");
+        var inMemoryUniqueValues = handler.Reference(context.BasePackage + ".runtime.InMemoryUniqueValueStore");
+        var constraints = handler.Reference(context.BasePackage + ".infrastructure.ModeledConstraints");
+        handler.Line("@" + handler.Reference("org.springframework.stereotype.Component"))
             .Block($"public class {Name}Handler", body => body
-                .Line($"private final {context.BasePackage}.runtime.UniqueValueStore uniqueValues;")
-                .Line($"public {Name}Handler() {{ uniqueValues = new {context.BasePackage}.runtime.InMemoryUniqueValueStore(); }}")
-                .Line("@org.springframework.beans.factory.annotation.Autowired")
-                .Line($"public {Name}Handler({context.BasePackage}.runtime.UniqueValueStore uniqueValues) {{ this.uniqueValues = uniqueValues; }}")
-                .Line("@org.axonframework.messaging.commandhandling.annotation.CommandHandler")
-                .Block($"public void handle({Name} command, org.axonframework.messaging.eventhandling.gateway.EventAppender appender, org.axonframework.messaging.core.unitofwork.ProcessingContext processingContext, @org.axonframework.modelling.annotation.InjectEntity(idProperty = \"eventSourceId\") org.axonframework.modelling.repository.ManagedEntity<{Primary.JavaType}, {Name}Stream> stream)", method => method
-                    .Line($"if (!java.util.Objects.equals(command.eventSourceId(), command.event().{Primary.ComponentName}())) throw new IllegalArgumentException(\"Event source does not match append boundary\");")
-                    .Line($"{context.BasePackage}.infrastructure.ModeledConstraints.apply(uniqueValues, command.event(), processingContext);")
-                    .Line("appender.append(command.event());")))
-            .Build();
-        context.AddJava(package, Name + "Handler", handler, sources: [reaction]);
+                .Line($"private final {uniqueValues} uniqueValues;")
+                .Line($"public {Name}Handler() {{ uniqueValues = new {inMemoryUniqueValues}(); }}")
+                .Line("@" + body.Reference("org.springframework.beans.factory.annotation.Autowired"))
+                .Line($"public {Name}Handler({uniqueValues} uniqueValues) {{ this.uniqueValues = uniqueValues; }}")
+                .Line("@" + body.Reference("org.axonframework.messaging.commandhandling.annotation.CommandHandler"))
+                .Block($"public void handle({Name} command, {body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} processingContext, @{body.Reference("org.axonframework.modelling.annotation.InjectEntity")}(idProperty = \"eventSourceId\") {body.Reference("org.axonframework.modelling.repository.ManagedEntity")}<{ReactionJavaReferences.Expression(body, Primary.JavaType)}, {Name}Stream> stream)", method => method
+                    .Line($"if (!{method.Reference("java.util.Objects")}.equals(command.eventSourceId(), command.event().{Primary.ComponentName}())) throw new IllegalArgumentException(\"Event source does not match append boundary\");")
+                    .Line($"{constraints}.apply(uniqueValues, command.event(), processingContext);")
+                    .Line("appender.append(command.event());")));
+        context.AddJava(package, Name + "Handler", handler.Build(), sources: [reaction]);
         EmitStream(context, package, reaction);
     }
 
     void EmitStream(AxonEmissionContext context, string package, SemanticId reaction)
     {
-        var contracts = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id);
-        var stream = new JavaCodeBuilder(package)
-            .Line($"@org.axonframework.eventsourcing.annotation.EventSourcedEntity(tagKey = {TagReference})")
-            .Line($"@org.axonframework.extension.spring.stereotype.EventSourced(idType = {Primary.JavaType}.class, tagKey = {TagReference})")
+        var contracts = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id).ToArray();
+        var stream = new JavaCodeBuilder(package).Declare(Name + "Stream");
+        ReactionJavaReferences.Claim(stream, contracts.Select(contract => AxonEventsEmitter.TypeFor(context, contract.Id)).Concat([Primary.JavaType, TagReference]));
+        var tag = ReactionJavaReferences.Expression(stream, TagReference);
+        stream.Line($"@{stream.Reference("org.axonframework.eventsourcing.annotation.EventSourcedEntity")}(tagKey = {tag})")
+            .Line($"@{stream.Reference("org.axonframework.extension.spring.stereotype.EventSourced")}(idType = {ReactionJavaReferences.Expression(stream, Primary.JavaType)}.class, tagKey = {tag})")
             .Block($"public class {Name}Stream", body =>
             {
-                body.Line("@org.axonframework.eventsourcing.annotation.reflection.EntityCreator").Line($"public {Name}Stream() {{}}");
+                body.Line("@" + body.Reference("org.axonframework.eventsourcing.annotation.reflection.EntityCreator")).Line($"public {Name}Stream() {{}}");
                 var index = 0;
                 foreach (var contract in contracts)
-                    body.Line("@org.axonframework.eventsourcing.annotation.EventSourcingHandler").Line($"public void on{index++}({AxonEventsEmitter.TypeFor(context, contract.Id)} event) {{}}");
-            }).Build();
-        context.AddJava(package, Name + "Stream", stream, sources: [reaction]);
+                    body.Line("@" + body.Reference("org.axonframework.eventsourcing.annotation.EventSourcingHandler")).Line($"public void on{index++}({ReactionJavaReferences.Expression(body, AxonEventsEmitter.TypeFor(context, contract.Id))} event) {{}}");
+            });
+        context.AddJava(package, Name + "Stream", stream.Build(), sources: [reaction]);
     }
 }

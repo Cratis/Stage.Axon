@@ -7,14 +7,14 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 
 internal static class AxonApplicationScaffold
 {
-    internal static string Application(string package) => new JavaCodeBuilder(package)
+    internal static string Application(string package) => new JavaCodeBuilder(package).Declare("Application")
         .Import("org.springframework.boot.SpringApplication")
         .Import("org.springframework.boot.autoconfigure.SpringBootApplication")
         .Line("@SpringBootApplication")
         .Block("public class Application", body => body.Block("public static void main(String[] args)", method => method.Line("SpringApplication.run(Application.class, args);")))
         .Build();
 
-    internal static string Infrastructure(string package) => new JavaCodeBuilder(package + ".infrastructure")
+    internal static string Infrastructure(string package) => new JavaCodeBuilder(package + ".infrastructure").Declare("AxonConfiguration")
         .Import("java.time.Clock")
         .Import("org.springframework.context.annotation.Bean")
         .Import("org.springframework.context.annotation.Configuration")

@@ -8,6 +8,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
 internal static class ReactionScheduling
 {
+    // These generated annotations contain only framework type references and literal schedule parameters.
     internal static string? Annotation(SemanticReactionTrigger trigger) => trigger.Kind switch
     {
         SemanticReactionTriggerKind.Interval => Interval(trigger.Every),
@@ -19,7 +20,7 @@ internal static class ReactionScheduling
     {
         if (trigger.Kind != SemanticReactionTriggerKind.Schedule) return;
         if (trigger.OnDayOfMonth is null && trigger.OnDayOfWeek is null) return;
-        body.Line("var date = java.time.LocalDate.now(clock.withZone(java.time.ZoneOffset.UTC));");
+        body.Line($"var date = {body.Reference("java.time.LocalDate")}.now(clock.withZone({body.Reference("java.time.ZoneOffset")}.UTC));");
         if (trigger.OnDayOfMonth is { } day) body.Line($"if (date.getDayOfMonth() != {day}) return;");
         if (trigger.OnDayOfWeek is { } weekday) body.Line($"if (date.getDayOfWeek().getValue() % 7 != {weekday}) return;");
     }

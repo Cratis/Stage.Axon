@@ -32,10 +32,13 @@ public class when_rendering_event_tag_constants : for_AxonArtifactRenderPlanner.
     [Fact] void should_prevent_instantiation() => tags.ShouldContain("private EventTags() {}");
     [Fact] void should_preserve_the_original_tag_value() => tags.ShouldContain("public static final String ORDER_ID = \"orderId\";");
     [Fact] void should_deduplicate_shared_tag_keys() => (tags.Split("public static final String ORDER_ID", StringSplitOptions.None).Length - 1).ShouldEqual(1);
-    [Fact] void should_reference_the_constant_from_event_components() => events.ShouldContain($"EventTag(key = {context.BasePackage}.orders.events.EventTags.ORDER_ID)");
+    [Fact] void should_reference_the_constant_from_event_components() => events.ShouldContain("EventTag(key = EventTags.ORDER_ID)");
     [Fact] void should_not_repeat_the_tag_literal_in_events() => events.ShouldNotContain("key = \"orderId\"");
-    [Fact] void should_omit_redundant_json_annotations() => events.ShouldNotContain("@com.fasterxml.jackson.annotation.JsonProperty(\"customer\")");
-    [Fact] void should_keep_event_metadata() => events.ShouldContain("@org.axonframework.messaging.eventhandling.annotation.Event");
+    [Fact] void should_omit_redundant_json_annotations() => events.ShouldNotContain("@JsonProperty(\"customer\")");
+    [Fact] void should_keep_event_metadata() => events.ShouldContain("@Event(");
+    [Fact] void should_import_event_metadata() => events.ShouldContain("import org.axonframework.messaging.eventhandling.annotation.Event;");
+    [Fact] void should_import_primary_tags() => events.ShouldContain("import org.axonframework.eventsourcing.annotation.EventTag;");
+    [Fact] void should_not_import_same_package_tag_constants() => events.ShouldNotContain($"import {context.BasePackage}.orders.events.EventTags;");
 
     [Fact]
     void should_not_emit_constants_for_a_module_without_events()

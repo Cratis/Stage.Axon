@@ -11,17 +11,22 @@ internal static class LiveQueryStreams
     internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query)
     {
         var name = JavaNames.Type(query.Name) + "Streams";
-        var code = new JavaCodeBuilder(package).Line($$"""
-            @org.springframework.stereotype.Component({{JavaCodeBuilder.StringLiteral(package + "." + name)}})
-            public final class {{name}} implements org.springframework.context.ApplicationListener<org.springframework.context.event.ContextClosedEvent> {
-                private final java.util.Set<Session> sessions = java.util.concurrent.ConcurrentHashMap.newKeySet();
-                private final java.util.concurrent.atomic.AtomicBoolean closing = new java.util.concurrent.atomic.AtomicBoolean();
+        var code = new JavaCodeBuilder(package).Declare(name).Declare("Session");
+        var flow = code.Reference("java.util.concurrent.Flow");
+        var atomicBoolean = code.Reference("java.util.concurrent.atomic.AtomicBoolean");
+        var emitter = code.Reference("org.springframework.web.servlet.mvc.method.annotation.SseEmitter");
+        var closed = code.Reference("org.springframework.context.event.ContextClosedEvent");
+        code.Line($$"""
+            @{{code.Reference("org.springframework.stereotype.Component")}}({{JavaCodeBuilder.StringLiteral(package + "." + name)}})
+            public final class {{name}} implements {{code.Reference("org.springframework.context.ApplicationListener")}}<{{closed}}> {
+                private final {{code.Reference("java.util.Set")}}<Session> sessions = {{code.Reference("java.util.concurrent.ConcurrentHashMap")}}.newKeySet();
+                private final {{atomicBoolean}} closing = new {{atomicBoolean}}();
 
-                public org.springframework.web.servlet.mvc.method.annotation.SseEmitter open(java.util.concurrent.Flow.Publisher<Object> publisher) {
+                public {{emitter}} open({{flow}}.Publisher<Object> publisher) {
                     var session = new Session();
                     sessions.add(session);
                     if (closing.get()) session.stop();
-                    var emitter = {{context.BasePackage}}.runtime.SseBridge.stream(downstream -> publisher.subscribe(session.forwardTo(downstream)));
+                    var emitter = {{code.Reference(context.BasePackage + ".runtime.SseBridge")}}.stream(downstream -> publisher.subscribe(session.forwardTo(downstream)));
                     session.attach(emitter);
                     return emitter;
                 }
@@ -29,21 +34,21 @@ internal static class LiveQueryStreams
                 int activeCount() { return sessions.size(); }
 
                 @Override
-                public void onApplicationEvent(org.springframework.context.event.ContextClosedEvent event) {
+                public void onApplicationEvent({{closed}} event) {
                     closing.set(true);
                     sessions.forEach(Session::stop);
                 }
 
                 private final class Session {
-                    private final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Flow.Subscription> subscription = new java.util.concurrent.atomic.AtomicReference<>();
-                    private final java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
-                    private volatile org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter;
+                    private final {{code.Reference("java.util.concurrent.atomic.AtomicReference")}}<{{flow}}.Subscription> subscription = new {{code.Reference("java.util.concurrent.atomic.AtomicReference")}}<>();
+                    private final {{atomicBoolean}} cancelled = new {{atomicBoolean}}();
+                    private volatile {{emitter}} emitter;
 
-                    private java.util.concurrent.Flow.Subscriber<Object> forwardTo(java.util.concurrent.Flow.Subscriber<? super Object> downstream) {
-                        return new java.util.concurrent.Flow.Subscriber<>() {
-                            @Override public void onSubscribe(java.util.concurrent.Flow.Subscription value) {
+                    private {{flow}}.Subscriber<Object> forwardTo({{flow}}.Subscriber<? super Object> downstream) {
+                        return new {{flow}}.Subscriber<>() {
+                            @Override public void onSubscribe({{flow}}.Subscription value) {
                                 if (!subscription.compareAndSet(null, value)) { value.cancel(); return; }
-                                downstream.onSubscribe(new java.util.concurrent.Flow.Subscription() {
+                                downstream.onSubscribe(new {{flow}}.Subscription() {
                                     @Override public void request(long amount) { if (!cancelled.get()) value.request(amount); }
                                     @Override public void cancel() { Session.this.cancel(); }
                                 });
@@ -55,7 +60,7 @@ internal static class LiveQueryStreams
                         };
                     }
 
-                    private void attach(org.springframework.web.servlet.mvc.method.annotation.SseEmitter value) {
+                    private void attach({{emitter}} value) {
                         emitter = value;
                         value.onCompletion(this::cancel);
                         value.onTimeout(this::cancel);

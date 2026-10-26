@@ -25,7 +25,7 @@ public class when_preserving_legacy_projection_expectations : given.a_native_vie
     }
 
     [Fact] void should_keep_the_legacy_specification_enabled() => _context.Specifications[_spec.Id].DisabledCode.ShouldBeNull();
-    [Fact] void should_replay_the_original_event() => _java.ShouldContain("projector.on(new nativeviews.views.events.Increased(new nativeviews.runtime.EventSourceId(\"spec-source\"), 8L), null);");
+    [Fact] void should_replay_the_original_event() => _java.ShouldContain("projector.on(new Increased(new EventSourceId(\"spec-source\"), 8L), null);");
     [Fact] void should_keep_the_original_keyed_assertion() => _java.ShouldContain("store.get(\"global\").stream().anyMatch(row ->");
     [Fact] void should_not_add_a_caller_to_legacy_materialization() => _java.ShouldNotContain("SecurityContextHolder");
 }

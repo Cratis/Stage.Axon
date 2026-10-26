@@ -36,7 +36,10 @@ public class when_selecting_the_primary_tag : for_AxonArtifactRenderPlanner.give
     void should_add_the_missing_primary_component()
     {
         var code = AxonEventSources.Record(context, "example.events", contract, "");
-        code.ShouldContain($"@org.axonframework.eventsourcing.annotation.EventTag(key = {context.BasePackage}.orders.events.EventTags.ORDER_ID) {context.BasePackage}.concepts.OrderId orderId");
+        code.ShouldContain("@EventTag(key = EventTags.ORDER_ID) OrderId orderId");
+        code.ShouldContain("import org.axonframework.eventsourcing.annotation.EventTag;");
+        code.ShouldContain($"import {context.BasePackage}.orders.events.EventTags;");
+        code.ShouldContain($"import {context.BasePackage}.concepts.OrderId;");
         TagCount(code).ShouldEqual(1);
     }
 
@@ -71,5 +74,5 @@ public class when_selecting_the_primary_tag : for_AxonArtifactRenderPlanner.give
         primary.JavaType.ShouldEqual(context.BasePackage + ".runtime.EventSourceId");
     }
 
-    static int TagCount(string code) => code.Split("@org.axonframework.eventsourcing.annotation.EventTag", StringSplitOptions.None).Length - 1;
+    static int TagCount(string code) => code.Split("@EventTag", StringSplitOptions.None).Length - 1;
 }

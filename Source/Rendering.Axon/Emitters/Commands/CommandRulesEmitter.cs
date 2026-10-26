@@ -12,19 +12,35 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
     internal string Render(string package)
     {
         var name = JavaNames.Type(command.Name);
-        var builder = new JavaCodeBuilder(package)
-            .Import("org.springframework.stereotype.Component")
-            .Import("jakarta.validation.Validator")
-            .Import(types.BasePackage + ".runtime.ValidationContext");
-        builder.Line("@Component").Block($"public final class {name}Rules", body =>
-            body.Line("private final Validator validator;").Line()
-                .Block($"public {name}Rules(Validator validator)", constructor => constructor.Line("this.validator = validator;")).Line()
+        var builder = new JavaCodeBuilder(package).Declare(name).Declare(name + "Rules");
+        ClaimRules(builder);
+        var validator = builder.Reference("jakarta.validation.Validator");
+        builder.Line($"@{builder.Reference("org.springframework.stereotype.Component")}").Block($"public final class {name}Rules", body =>
+            body.Line($"private final {validator} validator;").Line()
+                .Block($"public {name}Rules({validator} validator)", constructor => constructor.Line("this.validator = validator;")).Line()
                 .Block($"public void validateInput({name} command)", method => BeanValidation(method).Line("validation.throwIfInvalid();")).Line()
                 .Block($"public void validate({name} command)", RenderValidation));
         return builder.Build();
     }
 
-    static JavaCodeBuilder BeanValidation(JavaCodeBuilder builder) => builder.Line("var validation = new ValidationContext();").Line("validator.validate(command).stream().sorted(java.util.Comparator.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject(violation.getPropertyPath().toString(), violation.getMessage()));");
+    JavaCodeBuilder BeanValidation(JavaCodeBuilder builder) => builder.Line($"var validation = new {builder.Reference(types.BasePackage + ".runtime.ValidationContext")}();").Line($"validator.validate(command).stream().sorted({builder.Reference("java.util.Comparator")}.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject(violation.getPropertyPath().toString(), violation.getMessage()));");
+
+    void ClaimRules(JavaCodeBuilder builder)
+    {
+        foreach (var rule in command.Validations)
+        {
+            if (command.Properties.SingleOrDefault(property => property.Id == rule.Property) is { } property) new CommandValidationPredicates(types, rule, property.Type, string.Empty).Claim(builder);
+        }
+        foreach (var property in command.Properties.Where(property => property.Type.Kind == SemanticTypeReferenceKind.Concept)) ClaimConceptRules(builder, property);
+    }
+
+    void ClaimConceptRules(JavaCodeBuilder builder, SemanticProperty property)
+    {
+        foreach (var rule in context.Request.Model.Application.Concepts.Single(concept => concept.Id == property.Type.Target).Validations)
+        {
+            new CommandValidationPredicates(types, rule, property.Type, string.Empty).Claim(builder);
+        }
+    }
 
     void RenderValidation(JavaCodeBuilder builder)
     {
@@ -59,7 +75,7 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
     {
         foreach (var requirement in command.Requirements)
         {
-            var condition = new CommandConditions(command, types).Render(requirement.Condition);
+            var condition = new CommandConditions(command, types).Render(requirement.Condition, builder);
             if (condition is null) Unsupported(builder, "evaluate a command requirement using protected state");
             else builder.Line($"validation.require({condition}, \"\", {JavaCodeBuilder.StringLiteral(requirement.Message ?? "Command requirement was not satisfied.")});");
         }
@@ -68,7 +84,7 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
     void RenderRule(JavaCodeBuilder builder, SemanticProperty property, SemanticValidationRule rule)
     {
         var member = JavaNames.Member(property.Name);
-        var predicate = new CommandValidationPredicates(types, rule, property.Type, $"command.{member}()").Render();
+        var predicate = new CommandValidationPredicates(types, rule, property.Type, $"command.{member}()").Render(builder);
         if (predicate is null)
         {
             Unsupported(builder, $"validate {property.Name} using {rule.Kind}");

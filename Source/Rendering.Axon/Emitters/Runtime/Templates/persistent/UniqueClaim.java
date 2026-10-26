@@ -3,15 +3,20 @@
 
 package __RUNTIME__.persistent;
 
-@jakarta.persistence.Entity
-@jakarta.persistence.Table(name = "stage_unique_claim")
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "stage_unique_claim")
 public class UniqueClaim {
-    @jakarta.persistence.Id
-    @jakarta.persistence.Column(length = 8192)
+    @Id
+    @Column(length = 8192)
     private String id;
-    @jakarta.persistence.Column(nullable = false, length = 2048)
+    @Column(nullable = false, length = 2048)
     private String constraintName;
-    @jakarta.persistence.Column(nullable = false, length = 4096)
+    @Column(nullable = false, length = 4096)
     private String owner;
 
     protected UniqueClaim() {}

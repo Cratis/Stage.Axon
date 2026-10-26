@@ -25,10 +25,17 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
             EmitIntent(context, slice, constraint);
         }
         var package = context.BasePackage + ".infrastructure";
-        var code = new JavaCodeBuilder(package).Block("public final class ModeledConstraints", body =>
+        var code = new JavaCodeBuilder(package).Declare("ModeledConstraints");
+        foreach (var contract in constraints.Where(item => ConstraintCoverage.Supported(context, item.Constraint))
+            .SelectMany(item => item.Constraint.Targets.Select(target => target.EventContract).Concat(item.Constraint.ReleasedBy)).Distinct())
+        {
+            code.Reference(AxonEventsEmitter.TypeFor(context, contract));
+        }
+        var store = code.Reference(context.BasePackage + ".runtime.UniqueValueStore");
+        code.Block("public final class ModeledConstraints", body =>
         {
             body.Line("private ModeledConstraints() {}")
-                .Block($"public static void apply({context.BasePackage}.runtime.UniqueValueStore store, Object event, org.axonframework.messaging.core.unitofwork.ProcessingContext context)", method =>
+                .Block($"public static void apply({store} store, {body.Reference("java.lang.Object")} event, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context)", method =>
             {
                 foreach (var (slice, constraint) in constraints.Where(item => ConstraintCoverage.Supported(context, item.Constraint))) EmitRule(context, method, slice, constraint);
             });
@@ -38,6 +45,7 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
 
     static void EmitRule(AxonEmissionContext context, JavaCodeBuilder body, SemanticId slice, SemanticConstraint constraint)
     {
+        var package = context.BasePackage + ".constraints";
         var key = JavaCodeBuilder.StringLiteral(slice + "/" + constraint.Name);
         var message = JavaCodeBuilder.StringLiteral(constraint.Message ?? ("Constraint violated: " + constraint.Name));
         foreach (var target in constraint.Targets)
@@ -45,13 +53,13 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
             var contract = CommandAppends.Contract(context, target.EventContract);
             var owner = AxonEventSources.PrimaryTag(context, contract).ComponentName;
             var values = target.Properties.Select(id => "fact." + JavaNames.Member(contract.Properties.Single(property => property.Id == id).Name) + "()");
-            body.Line($"if (event instanceof {AxonEventsEmitter.TypeFor(context, contract.Id)} fact) store.assign(context, {key}, java.util.Arrays.asList({string.Join(", ", values)}), fact.{owner}(), {constraint.IgnoreCasing.ToString().ToLowerInvariant()}, {message});");
+            body.Line($"if (event instanceof {AxonEventsEmitter.TypeFor(context, contract.Id, body, package)} fact) store.assign(context, {key}, {body.Reference("java.util.Arrays")}.asList({string.Join(", ", values)}), fact.{owner}(), {constraint.IgnoreCasing.ToString().ToLowerInvariant()}, {message});");
         }
         foreach (var id in constraint.ReleasedBy)
         {
             var contract = CommandAppends.Contract(context, id);
             var owner = AxonEventSources.PrimaryTag(context, contract).ComponentName;
-            body.Line($"if (event instanceof {AxonEventsEmitter.TypeFor(context, id)} fact) store.releaseOwner(context, {key}, fact.{owner}());");
+            body.Line($"if (event instanceof {AxonEventsEmitter.TypeFor(context, id, body, package)} fact) store.releaseOwner(context, {key}, fact.{owner}());");
         }
     }
 
@@ -59,7 +67,7 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
     {
         var package = context.BasePackage + ".constraints";
         var name = JavaNames.Type(constraint.Name) + "ConstraintIntent";
-        var code = new JavaCodeBuilder(package)
+        var code = new JavaCodeBuilder(package).Declare(name)
             .Block("public final class " + name, body => body.Line("private " + name + "() {}")
                 .Block("public static void enforce()", method => method.Line("throw new UnsupportedOperationException(\"Append-time uniqueness is not implemented\");")))
             .Build();

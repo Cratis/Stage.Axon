@@ -20,23 +20,23 @@ internal static class CommandStreamEmitter
         var contracts = ScopeSelection.Locate(context.Request.Model.Application)
             .SelectMany(slice => slice.Slice.Events.Where(contract => slice.Module.Id == located.Module.Id || required.Contains(contract.Id)))
             .DistinctBy(contract => contract.Id).ToArray();
-        var code = new JavaCodeBuilder(package)
-            .Import("org.axonframework.extension.spring.stereotype.EventSourced")
-            .Import("org.axonframework.eventsourcing.annotation.reflection.EntityCreator")
-            .Import("org.axonframework.eventsourcing.annotation.EventSourcingHandler")
-            .Import("org.axonframework.eventsourcing.annotation.EventSourcedEntity")
-            .Line($"@EventSourcedEntity(tagKey = {source.TagReference})")
-            .Line($"@EventSourced(idType = {source.JavaType}.class, tagKey = {source.TagReference})")
+        var code = new JavaCodeBuilder(package).Declare(name);
+        var tag = source.TagReference;
+        var events = contracts.ToDictionary(contract => contract.Id, contract => AxonEventsEmitter.TypeFor(context, contract.Id, code, package));
+        if (source.JavaType.StartsWith(context.BasePackage + ".", StringComparison.Ordinal)) code.Reference(source.JavaType);
+        var sourceType = new CommandJavaTypes(context.Request.Model.Application).Reference(source.JavaType, code);
+        code.Line($"@{code.Reference("org.axonframework.eventsourcing.annotation.EventSourcedEntity")}(tagKey = {tag})")
+            .Line($"@{code.Reference("org.axonframework.extension.spring.stereotype.EventSourced")}(idType = {sourceType}.class, tagKey = {tag})")
             .Block($"public class {name}", body =>
             {
-                body.Line("@EntityCreator").Line($"public {name}() {{}}")
+                body.Line($"@{body.Reference("org.axonframework.eventsourcing.annotation.reflection.EntityCreator")}").Line($"public {name}() {{}}")
                     .Line("// Replay the module's event types so the append condition covers the entire primary stream position.");
                 foreach (var read in decisions) body.Line($"private boolean {read.Member};").Line($"public boolean {read.Member}() {{ return {read.Member}; }}");
                 foreach (var contract in contracts)
                 {
                     var updates = string.Join(' ', decisions.Where(read => read.Events.All.Contains(contract.Id)).Select(read => read.Member + " = " + (read.Events.Removes.Contains(contract.Id) ? "false;" : "true;")));
-                    body.Line("@EventSourcingHandler")
-                        .Line($"public void on({AxonEventsEmitter.TypeFor(context, contract.Id)} event) {{{updates}}}");
+                    body.Line($"@{body.Reference("org.axonframework.eventsourcing.annotation.EventSourcingHandler")}")
+                        .Line($"public void on({events[contract.Id]} event) {{{updates}}}");
                 }
             });
         context.AddJava(package, name, code.Build(), sources: [command.Id]);

@@ -19,13 +19,20 @@ internal static class AxonEventSources
         return identifier is not null ? Tag(context, identifier) : ("eventSourceId", context.BasePackage + ".runtime.EventSourceId", "eventSourceId");
     }
 
-    internal static string Record(AxonEmissionContext context, string package, SemanticEventContract contract, string annotation)
+    internal static string Record(AxonEmissionContext context, string package, SemanticEventContract contract, string annotation) =>
+        Record(context, package, contract, _ => annotation);
+
+    internal static string Record(AxonEmissionContext context, string package, SemanticEventContract contract, Func<JavaCodeBuilder, string> annotation)
     {
         var primary = PrimaryTag(context, contract);
-        var parameters = contract.Properties.Select(property => Component(context, contract, property, primary)).ToList();
-        if (!contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName))
-            parameters.Insert(0, $"@org.axonframework.eventsourcing.annotation.EventTag(key = {EventTagsEmitter.Reference(context, contract)}) {primary.JavaType} {primary.ComponentName}");
-        var code = new JavaCodeBuilder(package);
+        var code = new JavaCodeBuilder(package).Declare(JavaNames.Type(contract.Name));
+        var tag = EventTagsEmitter.Reference(context, contract, code, package);
+        var addPrimary = !contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName);
+        var primaryType = addPrimary ? code.Reference(primary.JavaType) : string.Empty;
+        foreach (var property in contract.Properties) JavaSemanticTypes.Claim(context, property.Type, code, package);
+        var parameters = contract.Properties.Select(property => Component(context, property, (primary.ComponentName, tag), code)).ToList();
+        if (addPrimary)
+            parameters.Insert(0, $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {tag}) {primaryType} {primary.ComponentName}");
         var extraTags = contract.Tags.Concat(contract.Properties.Where(property => property.IsIdentifier).Select(property => property.Name))
             .Where(tag => tag != primary.TagKey).Distinct(StringComparer.Ordinal).ToArray();
         if (extraTags.Length > 0)
@@ -37,7 +44,7 @@ internal static class AxonEventSources
             code.DiffersFromScreenplay("Only the primary event-source component is tagged; extra model tags are omitted.")
                 .UnsupportedIntent(intent, path, diagnostic);
         }
-        return code.Line(annotation).Line($"public record {JavaNames.Type(contract.Name)}({string.Join(", ", parameters)}) {{}}").Build();
+        return code.Line(annotation(code)).Line($"public record {JavaNames.Type(contract.Name)}({string.Join(", ", parameters)}) {{}}").Build();
     }
 
     static SemanticConcept? FromProducer(AxonEmissionContext context, SemanticCommand command, SemanticProducedEvent produced) =>
@@ -63,10 +70,11 @@ internal static class AxonEventSources
         return (name, context.BasePackage + ".concepts." + JavaNames.Type(concept.Name), name);
     }
 
-    static string Component(AxonEmissionContext context, SemanticEventContract contract, SemanticProperty property, (string ComponentName, string JavaType, string TagKey) primary)
+    static string Component(AxonEmissionContext context, SemanticProperty property, (string ComponentName, string Reference) primary, JavaCodeBuilder code)
     {
         var name = JavaNames.Member(property.Name);
-        var tag = name == primary.ComponentName ? "@org.axonframework.eventsourcing.annotation.EventTag(key = " + EventTagsEmitter.Reference(context, contract) + ") " : string.Empty;
-        return tag + $"{JavaRecordComponents.JsonProperty(property.Name)}{JavaSemanticTypes.TypeFor(context, property.Type)} {name}";
+        var tag = name == primary.ComponentName ? $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {primary.Reference}) " : string.Empty;
+        var json = name == property.Name ? string.Empty : $"@{code.Reference("com.fasterxml.jackson.annotation.JsonProperty")}({JavaCodeBuilder.StringLiteral(property.Name)}) ";
+        return tag + $"{json}{JavaSemanticTypes.TypeFor(context, property.Type, code)} {name}";
     }
 }

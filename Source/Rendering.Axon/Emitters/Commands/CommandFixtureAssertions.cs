@@ -9,6 +9,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 internal sealed class CommandFixtureAssertions(AxonEmissionContext context, SemanticCommand command, SemanticSpecification specification)
 {
     readonly CommandJavaTypes _types = new(context.Request.Model.Application);
+    JavaCodeBuilder? _code;
 
     internal bool CanRenderResponse() => specification.ThenReturns switch
     {
@@ -19,11 +20,24 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
         _ => false
     };
 
+    internal void Claim(JavaCodeBuilder code)
+    {
+        if (specification.ThenDenied) return;
+        if (!specification.ThenErrors.IsEmpty)
+        {
+            code.Reference(context.BasePackage + ".runtime.CommandValidationException");
+            return;
+        }
+        ClaimResponse(code);
+    }
+
+    internal void EmitReferences(JavaCodeBuilder method, IReadOnlyList<string> expected) => new CommandFixtureAssertions(context, command, specification) { _code = method }.Emit(method, expected);
+
     internal void Emit(JavaCodeBuilder method, IReadOnlyList<string> expected)
     {
         if (specification.ThenDenied)
         {
-            method.Line("result.exception(org.springframework.security.access.AccessDeniedException.class).noEvents();");
+            method.Line($"result.exception({Reference("org.springframework.security.access.AccessDeniedException")}.class).noEvents();");
             return;
         }
         if (!specification.ThenErrors.IsEmpty)
@@ -37,14 +51,27 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
         Response(method);
     }
 
+    string Reference(string type) => _code?.Reference(type) ?? type;
+
+    string? Literal(SemanticValue value, SemanticTypeReference type) => _code is null ? _types.Literal(value, type) : _types.Literal(value, type, _code);
+
+    void ClaimResponse(JavaCodeBuilder code)
+    {
+        if (specification.ThenReturns is SemanticScalarSpecificationResponse scalar && command.Response is SemanticScalarCommandResponse response) _types.ClaimLiteral(scalar.Value, response.Type, code);
+        if (specification.ThenReturns is not SemanticRecordSpecificationResponse record || command.Response is not SemanticRecordCommandResponse contract) return;
+        code.Declare(JavaNames.Type(command.Name) + "Response");
+        foreach (var field in record.Fields) _types.ClaimLiteral(field.Value, contract.Fields.Single(candidate => candidate.Name == field.Name).Type, code);
+    }
+
     void Errors(JavaCodeBuilder method)
     {
+        var exceptionType = Reference(context.BasePackage + ".runtime.CommandValidationException");
         method.Block("result.exceptionSatisfies(error ->", assertion =>
         {
-            assertion.Line($"org.assertj.core.api.Assertions.assertThat(error).isInstanceOf({context.BasePackage}.runtime.CommandValidationException.class);")
-                .Line($"var failure = ({context.BasePackage}.runtime.CommandValidationException) error;");
+            assertion.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(error).isInstanceOf({exceptionType}.class);")
+                .Line($"var failure = ({exceptionType}) error;");
             foreach (var error in specification.ThenErrors.Where(error => error.Message is not null))
-                assertion.Line($"org.assertj.core.api.Assertions.assertThat(failure.errors()).extracting(validationError -> validationError.message()).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
+                assertion.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(failure.errors()).extracting(validationError -> validationError.message()).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
         }).Line(");").Line("result.noEvents();");
     }
 
@@ -55,7 +82,7 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
             method.Line($"result.events({string.Join(", ", expected)});");
             return;
         }
-        method.Line("result.eventsSatisfy(events -> org.assertj.core.api.Assertions.assertThat(events.stream().map(event -> event.payload()).toList())")
+        method.Line($"result.eventsSatisfy(events -> {Reference("org.assertj.core.api.Assertions")}.assertThat(events.stream().map(event -> event.payload()).toList())")
             .Line($"    .containsExactlyInAnyOrder({string.Join(", ", expected)}));");
     }
 
@@ -63,7 +90,7 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
     {
         if (specification.ThenReturns is SemanticScalarSpecificationResponse scalar && command.Response is SemanticScalarCommandResponse response)
         {
-            method.Line($"result.resultMessagePayload({_types.Literal(scalar.Value, response.Type)});");
+            method.Line($"result.resultMessagePayload({Literal(scalar.Value, response.Type)});");
         }
         else if (specification.ThenReturns is SemanticRecordSpecificationResponse record && command.Response is SemanticRecordCommandResponse contract)
         {
@@ -72,7 +99,7 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
                 foreach (var field in record.Fields)
                 {
                     var type = contract.Fields.Single(candidate => candidate.Name == field.Name).Type;
-                    assertion.Line($"org.assertj.core.api.Assertions.assertThat(response.{JavaNames.Member(field.Name)}()).isEqualTo({_types.Literal(field.Value, type)});");
+                    assertion.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(response.{JavaNames.Member(field.Name)}()).isEqualTo({Literal(field.Value, type)});");
                 }
             }).Line(");");
         }

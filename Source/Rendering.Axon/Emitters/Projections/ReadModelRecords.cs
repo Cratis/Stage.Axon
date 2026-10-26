@@ -11,15 +11,24 @@ internal static class ReadModelRecords
     internal static string Code(ViewJavaTypes types, string package, SemanticReadModel model)
     {
         var name = JavaNames.Type(model.Name);
-        var components = string.Join(", ", model.Properties.Select(property => $"{JavaRecordComponents.JsonProperty(property.Name)}{types.Type(property.Type)} {JavaNames.Member(property.Name)}"));
-        return new JavaCodeBuilder(package).Block($"public record {name}({components})", body =>
+        var code = new JavaCodeBuilder(package).Declare(name);
+        foreach (var property in model.Properties) types.Claim(property.Type, code);
+        var components = string.Join(", ", model.Properties.Select(property => Component(types, property, code)));
+        return code.Block($"public record {name}({components})", body =>
         {
             foreach (var property in model.Properties)
             {
                 var arguments = model.Properties.Select(candidate => candidate.Id == property.Id ? "value" : JavaNames.Member(candidate.Name) + "()");
-                body.Block($"public {name} with{JavaNames.Type(property.Name)}({types.Type(property.Type)} value)", method =>
+                body.Block($"public {name} with{JavaNames.Type(property.Name)}({types.Type(property.Type, body)} value)", method =>
                     method.Line($"return new {name}({string.Join(", ", arguments)});"));
             }
         }).Build();
+    }
+
+    static string Component(ViewJavaTypes types, SemanticProperty property, JavaCodeBuilder code)
+    {
+        var name = JavaNames.Member(property.Name);
+        var json = name == property.Name ? string.Empty : $"@{code.Reference("com.fasterxml.jackson.annotation.JsonProperty")}({JavaCodeBuilder.StringLiteral(property.Name)}) ";
+        return $"{json}{types.Type(property.Type, code)} {name}";
     }
 }

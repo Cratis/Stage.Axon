@@ -32,12 +32,13 @@ internal static class ReactionInvocation
             return;
         }
         var roles = reaction.RunsAs.Roles.Distinct(StringComparer.Ordinal)
-            .Select(role => "new org.springframework.security.core.authority.SimpleGrantedAuthority(" + JavaCodeBuilder.StringLiteral("ROLE_" + role) + ")");
-        method.Line("var previous = org.springframework.security.core.context.SecurityContextHolder.getContext();")
-            .Line("var identity = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();")
-            .Line("identity.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(\"system\", null, java.util.List.of(" + string.Join(", ", roles) + ")));")
-            .Block("try", body => body.Line("org.springframework.security.core.context.SecurityContextHolder.setContext(identity);").Line(invocation))
-            .Block("finally", body => body.Line("org.springframework.security.core.context.SecurityContextHolder.setContext(previous);"));
+            .Select(role => $"new {method.Reference("org.springframework.security.core.authority.SimpleGrantedAuthority")}(" + JavaCodeBuilder.StringLiteral("ROLE_" + role) + ")");
+        var holder = method.Reference("org.springframework.security.core.context.SecurityContextHolder");
+        method.Line($"var previous = {holder}.getContext();")
+            .Line($"var identity = {holder}.createEmptyContext();")
+            .Line($"identity.setAuthentication(new {method.Reference("org.springframework.security.authentication.UsernamePasswordAuthenticationToken")}(\"system\", null, {method.Reference("java.util.List")}.of(" + string.Join(", ", roles) + ")));")
+            .Block("try", body => body.Line($"{holder}.setContext(identity);").Line(invocation))
+            .Block("finally", body => body.Line($"{holder}.setContext(previous);"));
     }
 
     internal static bool RequiresIdentity(AxonEmissionContext context, SemanticInvocation invocation) =>

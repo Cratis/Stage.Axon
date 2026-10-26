@@ -16,7 +16,7 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
         var name = JavaNames.Type(model.Name);
         if (reducer.Transitions.IsEmpty)
             context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model.Id, "This reducer declares no transition body or observed event; there is no transition to render.", "reduce events into the read model", model.Id.ToString());
-        var contract = new JavaCodeBuilder(package)
+        var contract = new JavaCodeBuilder(package).Declare(name).Declare(name + "Reducer")
             .DiffersFromScreenplay("the reducer is an Axon event projector delegating to a replaceable Spring reducer bean; implementation bodies are not translated.")
             .Block($"public interface {name}Reducer", body =>
             {
@@ -38,16 +38,16 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
         context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model.Id, reason, "reduce this event and current state into a new read model or delete it", model.Id.ToString());
         code.Block($"default {JavaNames.Type(model.Name)} reduce({types.EventType(transition.EventContract)} event, {JavaNames.Type(model.Name)} current, org.axonframework.messaging.eventhandling.EventMessage message)", method => method
             .UnsupportedIntent("reduce this event and current state into a new read model or delete it", model.Id.ToString(), AxonRefusalCodes.Reduction)
-            .Line($"throw new UnsupportedOperationException({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.Reduction + ": " + reason)});"));
+            .Line($"throw new {method.Reference("java.lang.UnsupportedOperationException")}({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.Reduction + ": " + reason)});"));
     }
 
     void EmitConfiguration(string package, string name, SemanticId id)
     {
-        var code = new JavaCodeBuilder(package)
-            .Line($"@org.springframework.context.annotation.Configuration({JavaCodeBuilder.StringLiteral(package + "." + name + "ReducerConfiguration")})")
+        var code = new JavaCodeBuilder(package).Declare(name + "Reducer").Declare(name + "ReducerConfiguration");
+        code.Line($"@{code.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "ReducerConfiguration")})")
             .Block($"public class {name}ReducerConfiguration", body => body
                 .Line($"@org.springframework.context.annotation.Bean({JavaCodeBuilder.StringLiteral(package + "." + name + "Reducer")})")
-                .Line($"@org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean({name}Reducer.class)")
+                .Line($"@{body.Reference("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")}({name}Reducer.class)")
                 .Block($"public {name}Reducer {JavaNames.Member(name)}Reducer()", method => method.Line($"return new {name}Reducer() {{}};")));
         context.AddJava(package, name + "ReducerConfiguration", code.Build(), sources: id);
     }
@@ -56,23 +56,26 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
     {
         var name = JavaNames.Type(model.Name);
         var updates = new ProjectionUpdates(context, types, model.Id);
-        var values = new ProjectionValues(context, types);
-        var code = new JavaCodeBuilder(package).Import(context.BasePackage + ".runtime.ReadModelStore")
-            .Line($"@org.springframework.stereotype.Component({JavaCodeBuilder.StringLiteral(package + "." + name + "ReducerProjector")})")
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Reducer").Declare(name + "ReducerProjector");
+        var storeType = code.Reference(context.BasePackage + ".runtime.ReadModelStore");
+        updates.Claim(code, package);
+        foreach (var transition in reducer.Transitions) types.EventType(transition.EventContract, code);
+        var values = new ProjectionValues(context, types, code);
+        code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "ReducerProjector")})")
             .Block($"public class {name}ReducerProjector", body =>
             {
-                body.Line($"private final ReadModelStore<Object, {name}> store;").Line($"private final {name}Reducer reducer;")
-                    .Block($"public {name}ReducerProjector(@org.springframework.beans.factory.annotation.Qualifier({JavaCodeBuilder.StringLiteral(package + "." + name)}) ReadModelStore<Object, {name}> store, {name}Reducer reducer)", constructor => constructor.Line("this.store = store;").Line("this.reducer = reducer;"));
+                body.Line($"private final {storeType}<{body.Reference("java.lang.Object")}, {name}> store;").Line($"private final {name}Reducer reducer;")
+                    .Block($"public {name}ReducerProjector(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + name)}) {storeType}<{body.Reference("java.lang.Object")}, {name}> store, {name}Reducer reducer)", constructor => constructor.Line("this.store = store;").Line("this.reducer = reducer;"));
                 foreach (var transition in reducer.Transitions)
                 {
                     var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == transition.EventContract);
-                    body.Line("@org.axonframework.messaging.eventhandling.annotation.EventHandler")
-                        .Block($"public synchronized void on({types.EventType(transition.EventContract)} event, org.axonframework.messaging.eventhandling.EventMessage message{updates.Parameter})", method =>
+                    body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
+                        .Block($"public synchronized void on({types.EventType(transition.EventContract, body)} event, {body.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message{updates.ParameterFor(body)})", method =>
                         {
                             method.Line($"var key = {values.Source(@event)};")
                                 .Line("var next = reducer.reduce(event, store.get(key).orElse(null), message);")
                                 .Line("if (next == null) store.remove(key); else store.put(key, next);");
-                            updates.Notify(method);
+                            updates.Notify(method, package);
                         });
                 }
             });

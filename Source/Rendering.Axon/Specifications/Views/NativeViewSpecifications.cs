@@ -25,8 +25,7 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
         var given = Event(spec.GivenEvents[0]);
         if (given is null) return null;
         var sourceKey = JavaCodeBuilder.StringLiteral(((SemanticTextValue)spec.GivenEvents[0].EventSource!.Value).Value);
-        var assertions = spec.ThenReadModels.Select(expected => Assertion(expected, sourceKey)).ToArray();
-        var body = new Body(JavaNames.Type(model.Name), JavaNames.Type(projection.Name), given, assertions, ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id)));
+        var body = new Body(JavaNames.Type(model.Name), JavaNames.Type(projection.Name), given, sourceKey, ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id)));
         return method => Emit(method, spec, body);
     }
 
@@ -42,19 +41,19 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
     static bool PureThen(SemanticSpecification spec) =>
         !spec.ThenDenied && spec.ThenErrors.IsEmpty && spec.ThenEvents.IsEmpty && spec.ThenQueries.IsEmpty && spec.ThenAbsentReadModels.IsEmpty && spec.ThenReadModels.Length == 1;
 
-    static void Emit(JavaCodeBuilder method, SemanticSpecification spec, Body plan)
+    void Emit(JavaCodeBuilder method, SemanticSpecification spec, Body plan)
     {
         method.Block("try", body =>
         {
             CommandFixtureSecurity.Caller(body, spec.GivenCaller);
-            body.Line($"ReadModelStore<Object, {plan.Model}> store = new InMemoryReadModelStore<>();")
+            body.Line($"{body.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {plan.Model}> store = new {body.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
                 .Line($"var projector = new {plan.Projection}Projector(store);")
-                .Line($"projector.on({plan.Event}{plan.Arguments});");
-            foreach (var assertion in plan.Assertions) body.Line(assertion);
-        }).Block("finally", body => body.Line("org.springframework.security.core.context.SecurityContextHolder.clearContext();"));
+                .Line($"projector.on({AxonViewEvents.Expression(context, types, plan.Event, body)}{plan.Arguments});");
+            foreach (var expected in spec.ThenReadModels) body.Line(Assertion(expected, plan.SourceKey, body));
+        }).Block("finally", body => body.Line($"{body.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
     }
 
-    string? Event(SemanticSpecificationEvent given)
+    SemanticSpecificationEvent? Event(SemanticSpecificationEvent given)
     {
         var contract = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == given.EventContract);
         var primary = AxonEventSources.PrimaryTag(context, contract);
@@ -63,19 +62,19 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
 
         // The flat projector reads $eventSourceId through the event's normalized primary tag, not an EventMessage.
         if (identity is not null) given = given with { Values = [.. given.Values.Where(value => value.TargetProperty != identity.Id), new(identity.Id, given.EventSource.Value)] };
-        return AxonViewEvents.Expression(context, types, given);
+        return given;
     }
 
-    string Assertion(SemanticSpecificationReadModel expected, string sourceKey)
+    string Assertion(SemanticSpecificationReadModel expected, string sourceKey, JavaCodeBuilder code)
     {
-        var matcher = new ViewExpectations(context.Request.Model.Application, types);
+        var matcher = new ViewExpectations(context.Request.Model.Application, types, code);
         var predicates = expected.Values.Select(entry =>
         {
             var property = model.Properties.First(candidate => candidate.Id == entry.TargetProperty);
             return matcher.Predicate(entry.Value, property.Type, $"row.{JavaNames.Member(property.Name)}()");
         });
-        var key = ViewExpectedKeys.Expression(expected.Key, model, types) ?? sourceKey;
-        return $"org.junit.jupiter.api.Assertions.assertTrue(store.get({key}).stream().anyMatch(row -> {string.Join(" && ", predicates)}), \"Expected modeled read-model properties\");";
+        var key = ViewExpectedKeys.Expression(expected.Key, model, types, code) ?? sourceKey;
+        return $"{code.Reference("org.junit.jupiter.api.Assertions")}.assertTrue(store.get({key}).stream().anyMatch(row -> {string.Join(" && ", predicates)}), \"Expected modeled read-model properties\");";
     }
 
     bool Supported(SemanticSpecification spec) =>
@@ -85,5 +84,5 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
         expected.ReadModel == model.Id && !expected.Exactly && expected.Values.Length > 0 &&
         expected.Values.All(entry => model.Properties.Any(property => property.Id == entry.TargetProperty));
 
-    sealed record Body(string Model, string Projection, string Event, string[] Assertions, string Arguments);
+    sealed record Body(string Model, string Projection, SemanticSpecificationEvent Event, string SourceKey, string Arguments);
 }

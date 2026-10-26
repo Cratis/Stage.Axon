@@ -29,13 +29,17 @@ internal sealed class ReactionSpecificationsEmitter(AxonEmissionContext context,
         var supported = scenario.CanEmit;
         var name = JavaNames.Type(reaction.Name) + JavaNames.Type(specification.Name) + "SpecificationsTest";
         var method = "spec_" + JavaNames.Member(specification.Name);
-        var code = new JavaCodeBuilder(package);
-        if (supported) code.Line("@org.springframework.boot.test.context.SpringBootTest").Line("@org.springframework.test.annotation.DirtiesContext");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(JavaNames.Type(reaction.Name) + "Reaction");
+        if (supported)
+        {
+            scenario.Claim(code);
+            code.Line("@" + code.Reference("org.springframework.boot.test.context.SpringBootTest")).Line("@" + code.Reference("org.springframework.test.annotation.DirtiesContext"));
+        }
         code.Block("class " + name, body =>
         {
             if (supported) Fields(body);
-            body.Line("@org.junit.jupiter.api.Test").Line($"@org.junit.jupiter.api.DisplayName({JavaCodeBuilder.StringLiteral(specification.Id.ToString())})");
-            if (!supported) body.Line($"@org.junit.jupiter.api.Disabled({JavaCodeBuilder.StringLiteral(Refusal + ": unsupported application-trigger specification fixtures")})");
+            body.Line("@" + body.Reference("org.junit.jupiter.api.Test")).Line($"@{body.Reference("org.junit.jupiter.api.DisplayName")}({JavaCodeBuilder.StringLiteral(specification.Id.ToString())})");
+            if (!supported) body.Line($"@{body.Reference("org.junit.jupiter.api.Disabled")}({JavaCodeBuilder.StringLiteral(Refusal + ": unsupported application-trigger specification fixtures")})");
             body.Block("void " + method + "() throws Exception", test =>
             {
                 if (supported)
@@ -56,9 +60,10 @@ internal sealed class ReactionSpecificationsEmitter(AxonEmissionContext context,
 
     void Fields(JavaCodeBuilder body)
     {
-        body.Line($"@org.springframework.beans.factory.annotation.Autowired private {JavaNames.Type(reaction.Name)}Reaction reaction;")
-            .Line("@org.springframework.beans.factory.annotation.Autowired private org.axonframework.eventsourcing.eventstore.EventStorageEngine events;")
-            .Line("@org.springframework.test.context.bean.override.mockito.MockitoBean private java.time.Clock clock;")
-            .Line("@org.junit.jupiter.api.AfterEach void clearCaller() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }");
+        var autowired = body.Reference("org.springframework.beans.factory.annotation.Autowired");
+        body.Line($"@{autowired} private {JavaNames.Type(reaction.Name)}Reaction reaction;")
+            .Line($"@{autowired} private {body.Reference("org.axonframework.eventsourcing.eventstore.EventStorageEngine")} events;")
+            .Line($"@{body.Reference("org.springframework.test.context.bean.override.mockito.MockitoBean")} private {body.Reference("java.time.Clock")} clock;")
+            .Line($"@{body.Reference("org.junit.jupiter.api.AfterEach")} void clearCaller() {{ {body.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext(); }}");
     }
 }

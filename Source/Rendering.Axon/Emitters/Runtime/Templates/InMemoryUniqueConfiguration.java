@@ -3,9 +3,13 @@
 
 package __RUNTIME__;
 
-@org.springframework.context.annotation.Configuration
-@org.springframework.context.annotation.Profile("!persistent")
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+
+@Configuration
+@Profile("!persistent")
 public class InMemoryUniqueConfiguration {
-    @org.springframework.context.annotation.Bean
+    @Bean
     UniqueValueStore uniqueValueStore() { return new InMemoryUniqueValueStore(); }
 }
