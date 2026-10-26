@@ -26,10 +26,10 @@ public class when_selecting_cascaded_validation : for_AxonArtifactRenderPlanner.
         enumeration = Render(SemanticTypeReference.ForConcept(request.Model.Application.Concepts.First(concept => !concept.Values.IsDefaultOrEmpty).Id));
     }
 
-    [Fact] void should_not_cascade_into_dates() => date.ShouldNotContain("@jakarta.validation.Valid ");
-    [Fact] void should_not_cascade_into_scalars() => text.ShouldNotContain("@jakarta.validation.Valid ");
-    [Fact] void should_not_cascade_into_enums() => enumeration.ShouldNotContain("@jakarta.validation.Valid ");
-    [Fact] void should_retain_required_validation() => date.ShouldContain("@jakarta.validation.constraints.NotNull java.time.LocalDate value");
+    [Fact] void should_not_cascade_into_dates() => date.ShouldNotContain("@Valid ");
+    [Fact] void should_not_cascade_into_scalars() => text.ShouldNotContain("@Valid ");
+    [Fact] void should_not_cascade_into_enums() => enumeration.ShouldNotContain("@Valid ");
+    [Fact] void should_retain_required_validation() => date.ShouldContain("@NotNull LocalDate value");
     [Fact] void should_cascade_into_composites() => types.Cascades(new(SemanticTypeReferenceKind.CompositeType, SemanticPrimitiveType.Text, default, false, false)).ShouldBeTrue();
 
     string Render(SemanticTypeReference type)

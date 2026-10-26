@@ -32,7 +32,7 @@ public class when_rendering_state_changes : for_AxonArtifactRenderPlanner.given.
     [Fact] void should_append_the_single_event_directly() => Code("PlaceOrderHandler").ShouldContain("appender.append(new ");
     [Fact] void should_not_collect_a_single_event() => Code("PlaceOrderHandler").ShouldNotContain("ArrayList");
     [Fact] void should_use_the_shared_primary_tag() => Code("PlaceOrderStream").ShouldContain($"@EventSourcedEntity(tagKey = {context.BasePackage}.orders.events.EventTags.ORDER_ID)");
-    [Fact] void should_mark_the_command_identity() => Code("PlaceOrder").ShouldContain("@org.axonframework.modelling.annotation.TargetEntityId");
+    [Fact] void should_mark_the_command_identity() => Code("PlaceOrder").ShouldContain("@TargetEntityId");
     [Fact] void should_emit_a_post_endpoint() => Code("PlaceOrderEndpoint").ShouldContain("@PostMapping(\"/api/orders/orders/place-order\")");
     [Fact] void should_return_a_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("CompletableFuture<Void>");
     [Fact] void should_dispatch_with_the_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("send(command, Void.class)");
