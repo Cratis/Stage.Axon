@@ -14,10 +14,13 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
 
     internal static string Cache(ProjectionScopeNode node, int index) => "join" + node.Name + index;
 
+    internal static string ChangeType(ProjectionScopeNode root) => root.Type == "ScopeChange" ? "ScopeChangeResult" : "ScopeChange";
+
     internal void Emit()
     {
         var name = JavaNames.Type(projection.Name) + "Projector";
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare("Change");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare(ChangeType(_root));
+        foreach (var property in _root.All.SelectMany(node => node.Properties)) types.ClaimProjectionType(property.Type, code);
         _updates.Claim(code, package);
         foreach (var @event in Events()) types.EventType(@event.Id, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
@@ -43,12 +46,12 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             .Line($"private final {code.Reference("java.time.Clock")} clock;")
             .Line($"private final {code.Reference("java.util.Set")}<{code.Reference("java.lang.Object")}> keys = new {code.Reference("java.util.LinkedHashSet")}<>();")
             .Line($"private final {code.Reference("java.util.List")}<{code.Reference("java.util.function.BooleanSupplier")}> pending = new {code.Reference("java.util.ArrayList")}<>();")
-            .Line("private record Change<T>(T value, boolean touched, boolean ancestors) {}")
+            .Line($"private record {ChangeType(_root)}<T>(T value, boolean touched, boolean ancestors) {{}}")
             .DiffersFromScreenplay("projection join indexes are replay-built; restore them by replaying events after restarting a persistent store.");
         foreach (var node in _root.All)
         {
             for (var index = 0; index < node.Scope.Joins.Length; index++)
-                code.Line($"private final {code.Reference("java.util.Map")}<{code.Reference("java.lang.String")}, {code.Reference("java.util.function.UnaryOperator")}<{node.Type}>> {Cache(node, index)} = new {code.Reference("java.util.HashMap")}<>();");
+                code.Line($"private final {code.Reference("java.util.Map")}<{code.Reference("java.lang.String")}, {code.Reference("java.util.function.UnaryOperator")}<{code.Reference(node.Type)}>> {Cache(node, index)} = new {code.Reference("java.util.HashMap")}<>();");
         }
         code.Line($"@{code.Reference("org.springframework.beans.factory.annotation.Autowired")}")
             .Block($"public {name}(@{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store, {code.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.store = store;").Line("this.clock = clock;"))

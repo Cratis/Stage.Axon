@@ -20,7 +20,7 @@ internal sealed class ViewConceptValues(SemanticApplication application)
     {
         var concept = Concept(type);
         if (concept.Values.IsEmpty) return $"new {name}({value})";
-        var argument = Numbered(concept) ? $"Math.toIntExact({value})" : value;
+        var argument = Numbered(concept) ? $"java.lang.Math.toIntExact({value})" : value;
         return $"{name}.fromValue({argument})";
     }
 

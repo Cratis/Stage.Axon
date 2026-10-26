@@ -99,6 +99,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var name = JavaNames.Type(projection.Name) + "Projector";
         var updates = new ProjectionUpdates(context, types, model.Id);
         var code = new JavaCodeBuilder(package).Declare(modelName).Declare(name);
+        foreach (var property in model.Properties) types.ClaimProjectionType(property.Type, code);
         var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
         updates.Claim(code, package);
         foreach (var from in ProjectionTransitions.From(projection)) types.EventType(from.EventContract, code);
@@ -132,7 +133,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         }
         var modelName = JavaNames.Type(model.Name);
         code.Line($"store.update({key}, current -> {{")
-            .Line($"    var state = current == null ? new {modelName}({string.Join(", ", model.Properties.Select(property => types.Default(property.Type)))}) : current;");
+            .Line($"    var state = current == null ? new {modelName}({string.Join(", ", model.Properties.Select(property => types.Default(property.Type, code)))}) : current;");
         foreach (var mapping in from.Mappings)
         {
             var target = mapping.Target.Length == 1 ? model.Properties.FirstOrDefault(property => property.Id == mapping.Target[0]) : null;

@@ -27,7 +27,7 @@ public class when_emitting_scoped_views : given.a_view_request
     [Fact] void should_copy_children_into_immutable_lists() => _projector.ShouldContain("List.copyOf(rootChild0)");
     [Fact] void should_preserve_original_deferred_event_values() => _projector.ShouldContain("pending.add(() -> projectCardAdded(event, message))");
     [Fact] void should_backfill_joins() => _projector.ShouldContain("joined.apply(state)");
-    [Fact] void should_remove_instances() => _projector.ShouldContain("return new Change<>(null, true, true)");
+    [Fact] void should_remove_instances() => _projector.ShouldContain("return new ScopeChange<>(null, true, true)");
     [Fact] void should_inject_java_time_clock() => _projector.ShouldContain("Clock clock");
     [Fact] void should_import_list_helpers() => _projector.ShouldContain("import java.util.List;");
     [Fact] void should_import_atomic_flags() => _projector.ShouldContain("import java.util.concurrent.atomic.AtomicBoolean;");

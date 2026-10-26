@@ -34,17 +34,21 @@
 
     <!--
         Inline specs live beside the code they specify (when_*/, for_*/ and given/ folders).
-        Every project doubles as a test project in Debug; the spec files are stripped from Release builds.
-        A dedicated spec project opts out by setting <DedicatedSpecsProject>true</DedicatedSpecsProject>.
+        Projects double as test projects in Debug; the spec files are stripped from Release builds.
+        Set EnableInlineSpecs=false before importing these props to keep a library free of test dependencies.
+        Dedicated spec projects set DedicatedSpecsProject=true before importing and supply their own test packages.
     -->
-    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <PropertyGroup>
+        <EnableInlineSpecs Condition="'$(EnableInlineSpecs)' == ''">true</EnableInlineSpecs>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug' AND '$(EnableInlineSpecs)' == 'true'">
         <IsTestProject>true</IsTestProject>
 
         <!-- The test SDK generates an entry point; projects with top-level statements keep their own. -->
         <NoWarn>$(NoWarn);CS7022</NoWarn>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(Configuration)' == 'Debug' AND '$(DedicatedSpecsProject)' != 'true'">
+    <ItemGroup Condition="'$(Configuration)' == 'Debug' AND '$(EnableInlineSpecs)' == 'true' AND '$(DedicatedSpecsProject)' != 'true'">
         <PackageReference Include="xunit" />
         <PackageReference Include="xunit.runner.visualstudio">
             <PrivateAssets>all</PrivateAssets>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <GenerateProgramFile>false</GenerateProgramFile>
+        <IsPackable>false</IsPackable>
+        <AssemblyName>Cratis.Stage.Samples.MinimalTarget</AssemblyName>
+        <RootNamespace>Cratis.Stage.Samples.MinimalTarget</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Cratis.Stage.Contracts" />
+        <ProjectReference Include="../Rendering.Conformance/Rendering.Conformance.csproj" />
+    </ItemGroup>
+</Project>

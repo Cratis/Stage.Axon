@@ -37,7 +37,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
                     method.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
             })
             .Block($"public void on({eventType} event{_updates.Parameter})", method => method.Line($"apply(event{arguments}, store);"))
-            .Block($"private void apply({eventType} event{_updates.Parameter}, {store}<Object, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
+            .Block($"private void apply({eventType} event{_updates.Parameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
     }
 
     void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)
