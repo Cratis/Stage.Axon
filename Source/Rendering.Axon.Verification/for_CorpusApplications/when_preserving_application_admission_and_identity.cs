@@ -37,24 +37,27 @@ public class when_preserving_application_admission_and_identity : Specification
     {
         foreach (var (name, loaded) in _models)
         {
-            _plans.Add(name, name == IngressProofModel.Application
-                ? IngressProofModel.Plan(loaded)
-                : AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id)));
+            _plans.Add(name, name switch
+            {
+                IngressProofModel.Application => IngressProofModel.Plan(loaded),
+                IngressProofModel.PersistentApplication => IngressProofModel.PersistentPlan(loaded),
+                _ => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id))
+            });
         }
     }
 
     void Destroy() => _inputs?.Dispose();
 
     [Fact]
-    void should_keep_all_twenty_four_application_names() => _applications.Select(application => application.Name).SequenceEqual<string>(
+    void should_keep_all_twenty_five_application_names() => _applications.Select(application => application.Name).SequenceEqual<string>(
     [
         "administration", "approvals", "bookings", "catalog", "contracts", "crm", "customer-portal", "hr", "inventory", "invoicing", "orders", "projects", "ticketing", "vendors", "work-orders",
-        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views", "ingress-invariants"
+        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views", "ingress-invariants", "ingress-persistent"
     ]).ShouldBeTrue();
 
     [Fact] void should_keep_native_report_application_names() => CorpusApplications.Find(given.the_repository.Root()).Select(application => application.Name).SequenceEqual(_applications.Select(application => application.Name)).ShouldBeTrue();
-    [Fact] void should_compile_every_application() => _models.Count.ShouldEqual(24);
-    [Fact] void should_plan_every_application_without_refusals() => (_plans.Count == 24 && _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty)).ShouldBeTrue();
+    [Fact] void should_compile_every_application() => _models.Count.ShouldEqual(25);
+    [Fact] void should_plan_every_application_without_refusals() => (_plans.Count == 25 && _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty)).ShouldBeTrue();
     [Fact] void should_use_the_composed_custom_package_root() => _applications.Single(application => application.Name == "sample-custom-packages").Root.ShouldEqual(_inputs.Root);
 
     [Fact] void should_bind_proof_facts_to_the_authenticated_caller() => ProofSource("RegisterAccountHandler").ShouldContain("Caller.current().identity()");
@@ -65,8 +68,18 @@ public class when_preserving_application_admission_and_identity : Specification
     [Fact] void should_refuse_the_unsupported_cross_stream_proof() => ProofSource("CloseOtherAccountHandler").ShouldContain("throw new UnsupportedOperationException(\"STAGE-AXON-0106:");
     [Fact] void should_not_append_in_the_unsupported_proof() => ProofSource("CloseOtherAccountHandler").ShouldNotContain("appender.append(");
     [Fact] void should_emit_the_persistent_gateway_race_base() => ProofSource("PersistentUniqueConcurrencyTest").ShouldContain("abstract CompletableFuture<Void> register(UUID owner, String value)");
+    [Fact] void should_preserve_the_scoped_memory_proof_view() => ProofSource("ActiveAccountsStoreConfiguration").ShouldContain("new PersistentReadModelSafety(");
+    [Fact] void should_not_render_views_for_the_persistent_proofs() => _plans[IngressProofModel.PersistentApplication].Artifacts.Any(artifact => artifact.RelativePath.Contains("/accounts/registry/active/", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_not_warn_about_persistent_proof_views() => _plans[IngressProofModel.PersistentApplication].Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0308").ShouldBeFalse();
+    [Fact] void should_enforce_persistent_protected_reads() => PersistentProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new CommandValidationException");
+    [Fact] void should_preserve_persistent_read_removals() => PersistentProofSource("ConsumeAccountStream").ShouldContain("decisionRead0 = false;");
+    [Fact] void should_preserve_persistent_read_creation() => PersistentProofSource("ConsumeAccountStream").ShouldContain("decisionRead0 = true;");
+    [Fact] void should_enlist_persistent_uniqueness() => PersistentProofSource("ModeledConstraints").ShouldContain("store.assign(context,");
+    [Fact] void should_release_persistent_claims() => PersistentProofSource("ModeledConstraints").ShouldContain("store.releaseOwner(context,");
 
-    string ProofSource(string name) => Encoding.UTF8.GetString(_plans[IngressProofModel.Application].Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());
+    string ProofSource(string name) => Source(IngressProofModel.Application, name);
+    string PersistentProofSource(string name) => Source(IngressProofModel.PersistentApplication, name);
+    string Source(string application, string name) => Encoding.UTF8.GetString(_plans[application].Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());
 
     [Fact]
     public async Task should_keep_custom_application_identity_across_owned_input_directories()

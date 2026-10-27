@@ -23,10 +23,29 @@ internal static class IngressProofArtifacts
                 StringComparer.Ordinal);
     }
 
-    internal static async Task Write(string destination)
+    internal static IReadOnlyDictionary<string, string> Sources(string application)
     {
-        var directory = Path.Combine(destination, "src/test/java", RuntimePackage.Replace('.', '/'));
-        Directory.CreateDirectory(directory);
-        foreach (var (name, source) in Sources()) await File.WriteAllTextAsync(Path.Combine(directory, name), source);
+        string[] selected = application switch
+        {
+            IngressProofModel.Application => ["GeneratedIngressSupport.java", "GeneratedProtectedReadTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedSecurityIngressTest.java"],
+            IngressProofModel.PersistentApplication => ["GeneratedIngressSupport.java", "GeneratedProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java", "GeneratedPersistentUniqueConcurrencyTest.java"],
+            _ => throw new NativeVerificationFailed("Unknown ingress proof application: " + application)
+        };
+        return Sources().Where(source => selected.Contains(source.Key, StringComparer.Ordinal))
+            .ToDictionary(source => source.Key, source => source.Value.Replace(ApplicationPackage, Package(application), StringComparison.Ordinal), StringComparer.Ordinal);
     }
+
+    internal static async Task Write(string destination, string application)
+    {
+        var directory = Path.Combine(destination, "src/test/java", (Package(application) + ".runtime").Replace('.', '/'));
+        Directory.CreateDirectory(directory);
+        foreach (var (name, source) in Sources(application)) await File.WriteAllTextAsync(Path.Combine(directory, name), source);
+    }
+
+    static string Package(string application) => application switch
+    {
+        IngressProofModel.Application => ApplicationPackage,
+        IngressProofModel.PersistentApplication => "corpusingresspersistent",
+        _ => throw new NativeVerificationFailed("Unknown ingress proof application: " + application)
+    };
 }

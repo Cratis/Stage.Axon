@@ -26,7 +26,8 @@ internal static class CorpusApplications
             ("sample-custom-packages", customModelRoot),
             ("views-combined", views),
             .. files.Select(path => ("view-" + Path.GetFileNameWithoutExtension(path), path)),
-            (IngressProofModel.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/ingress-invariants.play"))
+            (IngressProofModel.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/ingress-invariants.play")),
+            (IngressProofModel.PersistentApplication, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/ingress-invariants.play"))
         ];
     }
 }

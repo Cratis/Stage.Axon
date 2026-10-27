@@ -9,15 +9,24 @@ namespace Cratis.Stage.Rendering.Axon.Verification.for_IngressProofArtifacts;
 public class when_preparing_native_proofs : Specification
 {
     IReadOnlyDictionary<string, string> _sources;
+    IReadOnlyDictionary<string, string> _memory;
+    IReadOnlyDictionary<string, string> _persistent;
     string _all;
 
     void Because()
     {
         _sources = IngressProofArtifacts.Sources();
+        _memory = IngressProofArtifacts.Sources(IngressProofModel.Application);
+        _persistent = IngressProofArtifacts.Sources(IngressProofModel.PersistentApplication);
         _all = string.Join('\n', _sources.Values);
     }
 
-    [Fact] void should_include_all_native_proof_sources() => _sources.Count.ShouldEqual(6);
+    [Fact]
+    void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
+    [
+        "GeneratedIngressSupport.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
+        "GeneratedPersistentUniqueConcurrencyTest.java", "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
+    ]).ShouldBeTrue();
     [Fact] void should_resolve_all_template_packages() => _all.ShouldNotContain("__APPLICATION__");
     [Fact] void should_resolve_the_runtime_package() => _all.ShouldNotContain("__RUNTIME__");
     [Fact] void should_not_add_license_headers_to_java() => _all.ShouldNotContain("Copyright (c) Cratis");
@@ -33,4 +42,13 @@ public class when_preparing_native_proofs : Specification
     [Fact] void should_not_define_an_unauthorized_http_status() => _all.ShouldNotContain("isUnauthorized()");
     [Fact] void should_not_define_a_forbidden_http_status() => _all.ShouldNotContain("isForbidden()");
     [Fact] void should_report_observed_denial_statuses() => _all.ShouldContain("response.getStatus()");
+    [Fact] void should_not_start_the_scoped_app_with_the_persistent_profile() => _memory.Values.Any(source => source.Contains("@ActiveProfiles(\"persistent\")", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_keep_jpa_uniqueness_proofs_out_of_the_scoped_app() => _memory.ContainsKey("GeneratedPersistentUniqueConcurrencyTest.java").ShouldBeFalse();
+    [Fact] void should_keep_jpa_read_proofs_out_of_the_scoped_app() => _memory.ContainsKey("GeneratedPersistentProtectedReadTest.java").ShouldBeFalse();
+    [Fact] void should_run_jpa_uniqueness_in_the_viewless_app() => _persistent["GeneratedPersistentUniqueConcurrencyTest.java"].ShouldContain("@ActiveProfiles(\"persistent\")");
+    [Fact] void should_run_jpa_protected_reads_in_the_viewless_app() => _persistent["GeneratedPersistentProtectedReadTest.java"].ShouldContain("@ActiveProfiles(\"persistent\")");
+    [Fact] void should_bind_persistent_proofs_to_the_viewless_package() => _persistent.Values.All(source => source.Contains("package corpusingresspersistent.runtime;", StringComparison.Ordinal)).ShouldBeTrue();
+    [Fact] void should_not_require_view_types_in_the_persistent_app() => _persistent.Values.Any(source => source.Contains(".accounts.registry.active.", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_keep_authorization_proofs_in_the_scoped_app() => _memory.ContainsKey("GeneratedSecurityIngressTest.java").ShouldBeTrue();
+    [Fact] void should_keep_memory_proofs_in_the_scoped_app() => _memory.ContainsKey("GeneratedMemoryProtectedReadTest.java").ShouldBeTrue();
 }
