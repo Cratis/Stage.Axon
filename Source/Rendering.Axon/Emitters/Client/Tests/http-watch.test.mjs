@@ -1,7 +1,7 @@
 // Server-sent parsing and live watches: a scripted stream, a manual scheduler, no sleeps.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FrameTooLarge, liveQuery, manualScheduler, problem, readFrames, recorder, scriptedFetch, sseStream, transportFor, until } from "./support.mjs";
+import { FrameTooLarge, hangingFetch, liveQuery, manualScheduler, problem, readFrames, recorder, scriptedFetch, sseStream, transportFor, until } from "./support.mjs";
 
 function bodyOf(...chunks) {
     const encoder = new TextEncoder();
@@ -251,4 +251,125 @@ test("a closed watch is not reopened by changeIdentity", async () => {
     transport.changeIdentity();
     assert.equal(fetch.calls.length, 1);
     assert.equal(observer.events.includes("cleared@1"), false);
+});
+
+// An observer that runs `react` the first time the state is live (or the first value arrives), to act from inside the callback.
+function reacting(kind, react) {
+    const observer = recorder();
+    let fired = false;
+    const record = observer[kind];
+    observer[kind] = (payload, epoch) => {
+        record(payload, epoch);
+        if (!fired && (kind === "value" || payload === "live")) { fired = true; react(); }
+    };
+    return observer;
+}
+
+const settle = async () => { for (let turn = 0; turn < 20; turn++) await new Promise(resolve => setImmediate(resolve)); };
+const oldEpoch = (observer) => observer.events.filter(event => event.startsWith("value:") && event.endsWith("@0"));
+
+test("an identity change inside state(live) delivers no value of the old epoch", async () => {
+    const harness = open({ stream: { errorOnAbort: false } });
+    const observer = reacting("state", () => harness.transport.changeIdentity());
+    harness.transport.watch(liveQuery, {}, observer);
+    await until(() => harness.streams.length === 1);
+    harness.streams[0].push("data: \"old\"\n\n");
+    await settle();
+    assert.deepEqual(oldEpoch(observer), []);
+    assert.equal(observer.events.includes("cleared@1"), true);
+});
+
+test("an identity change inside state(live) delivers none of the frames of the same chunk", async () => {
+    const harness = open({ stream: { errorOnAbort: false } });
+    const observer = reacting("state", () => harness.transport.changeIdentity());
+    harness.transport.watch(liveQuery, {}, observer);
+    await until(() => harness.streams.length === 1);
+    harness.streams[0].push("data: 1\n\ndata: 2\n\n");
+    await settle();
+    assert.deepEqual(oldEpoch(observer), []);
+});
+
+test("an identity change inside a value callback delivers no later frame of that chunk", async () => {
+    const harness = open({ stream: { errorOnAbort: false } });
+    const observer = reacting("value", () => harness.transport.changeIdentity());
+    harness.transport.watch(liveQuery, {}, observer);
+    await until(() => harness.streams.length === 1);
+    harness.streams[0].push("data: 1\n\ndata: 2\n\ndata: 3\n\n");
+    await settle();
+    assert.deepEqual(oldEpoch(observer), ["value:1@0"]);
+});
+
+test("closing the watch inside state(live) delivers no value", async () => {
+    let subscription;
+    const harness = open({ stream: { errorOnAbort: false } });
+    const observer = reacting("state", () => subscription.close());
+    subscription = harness.transport.watch(liveQuery, {}, observer);
+    await until(() => harness.streams.length === 1);
+    harness.streams[0].push("data: 1\n\n");
+    await settle();
+    assert.equal(observer.values().length, 0);
+});
+
+test("aborting the caller signal inside state(live) delivers no value", async () => {
+    const controller = new AbortController();
+    const harness = open({ stream: { errorOnAbort: false } });
+    const observer = reacting("state", () => controller.abort());
+    harness.transport.watch(liveQuery, {}, observer, controller.signal);
+    await until(() => harness.streams.length === 1);
+    harness.streams[0].push("data: 1\n\n");
+    await settle();
+    assert.equal(observer.values().length, 0);
+});
+
+test("a fetch that never answers times out after three heartbeats and reconnects", async () => {
+    const scheduler = manualScheduler();
+    const fetch = hangingFetch();
+    const observer = recorder();
+    transportFor(fetch, { scheduler, heartbeatMs: 1000 }).watch(liveQuery, {}, observer);
+    await until(() => fetch.calls.length === 1);
+    scheduler.fire(3000);
+    await until(() => scheduler.delays().includes(1000));
+    assert.equal(fetch.calls[0].init.signal.aborted, true);
+    assert.deepEqual(observer.events, ["state:connecting@0", "state:reconnecting@0"]);
+    scheduler.fire(1000);
+    await until(() => fetch.calls.length === 2);
+});
+
+test("closing a watch whose fetch never answers aborts it and leaves nothing scheduled", async () => {
+    const scheduler = manualScheduler();
+    const fetch = hangingFetch();
+    const observer = recorder();
+    const subscription = transportFor(fetch, { scheduler, heartbeatMs: 1000 }).watch(liveQuery, {}, observer);
+    await until(() => fetch.calls.length === 1);
+    subscription.close();
+    await settle();
+    assert.equal(fetch.calls[0].init.signal.aborted, true);
+    assert.deepEqual(scheduler.delays(), []);
+    assert.deepEqual(observer.events, ["state:connecting@0", "state:closed@0"]);
+});
+
+// A scheduler that also counts how many idle timers were armed, so a reset is visible.
+function countingScheduler() {
+    const scheduler = manualScheduler();
+    const schedule = scheduler.schedule;
+    scheduler.armed = 0;
+    scheduler.schedule = (callback, delayMs) => { if (delayMs === 3000) scheduler.armed += 1; return schedule(callback, delayMs); };
+    return scheduler;
+}
+
+test("a heartbeat and a data frame each reset the idle watchdog, replacing the pending timer", async () => {
+    const scheduler = countingScheduler();
+    const streams = [];
+    const fetch = scriptedFetch(async (init) => { const stream = sseStream(init); streams.push(stream); return stream.response(); });
+    const observer = recorder();
+    transportFor(fetch, { scheduler, heartbeatMs: 1000 }).watch(liveQuery, {}, observer);
+    await until(() => streams.length === 1);
+    await settle();
+    const before = scheduler.armed;
+    streams[0].push(": hb\n\n");
+    await until(() => scheduler.armed === before + 1);
+    streams[0].push("data: 1\n\n");
+    await until(() => observer.values().length === 1);
+    assert.equal(scheduler.armed, before + 2);
+    assert.deepEqual(scheduler.delays().filter(delay => delay === 3000), [3000]);
 });

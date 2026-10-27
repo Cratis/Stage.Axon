@@ -371,6 +371,8 @@ class Watch<K extends object, R> implements Subscription {
     }
 
     async stream(attempt: Attempt): Promise<void> {
+        // The watchdog also covers the connect phase, so a fetch that never answers is reopened.
+        this.watchdog(attempt);
         const response = await this.owner.fetcher(this.owner.url(this.route!, this.key), {
             method: "GET",
             headers: this.owner.headers(streamType),
@@ -413,6 +415,8 @@ class Watch<K extends object, R> implements Subscription {
                 first = false;
                 this.attempts = 0;
                 this.state("live");
+                // The state callback may have changed the identity or closed the watch.
+                if (!attempt.current()) return;
             }
 
             this.observer.value(value, attempt.epoch);
