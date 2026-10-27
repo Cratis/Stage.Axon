@@ -16,7 +16,9 @@ public class when_a_module_is_named_triggers : for_AxonArtifactRenderPlanner.giv
 
     void Because()
     {
-        var application = request.Model.Application with { Modules = [.. request.Model.Application.Modules.Select(module => module with { Name = "Triggers" })],
+        var application = request.Model.Application with
+        {
+            Modules = [.. request.Model.Application.Modules.Select(module => module with { Name = "Triggers" })],
             Triggers = request.Model.Application.Triggers.Add(new(Cratis.Screenplay.Semantics.SemanticId.Create(Cratis.Screenplay.Semantics.SemanticKind.Trigger, "Wake"), "Wake", []))
         };
         var renamed = request with { Model = Cratis.Screenplay.Semantics.ExecutableSemanticModel.Create(Cratis.Screenplay.Semantics.LanguageVersion.V6, Cratis.Screenplay.Semantics.SemanticVersion.V6, application) };
