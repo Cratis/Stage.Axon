@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Security;
+using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -37,6 +38,7 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
                 var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
                 if (authorization.Length > 0) authorization = authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal);
                 var route = Route(located, query);
+                Register(authorization, route);
                 if (authorization.Length > 0) body.Line(authorization);
                 Snapshot(body, name, route, modelName);
                 if (live)
@@ -76,5 +78,20 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
                 method.Line($"var query = new {name}({shape.Parsed(method)});")
                     .Line($"return streams.open({name}Subscription.values(gateway, query));");
             });
+    }
+
+    void Register(string authorization, string route)
+    {
+        var expression = AxonHttpTestsEndpoints.Expression(authorization);
+        var parameters = shape.Arguments.Select(argument => new HttpParameter(argument.Name, !argument.Type.IsOptional)).ToArray();
+        var cardinality = query.Cardinality switch
+        {
+            SemanticQueryCardinality.Many => "many",
+            SemanticQueryCardinality.One => "one",
+            _ => "zeroOrOne"
+        };
+        AxonHttpTestsEndpoints.Register(context, new("query", "GET", route, null, expression, parameters, cardinality));
+        if (query.Delivery == SemanticQueryDelivery.Live)
+            AxonHttpTestsEndpoints.Register(context, new("stream", "GET", route, "text/event-stream", expression, parameters, cardinality));
     }
 }
