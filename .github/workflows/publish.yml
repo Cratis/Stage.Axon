@@ -93,6 +93,9 @@ jobs:
           server-id: central
           server-username: MAVEN_CENTRAL_USERNAME
           server-password: MAVEN_CENTRAL_PASSWORD
+      # Known gap: if an earlier run uploaded the bundle but died before Central published it, neither check below
+      # sees the version and the rerun deploys again; Central rejects the duplicate, so the job fails loudly
+      # and the deployment must be dropped or published by hand in the Central Portal, then the job re-run.
       - name: Check whether this version is already published
         id: exists
         env:

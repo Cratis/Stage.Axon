@@ -32,26 +32,48 @@ function escapeRegex(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function deployTargets(line) {
-    return [...line.matchAll(/(?:^|\s)(?:-f|--file)(?:\s+|=)["']?([^\s"']+)/g)].map(match => match[1].replace(/^\.\//, ''));
+const approvedDeploy = /^(?:\.\/)?(?:[\w.\/-]*\/)?mvnw?(?:\.cmd)?((?:\s+(?:-B|-f\s+\S+|-D[\w.]+=[\w.${}"'-]*))*)\s+deploy$/i;
+
+// A shell command line is several commands; only a command that is exactly the approved deploy is exempt.
+function commands(line) {
+    return line.split(/&&|\|\||[;|&()`]/).map(part => part.replace(/^\s*(?:-\s+)?(?:run:\s*)?/, '').trim());
 }
 
-function isScopedDeploy(line, mavenPackages) {
-    const targets = deployTargets(line);
+function isApprovedDeploy(command, mavenPackages) {
+    const match = approvedDeploy.exec(command);
+    if (!match) return false;
+    const targets = [...match[1].matchAll(/-f\s+(\S+)/g)].map(target => target[1].replace(/^\.\//, ''));
     return targets.length === 1 && mavenPackages.some(pkg => pkg.pom === targets[0]);
+}
+
+function withoutApprovedDeploys(line, mavenPackages) {
+    return commands(line).filter(command => !isApprovedDeploy(command, mavenPackages)).join(' ; ');
+}
+
+// Joins shell line continuations so a command split across lines is judged as one command.
+function logicalLines(text) {
+    const result = [];
+    let pending = null;
+    text.split(/\r?\n/).forEach((line, index) => {
+        const start = pending ?? { index, text: '' };
+        const joined = start.text + line.replace(/\\$/, ' ');
+        if (/\\$/.test(line)) pending = { index: start.index, text: joined };
+        else { result.push({ index: start.index, text: joined }); pending = null; }
+    });
+    if (pending) result.push({ index: pending.index, text: pending.text });
+    return result;
 }
 
 function inspectFile(path, name, findings, packages, publishWorkflow, mavenPackages) {
     const text = readFileSync(path, 'utf8');
-    const lines = text.split(/\r?\n/);
-    lines.forEach((line, index) => {
+    logicalLines(text).forEach(({ index, text: full }) => {
+        const line = name === publishWorkflow ? withoutApprovedDeploys(full, mavenPackages) : full;
         for (const [rule, pattern] of rules) {
             if (name === publishWorkflow && publishRules.has(rule)) continue;
-            if (name === publishWorkflow && rule === 'registry-publish' && mavenDeploy.test(line) && isScopedDeploy(line, mavenPackages)) continue;
-            if (pattern.test(line)) findings.push(`${name}:${index + 1} [${rule}] ${line.trim()}`);
+            if (pattern.test(line)) findings.push(`${name}:${index + 1} [${rule}] ${full.trim()}`);
         }
-        if (name === publishWorkflow && mavenDeploy.test(line) && !isScopedDeploy(line, mavenPackages)) {
-            findings.push(`${name}:${index + 1} [maven-scope] a Maven deploy must name exactly one allowlisted pom with -f: ${line.trim()}`);
+        if (name === publishWorkflow && mavenDeploy.test(line)) {
+            findings.push(`${name}:${index + 1} [maven-scope] only the approved allowlisted Maven deploy command may deploy: ${full.trim()}`);
         }
         if (/\bdotnet\s+pack\b/i.test(line) && !packages.some(pkg => hasPack(line, pkg.project))) {
             findings.push(`${name}:${index + 1} [pack-scope] dotnet pack must target an allowlisted project`);
@@ -155,16 +177,16 @@ function checkPublishWorkflow(root, packages, publishWorkflow, findings, mavenPa
         return;
     }
     const lines = readFileSync(path, 'utf8').split(/\r?\n/);
+    const logical = logicalLines(lines.join('\n'));
     for (const pkg of packages) {
         if (!lines.some(line => hasPack(line, pkg.project))) {
             findings.push(`${publishWorkflow}:1 [publish-workflow] missing dotnet pack ${pkg.project}`);
         }
     }
     const scan = lines.findIndex(line => /package-allowlist\.mjs\b(?!\s+--packed)/.test(line));
-    const deploys = lines.map((line, index) => (mavenDeploy.test(line) ? index : -1)).filter(index => index >= 0);
-    const scoped = deploys.filter(index => isScopedDeploy(lines[index], mavenPackages));
+    const deploys = logical.flatMap(({ index, text }) => commands(text).filter(command => isApprovedDeploy(command, mavenPackages)).map(() => index));
     const firstPush = lines.findIndex(line => rules[0][1].test(line));
-    if (scan < 0 || deploys.length !== 1 || scoped.length !== 1 || scan >= deploys[0] || (firstPush >= 0 && deploys[0] >= firstPush)) {
+    if (scan < 0 || deploys.length !== 1 || scan >= deploys[0] || (firstPush >= 0 && deploys[0] >= firstPush)) {
         findings.push(`${publishWorkflow}:1 [publish-workflow] scan with package-allowlist.mjs, then run exactly one Maven deploy of an allowlisted pom with -f, before the first nuget push`);
     }
     const verify = lines.findIndex(line => /package-allowlist\.mjs\s+--packed\b/.test(line));

@@ -281,3 +281,33 @@ for (const [name, text] of [
         assert.ok(findings(t, { [PUBLISH_WORKFLOW]: text }).some(f => f.includes('[publish-workflow]')));
     });
 }
+
+for (const [name, line] of [
+    ['npm publish', `${deploy} && npm publish`],
+    ['a second mvn deploy', `${deploy} && mvn deploy`],
+    ['a second wrapper deploy', `${deploy}; ./mvnw deploy`],
+    ['a piped deploy', `${deploy} | xargs mvn deploy`],
+    ['a nuget push', `${deploy}; dotnet nuget push out/x`],
+    ['a substituted publish', `${deploy} $(npm publish)`],
+    ['a backgrounded publish', `${deploy} & npm publish`]
+]) {
+    test(`rejects the approved deploy with ${name} appended`, t => {
+        assert.ok(findings(t, deployLine(line)).length > 0);
+    });
+}
+
+test('rejects a publish continued after the approved deploy on the next line', t => {
+    assert.ok(findings(t, deployLine(`${deploy} \\\n  && npm publish`)).some(f => f.includes('[registry-publish]')));
+});
+
+test('accepts the approved deploy split across continuation lines', t => {
+    assert.deepEqual(findings(t, deployLine(`./Source/Runtime/mvnw -B \\\n  -f ${runtime.pom} \\\n  -Drevision=1 deploy`)), []);
+});
+
+test('rejects a second approved deploy elsewhere in the publish workflow', t => {
+    assert.ok(findings(t, { [PUBLISH_WORKFLOW]: `${publishText}\n${deploy}` }).some(f => f.includes('[publish-workflow]')));
+});
+
+test('rejects the approved deploy command in another workflow', t => {
+    assert.ok(findings(t, { [workflow]: deploy }).some(f => f.includes('[registry-publish]')));
+});
