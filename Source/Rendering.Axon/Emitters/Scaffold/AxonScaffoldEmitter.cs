@@ -19,6 +19,9 @@ internal sealed class AxonScaffoldEmitter : IAxonEmitter
         context.AddJava(context.BasePackage + ".infrastructure", "AxonConfiguration", AxonApplicationScaffold.Infrastructure(context.BasePackage));
         context.Artifacts.Add(PlannedArtifact.CreateText(".gitignore", "target/\ndata/\n.idea/\n*.iml\n"));
         context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/application-persistent.properties", AxonPersistentScaffold.Properties));
+        context.Artifacts.Add(PlannedArtifact.CreateText(
+            "src/test/resources/spring.properties",
+            "# Axon entity registration cannot be repeated when Spring restarts a paused test context.\nspring.test.context.cache.pause=NEVER\n"));
         context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/application.yml", "server:\n  address: 127.0.0.1\nspring:\n  application:\n    name: " + context.BasePackage + "\naxon:\n  axonserver:\n    enabled: false\n"));
         context.Artifacts.Add(PlannedArtifact.CreateText("README.md", "# Generated Axon application\n\nRequires JDK 25 or later.\n\n```sh\nchmod +x mvnw\n./mvnw verify\n./mvnw spring-boot:run\n```\n\nOn Windows use `mvnw.cmd`. Maven Wrapper 3.3.4 downloads Maven 3.9.16 on first use. The wrapper scripts retain their Apache-2.0 license headers.\n\nThe default event store, tokens and read-model stores are in memory. Data is lost on restart; do not use this default for production. The service binds to loopback by default. Supply an identity provider before exposing protected endpoints. No users or credentials are generated.\n\nThis backend does not use Axon Server or containers. An optional application-owned `axonserver` profile may enable Axon Server; it is not generated or exercised in CI. Unsupported Screenplay constructs produce diagnostics and explicit intent comments; inspect these before deployment.\n"));
     }

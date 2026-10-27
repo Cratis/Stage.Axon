@@ -14,7 +14,7 @@ public class when_recording_model_intent : for_AxonArtifactRenderPlanner.given.a
     void Because()
     {
         degradation = new(request.Profile);
-        degradation.Unsupported("STAGE-AXON-CAPTURE", loaded.Model.Application.Id, "Captures are not implemented.", "capture invoice lines", "invoice.play/capture");
+        degradation.Unsupported("STAGE-AXON-0601", loaded.Model.Application.Id, "Captures are not implemented.", "capture invoice lines", "invoice.play/capture");
     }
 
     [Fact]

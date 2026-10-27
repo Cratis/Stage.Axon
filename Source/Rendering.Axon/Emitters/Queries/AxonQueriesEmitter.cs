@@ -95,9 +95,9 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                         ? $"var rows = {method.Reference("java.util.List")}.copyOf(performer.perform(query, store));"
                         : $"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
                     if (query.Cardinality == SemanticQueryCardinality.One)
-                        method.Line($"if (rows.size() != 1) throw new {method.Reference("java.lang.IllegalStateException")}(\"Expected exactly one query result\");");
+                        method.Line($"{method.Reference(types.BasePackage + ".runtime.QueryResults")}.exactlyOne(rows);");
                     if (query.Cardinality == SemanticQueryCardinality.ZeroOrOne)
-                        method.Line($"if (rows.size() > 1) throw new {method.Reference("java.lang.IllegalStateException")}(\"Expected at most one query result\");");
+                        method.Line($"{method.Reference(types.BasePackage + ".runtime.QueryResults")}.atMostOne(rows);");
                     method.Line($"return new {name}.Result(rows);");
                 });
             });

@@ -4,6 +4,7 @@
 using System.Text.RegularExpressions;
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Security;
+using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -33,7 +34,8 @@ internal static partial class CommandEndpointEmitter
             body.Line($"private final {gateway} commandGateway;").Line($"private final {name}Rules rules;")
                 .Block($"public {name}Endpoint({gateway} commandGateway, {name}Rules rules)", constructor => constructor.Line("this.commandGateway = commandGateway;").Line("this.rules = rules;"))
                 .Line("@" + body.Reference("org.springframework.web.bind.annotation.PostMapping") + "(" + JavaCodeBuilder.StringLiteral(Route(located, command)) + ")");
-            Authorize(context, command, body);
+            var expression = AxonHttpTestsEndpoints.Expression(Authorize(context, command, body));
+            AxonHttpTestsEndpoints.Register(context, new("command", "POST", Route(located, command), null, expression, [], null));
             body.Block($"public {body.Reference("java.util.concurrent.CompletableFuture")}<{returnType}> execute(@{body.Reference("org.springframework.web.bind.annotation.RequestBody")} {name} request)", method =>
                 method.Line("var command = " + (command.Properties.Any(property => property.IsGenerated) || source?.Allocated == true ? "request.forRequest();" : "request;"))
                     .Line("rules.validateInput(command);").Line($"return commandGateway.send(command, {returnType}.class);"));
@@ -56,14 +58,15 @@ internal static partial class CommandEndpointEmitter
         return name;
     }
 
-    static void Authorize(AxonEmissionContext context, SemanticCommand command, JavaCodeBuilder code)
+    static string Authorize(AxonEmissionContext context, SemanticCommand command, JavaCodeBuilder code)
     {
         var authorization = SecurityAnnotations.For(context, command.Authorization, command.Id);
-        if (authorization.Length == 0) return;
+        if (authorization.Length == 0) return authorization;
         foreach (var line in authorization.Split('\n'))
         {
             code.Line(line.StartsWith("@PreAuthorize(", StringComparison.Ordinal)
                 ? "@" + code.Reference("org.springframework.security.access.prepost.PreAuthorize") + line["@PreAuthorize".Length..] : line);
         }
+        return authorization;
     }
 }

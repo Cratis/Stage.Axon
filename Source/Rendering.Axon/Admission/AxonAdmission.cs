@@ -64,10 +64,12 @@ internal static class AxonAdmission
         profile.Inputs.Count(input => input.Name == AxonRendering.OptionsInput) == 1 &&
         profile.Inputs.Count(input => input.Name == AxonRendering.StrictInput) <= 1 &&
         FileHeaderInput.TryRead(profile, out _) &&
+        AxonApproximationsInput.TryRead(profile, out _) &&
         profile.Inputs.All(input => input.Name switch
         {
             AxonRendering.OptionsInput => input.Version == "1",
             FileHeaderInput.Name => true,
+            AxonApproximationsInput.Name => input.Version == "1",
             _ => ValidStrictInput(input)
         });
 
