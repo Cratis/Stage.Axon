@@ -25,6 +25,19 @@ public class when_emitting_declared_generation : for_AxonArtifactRenderPlanner.g
         code.ShouldContain("import io.cratis.fundamentals.concepts.GenerateValue;");
         code.ShouldContain("import io.cratis.fundamentals.concepts.Generatable;");
         context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
+        context.Degradation.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    void should_warn_without_changing_uuid_creation_when_options_are_not_implemented()
+    {
+        var template = loaded.Model.Application.Concepts.First(concept => concept.Primitive == SemanticPrimitiveType.Uuid);
+        var concept = new SemanticConcept(template.Id, "GeneratedId", SemanticPrimitiveType.Uuid, [], []) { Generation = new("uuid") { Pattern = "ignored" } };
+        var code = AxonConceptsEmitter.Scalar(context, concept);
+        code.ShouldContain("public static GeneratedId create() { return new GeneratedId(GenerateValue.uuid()); }");
+        context.Degradation.Warnings.Select(diagnostic => diagnostic.Code).ShouldContain("STAGE-AXON-GENERATION-OPTIONS");
+        context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
+        context.Degradation.Refusals.ShouldBeEmpty();
     }
 
     [Fact]
