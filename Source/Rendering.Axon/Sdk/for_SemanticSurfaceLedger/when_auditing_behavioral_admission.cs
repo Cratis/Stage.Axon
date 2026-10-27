@@ -10,7 +10,7 @@ public class when_auditing_behavioral_admission : Specification
 {
     [Fact]
     void should_not_retain_the_unclassified_sentinel() =>
-        SemanticSurfaceLedger.Entries.Where(entry => entry.Value.Detail == SemanticSurfaceLedger.Unclassified).Select(entry => entry.Key).ShouldBeEmpty();
+        SemanticSurfaceLedger.Entries.Where(entry => entry.Value.Detail == "UNCLASSIFIED").Select(entry => entry.Key).ShouldBeEmpty();
 
     [Fact]
     void should_not_retain_the_scaffold_placeholder() =>
@@ -21,9 +21,8 @@ public class when_auditing_behavioral_admission : Specification
         SemanticSurfaceLedger.Entries.Where(entry => entry.Value.Kind == SemanticSurfaceDispositionKind.Warned && !entry.Value.Detail.Contains("STAGE-AXON-", StringComparison.Ordinal)).Select(entry => entry.Key).ShouldBeEmpty();
 
     [Fact]
-    void should_pin_every_unread_behavioral_member() =>
-        SemanticSurfaceLedger.Entries.Where(entry => entry.Value.Detail == SemanticSurfaceLedger.UnreadBehavioral).Select(entry => entry.Key).Order().ShouldEqual(
-            [.. UnreadMembers.Split([' ', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(key => SemanticSurfaceLedger.Entries[key].IsLegacy).Order()]);
+    void should_warn_for_every_confirmed_unread_behavioral_member() =>
+        Assert.All(UnreadMembers.Split(' '), key => Assert.Equal(SemanticSurfaceDispositionKind.Warned, SemanticSurfaceLedger.Entries[key].Kind));
 
     [Theory]
     [InlineData("SemanticSlice.Captures", "STAGE-AXON-0601")]

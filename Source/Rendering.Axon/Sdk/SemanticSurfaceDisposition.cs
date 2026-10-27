@@ -24,5 +24,4 @@ internal sealed record SemanticSurfaceDisposition(
     string Detail,
     IReadOnlyList<Type> Readers,
     IReadOnlyList<string> Codes,
-    IgnoredReason? Reason,
-    bool IsLegacy = false);
+    IgnoredReason? Reason);

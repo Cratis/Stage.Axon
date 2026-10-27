@@ -5,14 +5,6 @@ namespace Cratis.Stage.Rendering.Axon.Sdk;
 
 internal static partial class SemanticSurfaceLedger
 {
-    const string ChangesMembers = """
-        SemanticCommand Id Name Properties Validations Produces Destination Requirements Authorization Route Handler CodeValidations Response Reads
-        SemanticCommandHandler RequirementId ResultVersion
-        SemanticCodeValidation RequirementId
-        SemanticCommandRoute Source Stream StreamId StreamIdParts
-        SemanticCommandRoutePart Part Value
-        """;
-
     static void ClassifyImplementations(LedgerBuilder rows)
     {
         const string nativeMembers = """

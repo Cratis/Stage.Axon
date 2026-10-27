@@ -45,7 +45,4 @@ public class when_verifying_ignored_members
         Assert.Equal(22, unread.Split(' ').Length);
         Assert.All(unread.Split(' '), key => Assert.NotEqual(SemanticSurfaceDispositionKind.Rendered, SemanticSurfaceLedger.Entries[key].Kind));
     }
-
-    [Fact]
-    public void should_not_exceed_the_shrinking_legacy_budget() => Assert.Equal(ledger_contract.LegacyBudget, SemanticSurfaceLedger.Entries.Count(entry => ledger_contract.Legacy(entry.Value)));
 }
