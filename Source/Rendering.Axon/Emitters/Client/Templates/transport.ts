@@ -111,10 +111,17 @@ export type Outcome<T> =
 
 export type LiveState = "connecting" | "live" | "reconnecting" | "closed" | "failed";
 
+/**
+ * Why a watch reports `failed` or `reconnecting`, in the same terms as a snapshot or command outcome.
+ * A terminal `failed` carries the reason: `unauthenticated` for 401, `forbidden` for 403, otherwise the problem kind.
+ * `reconnecting` carries `unavailable` when the server sent `Retry-After`, for example when it is at its live-stream capacity.
+ */
+export type LiveFailure = Exclude<Outcome<never>, { readonly status: "ok" } | { readonly status: "cancelled" }>;
+
 /** Receives live results. The epoch is the identity epoch the callback belongs to; callbacks from an older epoch are never made. */
 export interface WatchObserver<T> {
     value(value: T, epoch: number): void;
-    state(state: LiveState, epoch: number): void;
+    state(state: LiveState, epoch: number, failure?: LiveFailure): void;
     /** The identity changed: the previous value no longer applies. */
     cleared(epoch: number): void;
 }

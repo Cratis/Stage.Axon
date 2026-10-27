@@ -473,3 +473,52 @@ for (const scenario of callbacks) {
         });
     }
 }
+
+function failures() {
+    const seen = [];
+    return { seen, value() {}, cleared() {}, state: (state, _epoch, failure) => { if (failure !== undefined) seen.push({ state, failure }); } };
+}
+
+test("401 and 403 report the typed failure on the terminal state", async () => {
+    for (const [status, kind] of [[401, "unauthenticated"], [403, "forbidden"]]) {
+        const observer = failures();
+        transportFor(scriptedFetch(async () => new Response(null, { status })), { scheduler: manualScheduler() }).watch(liveQuery, {}, observer);
+        await until(() => observer.seen.length === 1);
+        assert.deepEqual(observer.seen, [{ state: "failed", failure: { status: kind } }]);
+    }
+});
+
+test("a refusal with Retry-After reconnects as unavailable carrying the seconds", async () => {
+    const observer = failures();
+    transportFor(scriptedFetch(async () => problem(503, "live-capacity", {}, { "Retry-After": "5" })), { scheduler: manualScheduler() }).watch(liveQuery, {}, observer);
+    await until(() => observer.seen.length === 1);
+    assert.deepEqual(observer.seen, [{ state: "reconnecting", failure: { status: "unavailable", retryAfterSeconds: 5 } }]);
+});
+
+test("a refusal without Retry-After and an ordinary reconnect carry no failure", async () => {
+    const observer = failures();
+    const scheduler = manualScheduler();
+    transportFor(scriptedFetch(async () => new Response("", { status: 500 })), { scheduler }).watch(liveQuery, {}, observer);
+    await until(() => scheduler.delays().length === 1);
+    assert.deepEqual(observer.seen, []);
+});
+
+test("a malformed frame ends the watch with a failed problem", async () => {
+    const { streams, transport } = open();
+    const observer = failures();
+    transport.watch(liveQuery, {}, observer);
+    await until(() => streams.length === 1);
+    streams[0].push("data: {nope\n\n");
+    await until(() => observer.seen.length === 1);
+    assert.equal(observer.seen[0].state, "failed");
+    assert.equal(observer.seen[0].failure.status, "failed");
+});
+
+test("a zero-or-one live frame is the bare row or null, the shape the server's Optional serializes to", async () => {
+    const { streams, observer, transport } = open();
+    transport.watch({ ...liveQuery, cardinality: "zeroOrOne", absent: () => "none" }, {}, observer);
+    await until(() => streams.length === 1);
+    streams[0].push("data: null\n\ndata: {\"id\":1}\n\n");
+    await until(() => observer.values().length === 2);
+    assert.deepEqual(observer.values(), ["value:\"none\"@0", "value:{\"id\":1}@0"]);
+});

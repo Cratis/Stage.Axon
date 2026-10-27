@@ -17,9 +17,11 @@ jobs:
         with:
           node-version: '22'
       - name: Test the CI guards (synthetic fixtures only)
-        run: node --test .github/scripts/packable-guard.test.mjs .github/scripts/no-package-publish.test.mjs
-      - name: Reject package publication in workflows and build files
-        run: node .github/scripts/no-package-publish.mjs
+        run: node --test .github/scripts/packable-guard.test.mjs .github/scripts/package-allowlist.test.mjs .github/scripts/cli-version-guard.test.mjs
+      - name: Guard Contracts and Screenplay versions against the CLI
+        run: node .github/scripts/cli-version-guard.mjs
+      - name: Guard package publication against the allowlist
+        run: node .github/scripts/package-allowlist.mjs
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -27,6 +29,10 @@ jobs:
         run: dotnet build Stage.Axon.slnx -c Release -warnaserror
       - name: Guard packable projects against Screenplay.Generation (Release graph)
         run: node .github/scripts/packable-guard.mjs --configuration Release
+      - name: Pack the renderer and verify the package set
+        run: |
+          dotnet pack Source/Rendering.Axon/Rendering.Axon.csproj -c Release --no-build -o "$RUNNER_TEMP/axon-package"
+          node .github/scripts/package-allowlist.mjs --packed "$RUNNER_TEMP/axon-package"
       - name: Build Debug including inline specifications
         run: dotnet build Stage.Axon.slnx -c Debug
       - name: Guard packable projects against Screenplay.Generation (Debug graph)
@@ -74,7 +80,7 @@ jobs:
           -c Debug --no-build -- render "${{ runner.temp }}/axon-corpus"
       - name: Run the generated HTTP transport proofs
         run: node --test "Source/Rendering.Axon/Emitters/Client/Tests/*.test.mjs"
-      - name: Type-check every generated TypeScript client
+      - name: Type-check every generated TypeScript client and the client-proof scenarios
         working-directory: ${{ runner.temp }}/axon-corpus
         shell: bash
         run: |
@@ -87,6 +93,9 @@ jobs:
           for config in "${configs[@]}"; do
             "$tsc" -p "$PWD/$config" --noEmit
           done
+          proof=client-proof/client/test/tsconfig.json
+          [ -e "$proof" ] || { echo "No client-proof scenario tsconfig.json found"; exit 1; }
+          "$tsc" -p "$PWD/$proof" --noEmit
       - name: Compile and execute every generated Maven module
         working-directory: ${{ runner.temp }}/axon-corpus
         run: sh ./mvnw -B -fae verify
