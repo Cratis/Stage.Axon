@@ -3,6 +3,7 @@ import { FrameTooLarge, readFrames } from "./sse.ts";
 import {
     DecodeError,
     type CommandDescriptor,
+    type LiveFailure,
     type LiveState,
     type Outcome,
     type Problem,
@@ -316,7 +317,7 @@ class Watch<K extends object, R> implements Subscription {
     }
 
     open(): void {
-        if (this.route === undefined || !this.query.live) this.end("failed");
+        if (this.route === undefined || !this.query.live) this.end("failed", { status: "failed", problem: undefined });
         else void this.connect();
     }
 
@@ -356,14 +357,14 @@ class Watch<K extends object, R> implements Subscription {
     }
 
     // Stops the watch's connection and reports a terminal state.
-    end(state: LiveState): void {
+    end(state: LiveState, failure?: LiveFailure): void {
         this.stop();
         const attempt = this.begin();
-        this.notify(attempt, () => this.observer.state(state, attempt.epoch));
+        this.notify(attempt, () => this.observer.state(state, attempt.epoch, failure));
     }
 
-    state(attempt: Attempt, state: LiveState): boolean {
-        return this.notify(attempt, () => this.observer.state(state, attempt.epoch));
+    state(attempt: Attempt, state: LiveState, failure?: LiveFailure): boolean {
+        return this.notify(attempt, () => this.observer.state(state, attempt.epoch, failure));
     }
 
     async connect(): Promise<void> {
@@ -397,7 +398,7 @@ class Watch<K extends object, R> implements Subscription {
         });
         if (!attempt.current()) return;
         if (response.status === 401 || response.status === 403) {
-            this.end("failed");
+            this.end("failed", { status: response.status === 401 ? "unauthenticated" : "forbidden" });
             return;
         }
 
@@ -411,11 +412,11 @@ class Watch<K extends object, R> implements Subscription {
         this.retry(attempt, undefined);
     }
 
-    // The server refused the stream: reconnect after its Retry-After, or the backoff.
+    // The server refused the stream: reconnect after its Retry-After, or the backoff. A refusal that names a delay is reported as unavailable.
     async rejected(response: Response, attempt: Attempt): Promise<void> {
         const seconds = retryAfterSeconds(response);
         await response.body?.cancel().catch(() => undefined);
-        this.retry(attempt, seconds === undefined ? undefined : Math.min(seconds * 1000, maxRetryAfterMs));
+        this.retry(attempt, seconds === undefined ? undefined : Math.min(seconds * 1000, maxRetryAfterMs), seconds === undefined ? undefined : { status: "unavailable", retryAfterSeconds: seconds });
     }
 
     // Hands each frame of the open stream to the observer while the connection is still current.
@@ -443,7 +444,7 @@ class Watch<K extends object, R> implements Subscription {
 
     // A malformed or oversized frame ends the watch; any other failure reconnects.
     failed(attempt: Attempt, error: unknown): void {
-        if (endsWatch(error)) this.end("failed");
+        if (endsWatch(error)) this.end("failed", { status: "failed", problem: { type: undefined, status: 0, detail: error instanceof Error ? error.message : undefined } });
         else this.retry(attempt, undefined);
     }
 
@@ -457,13 +458,13 @@ class Watch<K extends object, R> implements Subscription {
         }, this.owner.heartbeatMs * 3);
     }
 
-    retry(attempt: Attempt, serverDelayMs: number | undefined): void {
+    retry(attempt: Attempt, serverDelayMs: number | undefined, failure?: LiveFailure): void {
         if (!attempt.current()) return;
         this.stop();
         const delay = serverDelayMs ?? Math.min(maxBackoffMs, 1000 * 2 ** this.attempts);
         this.attempts += 1;
         const waiting = this.begin();
-        if (!this.state(waiting, "reconnecting")) return;
+        if (!this.state(waiting, "reconnecting", failure)) return;
         this.cancelRetry = this.owner.scheduler.schedule(() => {
             if (waiting.current()) void this.connect();
         }, delay);
