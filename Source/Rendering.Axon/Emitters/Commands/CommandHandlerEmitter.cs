@@ -37,7 +37,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             body.Line($"@{body.Reference("org.axonframework.messaging.commandhandling.annotation.CommandHandler")}");
             var authorization = SecurityAnnotations.For(context, command.Authorization, command.Id);
             if (authorization.Length > 0) body.Line(authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal));
-            body.Block($"public {response.ReturnTypeFor(body)} handle({Parameters(name, body, package)})", method => Handle(method, response));
+            body.Block($"public {response.ReturnTypeFor(body)} handle({Parameters(name, body, package)})", method => Handle(method, response, package));
             Dependencies(body, name);
         });
         context.AddJava(package, name + "Handler", code.Build(), sources: [command.Id]);
@@ -87,12 +87,12 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         return parameters + $", @{code.Reference("org.axonframework.modelling.annotation.InjectEntity")}{selector} @{code.Reference("org.jspecify.annotations.Nullable")} {name}Stream state";
     }
 
-    void Handle(JavaCodeBuilder body, CommandResponses response)
+    void Handle(JavaCodeBuilder body, CommandResponses response, string package)
     {
         if (!Supported(body, response)) return;
         if (command.Handler is { } handler)
         {
-            HandleNative(body, handler);
+            HandleNative(body, handler, package);
             return;
         }
         var appends = new List<(string Event, string? Condition)>();
@@ -112,7 +112,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         if (response.ReturnType != "void") body.Line("return " + body.ReferenceExpression(response.Value!) + ";");
     }
 
-    void HandleNative(JavaCodeBuilder body, SemanticCommandHandler handler)
+    void HandleNative(JavaCodeBuilder body, SemanticCommandHandler handler, string package)
     {
         var slot = new InlineBodySlot(handler.RequirementId, SemanticImplementationRole.CommandHandler, command.Id);
         if (handler.ResultVersion != 1)
@@ -126,6 +126,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             return;
         }
         Validate(body);
+        foreach (var produced in command.Produces) AxonEventsEmitter.TypeFor(context, CommandAppends.Contract(context, produced.EventContract).Id, body, package);
         body.RawBody(content);
         context.ConsumedImplementations.Add(handler.RequirementId);
     }
