@@ -170,10 +170,15 @@ class HttpBearerContractTest {
     @Test
     void noSessionCookieIsIssued() throws Exception {
         for (var endpoint : protectedRequests()) {
-            http.perform(endpoint).andExpect(status().isUnauthorized()).andExpect(header().doesNotExist("Set-Cookie"));
+            http.perform(endpoint).andExpect(status().isUnauthorized()).andExpect(header().doesNotExist("Set-Cookie"))
+                .andExpect(noSessionCreated());
         }
         http.perform(get("/_bearer/json").header("Authorization", bearer())).andExpect(status().isOk())
-            .andExpect(header().doesNotExist("Set-Cookie"));
+            .andExpect(header().doesNotExist("Set-Cookie")).andExpect(noSessionCreated());
+    }
+
+    private static ResultMatcher noSessionCreated() {
+        return result -> assertTrue(result.getRequest().getSession(false) == null, "bearer mode must not create an HTTP session");
     }
 
     private void assertBrowserGetsNoChallenge(String browser, String authorization) throws Exception {
