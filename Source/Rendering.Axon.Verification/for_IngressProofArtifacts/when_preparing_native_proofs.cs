@@ -1,13 +1,17 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text.RegularExpressions;
 using Cratis.Specifications;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.Verification.for_IngressProofArtifacts;
 
-public class when_preparing_native_proofs : Specification
+public partial class when_preparing_native_proofs : Specification
 {
+    [GeneratedRegex(@"\b(java|javax|jakarta|org\.axonframework|org\.springframework)\.[a-z]+\.[A-Za-z.]*[A-Z]", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture, 1000)]
+    private static partial Regex FrameworkType { get; }
+
     IReadOnlyDictionary<string, string> _sources;
     IReadOnlyDictionary<string, string> _memory;
     IReadOnlyDictionary<string, string> _persistent;
@@ -37,6 +41,9 @@ public class when_preparing_native_proofs : Specification
     [Fact] void should_never_construct_append_units_of_work() => _all.ShouldNotContain("executeWithResult(");
     [Fact] void should_use_bounded_native_contenders() => _all.ShouldContain("observed.await(5, TimeUnit.SECONDS)");
     [Fact] void should_not_sleep_in_native_proofs() => _all.ShouldNotContain("Thread.sleep(");
+    [Fact]
+    void should_use_imports_for_framework_types() => _all.Split('\n')
+        .Any(line => !line.StartsWith("import ", StringComparison.Ordinal) && !line.StartsWith("package ", StringComparison.Ordinal) && FrameworkType.IsMatch(line)).ShouldBeFalse();
     [Fact] void should_run_the_memory_protected_read_probe() => _sources["GeneratedMemoryProtectedReadTest.java"].ShouldContain("extends GeneratedProtectedReadTest");
     [Fact] void should_run_the_persistent_protected_read_probe() => _sources["GeneratedPersistentProtectedReadTest.java"].ShouldContain("@ActiveProfiles(\"persistent\")");
     [Fact] void should_inherit_the_persistent_unique_races() => _sources["GeneratedPersistentUniqueConcurrencyTest.java"].ShouldContain("extends PersistentUniqueConcurrencyTest");
