@@ -1,0 +1,86 @@
+domain Stage.ClientProof
+
+concept WorkItemId : Uuid
+
+concept WorkItemState : Enum
+  open
+  inProgress
+  done
+
+concept WorkItemPriority : Enum
+  low = 0
+  normal = 5
+  high = 10
+
+policy IsEditor
+  require role "Editor"
+
+module Work
+  feature Items
+    slice StateChange Create
+      command CreateWorkItem
+        id WorkItemId identifier
+        name String
+        title String
+        state WorkItemState
+        priority WorkItemPriority
+        authorize IsEditor
+
+        produces WorkItemCreated
+          for id
+          name = name
+          title = title
+          state = state
+          priority = priority
+
+        returns
+          id = id
+          name = name
+
+      event WorkItemCreated
+        name String
+        title String
+        state WorkItemState
+        priority WorkItemPriority
+
+      constraint UniqueWorkItemName
+        unique name on WorkItemCreated
+
+    slice StateChange Rename
+      command RenameWorkItem
+        id WorkItemId identifier
+        title String
+        authorize IsEditor
+
+        produces WorkItemRenamed
+          for id
+          title = title
+
+      event WorkItemRenamed
+        title String
+
+    slice StateView Overview
+      readmodel WorkItems
+        workItemId WorkItemId
+        name String
+        title String
+        state WorkItemState
+        priority WorkItemPriority
+
+      query WorkItemById => observable WorkItems optional
+        by workItemId WorkItemId
+        authorize IsEditor
+
+      query WorkItemByName => WorkItems[]
+        by name String
+        authorize IsEditor
+
+      projection WorkItemsProjection => WorkItems
+        from WorkItemCreated
+          workItemId = $eventSourceId
+          name = name
+          title = title
+          state = state
+          priority = priority
+        from WorkItemRenamed
+          title = title
