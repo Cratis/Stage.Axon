@@ -24,6 +24,7 @@ internal static class AxonHttpContractJson
 
     internal static IReadOnlyList<(string Type, int Status)> Problems(HttpEndpoint endpoint) => endpoint switch
     {
+        { Kind: "stream" } => [("live-capacity", 503)],
         { Kind: "command" } => [("validation", 400), ("conflict", 409), ("invalid-argument", 400), ("unsupported", 501)],
         { Cardinality: "one" } => [("query-result-missing", 404), ("query-cardinality", 500)],
         { Cardinality: "zeroOrOne" } => [("query-cardinality", 500)],
@@ -44,7 +45,7 @@ internal static class AxonHttpContractJson
             ["parameters"] = endpoint.Parameters.Select(parameter => new { name = parameter.Name, location = "query", required = parameter.Required }).ToArray(),
             ["cardinality"] = endpoint.Cardinality,
             ["authorization"] = endpoint.Authorization,
-            ["problems"] = stream ? [] : Problems(endpoint).Select(problem => new { type = "urn:cratis:stage-axon:problem:" + problem.Type, status = problem.Status }).ToArray()
+            ["problems"] = Problems(endpoint).Select(problem => new { type = "urn:cratis:stage-axon:problem:" + problem.Type, status = problem.Status }).ToArray()
         };
     }
 }

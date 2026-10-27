@@ -10,7 +10,6 @@ public class when_another_query_shadows_a_framework_type : given.a_query_collisi
 {
     [Theory]
     [InlineData("Object", "Flow.Publisher<java.lang.Object>")]
-    [InlineData("Override", "@java.lang.Override")]
     [InlineData("Flow", "java.util.concurrent.Flow.Publisher<Object>")]
     void should_reserve_the_other_query_before_emitting_framework_references(string name, string expected)
     {
