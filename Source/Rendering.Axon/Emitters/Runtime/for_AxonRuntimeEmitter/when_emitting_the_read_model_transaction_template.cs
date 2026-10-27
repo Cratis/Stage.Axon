@@ -10,12 +10,14 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Runtime.for_AxonRuntimeEmitter;
 public class when_emitting_the_read_model_transaction_template : for_AxonArtifactRenderPlanner.given.an_axon_request
 {
     string _source;
+    string _test;
 
     void Because()
     {
         var context = new AxonEmissionContext(request, new(request.Profile));
         new AxonRuntimeEmitter().Emit(context);
         _source = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ReadModelTransaction.java", StringComparison.Ordinal)).Bytes.AsSpan());
+        _test = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ReadModelTransactionTest.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 
     [Fact] void should_apply_after_commit_before_after_commit() => _source.ShouldContain("DefaultPhases.AFTER_COMMIT.order() - 1");
@@ -30,6 +32,11 @@ public class when_emitting_the_read_model_transaction_template : for_AxonArtifac
     [Fact] void should_release_collected_stores() => _source.ShouldContain("COORDINATORS.remove(key)");
     [Fact] void should_apply_through_the_wrapped_store() => _source.ShouldContain("store.put(key, value.get())");
     [Fact] void should_restore_the_interrupt_flag() => _source.ShouldContain("Thread.currentThread().interrupt()");
+    [Fact] void should_emit_native_rollback_proof() => _test.ShouldContain("discardsFailedWritesAndRetainsCommittedRows");
+    [Fact] void should_emit_native_wrapper_ordering_proof() => _test.ShouldContain("publishesCommittedWrapperChangesBeforeAfterCommitCallbacks");
+    [Fact] void should_emit_native_concurrent_rollback_proof() => _test.ShouldContain("doesNotLetOneRollbackEraseAnotherCommittedUnitOfWork");
+    [Fact] void should_emit_native_timeout_failure_proof() => _test.ShouldContain("failsTheUnitOfWorkVisiblyWhenReservationTimesOut");
+    [Fact] void should_emit_native_two_key_lock_order_proof() => _test.ShouldContain("serializesTwoKeyUpdatesAcquiredInSortedOrderWithoutDeadlock");
 
     [Fact]
     void should_use_imports_not_qualified_names() =>
