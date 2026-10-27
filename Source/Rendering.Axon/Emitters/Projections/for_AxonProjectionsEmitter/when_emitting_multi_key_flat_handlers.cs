@@ -28,10 +28,11 @@ public class when_emitting_multi_key_flat_handlers : Persistence.for_PersistentV
     }
 
     [Fact]
-    void should_leave_the_persistent_branch_unchanged()
+    void should_leave_the_persistent_branch_on_the_context_bound_emitter()
     {
         var code = Projector(false);
-        code.ShouldContain("if (store instanceof JpaReadModelStore<?>) {\n        apply(event, null, JpaReadModelStore.bind(store, context));\n        context.runOnAfterCommit(ignored ->");
+        code.ShouldContain("if (store instanceof JpaReadModelStore<?>) {\n        apply(event, updates, JpaReadModelStore.bind(store, context));\n    }");
+        code.ShouldNotContain("runOnAfterCommit");
         code.ShouldContain("else {\n        var bound = ReadModelTransaction.bind(store, context);");
     }
 

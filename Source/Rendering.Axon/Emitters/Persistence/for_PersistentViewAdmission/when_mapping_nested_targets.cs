@@ -43,7 +43,7 @@ public class when_mapping_nested_targets : given.a_flat_view
         } : slice);
     }
 
-    [Fact] void should_refuse_root_nested_targets() => PersistentViewAdmission.Supports(_context, ReadModelId("Board")).ShouldBeTrue(); // TEMP axon-35
+    [Fact] void should_admit_root_nested_targets() => PersistentViewAdmission.Supports(_context, ReadModelId("Board")).ShouldBeTrue();
     [Fact] void should_warn_without_crashing() => Code(_context, "BoardStoreConfiguration").ShouldContain("STAGE-AXON-0308");
     [Fact] void should_report_the_warning() => _context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == ReadModelId("Board") && diagnostic.Code == "STAGE-AXON-0308").ShouldBeTrue();
     [Fact] void should_keep_the_memory_store() => Code(_context, "BoardStoreConfiguration").ShouldContain("InMemoryReadModelStore");
@@ -53,6 +53,6 @@ public class when_mapping_nested_targets : given.a_flat_view
     [Fact] void should_refuse_unknown_segments() => (_records.Property(_board.Properties, [_details, _title]) is null).ShouldBeTrue();
     [Fact] void should_keep_the_collection_property_as_a_terminal_target() => _records.Property(_board.Properties, [_cards])!.Id.ShouldEqual(_cards);
     [Fact] void should_default_optional_composites() => Code(_context, "BoardProjectionProjector").ShouldContain("state.details() == null ? new BoardDetails(");
-    [Fact] void should_keep_the_scoped_memory_handler() => Code(_context, "BoardProjectionProjector").ShouldNotContain("pending"); // TEMP axon-35
+    [Fact] void should_not_stage_pending_scoped_writes() => Code(_context, "BoardProjectionProjector").ShouldNotContain("pending");
     [Fact] void should_keep_an_unadmitted_collection_scope_guarded() => Code(Render(slice => slice), "BoardStoreConfiguration").ShouldContain("STAGE-AXON-0308");
 }
