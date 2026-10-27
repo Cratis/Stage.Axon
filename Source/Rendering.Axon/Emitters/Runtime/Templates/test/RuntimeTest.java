@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 
 class RuntimeTest {
@@ -176,8 +177,8 @@ class RuntimeTest {
         var mapper = TestSupport.mapper();
         for (var invalid : List.of("0", "1", "20", "31")) {
             assertThrows(IllegalArgumentException.class, () -> Priority.fromValue(Integer.valueOf(invalid)));
-            assertThrows(tools.jackson.core.JacksonException.class, () -> mapper.readValue(invalid, Priority.class));
-            assertThrows(tools.jackson.core.JacksonException.class, () -> mapper.readValue(invalid, Status.class));
+            assertThrows(JacksonException.class, () -> mapper.readValue(invalid, Priority.class));
+            assertThrows(JacksonException.class, () -> mapper.readValue(invalid, Status.class));
         }
     }
 

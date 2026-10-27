@@ -28,7 +28,7 @@ public partial class when_preparing_native_proofs : Specification
     [Fact]
     void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
     [
-        "GeneratedIngressSupport.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
+        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
         "GeneratedPersistentUniqueConcurrencyTest.java", "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
     [Fact] void should_resolve_all_template_packages() => _all.ShouldNotContain("__APPLICATION__");

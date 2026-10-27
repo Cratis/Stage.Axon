@@ -32,7 +32,7 @@ internal sealed class CommandResponses(SemanticCommand command, CommandJavaTypes
         if (command.Response is not SemanticRecordCommandResponse record) return;
         var code = new JavaCodeBuilder(package).Declare(ReturnType);
         foreach (var field in record.Fields) types.Claim(field.Type, code);
-        var fields = record.Fields.Select(field => $"{CommandContractsEmitter.JsonProperty(field.Name, code)}{types.Type(field.Type, code)} {JavaNames.Member(field.Name)}");
+        var fields = record.Fields.Select(field => $"{JavaJsonNames.Annotation(field.Name, code)}{types.Type(field.Type, code)} {JavaNames.Member(field.Name)}");
         context.AddJava(package, ReturnType, code.Line($"public record {ReturnType}({string.Join(", ", fields)}) {{}}").Build(), sources: [command.Id]);
     }
 

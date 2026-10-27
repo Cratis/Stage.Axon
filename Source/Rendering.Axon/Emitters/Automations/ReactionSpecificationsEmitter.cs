@@ -37,6 +37,7 @@ internal sealed class ReactionSpecificationsEmitter(AxonEmissionContext context,
         }
         code.Block("class " + name, body =>
         {
+            CommandFixtureSecurity.ReportUnsupportedClaims(context, body, specification);
             if (supported) Fields(body);
             body.Line("@" + body.Reference("org.junit.jupiter.api.Test")).Line($"@{body.Reference("org.junit.jupiter.api.DisplayName")}({JavaCodeBuilder.StringLiteral(specification.Id.ToString())})");
             if (!supported) body.Line($"@{body.Reference("org.junit.jupiter.api.Disabled")}({JavaCodeBuilder.StringLiteral(Refusal + ": unsupported application-trigger specification fixtures")})");
