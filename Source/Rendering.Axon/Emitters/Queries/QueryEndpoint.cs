@@ -18,7 +18,7 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
     {
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name);
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Endpoint");
+        var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Endpoint");
         if (query.Delivery == SemanticQueryDelivery.Live) code.Declare(name + "Streams").Declare(name + "Subscription");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Endpoint", name + "Streams", name + "Subscription");
         shape.Claim(code);

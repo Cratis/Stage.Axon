@@ -40,8 +40,8 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                 EmitHandler(context, types, package, query, name, modelType, shape);
                 new QueryEndpoint(context, types, located, query, modelType, shape).Emit();
                 if (query.Delivery != SemanticQueryDelivery.Live) continue;
-                LiveQuerySubscription.Emit(context, package, query);
-                LiveQueryStreams.Emit(context, package, query);
+                LiveQuerySubscription.Emit(context, package, query, modelType);
+                LiveQueryStreams.Emit(context, package, query, modelType);
                 AxonViewLiveSpecs.Emit(context, types, located, query, owner, model);
             }
         }
@@ -50,7 +50,7 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
     static void EmitRecord(AxonEmissionContext context, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
     {
         var live = query.Delivery == SemanticQueryDelivery.Live;
-        var code = new JavaCodeBuilder(package).Declare(name).Declare("Result");
+        var code = QueryModelReference.Create(context, package).Declare(name).Declare("Result");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, "Result");
         shape.Claim(code);
         var list = code.Reference("java.util.List");
@@ -72,7 +72,7 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
 
     static void EmitHandler(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
     {
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Handler").Declare(name + "Performer");
+        var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Handler").Declare(name + "Performer");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Handler", name + "Performer");
         var store = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")
@@ -95,9 +95,9 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                         ? $"var rows = {method.Reference("java.util.List")}.copyOf(performer.perform(query, store));"
                         : $"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
                     if (query.Cardinality == SemanticQueryCardinality.One)
-                        method.Line("if (rows.size() != 1) throw new IllegalStateException(\"Expected exactly one query result\");");
+                        method.Line($"if (rows.size() != 1) throw new {method.Reference("java.lang.IllegalStateException")}(\"Expected exactly one query result\");");
                     if (query.Cardinality == SemanticQueryCardinality.ZeroOrOne)
-                        method.Line("if (rows.size() > 1) throw new IllegalStateException(\"Expected at most one query result\");");
+                        method.Line($"if (rows.size() > 1) throw new {method.Reference("java.lang.IllegalStateException")}(\"Expected at most one query result\");");
                     method.Line($"return new {name}.Result(rows);");
                 });
             });
