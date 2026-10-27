@@ -76,28 +76,44 @@ function noValue<R>(): R {
     return undefined as R;
 }
 
-// `text` is the body when the caller already read it.
-async function readProblem(response: Response, text?: string): Promise<{ problem: Problem; errors: readonly ValidationFailure[]; count: number }> {
-    let body: Record<string, unknown> = {};
+function isRecord(value: unknown): value is object {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// `text` is the body when the caller already read it. An empty or non-JSON body carries no problem details.
+async function readBody(response: Response, text?: string): Promise<Record<string, unknown>> {
     try {
         const parsed: unknown = JSON.parse(text ?? await response.text());
-        if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) body = Object.fromEntries(Object.entries(parsed));
+        return isRecord(parsed) ? Object.fromEntries(Object.entries(parsed)) : {};
     } catch {
-        // An empty or non-JSON body carries no problem details.
+        return {};
     }
+}
 
+function validationFailure(entry: unknown): ValidationFailure | undefined {
+    if (!isRecord(entry) || !("property" in entry) || !("message" in entry)) return undefined;
+    const { property, message } = entry;
+    return typeof property === "string" && typeof message === "string" ? { property, message } : undefined;
+}
+
+function validationFailures(body: Record<string, unknown>): readonly ValidationFailure[] {
+    const entries = body["errors"];
+    if (!Array.isArray(entries)) return [];
     const errors: ValidationFailure[] = [];
-    if (Array.isArray(body["errors"])) {
-        for (const entry of body["errors"]) {
-            if (typeof entry === "object" && entry !== null && "property" in entry && "message" in entry && typeof entry.property === "string" && typeof entry.message === "string")
-                errors.push({ property: entry.property, message: entry.message });
-        }
+    for (const entry of entries) {
+        const found = validationFailure(entry);
+        if (found !== undefined) errors.push(found);
     }
 
+    return errors;
+}
+
+async function readProblem(response: Response, text?: string): Promise<{ problem: Problem; errors: readonly ValidationFailure[]; count: number }> {
+    const body = await readBody(response, text);
     const type = typeof body["type"] === "string" ? body["type"] : undefined;
     const detail = typeof body["detail"] === "string" ? body["detail"] : undefined;
     const count = typeof body["count"] === "number" ? body["count"] : 0;
-    return { problem: { type, status: response.status, detail }, errors, count };
+    return { problem: { type, status: response.status, detail }, errors: validationFailures(body), count };
 }
 
 function retryAfterSeconds(response: Response): number | undefined {
@@ -107,19 +123,24 @@ function retryAfterSeconds(response: Response): number | undefined {
     return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
 }
 
-async function failure<T>(response: Response, text?: string): Promise<Outcome<T>> {
-    if (response.status === 401) return { status: "unauthenticated" };
-    if (response.status === 403) return { status: "forbidden" };
-    const { problem, errors, count } = await readProblem(response, text);
+// The outcome a typed problem maps to, or undefined when the problem type is not one the server defines.
+function typedOutcome<T>(response: Response, problem: Problem, errors: readonly ValidationFailure[], count: number): Outcome<T> | undefined {
     switch (problem.type) {
         case problemTypes.validation: return { status: "validation", errors };
         case problemTypes.conflict: return { status: "conflict", problem };
         case problemTypes.queryResultMissing: return { status: "notFound" };
         case problemTypes.queryCardinality: return { status: "cardinality", count };
         case problemTypes.liveCapacity: return { status: "unavailable", retryAfterSeconds: retryAfterSeconds(response) };
-        default: break;
+        default: return undefined;
     }
+}
 
+async function failure<T>(response: Response, text?: string): Promise<Outcome<T>> {
+    if (response.status === 401) return { status: "unauthenticated" };
+    if (response.status === 403) return { status: "forbidden" };
+    const { problem, errors, count } = await readProblem(response, text);
+    const typed = typedOutcome<T>(response, problem, errors, count);
+    if (typed !== undefined) return typed;
     if (response.status === 503) return { status: "unavailable", retryAfterSeconds: retryAfterSeconds(response) };
     return { status: "failed", problem };
 }
@@ -217,7 +238,7 @@ class HttpTransport implements Transport {
 
     watch<K extends object, R>(query: QueryDescriptor<K, R>, key: K, observer: WatchObserver<R>, signal?: AbortSignal): Subscription {
         const route = this.routes.get(query.id + " " + streamType);
-        const watch = new Watch<K, R>(this, route, query, key, observer);
+        const watch = new Watch<K, R>({ owner: this, route, query, key, observer });
         this.watches.add(watch);
         signal?.addEventListener("abort", () => watch.close(), { once: true });
         if (signal?.aborted === true) watch.close();
@@ -250,6 +271,28 @@ class HttpTransport implements Transport {
     }
 }
 
+// A malformed or oversized frame cannot be recovered by reconnecting.
+function endsWatch(error: unknown): boolean {
+    return error instanceof DecodeError || error instanceof SyntaxError || error instanceof FrameTooLarge;
+}
+
+// What a watch is made of; one object instead of five constructor arguments.
+interface WatchSetup<K extends object, R> {
+    readonly owner: HttpTransport;
+    readonly route: Route | undefined;
+    readonly query: QueryDescriptor<K, R>;
+    readonly key: K;
+    readonly observer: WatchObserver<R>;
+}
+
+// One connection attempt: its abort controller, the generation and epoch it belongs to, and whether it is still the current one.
+interface Attempt {
+    readonly connection: AbortController;
+    readonly generation: number;
+    readonly epoch: number;
+    readonly current: () => boolean;
+}
+
 // One live query. Every asynchronous step checks its generation, so a closed, reopened or superseded connection never delivers.
 class Watch<K extends object, R> implements Subscription {
     readonly owner: HttpTransport;
@@ -264,12 +307,12 @@ class Watch<K extends object, R> implements Subscription {
     cancelRetry: (() => void) | undefined;
     cancelIdle: (() => void) | undefined;
 
-    constructor(owner: HttpTransport, route: Route | undefined, query: QueryDescriptor<K, R>, key: K, observer: WatchObserver<R>) {
-        this.owner = owner;
-        this.route = route;
-        this.query = query;
-        this.key = key;
-        this.observer = observer;
+    constructor(setup: WatchSetup<K, R>) {
+        this.owner = setup.owner;
+        this.route = setup.route;
+        this.query = setup.query;
+        this.key = setup.key;
+        this.observer = setup.observer;
     }
 
     open(): void {
@@ -310,52 +353,60 @@ class Watch<K extends object, R> implements Subscription {
 
     async connect(): Promise<void> {
         this.stop();
-        const generation = this.generation;
-        const epoch = this.owner.epoch;
-        const current = () => !this.closed && generation === this.generation && epoch === this.owner.epoch;
-        const connection = new AbortController();
-        this.connection = connection;
+        const attempt = this.begin();
         this.state(this.attempts === 0 ? "connecting" : "reconnecting");
         try {
-            const response = await this.owner.fetcher(this.owner.url(this.route!, this.key), {
-                method: "GET",
-                headers: this.owner.headers(streamType),
-                credentials: "omit",
-                signal: connection.signal
-            });
-            if (!current()) return;
-            if (response.status === 401 || response.status === 403) {
-                this.stop();
-                this.state("failed");
-                return;
-            }
-
-            if (!response.ok || response.body === null) {
-                await this.rejected(response, current);
-                return;
-            }
-
-            this.watchdog(connection, generation);
-            await this.deliver(response.body, connection, generation, epoch, current);
-            if (current()) this.retry(undefined);
+            await this.stream(attempt);
         } catch (error) {
-            if (current()) this.failed(error);
+            if (attempt.current()) this.failed(error);
         }
     }
 
+    begin(): Attempt {
+        const generation = this.generation;
+        const epoch = this.owner.epoch;
+        const connection = new AbortController();
+        this.connection = connection;
+        return { connection, generation, epoch, current: () => !this.closed && generation === this.generation && epoch === this.owner.epoch };
+    }
+
+    async stream(attempt: Attempt): Promise<void> {
+        const response = await this.owner.fetcher(this.owner.url(this.route!, this.key), {
+            method: "GET",
+            headers: this.owner.headers(streamType),
+            credentials: "omit",
+            signal: attempt.connection.signal
+        });
+        if (!attempt.current()) return;
+        if (response.status === 401 || response.status === 403) {
+            this.stop();
+            this.state("failed");
+            return;
+        }
+
+        if (!response.ok || response.body === null) {
+            await this.rejected(response, attempt);
+            return;
+        }
+
+        this.watchdog(attempt);
+        await this.deliver(response.body, attempt);
+        if (attempt.current()) this.retry(undefined);
+    }
+
     // The server refused the stream: reconnect after its Retry-After, or the backoff.
-    async rejected(response: Response, current: () => boolean): Promise<void> {
+    async rejected(response: Response, attempt: Attempt): Promise<void> {
         const seconds = retryAfterSeconds(response);
         await response.body?.cancel().catch(() => undefined);
-        if (current()) this.retry(seconds === undefined ? undefined : Math.min(seconds * 1000, maxRetryAfterMs));
+        if (attempt.current()) this.retry(seconds === undefined ? undefined : Math.min(seconds * 1000, maxRetryAfterMs));
     }
 
     // Hands each frame of the open stream to the observer while the connection is still current.
-    async deliver(body: ReadableStream<Uint8Array>, connection: AbortController, generation: number, epoch: number, current: () => boolean): Promise<void> {
+    async deliver(body: ReadableStream<Uint8Array>, attempt: Attempt): Promise<void> {
         let first = true;
         for await (const frame of readFrames(body, this.owner.maxFrameChars)) {
-            if (!current()) return;
-            this.watchdog(connection, generation);
+            if (!attempt.current()) return;
+            this.watchdog(attempt);
             if (frame.kind === "comment") continue;
             const value = this.decodeFrame(frame.data);
             if (first) {
@@ -364,7 +415,7 @@ class Watch<K extends object, R> implements Subscription {
                 this.state("live");
             }
 
-            this.observer.value(value, epoch);
+            this.observer.value(value, attempt.epoch);
         }
     }
 
@@ -375,7 +426,7 @@ class Watch<K extends object, R> implements Subscription {
 
     // A malformed or oversized frame ends the watch; any other failure reconnects.
     failed(error: unknown): void {
-        if (error instanceof DecodeError || error instanceof SyntaxError || error instanceof FrameTooLarge) {
+        if (endsWatch(error)) {
             this.stop();
             this.state("failed");
         } else {
@@ -384,10 +435,10 @@ class Watch<K extends object, R> implements Subscription {
     }
 
     // Reopens a stream that stayed silent for three heartbeats; comment frames count as activity.
-    watchdog(connection: AbortController, generation: number): void {
+    watchdog(attempt: Attempt): void {
         this.cancelIdle?.();
         this.cancelIdle = this.owner.scheduler.schedule(() => {
-            if (generation === this.generation) connection.abort();
+            if (attempt.generation === this.generation) attempt.connection.abort();
         }, this.owner.heartbeatMs * 3);
     }
 
