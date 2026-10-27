@@ -12,10 +12,17 @@ namespace Cratis.Stage.Rendering.Axon.Sdk.for_SemanticSurfaceLedger;
 
 public class when_verifying_rendered_members
 {
-    // Every event is emitted private; only public visibility takes a special unsupported branch.
-    static readonly IReadOnlySet<string> RenderedByDefault = new HashSet<string>(StringComparer.Ordinal) { "SemanticEventVisibility.Private" };
+    static readonly IReadOnlySet<string> RenderedByDefault = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "SemanticEventVisibility.Private", // Every event is emitted private; public visibility takes the unsupported branch.
+        "SemanticQueryDelivery.Snapshot" // Every query gets a snapshot endpoint; only Live adds streaming support.
+    };
 
     static IEnumerable<KeyValuePair<string, SemanticSurfaceDisposition>> Entries => ledger_contract.StrictEntries.Where(entry => entry.Value.Kind == SemanticSurfaceDispositionKind.Rendered);
+
+    [Fact]
+    public void should_pin_the_audited_default_members() => Assert.Equal<string>(
+        ["SemanticEventVisibility.Private", "SemanticQueryDelivery.Snapshot"], RenderedByDefault.Order(StringComparer.Ordinal));
 
     [Fact]
     public void should_name_production_readers_for_every_rendered_member()
