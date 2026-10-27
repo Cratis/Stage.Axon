@@ -12,6 +12,7 @@ public class a_query_collision : a_view_request
 {
     protected SemanticKeyedQuery _query;
     protected SemanticReadModel _model;
+    protected SemanticReadModel[] _additionalModels = [];
     private protected AxonEmissionContext _context;
     protected string _package;
 
@@ -44,7 +45,7 @@ public class a_query_collision : a_view_request
         Slices = [.. feature.Slices.Select(slice => slice with
         {
             Queries = [.. slice.Queries.Select(query => query.Id == _query.Id ? _query : query)],
-            ReadModels = [.. slice.ReadModels.Select(model => model.Id == _model.Id ? _model : model)]
+            ReadModels = [.. slice.ReadModels.Select(model => model.Id == _model.Id ? _model : model), .. slice.ReadModels.Any(model => model.Id == _model.Id) ? _additionalModels : []]
         })]
     };
 }

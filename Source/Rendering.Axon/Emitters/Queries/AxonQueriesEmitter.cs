@@ -50,7 +50,7 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
     static void EmitRecord(AxonEmissionContext context, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
     {
         var live = query.Delivery == SemanticQueryDelivery.Live;
-        var code = new JavaCodeBuilder(package).Declare(name).Declare("Result");
+        var code = QueryModelReference.Create(context, package).Declare(name).Declare("Result");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, "Result");
         shape.Claim(code);
         var list = code.Reference("java.util.List");
@@ -72,7 +72,7 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
 
     static void EmitHandler(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
     {
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Handler").Declare(name + "Performer");
+        var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Handler").Declare(name + "Performer");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Handler", name + "Performer");
         var store = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")

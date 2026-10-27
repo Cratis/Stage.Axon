@@ -11,7 +11,7 @@ internal static class LiveQueryStreams
     internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query, string modelType)
     {
         var name = JavaNames.Type(query.Name) + "Streams";
-        var code = new JavaCodeBuilder(package).Declare(JavaNames.Type(query.Name)).Declare(name).Declare("Session");
+        var code = QueryModelReference.Create(context, package).Declare(JavaNames.Type(query.Name)).Declare(name).Declare("Session");
         QueryModelReference.ReserveLocal(code, package, modelType, JavaNames.Type(query.Name), name, "Session");
         var flow = code.Reference("java.util.concurrent.Flow");
         var atomicBoolean = code.Reference("java.util.concurrent.atomic.AtomicBoolean");
@@ -34,7 +34,7 @@ internal static class LiveQueryStreams
 
                 int activeCount() { return sessions.size(); }
 
-                @Override
+                @{{code.Reference("java.lang.Override")}}
                 public void onApplicationEvent({{closed}} event) {
                     closing.set(true);
                     sessions.forEach(Session::stop);
@@ -47,17 +47,17 @@ internal static class LiveQueryStreams
 
                     private {{flow}}.Subscriber<{{code.Reference("java.lang.Object")}}> forwardTo({{flow}}.Subscriber<? super {{code.Reference("java.lang.Object")}}> downstream) {
                         return new {{flow}}.Subscriber<>() {
-                            @Override public void onSubscribe({{flow}}.Subscription value) {
+                            @{{code.Reference("java.lang.Override")}} public void onSubscribe({{flow}}.Subscription value) {
                                 if (!subscription.compareAndSet(null, value)) { value.cancel(); return; }
                                 downstream.onSubscribe(new {{flow}}.Subscription() {
-                                    @Override public void request(long amount) { if (!cancelled.get()) value.request(amount); }
-                                    @Override public void cancel() { Session.this.cancel(); }
+                                    @{{code.Reference("java.lang.Override")}} public void request(long amount) { if (!cancelled.get()) value.request(amount); }
+                                    @{{code.Reference("java.lang.Override")}} public void cancel() { Session.this.cancel(); }
                                 });
                                 if (cancelled.get()) value.cancel();
                             }
-                            @Override public void onNext({{code.Reference("java.lang.Object")}} value) { if (!cancelled.get()) downstream.onNext(value); }
-                            @Override public void onError({{code.Reference("java.lang.Throwable")}} failure) { cancel(); downstream.onError(failure); }
-                            @Override public void onComplete() { cancel(); downstream.onComplete(); }
+                            @{{code.Reference("java.lang.Override")}} public void onNext({{code.Reference("java.lang.Object")}} value) { if (!cancelled.get()) downstream.onNext(value); }
+                            @{{code.Reference("java.lang.Override")}} public void onError({{code.Reference("java.lang.Throwable")}} failure) { cancel(); downstream.onError(failure); }
+                            @{{code.Reference("java.lang.Override")}} public void onComplete() { cancel(); downstream.onComplete(); }
                         };
                     }
 
