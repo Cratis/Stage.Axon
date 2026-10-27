@@ -20,7 +20,7 @@ public class when_a_command_response_field_is_a_java_keyword : for_AxonArtifactR
         var seed = ScopeSelection.Select(request).First(slice => !slice.Slice.Commands.IsEmpty).Slice.Commands[0];
         var property = seed.Properties[0];
         var context = new AxonEmissionContext(request, new(request.Profile));
-        var responses = new CommandResponses(seed with { Response = new SemanticRecordCommandResponse([new(Name: "class", Type: property.Type, Source: property.Id)]) }, new CommandJavaTypes(request.Model.Application));
+        var responses = new CommandResponses(seed with { Response = new SemanticRecordCommandResponse([new(Name: "class", Type: property.Type, Source: property.Id)]) }, new CommandJavaTypes(request.Model.Application, "example.orders"));
         responses.Emit(context, "example.orders");
         code = Encoding.UTF8.GetString(context.Artifacts.Single().Bytes.AsSpan());
     }

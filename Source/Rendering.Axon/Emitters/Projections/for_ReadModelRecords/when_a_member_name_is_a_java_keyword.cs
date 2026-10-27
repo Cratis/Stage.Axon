@@ -14,7 +14,7 @@ public class when_a_member_name_is_a_java_keyword : for_AxonArtifactRenderPlanne
 
     void Because()
     {
-        var types = new ViewJavaTypes(request.Model.Application);
+        var types = new ViewJavaTypes(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name));
         var model = ScopeSelection.Select(request).SelectMany(slice => slice.Slice.ReadModels).First();
         var property = model.Properties[0];
         renamed = ReadModelRecords.Code(types, "example.views", model with { Name = "KeywordView", Properties = [property with { Name = "class" }] });
