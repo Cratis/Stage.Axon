@@ -51,7 +51,7 @@ public class when_emitting_normalized_persistent_proofs : Projections.for_AxonPr
     [Fact] void should_import_the_state_supplier() => Code("TotalPersistentSupport").ShouldContain("import java.util.function.Supplier;");
     [Fact] void should_accept_a_state_supplier() => Code("TotalPersistentSupport").ShouldContain("static void await(BooleanSupplier condition, Supplier<String> state) throws Exception");
     [Fact] void should_keep_the_condition_only_overload() => Code("TotalPersistentSupport").ShouldContain("await(condition, () -> \"\");");
-    [Fact] void should_report_state_only_on_timeout() => Code("TotalPersistentSupport").ShouldContain("assertTrue(condition.getAsBoolean(), () -> \"Persistent processor/query condition timed out\" + state.get() + dump(journalApplication))");
+    [Fact] void should_report_state_only_on_timeout() => Code("TotalPersistentSupport").ShouldContain("assertTrue(condition.getAsBoolean(), () -> \"Persistent processor/query condition timed out\" + state.get())");
 
     [Theory]
     [InlineData("Test", 5)]

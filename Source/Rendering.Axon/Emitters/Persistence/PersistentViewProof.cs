@@ -187,8 +187,6 @@ internal static class PersistentViewProof
                 failure = Failure.NONE;
                 observedOwner = null;
                 observedOwners.clear();
-                journal.clear();
-                journalRun = "run1";
                 try {
                     try (var application = startMultiSegment(path)) {
                         assertInstanceOf(__PERSISTENCE__.JpaReadModelStore.class, store(application));
@@ -225,12 +223,9 @@ internal static class PersistentViewProof
                         assertEquals(__COUNT__, count(application), "Non-idempotent view change must roll back");
                         assertEquals(normalized(initial), normalized(store(application).all()), "No independently committed projection write");
                         assertRollbackTokens(application, owner, checkpoint, decodedCheckpoint);
-                        System.out.println("AXON35 end of run1" + dump(application));
                     }
                     failure = Failure.NONE;
-                    journalRun = "run2";
                     try (var application = startMultiSegment(path)) {
-                        System.out.println("AXON35 start of run2" + dump(application));
                         await(() -> normalized(store(application).all()).equals(normalized(afterRetry)) && count(application) == __COUNT__ + 1,
                                 () -> ": expected rows: " + normalized(afterRetry) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         assertQuery(application, afterRetry);
