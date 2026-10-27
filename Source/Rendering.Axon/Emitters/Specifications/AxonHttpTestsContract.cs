@@ -33,7 +33,7 @@ internal static class AxonHttpTestsContract
                     .Line();
                 EmitRoutes(body, endpoints, list, exception);
                 EmitDenials(body, endpoints, exception);
-                EmitLive(body, list);
+                EmitLive(body, list, TriggerEndpoints(context));
             });
         context.AddJava(package, Name, code.Build(), test: true);
     }
@@ -88,14 +88,20 @@ internal static class AxonHttpTestsContract
         return call;
     }
 
-    static void EmitLive(JavaCodeBuilder body, string list) => body
+    // Application trigger endpoints are internal and are excluded by handler identity, so ordinary routes under a module named Triggers stay covered.
+    static string[] TriggerEndpoints(AxonEmissionContext context) => [.. context.Request.Model.Application.Triggers.Select(trigger => context.BasePackage + ".triggers." + JavaNames.Type(trigger.Name) + "Endpoint").Order(StringComparer.Ordinal)];
+
+    static void EmitLive(JavaCodeBuilder body, string list, string[] triggerEndpoints) => body
         .Block($"private {list}<String> live()", method => method
             .Line($"var mappings = application.getBean(\"requestMappingHandlerMapping\", {body.Reference("org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping")}.class);")
+            .Line($"var excluded = {method.Reference("java.util.Set")}.of({string.Join(", ", triggerEndpoints.Select(JavaCodeBuilder.StringLiteral))});")
             .Line("var rows = new TreeSet<String>();")
-            .Block("for (var info : mappings.getHandlerMethods().keySet())", each => each
+            .Block("for (var handler : mappings.getHandlerMethods().entrySet())", each => each
+                .Line("var info = handler.getKey();")
+                .Line($"if (excluded.contains({each.Reference("org.springframework.util.ClassUtils")}.getUserClass(handler.getValue().getBeanType()).getName())) continue;")
                 .Line("var produces = info.getProducesCondition().getProducibleMediaTypes().stream().map(Object::toString).sorted().collect(Collectors.joining(\",\"));")
                 .Block("for (var pattern : info.getPathPatternsCondition().getPatternValues())", pattern => pattern
-                    .Line("if (!pattern.startsWith(\"/api/\") || pattern.startsWith(\"/api/triggers/\")) continue;")
+                    .Line("if (!pattern.startsWith(\"/api/\")) continue;")
                     .Line("for (var verb : info.getMethodsCondition().getMethods()) rows.add(verb + \" \" + pattern + (produces.isEmpty() ? \"\" : \" \" + produces));")))
             .Line("return new ArrayList<>(rows);"));
 

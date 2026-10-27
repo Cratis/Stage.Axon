@@ -36,9 +36,12 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
                     if (live) constructor.Line("this.streams = streams;");
                 });
                 var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
+
+                // Read the expression from the annotation as produced, before any qualification of its type name is rendered.
+                var expression = AxonHttpTestsEndpoints.Expression(authorization);
                 if (authorization.Length > 0) authorization = authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal);
                 var route = Route(located, query);
-                Register(authorization, route);
+                Register(expression, route);
                 if (authorization.Length > 0) body.Line(authorization);
                 Snapshot(body, name, route, modelName);
                 if (live)
@@ -80,9 +83,8 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
             });
     }
 
-    void Register(string authorization, string route)
+    void Register(string? expression, string route)
     {
-        var expression = AxonHttpTestsEndpoints.Expression(authorization);
         var parameters = shape.Arguments.Select(argument => new HttpParameter(argument.Name, !argument.Type.IsOptional)).ToArray();
         var cardinality = query.Cardinality switch
         {

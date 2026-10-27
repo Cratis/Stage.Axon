@@ -25,7 +25,7 @@ public class when_emitting_the_route_contract : a_query_collision
 
     [Fact] void should_list_the_json_route() => _test.ShouldContain("\"GET /api/views/counters/find-total\"");
     [Fact] void should_list_the_stream_route_with_its_media_type() => _test.ShouldContain("\"GET /api/views/counters/find-total text/event-stream\"");
-    [Fact] void should_exclude_trigger_routes_from_the_live_mappings() => _test.ShouldContain("pattern.startsWith(\"/api/triggers/\")");
+    [Fact] void should_not_exclude_routes_by_url_prefix() => _test.ShouldNotContain("/api/triggers/");
     [Fact] void should_compare_the_contract_file_to_the_live_mappings() => _test.ShouldContain("getResourceAsStream(\"/http-contract.json\")");
     [Fact] void should_describe_the_route_in_the_contract_file() => _json.ShouldContain("\"method\":\"GET\",\"path\":\"/api/views/counters/find-total\",\"produces\":[]");
     [Fact] void should_describe_the_stream_in_the_contract_file() => _json.ShouldContain("\"produces\":[\"text/event-stream\"]");

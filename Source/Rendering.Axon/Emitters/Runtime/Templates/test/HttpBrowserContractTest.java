@@ -12,11 +12,13 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.hamcrest.Matchers.startsWith;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -53,10 +55,20 @@ class HttpBrowserContractTest {
 
     @Test
     void aDisallowedOriginIsDenied() throws Exception {
-        var preflight = http.perform(options("/_identity/command").header("Origin", DENIED).header("Access-Control-Request-Method", "POST")).andReturn();
+        var preflight = http.perform(options("/_identity/command").header("Origin", DENIED).header("Access-Control-Request-Method", "POST"))
+            .andExpect(status().isForbidden()).andReturn();
         assertNull(preflight.getResponse().getHeader("Access-Control-Allow-Origin"));
-        var actual = http.perform(get("/_identity/json").header("Origin", DENIED).with(httpBasic("alice", "secret"))).andReturn();
+        var actual = http.perform(get("/_identity/json").header("Origin", DENIED).with(httpBasic("alice", "secret")))
+            .andExpect(status().isForbidden()).andReturn();
         assertNull(actual.getResponse().getHeader("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    void aDisallowedOriginCannotInvokeACommand() throws Exception {
+        HttpIdentityContractTest.INVOCATIONS.set(0);
+        http.perform(post("/_identity/command").contentType(MediaType.APPLICATION_JSON).content("{\"identity\":\"alice\"}")
+            .header("Origin", DENIED).with(httpBasic("alice", "secret"))).andExpect(status().isForbidden());
+        assertEquals(0, HttpIdentityContractTest.INVOCATIONS.get());
     }
 
     @Test
