@@ -87,6 +87,7 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
 
     void Specification(JavaCodeBuilder body, SemanticSpecification specification, string testClass, int index)
     {
+        CommandFixtureSecurity.ReportUnsupportedClaims(context, body, specification);
         var values = new CommandFixtureValues(context, command, specification, source);
         var input = values.Command();
         var given = specification.GivenEvents.Select(values.Event).ToArray();

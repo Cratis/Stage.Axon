@@ -12,11 +12,30 @@ internal static class CommandFixtureSecurity
 
     internal static void CallerReferences(JavaCodeBuilder method, SemanticCaller? caller) => CallerCore(method, caller, method);
 
+    internal static void ReportUnsupportedClaims(AxonEmissionContext context, JavaCodeBuilder code, SemanticSpecification specification)
+    {
+        var caller = specification.GivenCaller;
+        if (caller is not { Claims.IsDefaultOrEmpty: false }) return;
+        if (caller.Authenticated && HasOnlySubjectClaim(caller)) return;
+        const string diagnostic = "STAGE-AXON-SPEC-CLAIMS";
+        const string intent = "preserve all modeled caller claims in the security fixture";
+        var path = specification.Id + "/givenCaller/claims";
+        context.Degradation.Unsupported(diagnostic, specification.Id, "Caller fixtures preserve only the first sub or nameidentifier claim for an authenticated caller; other claims are not represented.", intent, path);
+        code.UnsupportedIntent(intent, path, diagnostic);
+    }
+
     internal static void Proxy(JavaCodeBuilder body, string name, bool usesClock) => ProxyCore(body, name, usesClock, null);
 
     internal static void ProxyReferences(JavaCodeBuilder body, string name, bool usesClock) => ProxyCore(body, name, usesClock, body);
 
     static string Reference(JavaCodeBuilder? code, string type) => code?.Reference(type) ?? type;
+
+    static bool HasOnlySubjectClaim(SemanticCaller caller)
+    {
+        if (caller.Claims.Length != 1) return false;
+        var type = caller.Claims[0].Type;
+        return type == "sub" || type.EndsWith("/nameidentifier", StringComparison.Ordinal);
+    }
 
     static void CallerCore(JavaCodeBuilder method, SemanticCaller? caller, JavaCodeBuilder? code)
     {
