@@ -4,6 +4,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -17,9 +18,9 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
     {
         var models = ScopeSelection.Select(context.Request).SelectMany(owner => owner.Slice.ReadModels).ToArray();
         if (!models.Any(model => PersistentViewAdmission.Supports(context, model.Id))) return;
-        var types = new ViewJavaTypes(context.Request.Model.Application);
+        var types = new ViewJavaTypes(context.Request.Model.Application, context.BasePackage);
         var package = types.BasePackage + ".persistence";
-        var runtime = types.BasePackage + ".runtime";
+        var runtime = AxonRuntimePackage.JavaPackage(types.BasePackage);
         var ids = models.Select(model => model.Id).ToArray();
 
         // Hash the generated application contract, not filesystem bytes or a mutable runtime checkpoint.
@@ -76,7 +77,7 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
         import org.springframework.context.annotation.Bean;
         import org.springframework.context.annotation.Configuration;
         import org.springframework.context.annotation.Profile;
-        import {{application}}.runtime.persistent.UniqueClaim;
+        import {{AxonRuntimePackage.Type(application, "persistent.UniqueClaim")}};
 
         @Configuration(proxyBeanMethods = false)
         @Profile("persistent")

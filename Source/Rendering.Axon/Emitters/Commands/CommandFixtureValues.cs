@@ -9,7 +9,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandFixtureValues(AxonEmissionContext context, SemanticCommand command, SemanticSpecification specification, CommandSource? source)
 {
-    readonly CommandJavaTypes _types = new(context.Request.Model.Application);
+    readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
 
     internal string? Command()
     {

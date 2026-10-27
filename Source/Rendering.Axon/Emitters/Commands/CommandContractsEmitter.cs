@@ -11,7 +11,7 @@ internal static class CommandContractsEmitter
 {
     internal static void EmitCommand(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource? source)
     {
-        var types = new CommandJavaTypes(context.Request.Model.Application);
+        var types = new CommandJavaTypes(context.Request.Model.Application, context.BasePackage);
         var package = Package(types, located);
         var name = JavaNames.Type(command.Name);
         context.AddJava(package, name, Code(context, command, package, source), sources: [command.Id, .. command.Properties.Select(property => property.Id)]);
@@ -21,12 +21,9 @@ internal static class CommandContractsEmitter
     internal static string Package(CommandJavaTypes types, LocatedSemanticSlice located) =>
         string.Join('.', new[] { types.BasePackage, JavaNames.PackageSegment(located.Module.Name) }.Concat(located.Features.Select(feature => JavaNames.PackageSegment(feature.Name))).Append(JavaNames.PackageSegment(located.Slice.Name)));
 
-    internal static string JsonProperty(string name, JavaCodeBuilder code) => JavaNames.Member(name) == name
-        ? string.Empty : $"@{code.Reference("com.fasterxml.jackson.annotation.JsonProperty")}({JavaCodeBuilder.StringLiteral(name)}) ";
-
     internal static string Code(AxonEmissionContext context, SemanticCommand command, string package, CommandSource? source)
     {
-        var types = new CommandJavaTypes(context.Request.Model.Application);
+        var types = new CommandJavaTypes(context.Request.Model.Application, context.BasePackage);
         var code = new JavaCodeBuilder(package).Declare(JavaNames.Type(command.Name));
         var references = command.Properties.Select(property => types.Type(property.Type with { IsCollection = false }))
             .Append(source?.JavaType ?? string.Empty)

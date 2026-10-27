@@ -18,6 +18,9 @@ public class when_listing_exported_types : Specification
     [
         typeof(AxonRendering),
         typeof(AxonArtifactRenderPlanner),
+        typeof(AxonRenderRequest),
+        typeof(AxonRenderOptions),
+        typeof(AxonHttpAuthentication),
         typeof(SimpleNameAlreadyClaimed)
     ]).ShouldBeTrue();
 

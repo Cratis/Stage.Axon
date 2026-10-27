@@ -44,7 +44,7 @@ public class when_emitting_multi_key_flat_handlers : Persistence.for_PersistentV
         var @event = ScopeSelection.Locate(_request.Model.Application).SelectMany(owner => owner.Slice.Events).Single(@event => @event.Id == projection.Scope!.From[0].EventContract);
         var first = projection.Scope!.From[0];
         var second = first with { Key = new SemanticProjectionValueKey(new SemanticProjectionEventProperty([@event.Properties.Single(property => property.Name == "amount").Id])) };
-        var types = new ViewJavaTypes(_request.Model.Application);
+        var types = new ViewJavaTypes(_request.Model.Application, JavaNames.PackageSegment(_request.Model.Application.Name));
         var body = new JavaCodeBuilder("axonviews.features.totals.views");
 
         // The semantic validator currently permits only one from per event on a level; exercise multi-key emission directly.

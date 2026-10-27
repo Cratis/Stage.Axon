@@ -56,6 +56,27 @@ public class when_resolving_a_java_body : a_view_request
     [Fact]
     void should_reject_the_wrong_role() => InlineJavaBodies.TryResolve(context, new(requirement.RequirementId, SemanticImplementationRole.CommandHandler, requirement.Source.SemanticId), out _, out _).ShouldBeFalse();
 
+    [Fact]
+    void should_name_the_authored_language_and_the_remedy()
+    {
+        var reason = Reason(requirement with { Language = "csharp" });
+        reason.ShouldEqual("The Axon target only realizes Java bodies; language 'csharp' is not supported. Supply the body in Java (or render it with a target that realizes this language) and render again.");
+    }
+
+    [Fact]
+    void should_report_an_unknown_language()
+    {
+        var reason = Reason(requirement with { Language = null });
+        reason.ShouldEqual("The implementation language is unknown. Supply the body in Java and render again.");
+    }
+
+    string Reason(SemanticImplementationRequirement candidate)
+    {
+        var request = _request with { ImplementationRequirements = [candidate] };
+        InlineJavaBodies.TryResolve(new(request, new(request.Profile)), new(candidate.RequirementId, candidate.Role, candidate.Source.SemanticId), out _, out var reason).ShouldBeFalse();
+        return reason;
+    }
+
     bool Resolve(SemanticImplementationRequirement candidate)
     {
         var request = _request with { ImplementationRequirements = [candidate] };

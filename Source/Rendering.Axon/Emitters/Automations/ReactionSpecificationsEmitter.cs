@@ -15,7 +15,7 @@ internal sealed class ReactionSpecificationsEmitter(AxonEmissionContext context,
 
     internal void Emit()
     {
-        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located);
+        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located);
         foreach (var specification in located.Slice.Specifications.Where(specification => specification.WhenTrigger?.Kind == SemanticReactionTriggerKind.ApplicationTrigger))
         {
             var index = Enumerable.Range(0, reaction.Triggers.Length).FirstOrDefault(index => reaction.Triggers[index].Source == specification.WhenTrigger!.Trigger, -1);
@@ -37,6 +37,7 @@ internal sealed class ReactionSpecificationsEmitter(AxonEmissionContext context,
         }
         code.Block("class " + name, body =>
         {
+            CommandFixtureSecurity.ReportUnsupportedClaims(context, body, specification);
             if (supported) Fields(body);
             body.Line("@" + body.Reference("org.junit.jupiter.api.Test")).Line($"@{body.Reference("org.junit.jupiter.api.DisplayName")}({JavaCodeBuilder.StringLiteral(specification.Id.ToString())})");
             if (!supported) body.Line($"@{body.Reference("org.junit.jupiter.api.Disabled")}({JavaCodeBuilder.StringLiteral(Refusal + ": unsupported application-trigger specification fixtures")})");

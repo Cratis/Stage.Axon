@@ -49,6 +49,8 @@ internal sealed partial class JavaCodeBuilder(string package)
     internal static string UnsupportedComment(string intent, string modelPath, string code) =>
         $"// Screenplay wanted to {CommentText(intent)} ({CommentText(modelPath)}), but this is not supported by the Axon target yet ({CommentText(code)}).";
 
+    internal static bool IsFramework(string type) => _frameworkPrefixes.Any(prefix => type.StartsWith(prefix, StringComparison.Ordinal));
+
     /// <summary>
     /// Imports a type and claims its simple name. Use it for generated application types from another package, before emitting
     /// code that calls <see cref="Reference"/>, so application types keep their short names.
@@ -140,8 +142,6 @@ internal sealed partial class JavaCodeBuilder(string package)
         if (_imports.Count > 0) result.Append('\n');
         return result.Append(_body).ToString();
     }
-
-    static bool IsFramework(string type) => _frameworkPrefixes.Any(prefix => type.StartsWith(prefix, StringComparison.Ordinal));
 
     static string SimpleName(string qualifiedName) => qualifiedName[(qualifiedName.LastIndexOf('.') + 1)..];
 

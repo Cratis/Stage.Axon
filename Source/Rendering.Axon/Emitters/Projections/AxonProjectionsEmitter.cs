@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Cratis.Stage.Rendering.Axon.Specifications.Views;
@@ -17,7 +18,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
 
     public void Emit(AxonEmissionContext context)
     {
-        var types = new ViewJavaTypes(context.Request.Model.Application);
+        var types = new ViewJavaTypes(context.Request.Model.Application, context.BasePackage);
         var namespaces = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var located in ScopeSelection.Select(context.Request))
         {
@@ -71,9 +72,9 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         }
         context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused.");
         var configuration = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration");
-        var storeType = configuration.Reference(types.BasePackage + ".runtime.ReadModelStore");
-        var memoryStoreType = configuration.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore");
-        var safetyType = configuration.Reference(types.BasePackage + ".runtime.persistent.PersistentReadModelSafety");
+        var storeType = configuration.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
+        var memoryStoreType = configuration.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"));
+        var safetyType = configuration.Reference(AxonRuntimePackage.Type(types.BasePackage, "persistent.PersistentReadModelSafety"));
         configuration
             .DiffersFromScreenplay($"Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused ({AxonRefusalCodes.ReadModelPersistence}).")
             .Line($"@{configuration.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
@@ -100,7 +101,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var updates = new ProjectionUpdates(context, types, model.Id);
         var code = new JavaCodeBuilder(package).Declare(modelName).Declare(name);
         foreach (var property in model.Properties) types.ClaimProjectionType(property.Type, code);
-        var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var storeType = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
         updates.Claim(code, package);
         foreach (var from in ProjectionTransitions.From(projection)) types.EventType(from.EventContract, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
