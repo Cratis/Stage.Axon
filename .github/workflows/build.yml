@@ -68,7 +68,7 @@ jobs:
           node-version: '24.20.0'
       - name: Build the standalone verification harness
         run: dotnet build Stage.Axon.slnx -c Debug
-      - name: Render all 23 corpus applications
+      - name: Render every corpus application
         run: >-
           dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj
           -c Debug --no-build -- render "${{ runner.temp }}/axon-corpus"
