@@ -1,0 +1,19 @@
+# Copyright (c) Cratis. All rights reserved.
+# Licensed under the MIT license. See LICENSE file in the project root for full license information.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: Cratis.Stage.Contracts
+      - dependency-name: Cratis.Screenplay
+    labels: ["no-release"]
+    groups:
+      cli-aligned-packages:
+        patterns:
+          - Cratis.Stage.Contracts
+          - Cratis.Screenplay
+    open-pull-requests-limit: 2
+    # A bump ahead of the CLI fails the version guard by design until the CLI catches up.

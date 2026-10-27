@@ -5,7 +5,7 @@
         <LangVersion>14.0</LangVersion>
         <Nullable>enable</Nullable>
 
-        <!-- Projects opt in to packing. Publication is not configured; CI rejects package pushes (Stage.Axon#4). -->
+        <!-- Projects opt in to packing; only the allowlist in .github/scripts/package-allowlist.mjs may (Stage.Axon#39). -->
         <IsPackable>false</IsPackable>
 
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
