@@ -2,6 +2,7 @@ package __RUNTIME__;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -71,7 +72,7 @@ class ReadModelTransactionTest {
         run(context -> {
             ReadModelTransaction.bind(wrapper, context).put("row", 7L);
             Assertions.assertEquals(0, changes.get());
-            context.afterCommit(completed -> {
+            context.runOnAfterCommit(completed -> {
                 Assertions.assertEquals(7L, wrapper.get("row").orElseThrow());
                 Assertions.assertEquals(1, changes.get());
                 notified.set(true);
@@ -123,7 +124,7 @@ class ReadModelTransactionTest {
             try {
                 await(staged);
                 var failure = Assertions.assertThrows(Exception.class, () -> run(context -> {
-                    context.afterCommit(done -> committed.set(true));
+                    context.runOnAfterCommit(done -> committed.set(true));
                     var bound = ReadModelTransaction.bind(store, context);
                     bound.put("other", 9L);
                     bound.put("row", 2L);
@@ -178,7 +179,12 @@ class ReadModelTransactionTest {
         });
     }
 
-    private void run(Consumer<ProcessingContext> work) { factory.create().execute(work).join(); }
+    private void run(Consumer<ProcessingContext> work) {
+        factory.create().executeWithResult(context -> {
+            work.accept(context);
+            return CompletableFuture.completedFuture(null);
+        }).join();
+    }
     private static void await(CountDownLatch latch) {
         try { Assertions.assertTrue(latch.await(20, TimeUnit.SECONDS)); }
         catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
