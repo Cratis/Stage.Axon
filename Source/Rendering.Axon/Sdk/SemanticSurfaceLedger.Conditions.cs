@@ -18,6 +18,7 @@ internal static partial class SemanticSurfaceLedger
             entries,
             "STAGE-AXON-VERSION: measured language/semantic pairs 2.0/2.0, 6.0/6.0, 10.0/10.0 and 25.0/25.0 are admitted; other pairs degrade.",
             "ExecutableSemanticModel.LanguageVersion ExecutableSemanticModel.SemanticVersion");
+        ClassifyBehaviors(entries);
     }
 
     static void ClassifyCommands(Dictionary<string, SemanticSurfaceDisposition> entries)
@@ -66,7 +67,7 @@ internal static partial class SemanticSurfaceLedger
             "SemanticCommand.Authorization SemanticKeyedQuery.Authorization SemanticApplication.Policies SemanticPolicy.Condition SemanticPolicy.Name SemanticPolicyReference.Name SemanticLogicalAuthorization.Left SemanticLogicalAuthorization.Operator SemanticLogicalAuthorization.Right SemanticLogicalPolicyCondition.Left SemanticLogicalPolicyCondition.Operator SemanticLogicalPolicyCondition.Right SemanticNotPolicyCondition.Operand SemanticClaimCondition.Claim SemanticClaimCondition.TargetKind SemanticClaimCondition.Value");
         Warn(
             entries,
-            "STAGE-AXON-COMPLIANCE: scalar concepts with Personal or Secret metadata warn because protection at rest is not configured; the constructor throws. Ordinary scalar concepts do not take this guard. The enum emission path does not apply this scalar guard; no protection semantics are claimed there.",
+            "STAGE-AXON-COMPLIANCE: scalar concepts with Personal or Secret metadata warn because protection at rest is not configured; the constructor throws. Ordinary scalar concepts do not take this guard. Enum concepts do not apply the scalar constructor guard and claim no protection semantics; the central behavior admission reports the same code once per compliance-marked enum concept and writes a comment in the concepts package-info.java.",
             "SemanticConcept.Compliance SemanticConceptCompliance.Personal SemanticConceptCompliance.Secret SemanticSecret.Scope SemanticPersonalData.Special SemanticPersonalData.Criminal");
         Warn(
             entries,
@@ -87,7 +88,7 @@ internal static partial class SemanticSurfaceLedger
     {
         Warn(
             entries,
-            "STAGE-AXON-0504: reaction registration requires every trigger to prepare with supported identity, input, annotation, shape, effect and guard, with no duplicate event sources. Native effects must be standalone; declarative effects permit one invocation OR one production; reaction.From is unsupported. One failed trigger prevents registration of the whole reaction, though artifacts remain in default output.",
+            "STAGE-AXON-0504: reaction registration requires every trigger to prepare with supported identity, input, annotation, shape, effect and guard, with no duplicate event sources. Native effects must be standalone; declarative effects permit one invocation OR one production; reaction.From is unsupported. One failed trigger prevents registration of the whole reaction, though artifacts remain in default output. A declared OnRefused branch also reports STAGE-AXON-0506. An unopted Interval/Schedule trigger fails preparation here with 0507.",
             "SemanticReaction.Triggers SemanticReaction.From SemanticReactionTrigger.Kind SemanticReactionTrigger.Source SemanticReactionTrigger.Where SemanticReactionTrigger.Invokes SemanticReactionTrigger.Produces SemanticReactionTrigger.RequirementId");
         Warn(
             entries,
@@ -95,7 +96,7 @@ internal static partial class SemanticSurfaceLedger
             "SemanticReaction.RunsAs SemanticReactionIdentity.Kind SemanticReactionIdentity.Roles SemanticReactionTrigger.Invokes");
         Warn(
             entries,
-            "STAGE-AXON-0507: successfully emitted Interval/Schedule methods use process-local UTC Spring scheduling, not durable scheduling; interval boundaries start with the process. Other trigger kinds do not emit this diagnostic, nor do schedules rejected before emission.",
+            "STAGE-AXON-0507: Interval/Schedule triggers are an approximation (process-local UTC Spring scheduling, not durable scheduling; interval boundaries start with the process) and require opt-in via AxonRendering.AllowApproximations. Without opt-in the trigger is not registered (0504) and 0507 warns by default and errors and refuses in strict mode; with opt-in the method is rendered and 0507 stays a warning in both modes. Other trigger kinds do not emit this diagnostic.",
             "SemanticReactionTrigger.Kind SemanticReactionTrigger.At SemanticReactionTrigger.Every SemanticReactionTrigger.OnDayOfMonth SemanticReactionTrigger.OnDayOfWeek SemanticReactionTriggerKind.Interval SemanticReactionTriggerKind.Schedule");
     }
 
@@ -134,7 +135,7 @@ internal static partial class SemanticSurfaceLedger
             "STAGE-AXON-SPEC: unclaimed specifications emit disabled placeholders and warn at the specification owner; a field alone does not establish whether an emitter claims the specification. Nonempty ThenInvocations independently warns even on already claimed tests; calls and values are not verified.",
             "SemanticSlice.Specifications SemanticSpecification.WhenCapture SemanticSpecification.WhenClock SemanticSpecification.WhenRedelivered SemanticSpecification.ThenInvocations SemanticSpecificationInvocation.Command SemanticSpecificationInvocation.Values");
         SetViews(entries, SemanticSurfaceDispositionKind.Rendered, "GivenClock supplies the command fixture clock when used and the reaction fixture clock; it does not establish clock-driven action or durable scheduling support.", "SemanticSpecification.GivenClock");
-        SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Not consumed by Axon emission; no atomic reaction execution guarantee is claimed. The reserved ATOMIC code has no runtime callsite.", "SemanticApplication.ReactionProductionMode SemanticReactionProductionMode.Atomic");
+        SetViews(entries, SemanticSurfaceDispositionKind.Rendered, "Rendered by construction: a registered trigger has exactly one effect, and multi-effect triggers are refused with STAGE-AXON-0504, so no separate atomic mode needs runtime code.", "SemanticApplication.ReactionProductionMode SemanticReactionProductionMode.Atomic");
     }
 
     static void Warn(Dictionary<string, SemanticSurfaceDisposition> entries, string detail, string members)

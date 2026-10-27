@@ -183,7 +183,6 @@ internal static partial class SemanticSurfaceLedger
         ClassifyImplementations(entries);
         foreach (var member in new[] { "SemanticSpecification.ThenInvocations", "SemanticSpecificationInvocation.Command", "SemanticSpecificationInvocation.Values" })
             entries[member] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-SPEC: expected command invocations and their argument values are not verified; scoped specification emission reports this unsupported assertion.");
-        entries["SemanticCaptureEventsSource.KeyIsEventSource"] = new(SemanticSurfaceDispositionKind.Ignored, "Not consumed by Axon emission; no execution equivalence is claimed for this capture source hint.");
         entries["ExecutableSemanticModel.LanguageVersion"] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-VERSION");
         entries["ExecutableSemanticModel.SemanticVersion"] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-VERSION");
         return entries;
@@ -191,7 +190,7 @@ internal static partial class SemanticSurfaceLedger
 
     static void AddMembers(Dictionary<string, SemanticSurfaceDisposition> entries, string members)
     {
-        var deferred = new SemanticSurfaceDisposition(SemanticSurfaceDispositionKind.Ignored, "Phase 1 is scaffold-only; domain behavior is not emitted.");
+        var deferred = new SemanticSurfaceDisposition(SemanticSurfaceDispositionKind.Ignored, Unclassified);
         foreach (var line in members.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);

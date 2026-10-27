@@ -19,7 +19,7 @@ public class when_another_read_model_shadows_a_query_framework_type : given.a_qu
     [InlineData("Throwable", "LiveTotalsStreams", "onError(java.lang.Throwable failure)")]
     [InlineData("Long", "LiveTotalsSubscription", "java.lang.Long.MAX_VALUE")]
     [InlineData("String", "FindTotalEndpoint", "required = true) java.lang.String name")]
-    [InlineData("IllegalStateException", "FindTotalHandler", "new java.lang.IllegalStateException(")]
+    [InlineData("QueryResults", "FindTotalHandler", "axonviews.runtime.QueryResults.atMostOne(rows);")]
     [InlineData("Flow", "LiveTotalsStreams", "java.util.concurrent.Flow.Publisher<Object>")]
     [InlineData("List", "FindTotal", "java.util.List<Total>")]
     [InlineData("QueryGateway", "FindTotalEndpoint", "org.axonframework.messaging.queryhandling.gateway.QueryGateway gateway")]
