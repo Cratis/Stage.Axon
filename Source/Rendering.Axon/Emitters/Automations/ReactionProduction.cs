@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -20,8 +21,8 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
         context.AddJava(package, Name, command.Build(), sources: [reaction]);
         var handler = new JavaCodeBuilder(package).Declare(Name).Declare(Name + "Handler").Declare(Name + "Stream");
         var selector = Primary.TagKey == "eventSourceId" ? "(idProperty = " + EventTagsEmitter.Reference(TagReference, handler, package) + ")" : string.Empty;
-        var uniqueValues = handler.Reference(context.BasePackage + ".runtime.UniqueValueStore");
-        var inMemoryUniqueValues = handler.Reference(context.BasePackage + ".runtime.InMemoryUniqueValueStore");
+        var uniqueValues = handler.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueStore"));
+        var inMemoryUniqueValues = handler.Reference(AxonRuntimePackage.Type(context.BasePackage, "InMemoryUniqueValueStore"));
         var constraints = handler.Reference(context.BasePackage + ".infrastructure.ModeledConstraints");
         handler.Line("@" + handler.Reference("org.springframework.stereotype.Component"))
             .Block($"public class {Name}Handler", body => body

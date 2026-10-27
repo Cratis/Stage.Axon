@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -74,7 +75,7 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
     {
         var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Handler").Declare(name + "Performer");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Handler", name + "Performer");
-        var store = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var store = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")
             .Block($"public class {name}Handler", body =>
             {
@@ -95,9 +96,9 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                         ? $"var rows = {method.Reference("java.util.List")}.copyOf(performer.perform(query, store));"
                         : $"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
                     if (query.Cardinality == SemanticQueryCardinality.One)
-                        method.Line($"{method.Reference(types.BasePackage + ".runtime.QueryResults")}.exactlyOne(rows);");
+                        method.Line($"{method.Reference(AxonRuntimePackage.Type(types.BasePackage, "QueryResults"))}.exactlyOne(rows);");
                     if (query.Cardinality == SemanticQueryCardinality.ZeroOrOne)
-                        method.Line($"{method.Reference(types.BasePackage + ".runtime.QueryResults")}.atMostOne(rows);");
+                        method.Line($"{method.Reference(AxonRuntimePackage.Type(types.BasePackage, "QueryResults"))}.atMostOne(rows);");
                     method.Line($"return new {name}.Result(rows);");
                 });
             });

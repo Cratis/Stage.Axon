@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
@@ -13,7 +14,7 @@ internal static class LiveQueryStreams
         var name = JavaNames.Type(query.Name) + "Streams";
         var code = QueryModelReference.Create(context, package).Declare(JavaNames.Type(query.Name)).Declare(name);
         QueryModelReference.ReserveLocal(code, package, modelType, JavaNames.Type(query.Name), name);
-        var live = code.Reference(context.BasePackage + ".runtime.LiveStreams");
+        var live = code.Reference(AxonRuntimePackage.Type(context.BasePackage, "LiveStreams"));
         code.Line($$"""
             @{{code.Reference("org.springframework.stereotype.Component")}}({{JavaCodeBuilder.StringLiteral(package + "." + name)}})
             public final class {{name}} {

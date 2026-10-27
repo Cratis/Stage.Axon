@@ -6,6 +6,7 @@ using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -75,7 +76,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                             .Line("throw new UnsupportedOperationException(\"Unsupported modeled view specification\");");
                         return;
                     }
-                    method.Line($"{method.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {JavaNames.Type(model.Name)}> store = new {method.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
+                    method.Line($"{method.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<Object, {JavaNames.Type(model.Name)}> store = new {method.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
                         .Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(store);");
                     foreach (var given in spec.GivenEvents)
                     {

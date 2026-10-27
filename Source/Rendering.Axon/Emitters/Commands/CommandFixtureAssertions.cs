@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
@@ -25,7 +26,7 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
         if (specification.ThenDenied) return;
         if (!specification.ThenErrors.IsEmpty)
         {
-            code.Reference(context.BasePackage + ".runtime.CommandValidationException");
+            code.Reference(AxonRuntimePackage.Type(context.BasePackage, "CommandValidationException"));
             return;
         }
         ClaimResponse(code);
@@ -65,7 +66,7 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
 
     void Errors(JavaCodeBuilder method)
     {
-        var exceptionType = Reference(context.BasePackage + ".runtime.CommandValidationException");
+        var exceptionType = Reference(AxonRuntimePackage.Type(context.BasePackage, "CommandValidationException"));
         method.Block("result.exceptionSatisfies(error ->", assertion =>
         {
             assertion.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(error).isInstanceOf({exceptionType}.class);")

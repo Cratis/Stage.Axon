@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -31,7 +32,7 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
         {
             code.Reference(AxonEventsEmitter.TypeFor(context, contract));
         }
-        var store = code.Reference(context.BasePackage + ".runtime.UniqueValueStore");
+        var store = code.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueStore"));
         code.Block("public final class ModeledConstraints", body =>
         {
             body.Line("private ModeledConstraints() {}")

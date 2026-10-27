@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -33,7 +34,7 @@ internal static class QueryPerformer
         if (!native) context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, reason, "answer the query with its modeled performer", query.Id.ToString());
         var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Performer");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Performer");
-        var store = code.Reference(context.BasePackage + ".runtime.ReadModelStore");
+        var store = code.Reference(AxonRuntimePackage.Type(context.BasePackage, "ReadModelStore"));
         if (!native) code.DiffersFromScreenplay("the modeled performer is a typed Spring extension point; implementation bodies are not translated.");
         code.Block($"public interface {name}Performer", body => body
                 .Block($"default {code.Reference("java.util.List")}<{modelName}> perform({name} query, {store}<{code.Reference("java.lang.Object")}, {modelName}> store)", method =>

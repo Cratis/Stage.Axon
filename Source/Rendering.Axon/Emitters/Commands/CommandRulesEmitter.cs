@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
@@ -23,7 +24,7 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
         return builder.Build();
     }
 
-    JavaCodeBuilder BeanValidation(JavaCodeBuilder builder) => builder.Line($"var validation = new {builder.Reference(types.BasePackage + ".runtime.ValidationContext")}();").Line($"validator.validate(command).stream().sorted({builder.Reference("java.util.Comparator")}.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject(violation.getPropertyPath().toString(), violation.getMessage()));");
+    JavaCodeBuilder BeanValidation(JavaCodeBuilder builder) => builder.Line($"var validation = new {builder.Reference(AxonRuntimePackage.Type(types.BasePackage, "ValidationContext"))}();").Line($"validator.validate(command).stream().sorted({builder.Reference("java.util.Comparator")}.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject(violation.getPropertyPath().toString(), violation.getMessage()));");
 
     void ClaimRules(JavaCodeBuilder builder)
     {

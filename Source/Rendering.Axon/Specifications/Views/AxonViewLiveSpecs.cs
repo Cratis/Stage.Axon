@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -44,7 +45,7 @@ internal static class AxonViewLiveSpecs
             return AxonViewEvents.Expression(context, types, given, builder) + ProjectionHandlerShape.Arguments(projection, updates, updates.Enabled ? builder.Reference("org.axonframework.messaging.queryhandling.QueryUpdateEmitter") + ".forContext(processing)" : "null");
         }
         var eventArguments = EventArguments(code);
-        var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var storeType = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
         var applicationType = code.Reference(types.BasePackage + ".Application");
         var source = code.Line($$"""
             @{{code.Reference("org.springframework.boot.test.context.SpringBootTest")}}(classes = {{applicationType}}.class)

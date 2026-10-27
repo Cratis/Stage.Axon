@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -71,7 +72,7 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
         method.Block("try", body =>
         {
             CommandFixtureSecurity.CallerReferences(body, spec.GivenCaller);
-            body.Line($"{body.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {plan.Model}> store = new {body.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
+            body.Line($"{body.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<Object, {plan.Model}> store = new {body.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
                 .Line($"var projector = new {plan.Projection}Projector(store);")
                 .Line($"projector.on({AxonViewEvents.Expression(context, types, plan.Event, body)}{plan.Arguments});");
             if (plan.Appended is { } appended) body.Line($"projector.on({AxonViewEvents.Expression(context, types, appended, body)}{plan.Arguments});");

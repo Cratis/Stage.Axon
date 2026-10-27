@@ -6,6 +6,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Queries;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -53,7 +54,7 @@ internal sealed class AxonViewHttpSpecs(AxonEmissionContext context, ViewJavaTyp
         var arguments = ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id));
         var lines = new List<AxonHttpTests.Fragment>
         {
-            new(code => $"application.getBean({JavaCodeBuilder.StringLiteral(modelType)}, {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}.class).clear();", code =>
+            new(code => $"application.getBean({JavaCodeBuilder.StringLiteral(modelType)}, {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}.class).clear();", code =>
             {
                 code.Reference(modelType);
                 code.Reference(projector);

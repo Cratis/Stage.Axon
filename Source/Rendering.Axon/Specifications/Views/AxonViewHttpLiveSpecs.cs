@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Queries;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -22,7 +23,7 @@ internal static class AxonViewHttpLiveSpecs
         if (projector[..projector.LastIndexOf('.')] == package) code.Declare(projectorName);
         else projectorName = code.Reference(projector);
         var arguments = eventArguments(code);
-        var storeType = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var storeType = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
         var applicationType = code.Reference(types.BasePackage + ".Application");
         code.Line($$"""
             class {{name}} {

@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Emitters;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -96,7 +97,7 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
     // Requirement roles no inline-body slot selects are never reported by InlineImplementationDiagnostics.
     static IEnumerable<AxonBehaviorDecision> ImplementationDecisions(ArtifactRenderRequest request)
     {
-        var package = AxonNamesInput.BasePackage(request) + ".runtime";
+        var package = AxonRuntimePackage.InlinePackage(AxonNamesInput.BasePackage(request));
         var requirements = request.ImplementationRequirements.IsDefault ? [] : request.ImplementationRequirements;
         foreach (var requirement in requirements.Where(requirement => requirement.Role is not (SemanticImplementationRole.CommandHandler or SemanticImplementationRole.ReactionEffect or SemanticImplementationRole.QueryPerformer or SemanticImplementationRole.ReducerTransition)))
         {
