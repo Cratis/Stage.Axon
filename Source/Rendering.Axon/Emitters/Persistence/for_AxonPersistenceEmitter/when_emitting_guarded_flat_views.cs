@@ -64,7 +64,7 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_remove_segment_aware_rollback_comparisons() => Code("TotalPersistentTest").ShouldNotContain("assertRollbackTokens(");
     [Fact] void should_remove_token_decoding_helpers() => Code("TotalPersistentTest").ShouldNotContain("tokenEntries(");
     [Fact] void should_remove_non_owner_monotonicity_checks() => Code("TotalPersistentTest").ShouldNotContain("WrappedToken");
-    [Fact] void should_document_single_segment_coverage() => Code("TotalPersistentTest").ShouldContain("Single-segment proof: native run 40395678690 showed public sequenceIdentifierFor + Segment.matches selected segment 2 while pooled routing used segment 13. Multi-segment rollback is tracked in Cratis/Stage.Axon#16; this proof does not cover it.");
+    [Fact] void should_document_single_segment_coverage() => Code("TotalPersistentTest").ShouldContain("Single-segment proof: native run 40395678690 showed public sequenceIdentifierFor + Segment.matches selected segment 2 while pooled routing used segment 13. See the sibling TotalPersistentMultiSegmentTest for observed-owner multi-segment rollback coverage.");
     [Fact] void should_preserve_production_application_configuration() => Resource("application.yml").ShouldNotContain("initial-segment-count");
     [Fact] void should_preserve_production_view_configuration() => Resource("axon-views.properties").ShouldNotContain("initial-segment-count");
     [Fact] void should_preserve_production_persistent_profile_configuration() => Resource("application-persistent.properties").ShouldNotContain("initial-segment-count");
