@@ -22,11 +22,11 @@ internal sealed class AxonRuntimeEmitter : IAxonEmitter
             var test = relative.StartsWith("test.", StringComparison.Ordinal);
             if (test) relative = relative["test.".Length..];
             var separator = relative.LastIndexOf('.');
-            var package = context.BasePackage + ".runtime" + (separator < 0 ? string.Empty : "." + relative[..separator]);
+            var package = AxonRuntimePackage.JavaPackage(context) + (separator < 0 ? string.Empty : "." + relative[..separator]);
             var name = relative[(separator + 1)..];
             using var stream = assembly.GetManifestResourceStream(resource)!;
             using var reader = new StreamReader(stream);
-            var source = reader.ReadToEnd().Replace("__RUNTIME__", context.BasePackage + ".runtime", StringComparison.Ordinal)
+            var source = reader.ReadToEnd().Replace("__RUNTIME__", AxonRuntimePackage.JavaPackage(context), StringComparison.Ordinal)
                 .Replace("__SECURITY__", context.BasePackage + ".infrastructure", StringComparison.Ordinal);
             context.AddJava(package, name, SortImports(source), test);
         }

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
@@ -12,8 +13,8 @@ internal static class PersistentProjectionStore
     {
         var name = JavaNames.Type(model.Name);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration");
-        var store = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
-        var memory = code.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore");
+        var store = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
+        var memory = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"));
         var persistent = code.Reference(types.BasePackage + ".persistence.JpaReadModelStore");
         var bootstrap = code.Reference(types.BasePackage + ".persistence.PersistentViewConfiguration");
         var qualifier = JavaCodeBuilder.StringLiteral(package + "." + name);

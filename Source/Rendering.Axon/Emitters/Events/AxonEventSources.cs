@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Concepts;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -16,7 +17,7 @@ internal static class AxonEventSources
             .SelectMany(command => command.Produces.Where(produced => produced.EventContract == contract.Id).Select(produced => (Command: command, Produced: produced)));
         var identifier = producers.Select(pair => FromProducer(context, pair.Command, pair.Produced)).FirstOrDefault(concept => concept is not null)
             ?? Identifier(context, contract.Properties);
-        return identifier is not null ? Tag(context, identifier) : ("eventSourceId", context.BasePackage + ".runtime.EventSourceId", "eventSourceId");
+        return identifier is not null ? Tag(context, identifier) : ("eventSourceId", AxonRuntimePackage.Type(context.BasePackage, "EventSourceId"), "eventSourceId");
     }
 
     internal static string Record(AxonEmissionContext context, string package, SemanticEventContract contract, string annotation) =>
@@ -74,7 +75,7 @@ internal static class AxonEventSources
     {
         var name = JavaNames.Member(property.Name);
         var tag = name == primary.ComponentName ? $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {primary.Reference}) " : string.Empty;
-        var json = name == property.Name ? string.Empty : $"@{code.Reference("com.fasterxml.jackson.annotation.JsonProperty")}({JavaCodeBuilder.StringLiteral(property.Name)}) ";
+        var json = JavaJsonNames.Annotation(property.Name, code);
         return tag + $"{json}{JavaSemanticTypes.TypeFor(context, property.Type, code)} {name}";
     }
 }
