@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
@@ -17,7 +18,7 @@ internal static class LiveQuerySubscription
         QueryModelReference.ReserveLocal(code, package, modelType, name, name + "Subscription");
         var flow = code.Reference("java.util.concurrent.Flow");
         var gateway = code.Reference("org.axonframework.messaging.queryhandling.gateway.QueryGateway");
-        var live = code.Reference(context.BasePackage + ".runtime.LiveSnapshots");
+        var live = code.Reference(AxonRuntimePackage.Type(context.BasePackage, "LiveSnapshots"));
         var source = code.Line($$"""
             public final class {{name}}Subscription {
                 private {{name}}Subscription() {}

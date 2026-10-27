@@ -6,6 +6,7 @@ using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -150,7 +151,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
             CommandFixtureSecurity.CallerReferences(body, spec.GivenCaller);
             var modelName = JavaNames.Type(model.Name);
             var updates = new ProjectionUpdates(context, types, model.Id);
-            body.Line($"{body.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{body.Reference("java.lang.Object")}, {modelName}> store = new {body.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
+            body.Line($"{body.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{body.Reference("java.lang.Object")}, {modelName}> store = new {body.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
                 .Line($"var projector = new {modelName}ReducerProjector(store, new {modelName}Reducer() {{}});");
             foreach (var given in plan.Events)
             {
