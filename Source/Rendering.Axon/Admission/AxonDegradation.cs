@@ -16,14 +16,29 @@ internal sealed class AxonDegradation(ArtifactRenderProfile profile)
 
     internal bool Strict { get; } = profile.Inputs.Any(input => input.Name == AxonRendering.StrictInput && Encoding.UTF8.GetString(input.Bytes.AsSpan()) == "true");
 
+    internal ImmutableHashSet<string> AllowedApproximations { get; } = AxonApproximationsInput.TryRead(profile, out var allowed) ? allowed : [];
+
     internal IReadOnlyList<ArtifactRenderDiagnostic> UnsupportedConstructs => _diagnostics;
 
     internal IReadOnlyList<AxonUnsupportedIntent> Intents => _intents;
 
     internal ImmutableArray<ArtifactRenderRefusal> Refusals => Strict
-        ? [.. _diagnostics.GroupBy(diagnostic => (diagnostic.Artifact, Kind: "construct"))
+        ? [.. _diagnostics.Where(diagnostic => diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Error).GroupBy(diagnostic => (diagnostic.Artifact, Kind: "construct"))
             .Select(group => new ArtifactRenderRefusal(group.Key.Artifact, group.Key.Kind, [.. group.Select(diagnostic => diagnostic.Code).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)]))]
         : [];
+
+    internal bool Approximate(string code, SemanticId construct, string reason, string intent, string modelPath)
+    {
+        if (!AllowedApproximations.Contains(code))
+        {
+            Unsupported(code, construct, reason + " Approximation requires opt-in via AxonRendering.AllowApproximations.", intent, modelPath);
+            return false;
+        }
+
+        _diagnostics.Add(new(code, ArtifactRenderDiagnosticSeverity.Warning, reason, construct));
+        _intents.Add(new(code, construct, intent, modelPath));
+        return true;
+    }
 
     internal ArtifactRenderDiagnostic Unsupported(string code, SemanticId construct, string reason, string? intent = null, string? modelPath = null)
     {

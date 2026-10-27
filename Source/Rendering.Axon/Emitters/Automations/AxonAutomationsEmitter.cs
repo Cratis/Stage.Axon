@@ -57,9 +57,10 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
                 body.Line($"private final {body.Reference("org.axonframework.messaging.commandhandling.gateway.CommandGateway")} commands;")
                     .Line($"private final {body.Reference("java.time.Clock")} clock;")
                     .Block($"public {name}({body.Reference("org.axonframework.messaging.commandhandling.gateway.CommandGateway")} commands, {body.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.commands = commands;").Line("this.clock = clock;"));
+                var unregistered = triggers.Any(trigger => trigger is null);
                 for (var index = 0; index < triggers.Length; index++)
                 {
-                    if (triggers[index] is not { } trigger)
+                    if (triggers[index] is not { } trigger || (unregistered && trigger.Production is not null))
                     {
                         body.UnsupportedIntent($"execute reaction {reaction.Name} trigger {index + 1} with its original guards, identity, mappings and effects", reaction.Id.ToString(), "STAGE-AXON-0504");
                         continue;

@@ -12,6 +12,7 @@ public class when_visiting_families : for_AxonArtifactRenderPlanner.given.an_axo
     [Fact]
     void should_keep_the_shared_family_order() =>
         AxonEmitters.Ordered.Select(emitter => emitter.GetType().Name).ShouldEqual(
+            "AxonBehaviorAdmission",
             "AxonScaffoldEmitter",
             "AxonConceptsEmitter",
             "AxonEventsEmitter",

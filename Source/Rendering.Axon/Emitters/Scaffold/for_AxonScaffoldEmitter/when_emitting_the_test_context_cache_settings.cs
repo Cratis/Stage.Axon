@@ -19,5 +19,5 @@ public class when_emitting_the_test_context_cache_settings : for_AxonArtifactRen
     }
 
     [Fact] void should_emit_the_spring_properties_once_under_src_test_resources() => _context.Artifacts.Count(artifact => artifact.RelativePath == Path).ShouldEqual(1);
-    [Fact] void should_keep_cached_contexts_running_so_axon_start_handlers_do_not_subscribe_twice() => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath == Path).Bytes.AsSpan()).ShouldContain("spring.test.context.cache.pause=never");
+    [Fact] void should_keep_cached_contexts_running_so_axon_start_handlers_do_not_subscribe_twice() => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath == Path).Bytes.AsSpan()).ShouldContain("spring.test.context.cache.pause=NEVER");
 }

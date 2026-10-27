@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 using Cratis.Stage.Rendering.Axon.Java;
 
@@ -15,8 +16,14 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
         var annotation = ReactionScheduling.Annotation(trigger);
         var input = ReactionInput.Create(context, trigger);
         if (annotation is null || input is null) return null;
-        if (trigger.RequirementId is not null) return PrepareNative(trigger, annotation, input);
-        return PrepareDeclarative(trigger, index, annotation, input);
+        var prepared = trigger.RequirementId is not null ? PrepareNative(trigger, annotation, input) : PrepareDeclarative(trigger, index, annotation, input);
+        if (prepared is null || trigger.Kind is not (SemanticReactionTriggerKind.Interval or SemanticReactionTriggerKind.Schedule)) return prepared;
+        return context.Degradation.Approximate(
+            AxonRefusalCodes.Schedule,
+            reaction.Id,
+            "Schedules use UTC and process-local Spring scheduling, not a durable scheduler; interval boundaries start with this process.",
+            $"run reaction {reaction.Name} trigger {index + 1} on its modeled clock",
+            $"{reaction.Id}/triggers/{index}") ? prepared : null;
     }
 
     internal void Emit(SemanticReactionTrigger model, PreparedReactionTrigger trigger, int index, JavaCodeBuilder body)
@@ -33,8 +40,6 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
             Effect(method, trigger);
         });
         if (trigger.NativeBody is not null) context.ConsumedImplementations.Add(model.RequirementId!);
-        if (model.Kind is SemanticReactionTriggerKind.Interval or SemanticReactionTriggerKind.Schedule)
-            context.Degradation.Unsupported("STAGE-AXON-0507", reaction.Id, "Schedules use UTC and process-local Spring scheduling, not a durable scheduler; interval boundaries start with this process.");
     }
 
     static bool StandaloneNativeEffect(SemanticReactionTrigger trigger) => trigger.Produces.IsEmpty && trigger.Invokes.IsEmpty;

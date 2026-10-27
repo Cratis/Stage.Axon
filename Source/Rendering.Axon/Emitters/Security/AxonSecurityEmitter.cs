@@ -22,6 +22,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             .Import("org.springframework.context.annotation.Configuration")
             .Import("org.springframework.beans.factory.annotation.Value")
             .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")
+            .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication")
             .Import("org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity")
             .Import("org.springframework.security.config.annotation.web.builders.HttpSecurity")
             .Import("org.springframework.security.core.userdetails.UserDetailsService")
@@ -36,6 +37,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             .Line("@EnableMethodSecurity")
             .Block("public class SecurityConfiguration", body => body
                 .Line("@Bean")
+                .Line("@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)")
                 .Block("SecurityFilterChain security(HttpSecurity http, @Value(\"${stage.axon.cors.allowed-origins:}\") String allowedOrigins) throws Exception", method => method
                     .Line("return http.csrf(csrf -> csrf.disable())")
                     .Line("    .cors(cors -> cors.configurationSource(cors(allowedOrigins)))")
