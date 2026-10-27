@@ -58,9 +58,12 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
         var result = query.Cardinality == SemanticQueryCardinality.Many ? $"{code.Reference("java.util.List")}<{modelName}>" : modelName;
         code.Block($"public {code.Reference("java.util.concurrent.CompletableFuture")}<{response}<{result}>> get({shape.Parameters(code)})", method =>
         {
-            var mapped = query.Cardinality == SemanticQueryCardinality.Many
-                ? $"{response}.ok(result.rows())"
-                : $"result.rows().isEmpty() ? {response}.notFound().build() : {response}.ok(result.rows().getFirst())";
+            var mapped = query.Cardinality switch
+            {
+                SemanticQueryCardinality.Many => $"{response}.ok(result.rows())",
+                SemanticQueryCardinality.One => $"{response}.ok(result.rows().getFirst())",
+                _ => $"result.rows().isEmpty() ? {response}.notFound().build() : {response}.ok(result.rows().getFirst())"
+            };
             method.Line($"return gateway.query(new {name}({shape.Parsed(method)}), {name}.Result.class).thenApply(result -> {mapped});");
         });
     }
