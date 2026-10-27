@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!-- Keep these pins on the same major and no newer than Cratis/cli main; cli-version-guard.mjs fails ahead/incompatible pins and warns on lag in build and publish. -->
-    <StageVersion Condition="'$(StageVersion)' == ''">4.203.0</StageVersion>
+    <StageVersion Condition="'$(StageVersion)' == ''">4.204.0</StageVersion>
     <ScreenplayVersion Condition="'$(ScreenplayVersion)' == ''">4.250.0</ScreenplayVersion>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageVersionOverrideEnabled>false</CentralPackageVersionOverrideEnabled>
