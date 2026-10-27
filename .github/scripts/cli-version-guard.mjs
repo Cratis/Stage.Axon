@@ -87,8 +87,13 @@ function comparePair(localText, cliText, pair) {
     return { ...pair, localVersion, cliVersion, status };
 }
 
+export function withoutComments(text) {
+    return text.replace(/<!--[\s\S]*?-->/g, '');
+}
+
 export function compare(localText, cliText) {
-    const pairs = PAIRS.map(pair => comparePair(localText, cliText, pair));
+    const [local, cli] = [withoutComments(localText), withoutComments(cliText)];
+    const pairs = PAIRS.map(pair => comparePair(local, cli, pair));
     return { ok: pairs.every(pair => ['equal', 'behind'].includes(pair.status)), pairs };
 }
 

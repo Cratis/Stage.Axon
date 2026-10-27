@@ -109,6 +109,18 @@ for (let index = 1; index < prereleases.length; index++) {
     });
 }
 
+test('a commented-out property does not count as a pin', () => {
+    const onlyCommented = `<!-- ${property('StageVersion', '4.203.0')} -->\n${property('ScreenplayVersion', '4.250.0')}`;
+    assert.throws(() => compare(local(), onlyCommented), /StageVersion/);
+});
+
+test('a commented-out historical pin next to the active one is not a duplicate', () => {
+    const withHistory = `<!-- ${property('StageVersion', '4.197.0')} -->\n${props()}`;
+    assert.equal(compare(local(), withHistory).ok, true);
+    const localWithHistory = `<!-- <PackageVersion Include="Cratis.Screenplay" Version="4.241.0" /> -->\n${local()}`;
+    assert.equal(compare(localWithHistory, props()).ok, true);
+});
+
 test('semver compares numeric components and ignores build metadata', () => {
     assert.equal(compareVersions('4.9.0', '4.10.0'), -1);
     assert.equal(compareVersions('4.203.0+build.1', '4.203.0+build.2'), 0);
