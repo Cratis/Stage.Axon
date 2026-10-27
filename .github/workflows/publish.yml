@@ -1,0 +1,128 @@
+# Copyright (c) Cratis. All rights reserved.
+# Licensed under the MIT license. See LICENSE file in the project root for full license information.
+name: Publish
+
+# Keep up to 100 pending Publish runs in FIFO order with `queue: max` (Cratis/Direct#1517).
+# The default single pending slot drops the older pending release when a third merge arrives.
+# Runs remain serialized and in-flight releases are never cancelled.
+# Omit `cancel-in-progress`: GitHub rejects it together with `queue: max`.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  queue: max
+
+env:
+  NUGET_OUTPUT: ./Artifacts/NuGet
+  DOTNET_VERSION: "10.0.x"
+
+permissions:
+  issues: write
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: '0.0.0'
+        type: string
+      release-notes:
+        description: 'Release notes'
+        required: true
+        default: 'No release notes'
+        type: string
+  # Releasing on push rather than on the pull_request closed event is deliberate. A pull request from a fork
+  # runs with a read-only GITHUB_TOKEN and no secrets even on merge, so it cannot create the release or reach
+  # the publishing credentials - which is how a merged, labeled fork contribution silently released nothing.
+  # A push to main always runs with a full-permission token, and the release action finds the merged pull
+  # request and its label from the commit.
+  push:
+    branches:
+      - main
+    paths:
+      - "Source/**"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - ".github/workflows/publish.yml"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      publish: ${{ steps.release.outputs.should-publish }}
+      reason: ${{ steps.release.outputs.reason }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Release
+        id: release
+        uses: cratis/release-action@v1
+        with:
+          version: ${{ github.event.inputs.version }}
+          release-notes: ${{ github.event.inputs.release-notes }}
+
+  publish-dotnet-packages:
+    if: needs.release.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [release]
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup .Net
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Guard Contracts and Screenplay versions against the CLI
+        run: node .github/scripts/cli-version-guard.mjs
+      - name: Require a non-placeholder release version
+        run: test -n "$RELEASE_VERSION" && test "$RELEASE_VERSION" != '0.0.0'
+      - name: Remove any existing artifacts
+        run: rm -rf "$NUGET_OUTPUT"
+      - name: Create the renderer NuGet package
+        run: dotnet pack Source/Rendering.Axon/Rendering.Axon.csproj -c Release -o "$NUGET_OUTPUT" -p:Version="$RELEASE_VERSION" -p:ContinuousIntegrationBuild=true
+      - name: Verify the packed set before publication
+        run: node .github/scripts/package-allowlist.mjs --packed "$NUGET_OUTPUT"
+      - name: NuGet login (OIDC → temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+      - name: Push NuGet packages
+        run: dotnet nuget push "$NUGET_OUTPUT/*.nupkg" --skip-duplicate --timeout 900 --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+
+  verify-published:
+    # A merge that publishes nothing is the failure mode that silently costs a release: the release job
+    # succeeds, every publish job is skipped for want of should-publish, and the whole run reports green. Fail
+    # instead, so a release that did not happen cannot be mistaken for one that did.
+    #
+    # Only for the reasons that mean something went wrong. Publishing nothing is correct and routine for the
+    # others - a commit pushed straight to main, a Dependabot merge, a re-run of a run that already released -
+    # and failing on those would make this job noise that everyone learns to ignore.
+    if: always() && needs.release.result == 'success' && (needs.release.outputs.publish == 'true' || contains(fromJSON('["no-label", "error"]'), needs.release.outputs.reason))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [release, publish-dotnet-packages]
+    steps:
+      - name: Report that nothing was published
+        if: needs.release.outputs.publish != 'true'
+        env:
+          RELEASE_REASON: ${{ needs.release.outputs.reason }}
+        run: |
+          echo "::error::Nothing was published and no release was cut (reason: $RELEASE_REASON). For 'no-label', add exactly one of major, minor or patch to the merged pull request and re-run this workflow - see the pull request policy check (verify-pull-request-policy), which is meant to catch this before the merge."
+          exit 1
+      - name: Require every publication to succeed
+        env:
+          DOTNET_RESULT: ${{ needs.publish-dotnet-packages.result }}
+        run: test "$DOTNET_RESULT" = success
