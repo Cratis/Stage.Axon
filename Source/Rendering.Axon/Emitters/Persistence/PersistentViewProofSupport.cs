@@ -14,7 +14,9 @@ internal static class PersistentViewProofSupport
         import jakarta.persistence.EntityManagerFactory;
         import java.nio.file.Files;
         import java.nio.file.Path;
+        import java.util.ArrayList;
         import java.util.Base64;
+        import java.util.Collections;
         import java.util.Collection;
         import java.util.List;
         import java.util.Map;
@@ -29,6 +31,11 @@ internal static class PersistentViewProofSupport
         import java.util.stream.Collectors;
         import org.axonframework.common.configuration.Configuration;
         import org.axonframework.common.jpa.EntityManagerExecutor;
+        import org.axonframework.conversion.GeneralConverter;
+        import org.axonframework.messaging.core.LegacyResources;
+        import org.axonframework.messaging.core.Message;
+        import org.axonframework.messaging.eventhandling.processing.streaming.token.TrackingToken;
+        import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;
         import org.axonframework.eventsourcing.eventstore.EventStore;
         import org.axonframework.eventsourcing.eventstore.SourcingCondition;
         import org.axonframework.messaging.eventstreaming.EventCriteria;
@@ -64,8 +71,10 @@ internal static class PersistentViewProofSupport
             static ConfigurableApplicationContext startMultiSegment(Path path) throws Exception {
                 var application = new SpringApplicationBuilder(FlatFixture.class).profiles("persistent").run(
                         "--server.port=0", "--spring.datasource.url=jdbc:h2:file:" + path,
+                        "--logging.level.org.axonframework.messaging.eventhandling.processing.streaming=DEBUG",
                         "--axon.eventhandling.processors[__PACKAGE__].initial-segment-count=4",
                         "--spring.jpa.hibernate.ddl-auto=update", "--spring.main.banner-mode=off");
+                journalApplication = application;
                 try {
                     await(() -> tokens(application).size() == 4);
                     return application;
@@ -135,7 +144,38 @@ internal static class PersistentViewProofSupport
             static void await(BooleanSupplier condition, Supplier<String> state) throws Exception {
                 var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
                 while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(25);
-                assertTrue(condition.getAsBoolean(), () -> "Persistent processor/query condition timed out" + state.get());
+                assertTrue(condition.getAsBoolean(), () -> "Persistent processor/query condition timed out" + state.get() + dump(journalApplication));
+            }
+            // TEMP axon-35: diagnostic journal of every witness delivery, dumped with the AXON35 prefix.
+            static final List<String> journal = Collections.synchronizedList(new ArrayList<>());
+            static volatile String journalRun = "init";
+            static volatile ConfigurableApplicationContext journalApplication;
+            static String dump(ConfigurableApplicationContext application) {
+                var out = new StringBuilder();
+                synchronized (journal) {
+                    for (var line : journal) out.append("\nAXON35 journal ").append(line);
+                }
+                if (application == null || !application.isActive()) return out.append("\nAXON35 application inactive").toString();
+                try (var manager = application.getBean(EntityManagerFactory.class).createEntityManager()) {
+                    for (var row : manager.createQuery("select e.globalIndex, e.identifier, e.aggregateIdentifier from AggregateEventEntry e order by e.globalIndex", Object[].class).getResultList())
+                        out.append("\nAXON35 event index=").append(row[0]).append(" id=").append(row[1]).append(" aggregate=").append(row[2]);
+                    var converter = application.getBean(GeneralConverter.class);
+                    for (var entry : manager.createQuery("select e from TokenEntry e where e.processorName = :name", TokenEntry.class)
+                            .setParameter("name", "__PACKAGE__").getResultList())
+                        out.append("\nAXON35 token segment=").append(entry.getSegment().getSegmentId()).append(" ").append(entry.getToken(converter));
+                } catch (RuntimeException cause) {
+                    out.append("\nAXON35 dump failed: ").append(cause);
+                }
+                return out.toString();
+            }
+            static void record(ProcessingContext context, Segment segment, Integer owner) {
+                var aggregate = context.getResource(LegacyResources.AGGREGATE_IDENTIFIER_KEY);
+                var line = journalRun + " thread=" + Thread.currentThread().getName() + " segment=" + owner + " mask=" + segment.getMask()
+                        + " token=" + TrackingToken.fromContext(context).orElse(null) + " message=" + Message.fromContext(context).identifier()
+                        + " aggregate=" + aggregate + " hash&mask=" + (aggregate == null ? "n/a" : (aggregate.hashCode() & segment.getMask()));
+                journal.add(line + " outcome=delivered");
+                context.runOnAfterCommit(ignored -> journal.add(line + " outcome=committed"));
+                context.onError((ignored, phase, cause) -> journal.add(line + " outcome=error " + phase + " " + cause));
             }
             enum Failure { NONE, HANDLER, TOKEN, ASYNC, NON_JOINED }
             static volatile Failure failure = Failure.NONE;
@@ -156,6 +196,7 @@ internal static class PersistentViewProofSupport
                             .orElseThrow(() -> new AssertionError("FIXTURE: pooled witness requires an owning segment"));
                     observedOwner = owner;
                     observedOwners.put(tag(event), owner);
+                    record(context, Segment.fromContext(context).orElseThrow(), owner);
                     context.onError((ignored, phase, cause) -> rolledBack.countDown());
                     var bound = JpaReadModelStore.bind(store(application), context);
                     if (failure == Failure.ASYNC) {
