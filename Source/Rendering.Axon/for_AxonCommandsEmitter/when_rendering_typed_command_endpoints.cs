@@ -23,7 +23,7 @@ public class when_rendering_typed_command_endpoints : for_AxonArtifactRenderPlan
         var located = ScopeSelection.Select(request).First(slice => !slice.Slice.Commands.IsEmpty);
         var seed = located.Slice.Commands[0];
         var property = seed.Properties[0];
-        var types = new CommandJavaTypes(request.Model.Application);
+        var types = new CommandJavaTypes(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name));
         expectedScalarType = types.Type(property.Type, new JavaCodeBuilder("test.expected"));
         scalarCode = Endpoint(located, seed with { Response = new SemanticScalarCommandResponse(property.Id, property.Type) });
         recordCode = Endpoint(located, seed with { Response = new SemanticRecordCommandResponse([new(Name: "orderId", Type: property.Type, Source: property.Id)]) });

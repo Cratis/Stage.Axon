@@ -36,7 +36,7 @@ internal sealed record CommandSource
     internal static CommandSource? Create(AxonEmissionContext context, SemanticCommand command, SemanticEventContract contract)
     {
         var tag = AxonEventSources.PrimaryTag(context, contract);
-        var types = new CommandJavaTypes(context.Request.Model.Application);
+        var types = new CommandJavaTypes(context.Request.Model.Application, context.BasePackage);
         var type = TypeFor(context, tag.JavaType);
         var destination = command.Produces.FirstOrDefault()?.Destination ?? command.Destination?.Value;
         var input = InputProperty(command, contract, tag.ComponentName, destination);
@@ -48,7 +48,7 @@ internal sealed record CommandSource
 
     internal static SemanticTypeReference TypeFor(AxonEmissionContext context, string javaType)
     {
-        var types = new CommandJavaTypes(context.Request.Model.Application);
+        var types = new CommandJavaTypes(context.Request.Model.Application, context.BasePackage);
         var concept = context.Request.Model.Application.Concepts.FirstOrDefault(concept => types.Type(SemanticTypeReference.ForConcept(concept.Id)) == javaType);
         return concept is null ? SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text) : SemanticTypeReference.ForConcept(concept.Id);
     }

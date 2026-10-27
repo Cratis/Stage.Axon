@@ -47,7 +47,7 @@ internal static class PersistentViewAdmission
     {
         var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(candidate => candidate.Id == from.EventContract);
         var application = context.Request.Model.Application;
-        var types = new ViewJavaTypes(application);
+        var types = new ViewJavaTypes(application, context.BasePackage);
         var values = new ProjectionValues(context, types);
         var records = new ProjectionRecords(application, types);
         return values.Key(from.Key, @event) is not null && from.Mappings.All(mapping => Mapping(values, records, model, @event, mapping));

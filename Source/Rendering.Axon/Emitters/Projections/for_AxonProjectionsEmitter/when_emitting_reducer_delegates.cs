@@ -80,7 +80,7 @@ public class when_emitting_reducer_delegates : a_view_request
         foreach (var candidate in malformed)
         {
             var context = new AxonEmissionContext(_request, new(_request.Profile));
-            new ReducerProjection(context, new(_request.Model.Application)).Emit(located, model, candidate);
+            new ReducerProjection(context, new(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name))).Emit(located, model, candidate);
             context.Artifacts.Count.ShouldEqual(0);
             context.ConsumedImplementations.Count.ShouldEqual(0);
             context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0306").ShouldBeTrue();

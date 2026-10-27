@@ -22,7 +22,7 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
             foreach (var reaction in located.Slice.Reactions)
             {
                 if (!EmitReaction(context, located, reaction)) continue;
-                registered.Add((CommandContractsEmitter.Package(new(context.Request.Model.Application), located) + "." + JavaNames.Type(reaction.Name) + "Reaction", reaction));
+                registered.Add((CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located) + "." + JavaNames.Type(reaction.Name) + "Reaction", reaction));
                 new ReactionSpecificationsEmitter(context, located, reaction).Emit();
             }
         }
@@ -41,7 +41,7 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
 
     static bool EmitReaction(AxonEmissionContext context, LocatedSemanticSlice located, SemanticReaction reaction)
     {
-        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located);
+        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located);
         var name = JavaNames.Type(reaction.Name) + "Reaction";
         var emitter = new ReactionTriggerEmitter(context, reaction);
         var duplicateEvents = reaction.Triggers.Where(trigger => trigger.Kind == SemanticReactionTriggerKind.Event).GroupBy(trigger => trigger.Source).Any(group => group.Count() > 1);

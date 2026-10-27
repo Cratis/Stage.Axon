@@ -18,7 +18,7 @@ public class when_the_query_name_collides_with_the_gateway : a_view_request
         var located = ScopeSelection.Select(_request).Single(slice => slice.Slice.Queries.Any(query => query.Name == "FindTotal"));
         var query = located.Slice.Queries.Single(query => query.Name == "FindTotal") with { Name = "QueryGateway" };
         var model = located.Slice.ReadModels.Single(model => model.Id == query.ReadModel);
-        var types = new ViewJavaTypes(_request.Model.Application);
+        var types = new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name));
         var context = new AxonEmissionContext(_request, new(_request.Profile));
         new QueryEndpoint(context, types, located, query, types.Package(located) + "." + model.Name, new(query, model, types)).Emit();
         _endpoint = Text(context.Artifacts.Single());

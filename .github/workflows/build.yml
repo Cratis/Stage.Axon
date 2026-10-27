@@ -99,6 +99,9 @@ jobs:
       - name: Compile and execute every generated Maven module
         working-directory: ${{ runner.temp }}/axon-corpus
         run: sh ./mvnw -B -fae verify
+      - name: Run the Scene proof host
+        working-directory: Source/Rendering.Axon.Verification/ClientProof/scene
+        run: npm ci --ignore-scripts --no-audit --no-fund && npm exec -- tsc -p . --noEmit && node --test "test/"*.test.ts
       - name: Require passing native tests and the exact disabled-test budgets
         run: >-
           dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj

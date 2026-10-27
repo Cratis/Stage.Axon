@@ -49,5 +49,5 @@ public class when_rejecting_an_unsupported_shape : given.a_native_view_request
     [Fact] void should_not_ignore_a_missing_appended_source() => Plan(_spec with { WhenAppended = new(_spec.GivenEvents[0].EventContract, _spec.GivenEvents[0].Values) }).ShouldBeNull();
     [Fact] void should_not_ignore_another_read_model() => Plan(_spec with { WhenClock = null, ThenReadModels = [.. _spec.ThenReadModels.Select(expected => expected with { ReadModel = _spec.Id })] }).ShouldBeNull();
 
-    Action<Java.JavaCodeBuilder>? Plan(SemanticSpecification spec) => new NativeViewSpecifications(_context, new ViewJavaTypes(_request.Model.Application), _located, _located.Slice.ReadModels.Single(model => model.Name == "Categories")).Plan(spec);
+    Action<Java.JavaCodeBuilder>? Plan(SemanticSpecification spec) => new NativeViewSpecifications(_context, new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name)), _located, _located.Slice.ReadModels.Single(model => model.Name == "Categories")).Plan(spec);
 }

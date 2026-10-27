@@ -18,7 +18,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
 
     public void Emit(AxonEmissionContext context)
     {
-        var types = new ViewJavaTypes(context.Request.Model.Application);
+        var types = new ViewJavaTypes(context.Request.Model.Application, context.BasePackage);
         foreach (var located in ScopeSelection.Select(context.Request))
         {
             foreach (var model in located.Slice.ReadModels)

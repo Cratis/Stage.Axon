@@ -18,7 +18,7 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
     public void Emit(AxonEmissionContext context)
     {
         var application = context.Request.Model.Application;
-        var types = new ViewJavaTypes(application);
+        var types = new ViewJavaTypes(application, context.BasePackage);
         foreach (var located in ScopeSelection.Select(context.Request))
         {
             foreach (var query in located.Slice.Queries.Concat(QueryPerformer.Queries(context, located)))

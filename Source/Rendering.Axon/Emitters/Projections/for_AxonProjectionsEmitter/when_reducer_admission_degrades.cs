@@ -27,7 +27,7 @@ public class when_reducer_admission_degrades : given.a_view_request
         var located = ScopeSelection.Select(request).Single(slice => !slice.Slice.Reducers.IsEmpty);
         var reducer = located.Slice.Reducers.Single();
         var context = new AxonEmissionContext(request, new(request.Profile));
-        new ReducerProjection(context, new(request.Model.Application)).Emit(located, located.Slice.ReadModels.Single(), reducer);
+        new ReducerProjection(context, new(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name))).Emit(located, located.Slice.ReadModels.Single(), reducer);
         var java = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalReducer.java", StringComparison.Ordinal)));
         java.ShouldContain("return current;");
         java.ShouldContain("events are ignored until a supported body is authored");
@@ -65,7 +65,7 @@ public class when_reducer_admission_degrades : given.a_view_request
         var admission = ReducerBodies.Admission(context, located, reducer);
         admission.Blocked.ShouldBeNull();
         admission.Transitions.Values.All(transition => !transition.Placed && transition.Reason.Contains("filter", StringComparison.Ordinal)).ShouldBeTrue();
-        new ReducerProjection(context, new(_request.Model.Application)).Emit(located, located.Slice.ReadModels.Single(), reducer);
+        new ReducerProjection(context, new(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name))).Emit(located, located.Slice.ReadModels.Single(), reducer);
         var java = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalReducer.java", StringComparison.Ordinal)));
         java.ShouldContain("return current;");
         java.ShouldContain("STAGE-AXON-0306");
@@ -81,8 +81,8 @@ public class when_reducer_admission_degrades : given.a_view_request
         var warning = new AxonEmissionContext(request, new(request.Profile));
         var strictRequest = request with { Profile = AxonRendering.CreateProfile(strict: true) };
         var strict = new AxonEmissionContext(strictRequest, new(strictRequest.Profile));
-        new ReducerProjection(warning, new(request.Model.Application)).Emit(located, located.Slice.ReadModels.Single(), located.Slice.Reducers.Single());
-        new ReducerProjection(strict, new(request.Model.Application)).Emit(located, located.Slice.ReadModels.Single(), located.Slice.Reducers.Single());
+        new ReducerProjection(warning, new(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name))).Emit(located, located.Slice.ReadModels.Single(), located.Slice.Reducers.Single());
+        new ReducerProjection(strict, new(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name))).Emit(located, located.Slice.ReadModels.Single(), located.Slice.Reducers.Single());
         strict.Degradation.Refusals.IsEmpty.ShouldBeFalse();
         strict.Degradation.UnsupportedConstructs.All(diagnostic => diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Error).ShouldBeTrue();
         string.Join('\n', strict.Artifacts.Select(Text)).ShouldEqual(string.Join('\n', warning.Artifacts.Select(Text)));
