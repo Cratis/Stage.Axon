@@ -11,6 +11,14 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
 {
     readonly ProjectionUpdates _updates = new(context, types, model.Id);
 
+    /// <summary>
+    /// Gets the keys to reserve before a multi-transition handler runs; none when a key cannot be evaluated, so the transition degrades on its own.
+    /// </summary>
+    /// <param name="keys">The evaluated key expressions, null where a key cannot be emitted.</param>
+    /// <returns>The keys to reserve, or an empty list.</returns>
+    internal static IReadOnlyList<string> PreReserved(IReadOnlyList<string?> keys) =>
+        keys.Count >= 2 && keys.All(key => key is not null) ? [.. keys.OfType<string>()] : [];
+
     internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false)
     {
         EmitContextual(body, eventType, transitions, message);
