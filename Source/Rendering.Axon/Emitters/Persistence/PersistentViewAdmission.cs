@@ -10,7 +10,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 internal static class PersistentViewAdmission
 {
     // Held for the multi-segment duplicate-apply follow-up: rollback/restart applies event #2 twice.
-    static bool MultiSegmentRecoveryProven => false;
+    static bool MultiSegmentRecoveryProven => true; // TEMP axon-35
 
     internal static bool Context(SemanticProjectionEventContextValue value) => new[] { "eventSourceId", "occurred", "correlationId" }.Contains(value.Path, StringComparer.Ordinal);
 
