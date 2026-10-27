@@ -11,9 +11,17 @@ public class when_verifying_audited_areas
     public void should_not_leave_model_members_legacy()
     {
         const string types = "ExecutableSemanticModel LanguageVersion SemanticVersion SemanticRevision SemanticId EventContractId EventContractRevision SemanticApplication SemanticReactionProductionMode SemanticModule SemanticFeature SemanticSlice SemanticSliceKind Diagnostic DiagnosticSeverity SourceLocation DiagnosticArguments DiagnosticArgument SemanticAddress SemanticKind SemanticAddressPart SemanticAddressPartKind ApplicationIdentity SemanticSourceMapEntry SemanticSourceSpan DocumentId SemanticIdentityOrigin SemanticSourceMapRole CodeBlockSourceLine";
+        Audit(types, 125);
+    }
+
+    [Fact]
+    public void should_not_leave_domain_members_legacy() => Audit("SemanticConcept SemanticGeneration SemanticConceptCompliance SemanticSecret SemanticPersonalData SemanticCompositeType SemanticProperty SemanticTypeReference SemanticTypeReferenceKind SemanticPrimitiveType SemanticValidationRule SemanticValidationRuleKind SemanticValidationSeverity", 82);
+
+    static void Audit(string types, int count)
+    {
         var names = types.Split(' ').ToHashSet(StringComparer.Ordinal);
         var entries = SemanticSurfaceLedger.Entries.Where(entry => names.Contains(entry.Key.Split('.')[0])).ToArray();
-        Assert.Equal(125, entries.Length);
+        Assert.Equal(count, entries.Length);
         Assert.Empty(entries.Where(entry => entry.Value.IsLegacy).Select(entry => entry.Key));
     }
 }

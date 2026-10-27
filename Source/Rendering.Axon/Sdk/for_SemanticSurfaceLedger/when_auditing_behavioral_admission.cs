@@ -23,7 +23,7 @@ public class when_auditing_behavioral_admission : Specification
     [Fact]
     void should_pin_every_unread_behavioral_member() =>
         SemanticSurfaceLedger.Entries.Where(entry => entry.Value.Detail == SemanticSurfaceLedger.UnreadBehavioral).Select(entry => entry.Key).Order().ShouldEqual(
-            [.. UnreadMembers.Split([' ', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Order()]);
+            [.. UnreadMembers.Split([' ', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(key => SemanticSurfaceLedger.Entries[key].IsLegacy).Order()]);
 
     [Theory]
     [InlineData("SemanticSlice.Captures", "STAGE-AXON-0601")]

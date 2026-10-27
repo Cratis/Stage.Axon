@@ -187,6 +187,7 @@ internal static partial class SemanticSurfaceLedger
         ClassifyBehaviors(rows);
         ClassifyMetadata(rows);
         ClassifyModel(rows);
+        ClassifyDomain(rows);
         var views = Inventory(ViewsMembers).ToHashSet(StringComparer.Ordinal);
         var unread = UnreadMembers.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
         foreach (var key in Inventory(Members).Concat(views).Concat(Inventory(ChangesMembers)))
