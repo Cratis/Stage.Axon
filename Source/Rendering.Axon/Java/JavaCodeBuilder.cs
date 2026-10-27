@@ -134,7 +134,7 @@ internal sealed partial class JavaCodeBuilder(string package)
 
     internal string Build()
     {
-        var result = new StringBuilder("// Copyright (c) Cratis. All rights reserved.\n// Licensed under the MIT license. See LICENSE file in the project root for full license information.\n\n");
+        var result = new StringBuilder();
         result.Append("package ").Append(package).Append(";\n\n");
         foreach (var type in _imports) result.Append("import ").Append(type).Append(";\n");
         if (_imports.Count > 0) result.Append('\n');

@@ -27,7 +27,7 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
 
         return ArtifactRenderPlan.Create(
             request,
-            degradation.Refusals.IsEmpty ? [.. context.Artifacts] : [],
+            degradation.Refusals.IsEmpty ? GeneratedFileHeader.Apply(request.Profile, context.Artifacts) : [],
             [.. diagnostics, .. degradation.UnsupportedConstructs],
             [],
             degradation.Refusals,

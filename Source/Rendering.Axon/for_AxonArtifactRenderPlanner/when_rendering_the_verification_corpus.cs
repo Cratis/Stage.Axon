@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Contracts.Semantics;
@@ -53,5 +54,6 @@ public class when_rendering_the_verification_corpus : Specification
     [Fact] void should_not_pass_without_rendering_any_application() => (_plans.Count > 0).ShouldBeTrue();
     [Fact] void should_keep_unsupported_constructs_nonfatal() => _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty).ShouldBeTrue();
     [Fact] void should_emit_a_buildable_application_for_every_admitted_model() => _plans.Values.All(plan => plan.Artifacts.Any(artifact => artifact.RelativePath == "pom.xml")).ShouldBeTrue();
+    [Fact] void should_emit_no_cratis_license_header() => _plans.Values.SelectMany(plan => plan.Artifacts).All(artifact => !Encoding.UTF8.GetString(artifact.Bytes.AsSpan()).Contains("Copyright (c) Cratis", StringComparison.Ordinal) && !Encoding.UTF8.GetString(artifact.Bytes.AsSpan()).Contains("Licensed under the MIT license", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_emit_http_round_trips_for_every_application() => _plans.Values.All(plan => plan.Artifacts.Any(artifact => artifact.RelativePath.EndsWith("/RuntimeHttpExchangeTest.java", StringComparison.Ordinal))).ShouldBeTrue();
 }

@@ -27,13 +27,16 @@ public static class AxonRendering
     /// <param name="implementationGaps">The requested implementation-gap policy.</param>
     /// <param name="refusals">The requested artifact-refusal policy.</param>
     /// <param name="strict">Whether unsupported constructs produce errors and refusals instead of warnings.</param>
+    /// <param name="fileHeader">Optional plain-text lines to prefix emitted Java files as comments; none by default.</param>
     /// <returns>The immutable Axon profile.</returns>
     public static ArtifactRenderProfile CreateProfile(
         ImplementationGapMode implementationGaps = ImplementationGapMode.Refuse,
         ArtifactRefusalMode refusals = ArtifactRefusalMode.Refuse,
-        bool strict = false)
+        bool strict = false,
+        ImmutableArray<string> fileHeader = default)
     {
         ImmutableArray<ArtifactRenderInput> inputs = [ArtifactRenderInput.Create(OptionsInput, "1", [.. Encoding.UTF8.GetBytes($"{(int)implementationGaps}:{(int)refusals}")])];
+        if (!fileHeader.IsDefaultOrEmpty) inputs = inputs.Add(FileHeaderInput.Create(fileHeader));
         if (strict) inputs = inputs.Add(ArtifactRenderInput.Create(StrictInput, "1", [.. Encoding.UTF8.GetBytes("true")]));
         return ArtifactRenderProfile.Create(
             Target,

@@ -6,7 +6,6 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 internal static class AxonPersistentScaffold
 {
     internal const string Properties = """
-        # Copyright (c) Cratis. All rights reserved. Licensed under the MIT license.
         spring.datasource.url=jdbc:h2:file:./data/stage
         spring.datasource.username=sa
         spring.datasource.password=

@@ -6,8 +6,6 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 internal static class PersistentViewProof
 {
     internal const string Source = """
-        // Copyright (c) Cratis. All rights reserved.
-        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
         package __PACKAGE__;
 
         import __PERSISTENCE__.JpaReadModelStore;
@@ -131,8 +129,6 @@ internal static class PersistentViewProof
         """;
 
     internal const string MultiSegmentSource = """
-        // Copyright (c) Cratis. All rights reserved.
-        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
         package __PACKAGE__;
 
         import jakarta.persistence.EntityManagerFactory;

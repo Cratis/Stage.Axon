@@ -63,8 +63,6 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
         """;
 
     static string Configuration(string package, string application, string fingerprint, string processors) => $$"""
-        // Copyright (c) Cratis. All rights reserved.
-        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
         package {{package}};
 
         import jakarta.persistence.EntityManagerFactory;

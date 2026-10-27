@@ -59,7 +59,13 @@ internal static class AxonAdmission
     static bool ValidInputs(ArtifactRenderProfile profile) =>
         profile.Inputs.Count(input => input.Name == AxonRendering.OptionsInput) == 1 &&
         profile.Inputs.Count(input => input.Name == AxonRendering.StrictInput) <= 1 &&
-        profile.Inputs.All(input => input.Name == AxonRendering.OptionsInput ? input.Version == "1" : ValidStrictInput(input));
+        FileHeaderInput.TryRead(profile, out _) &&
+        profile.Inputs.All(input => input.Name switch
+        {
+            AxonRendering.OptionsInput => input.Version == "1",
+            FileHeaderInput.Name => true,
+            _ => ValidStrictInput(input)
+        });
 
     static bool ValidStrictInput(ArtifactRenderInput input)
     {

@@ -6,8 +6,6 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 internal static class DefaultViewDispatchProof
 {
     internal const string Source = """
-        // Copyright (c) Cratis. All rights reserved.
-        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
         package __PACKAGE__;
 
         import __RUNTIME__.ReadModelStore;
