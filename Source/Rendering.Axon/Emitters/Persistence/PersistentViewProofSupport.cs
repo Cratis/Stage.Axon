@@ -15,14 +15,18 @@ internal static class PersistentViewProofSupport
         import java.nio.file.Files;
         import java.nio.file.Path;
         import java.util.Base64;
+        import java.util.Collection;
         import java.util.List;
         import java.util.Map;
+        import java.util.Set;
         import java.util.TreeMap;
         import java.util.UUID;
         import java.util.concurrent.CompletableFuture;
         import java.util.concurrent.CountDownLatch;
         import java.util.concurrent.TimeUnit;
         import java.util.function.BooleanSupplier;
+        import java.util.function.Supplier;
+        import java.util.stream.Collectors;
         import org.axonframework.common.configuration.Configuration;
         import org.axonframework.common.jpa.EntityManagerExecutor;
         import org.axonframework.eventsourcing.eventstore.EventStore;
@@ -86,16 +90,25 @@ internal static class PersistentViewProofSupport
                                     return (Void) null;
                                 })).get(10, TimeUnit.SECONDS);
             }
+            static Set<__MODEL__> normalized(Collection<__MODEL__> rows) {
+                return rows.stream().map(__NAME__Support::normalize).collect(Collectors.toSet());
+            }
+            private static __MODEL__ normalize(__MODEL__ row) {
+                __NORMALIZE__
+            }
+            static __PROJECTOR__ projector(ReadModelStore<Object, __MODEL__> store) {
+                return new __PROJECTOR__(store__REDUCER_ARGUMENT__);
+            }
             static List<__MODEL__> expected() {
                 var store = new InMemoryReadModelStore<Object, __MODEL__>();
-                var projector = new __PROJECTOR__(store);
+                var projector = projector(store);
         __EXPECTED__
                 assertFalse(store.all().isEmpty(), "Proof must construct nonempty modeled rows");
                 return store.all();
             }
             static List<__MODEL__> next(int replays) {
                 var store = new InMemoryReadModelStore<Object, __MODEL__>();
-                var projector = new __PROJECTOR__(store);
+                var projector = projector(store);
                 // Reconstruct the same key by replaying the modeled arrangement, not by guessing a row property.
         __EXPECTED__
                 for (var replay = 0; replay < replays; replay++) projector.on(__EVENT____ARGUMENT__);
@@ -117,9 +130,12 @@ internal static class PersistentViewProofSupport
                 }
             }
             static void await(BooleanSupplier condition) throws Exception {
+                await(condition, () -> "");
+            }
+            static void await(BooleanSupplier condition, Supplier<String> state) throws Exception {
                 var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
                 while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(25);
-                assertTrue(condition.getAsBoolean(), "Persistent processor/query condition timed out");
+                assertTrue(condition.getAsBoolean(), () -> "Persistent processor/query condition timed out" + state.get());
             }
             enum Failure { NONE, HANDLER, TOKEN, ASYNC, NON_JOINED }
             static volatile Failure failure = Failure.NONE;
@@ -169,7 +185,7 @@ internal static class PersistentViewProofSupport
                     assertEquals(before + 1, changing.get("count").orElseThrow(), "Actual handler must flush a changed view row");
                     if (failure != Failure.NONE) viewChanged.countDown();
                     if (failure == Failure.HANDLER) {
-                        new __PROJECTOR__(bound).on(event__ARGUMENT__);
+                        projector(bound).on(event__ARGUMENT__);
                         throw new IllegalStateException("deliberate handler failure after view write");
                     }
                 }

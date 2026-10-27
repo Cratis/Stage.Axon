@@ -14,6 +14,7 @@ internal static class PersistentViewProof
         import java.net.http.HttpRequest;
         import java.net.http.HttpResponse;
         import java.util.HashSet;
+        import java.util.Set;
         import java.util.concurrent.TimeUnit;
         import org.junit.jupiter.api.Test;
         import org.springframework.boot.web.server.context.WebServerApplicationContext;
@@ -29,23 +30,28 @@ internal static class PersistentViewProof
                 var path = database();
                 var initial = expected();
                 java.util.Map<Integer, String> checkpoint;
+                Set<__MODEL__> persisted;
                 try (var application = start(path)) {
                     var before = tokens(application);
         __APPENDS__
                     assertFixture(application, before);
-                    await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
+                    await(() -> normalized(store(application).all()).equals(normalized(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")),
+                            () -> ": expected rows: " + normalized(initial) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
+                    persisted = new HashSet<>(store(application).all());
                     checkpoint = tokens(application);
                     assertFalse(checkpoint.isEmpty());
                     assertEquals(1, checkpoint.size(), "Single-segment proof requires exactly one processor segment");
                 }
                 try (var application = start(path)) {
-                    assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()));
+                    assertEquals(persisted, new HashSet<>(store(application).all()), "Rows including event-context values must survive restart unchanged");
+                    assertEquals(normalized(initial), normalized(store(application).all()));
                     assertEquals(checkpoint, tokens(application), "Retain the real checkpoint; no reset/replay adoption");
                     assertQuery(application, initial);
                     assertEquals(__COUNT__, count(application), "Non-idempotent proof rows must survive restart");
                     var subsequent = next(1);
                     append(application, __EVENT__);
-                    await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(subsequent)) && count(application) == __COUNT__ + 1 && !tokens(application).equals(checkpoint));
+                    await(() -> normalized(store(application).all()).equals(normalized(subsequent)) && count(application) == __COUNT__ + 1 && !tokens(application).equals(checkpoint),
+                            () -> ": expected rows: " + normalized(subsequent) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                     assertQuery(application, subsequent);
                 }
             }
@@ -76,7 +82,8 @@ internal static class PersistentViewProof
                         var before = tokens(application);
         __APPENDS__
                         assertFixture(application, before);
-                        await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
+                        await(() -> normalized(store(application).all()).equals(normalized(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")),
+                                () -> ": expected rows: " + normalized(initial) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         var checkpoint = tokens(application);
                         assertFalse(checkpoint.isEmpty(), "Real processor checkpoint rows must exist");
                         assertEquals(1, checkpoint.size(), "Single-segment proof requires exactly one processor segment");
@@ -96,20 +103,22 @@ internal static class PersistentViewProof
                         if (requested == Failure.TOKEN)
                             assertTrue(tokenRejected.await(20, TimeUnit.SECONDS), "Real JpaTokenStore update must reach the rejecting trigger");
                         assertEquals(__COUNT__, count(application), "Non-idempotent view change must roll back");
-                        assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()), "No independently committed projection write");
+                        assertEquals(normalized(initial), normalized(store(application).all()), "No independently committed projection write");
                         // Single-segment proof: native run 40395678690 showed public sequenceIdentifierFor + Segment.matches selected segment 2 while pooled routing used segment 13. See the sibling __NAME__MultiSegmentTest for observed-owner multi-segment rollback coverage.
                         assertEquals(checkpoint, tokens(application), "Failed processing must not advance the actual checkpoint");
                     }
                     failure = Failure.NONE;
                     try (var application = start(path)) {
                         // The failed event must resume from the retained checkpoint exactly once.
-                        await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(afterRetry)) && count(application) == __COUNT__ + 1);
+                        await(() -> normalized(store(application).all()).equals(normalized(afterRetry)) && count(application) == __COUNT__ + 1,
+                                () -> ": expected rows: " + normalized(afterRetry) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         var checkpoint = tokens(application);
                         assertFalse(checkpoint.isEmpty());
                         assertQuery(application, afterRetry);
                         var subsequent = next(2);
                         append(application, __EVENT__);
-                        await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(subsequent)) && count(application) == __COUNT__ + 2 && !tokens(application).equals(checkpoint));
+                        await(() -> normalized(store(application).all()).equals(normalized(subsequent)) && count(application) == __COUNT__ + 2 && !tokens(application).equals(checkpoint),
+                                () -> ": expected rows: " + normalized(subsequent) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         assertQuery(application, subsequent);
                     }
                 } finally { failure = Failure.NONE; }
@@ -122,7 +131,7 @@ internal static class PersistentViewProof
                     assertEquals(200, response.statusCode());
                     var mapper = application.getBean(JsonMapper.class);
                     var actual = mapper.readValue(response.body(), new tools.jackson.core.type.TypeReference<java.util.List<__MODEL__>>() {});
-                    assertEquals(new HashSet<>(rows), new HashSet<>(actual), "HTTP query must read recovered durable rows");
+                    assertEquals(normalized(rows), normalized(actual), "HTTP query must read recovered durable rows");
                 }
             }
         }
@@ -184,7 +193,8 @@ internal static class PersistentViewProof
                         var before = tokens(application);
         __APPENDS__
                         assertFixture(application, before);
-                        await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
+                        await(() -> normalized(store(application).all()).equals(normalized(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")),
+                                () -> ": expected rows: " + normalized(initial) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         var checkpoint = tokens(application);
                         var owner = observedOwners.get(tag(__EVENT__));
                         assertNotNull(owner, "FIXTURE: arrangement must observe the failed event's owning segment");
@@ -211,18 +221,20 @@ internal static class PersistentViewProof
                         if (requested == Failure.TOKEN)
                             assertTrue(tokenRejected.await(20, TimeUnit.SECONDS), "Real JpaTokenStore update must reach the owner-scoped rejecting trigger");
                         assertEquals(__COUNT__, count(application), "Non-idempotent view change must roll back");
-                        assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()), "No independently committed projection write");
+                        assertEquals(normalized(initial), normalized(store(application).all()), "No independently committed projection write");
                         assertRollbackTokens(application, owner, checkpoint, decodedCheckpoint);
                     }
                     failure = Failure.NONE;
                     try (var application = startMultiSegment(path)) {
-                        await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(afterRetry)) && count(application) == __COUNT__ + 1);
+                        await(() -> normalized(store(application).all()).equals(normalized(afterRetry)) && count(application) == __COUNT__ + 1,
+                                () -> ": expected rows: " + normalized(afterRetry) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         assertQuery(application, afterRetry);
                         var checkpoint = tokens(application);
                         assertEquals(4, checkpoint.size(), "Reclaim must retain all four segments");
                         var subsequent = next(2);
                         append(application, __EVENT__);
-                        await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(subsequent)) && count(application) == __COUNT__ + 2 && !tokens(application).equals(checkpoint));
+                        await(() -> normalized(store(application).all()).equals(normalized(subsequent)) && count(application) == __COUNT__ + 2 && !tokens(application).equals(checkpoint),
+                                () -> ": expected rows: " + normalized(subsequent) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         assertQuery(application, subsequent);
                     }
                 } finally {
@@ -269,7 +281,7 @@ internal static class PersistentViewProof
                     assertEquals(200, response.statusCode());
                     var mapper = application.getBean(JsonMapper.class);
                     var actual = mapper.readValue(response.body(), new tools.jackson.core.type.TypeReference<java.util.List<__MODEL__>>() {});
-                    assertEquals(new HashSet<>(rows), new HashSet<>(actual), "HTTP query must read recovered durable rows");
+                    assertEquals(normalized(rows), normalized(actual), "HTTP query must read recovered durable rows");
                 }
             }
         }

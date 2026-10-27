@@ -61,7 +61,12 @@ public class when_models_claim_persistence_framework_names : Projections.for_Axo
     [Fact] void should_still_import_bean() => _configuration.ShouldContain("import org.springframework.context.annotation.Bean;");
     [Fact] void should_still_import_the_event_processor_definition() => _configuration.ShouldContain("import org.axonframework.extension.spring.config.EventProcessorDefinition;");
     [Fact] void should_still_import_the_propagating_error_handler() => _configuration.ShouldContain("import org.axonframework.messaging.eventhandling.processing.errorhandling.PropagatingErrorHandler;");
-    [Fact] void should_use_the_framework_set() => _configuration.ShouldContain("Set.of(\"axonviews.views.counters.totals\")");
+    [Fact]
+    void should_use_the_framework_set()
+    {
+        _configuration.ShouldContain("Set.of(");
+        _configuration.ShouldContain("\"axonviews.views.counters.totals\"");
+    }
     [Fact] void should_use_the_framework_processor_definition() => _configuration.ShouldContain("EventProcessorDefinition.pooledStreamingMatching(");
     [Fact] void should_use_the_framework_error_handler() => _configuration.ShouldContain("config.errorHandler(PropagatingErrorHandler.INSTANCE)");
     [Fact] void should_not_declare_a_colliding_type_in_the_configuration() => _configuration.ShouldNotContain("class Set");
@@ -72,8 +77,9 @@ public class when_models_claim_persistence_framework_names : Projections.for_Axo
     [Fact] void should_not_import_the_axon_configuration_in_the_configuration() => _configuration.ShouldNotContain("import org.axonframework.common.configuration.Configuration;");
     [Fact] void should_reference_the_modeled_set_qualified_in_the_support() => _support.ShouldContain("ReadModelStore<Object, axonviews.views.counters.totals.Set> store(");
     [Fact] void should_not_reference_the_modeled_set_by_short_name_in_the_support() => _support.ShouldNotContain("<Object, Set>");
-    [Fact] void should_reference_the_modeled_bean_event_qualified_in_the_fixture() => _fixture.ShouldContain("new axonviews.views.events.Bean(");
-    [Fact] void should_not_import_the_modeled_bean_event() => _fixture.ShouldNotContain("import axonviews.views.events.Bean;");
+    [Fact] void should_shorten_the_modeled_bean_event_without_a_fixture_collision() => _fixture.ShouldContain("new Bean(");
+    [Fact] void should_import_the_modeled_bean_event_without_a_fixture_collision() => _fixture.ShouldContain("import axonviews.views.events.Bean;");
+    [Fact] void should_keep_the_modeled_bean_qualified_when_the_support_imports_the_framework_annotation() => _support.ShouldContain("new axonviews.views.events.Bean(");
     [Fact] void should_keep_the_framework_processor_definition_in_the_envelope_proof() => _envelope.ShouldContain("import org.axonframework.extension.spring.config.EventProcessorDefinition;");
 
     string Code(string path) => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath == path).Bytes.AsSpan());
