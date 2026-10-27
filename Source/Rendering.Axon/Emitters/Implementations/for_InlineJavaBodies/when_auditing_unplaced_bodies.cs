@@ -47,6 +47,21 @@ public class when_auditing_unplaced_bodies : a_view_request
     [Fact] void should_refuse_in_strict_mode() => Audit(true).Degradation.Refusals.IsEmpty.ShouldBeFalse();
 
     [Fact]
+    void should_warn_without_refusing_by_default()
+    {
+        var context = Audit();
+        context.Degradation.UnsupportedConstructs.Where(diagnostic => diagnostic.Code == AxonRefusalCodes.ImplementationLanguage)
+            .All(diagnostic => diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Warning).ShouldBeTrue();
+        context.Degradation.Refusals.IsEmpty.ShouldBeTrue();
+    }
+
+    [Fact]
+    void should_refuse_the_foreign_language_in_strict_mode() =>
+        Audit(true).Degradation.Refusals.Any(refusal => refusal.Codes.Contains(AxonRefusalCodes.ImplementationLanguage)).ShouldBeTrue();
+
+    [Fact] void should_name_the_language_in_the_comment() => Text(Audit().Artifacts.Single()).ShouldContain("language 'csharp'");
+
+    [Fact]
     void should_be_deterministic() => Encoding.UTF8.GetString(Audit().Artifacts.Single().Bytes.AsSpan()).ShouldEqual(Encoding.UTF8.GetString(Audit().Artifacts.Single().Bytes.AsSpan()));
 
     AxonEmissionContext Audit(bool strict = false)
