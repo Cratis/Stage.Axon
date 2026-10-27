@@ -47,13 +47,16 @@ internal static class CorpusRenderer
         }
 
         var loaded = compilation.Loaded!;
-        var plan = AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id));
+        var plan = name == IngressProofModel.Application
+            ? IngressProofModel.Plan(loaded)
+            : AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id));
         if (!plan.Success || !plan.Refusals.IsEmpty)
         {
             throw new NativeVerificationFailed($"{name}: rendering failed: {string.Join("; ", plan.Diagnostics.Select(diagnostic => diagnostic.Code + ": " + diagnostic.Message))}");
         }
 
         await WriteArtifacts(destination, plan);
+        if (name == IngressProofModel.Application) await IngressProofArtifacts.Write(destination);
         Console.WriteLine($"{name}: rendered {plan.Artifacts.Length} artifacts; {plan.Diagnostics.Length} diagnostics; no refusals");
     }
 

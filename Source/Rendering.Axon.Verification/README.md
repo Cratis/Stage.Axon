@@ -38,3 +38,15 @@ The opt-in `PersistentRestartProbe` remains outside default Surefire discovery:
 It checks event and uniqueness-claim survival in a viewless fixture. For the selected application, unsupported views must refuse both seeded and fresh databases; supported flat views must refuse seeded legacy data without changing event, claim or token snapshots, but may start on a fresh database with generation metadata. Without `stage.expectViews=true`, successful main-application probes must be viewless. This probe supplements, rather than replaces, the default native tests.
 
 The boot smoke starts each packaged application, checks its intentional root HTTP 404, and stops every process it owns. It does not assert modeled command or query behavior; those assertions belong to the generated native tests. CI should put generated output and logs under `runner.temp`, not in the checkout.
+
+## Ingress and atomicity proofs
+
+The `ingress-invariants` verification fixture adds a 24th application without changing the original 23 application names. Its semantic preparation supplies a case-insensitive uniqueness constraint, authenticated-caller event mapping, required own-stream protected reads, and an unsupported cross-stream read. It has no disabled specifications; `disabled-tests.json` remains `{}`.
+
+Default Surefire discovery runs generated gateway uniqueness races against the actual JPA store, protected-read races in memory and persistent profiles, and HTTP/gateway method-security checks. Every race repeats 25 times with eight contenders, bounded barriers/latches and bounded termination; no sleeps or direct test appends are used. A spy calls the real JPA reservation before forcing a rollback; another rendezvous follows generated decision loading and validation. Tests assert recorded event counts and ownership, not merely returned exceptions. Protected-read losing exception classes are printed by the native tests.
+
+The authorization tests deny anonymous and wrong-role commands before claims or appends, deny snapshot queries on both ingress paths, and accept authorized calls. Recorded facts must identify the authenticated caller rather than a forged body/header principal. Live-query authorization remains covered by emitter specs; the optional live-stream ownership probe is not added.
+
+An in-memory uniqueness reservation may reject a contender even when its owner later rolls back; the JPA rollback proof does not promise that the in-memory store retries that contender. Authorization proofs record observed HTTP denial statuses without defining the transport's error-status or envelope policy.
+
+These are native CI proofs, not evidence from .NET rendering alone. Local verification renders their sources and runs emitter/harness specs; Java/Maven execution and the actual concurrency outcomes must be checked in CI.

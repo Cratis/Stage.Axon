@@ -25,7 +25,8 @@ internal static class CorpusApplications
             ("sample-templates", Path.Combine(repository, "Corpus/blueprint-templates/model")),
             ("sample-custom-packages", customModelRoot),
             ("views-combined", views),
-            .. files.Select(path => ("view-" + Path.GetFileNameWithoutExtension(path), path))
+            .. files.Select(path => ("view-" + Path.GetFileNameWithoutExtension(path), path)),
+            (IngressProofModel.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/ingress-invariants.play"))
         ];
     }
 }

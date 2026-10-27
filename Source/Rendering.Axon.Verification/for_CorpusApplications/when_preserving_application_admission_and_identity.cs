@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Contracts.Semantics;
@@ -36,23 +37,36 @@ public class when_preserving_application_admission_and_identity : Specification
     {
         foreach (var (name, loaded) in _models)
         {
-            _plans.Add(name, AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id)));
+            _plans.Add(name, name == IngressProofModel.Application
+                ? IngressProofModel.Plan(loaded)
+                : AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id)));
         }
     }
 
     void Destroy() => _inputs?.Dispose();
 
     [Fact]
-    void should_keep_all_twenty_three_application_names() => _applications.Select(application => application.Name).SequenceEqual<string>(
+    void should_keep_all_twenty_four_application_names() => _applications.Select(application => application.Name).SequenceEqual<string>(
     [
         "administration", "approvals", "bookings", "catalog", "contracts", "crm", "customer-portal", "hr", "inventory", "invoicing", "orders", "projects", "ticketing", "vendors", "work-orders",
-        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views"
+        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views", "ingress-invariants"
     ]).ShouldBeTrue();
 
     [Fact] void should_keep_native_report_application_names() => CorpusApplications.Find(given.the_repository.Root()).Select(application => application.Name).SequenceEqual(_applications.Select(application => application.Name)).ShouldBeTrue();
-    [Fact] void should_compile_every_application() => _models.Count.ShouldEqual(23);
-    [Fact] void should_plan_every_application_without_refusals() => (_plans.Count == 23 && _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty)).ShouldBeTrue();
+    [Fact] void should_compile_every_application() => _models.Count.ShouldEqual(24);
+    [Fact] void should_plan_every_application_without_refusals() => (_plans.Count == 24 && _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty)).ShouldBeTrue();
     [Fact] void should_use_the_composed_custom_package_root() => _applications.Single(application => application.Name == "sample-custom-packages").Root.ShouldEqual(_inputs.Root);
+
+    [Fact] void should_bind_proof_facts_to_the_authenticated_caller() => ProofSource("RegisterAccountHandler").ShouldContain("Caller.current().identity()");
+    [Fact] void should_enlist_proof_uniqueness_in_the_append_context() => ProofSource("ModeledConstraints").ShouldContain("store.assign(context,");
+    [Fact] void should_release_proof_claims_with_the_generated_close_command() => ProofSource("ModeledConstraints").ShouldContain("store.releaseOwner(context,");
+    [Fact] void should_protect_the_proof_command_handler() => ProofSource("RegisterAccountHandler").ShouldContain("@PreAuthorize(\"hasRole('Writer')\")");
+    [Fact] void should_enroll_the_proof_decision_before_validation() => ProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new CommandValidationException");
+    [Fact] void should_refuse_the_unsupported_cross_stream_proof() => ProofSource("CloseOtherAccountHandler").ShouldContain("throw new UnsupportedOperationException(\"STAGE-AXON-0106:");
+    [Fact] void should_not_append_in_the_unsupported_proof() => ProofSource("CloseOtherAccountHandler").ShouldNotContain("appender.append(");
+    [Fact] void should_emit_the_persistent_gateway_race_base() => ProofSource("PersistentUniqueConcurrencyTest").ShouldContain("abstract CompletableFuture<Void> register(UUID owner, String value)");
+
+    string ProofSource(string name) => Encoding.UTF8.GetString(_plans[IngressProofModel.Application].Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());
 
     [Fact]
     public async Task should_keep_custom_application_identity_across_owned_input_directories()
