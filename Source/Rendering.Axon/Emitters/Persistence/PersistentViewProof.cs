@@ -35,7 +35,8 @@ internal static class PersistentViewProof
                     var before = tokens(application);
         __APPENDS__
                     assertFixture(application, before);
-                    await(() -> normalized(store(application).all()).equals(normalized(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
+                    await(() -> normalized(store(application).all()).equals(normalized(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")),
+                            () -> ": expected rows: " + normalized(initial) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                     persisted = new HashSet<>(store(application).all());
                     checkpoint = tokens(application);
                     assertFalse(checkpoint.isEmpty());
@@ -49,7 +50,8 @@ internal static class PersistentViewProof
                     assertEquals(__COUNT__, count(application), "Non-idempotent proof rows must survive restart");
                     var subsequent = next(1);
                     append(application, __EVENT__);
-                    await(() -> normalized(store(application).all()).equals(normalized(subsequent)) && count(application) == __COUNT__ + 1 && !tokens(application).equals(checkpoint));
+                    await(() -> normalized(store(application).all()).equals(normalized(subsequent)) && count(application) == __COUNT__ + 1 && !tokens(application).equals(checkpoint),
+                            () -> ": expected rows: " + normalized(subsequent) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                     assertQuery(application, subsequent);
                 }
             }
@@ -80,7 +82,8 @@ internal static class PersistentViewProof
                         var before = tokens(application);
         __APPENDS__
                         assertFixture(application, before);
-                        await(() -> normalized(store(application).all()).equals(normalized(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
+                        await(() -> normalized(store(application).all()).equals(normalized(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")),
+                                () -> ": expected rows: " + normalized(initial) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         var checkpoint = tokens(application);
                         assertFalse(checkpoint.isEmpty(), "Real processor checkpoint rows must exist");
                         assertEquals(1, checkpoint.size(), "Single-segment proof requires exactly one processor segment");
@@ -107,13 +110,15 @@ internal static class PersistentViewProof
                     failure = Failure.NONE;
                     try (var application = start(path)) {
                         // The failed event must resume from the retained checkpoint exactly once.
-                        await(() -> normalized(store(application).all()).equals(normalized(afterRetry)) && count(application) == __COUNT__ + 1);
+                        await(() -> normalized(store(application).all()).equals(normalized(afterRetry)) && count(application) == __COUNT__ + 1,
+                                () -> ": expected rows: " + normalized(afterRetry) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         var checkpoint = tokens(application);
                         assertFalse(checkpoint.isEmpty());
                         assertQuery(application, afterRetry);
                         var subsequent = next(2);
                         append(application, __EVENT__);
-                        await(() -> normalized(store(application).all()).equals(normalized(subsequent)) && count(application) == __COUNT__ + 2 && !tokens(application).equals(checkpoint));
+                        await(() -> normalized(store(application).all()).equals(normalized(subsequent)) && count(application) == __COUNT__ + 2 && !tokens(application).equals(checkpoint),
+                                () -> ": expected rows: " + normalized(subsequent) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         assertQuery(application, subsequent);
                     }
                 } finally { failure = Failure.NONE; }
@@ -188,7 +193,8 @@ internal static class PersistentViewProof
                         var before = tokens(application);
         __APPENDS__
                         assertFixture(application, before);
-                        await(() -> normalized(store(application).all()).equals(normalized(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
+                        await(() -> normalized(store(application).all()).equals(normalized(initial)) && count(application) == __COUNT__ && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")),
+                                () -> ": expected rows: " + normalized(initial) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         var checkpoint = tokens(application);
                         var owner = observedOwners.get(tag(__EVENT__));
                         assertNotNull(owner, "FIXTURE: arrangement must observe the failed event's owning segment");
@@ -220,13 +226,15 @@ internal static class PersistentViewProof
                     }
                     failure = Failure.NONE;
                     try (var application = startMultiSegment(path)) {
-                        await(() -> normalized(store(application).all()).equals(normalized(afterRetry)) && count(application) == __COUNT__ + 1);
+                        await(() -> normalized(store(application).all()).equals(normalized(afterRetry)) && count(application) == __COUNT__ + 1,
+                                () -> ": expected rows: " + normalized(afterRetry) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         assertQuery(application, afterRetry);
                         var checkpoint = tokens(application);
                         assertEquals(4, checkpoint.size(), "Reclaim must retain all four segments");
                         var subsequent = next(2);
                         append(application, __EVENT__);
-                        await(() -> normalized(store(application).all()).equals(normalized(subsequent)) && count(application) == __COUNT__ + 2 && !tokens(application).equals(checkpoint));
+                        await(() -> normalized(store(application).all()).equals(normalized(subsequent)) && count(application) == __COUNT__ + 2 && !tokens(application).equals(checkpoint),
+                                () -> ": expected rows: " + normalized(subsequent) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                         assertQuery(application, subsequent);
                     }
                 } finally {

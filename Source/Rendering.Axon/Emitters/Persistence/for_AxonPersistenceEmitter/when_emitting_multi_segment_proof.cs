@@ -77,6 +77,11 @@ public class when_emitting_multi_segment_proof : Projections.for_AxonProjections
     [Fact] void should_require_counter_rollback() => Proof.ShouldContain("assertEquals(1, count(application), \"Non-idempotent view change must roll back\")");
     [Fact] void should_require_modeled_row_rollback() => Proof.ShouldContain("assertEquals(normalized(initial), normalized(store(application).all()), \"No independently committed projection write\")");
     [Fact] void should_require_exactly_once_reclaim() => Proof.ShouldContain("count(application) == 1 + 1");
+    [Fact]
+    void should_report_state_when_reclaim_times_out() => Proof.ShouldContain("""
+                        await(() -> normalized(store(application).all()).equals(normalized(afterRetry)) && count(application) == 1 + 1,
+                                () -> ": expected rows: " + normalized(afterRetry) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
+        """);
     [Fact] void should_require_exactly_once_subsequent_delivery() => Proof.ShouldContain("count(application) == 1 + 2");
     [Fact] void should_query_reclaimed_durable_rows() => Proof.ShouldContain("assertQuery(application, afterRetry)");
     [Fact] void should_keep_the_whole_map_single_segment_control() => Code("TotalPersistentTest").ShouldContain("assertEquals(checkpoint, tokens(application), \"Failed processing must not advance the actual checkpoint\")");

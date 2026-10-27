@@ -25,6 +25,7 @@ internal static class PersistentViewProofSupport
         import java.util.concurrent.CountDownLatch;
         import java.util.concurrent.TimeUnit;
         import java.util.function.BooleanSupplier;
+        import java.util.function.Supplier;
         import java.util.stream.Collectors;
         import org.axonframework.common.configuration.Configuration;
         import org.axonframework.common.jpa.EntityManagerExecutor;
@@ -129,9 +130,12 @@ internal static class PersistentViewProofSupport
                 }
             }
             static void await(BooleanSupplier condition) throws Exception {
+                await(condition, () -> "");
+            }
+            static void await(BooleanSupplier condition, Supplier<String> state) throws Exception {
                 var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
                 while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(25);
-                assertTrue(condition.getAsBoolean(), "Persistent processor/query condition timed out");
+                assertTrue(condition.getAsBoolean(), () -> "Persistent processor/query condition timed out" + state.get());
             }
             enum Failure { NONE, HANDLER, TOKEN, ASYNC, NON_JOINED }
             static volatile Failure failure = Failure.NONE;
