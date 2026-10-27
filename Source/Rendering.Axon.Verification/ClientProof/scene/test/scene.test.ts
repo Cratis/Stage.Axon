@@ -36,8 +36,10 @@ describe("SceneElementView over a live query", () => {
         assert.deepEqual(view.items, [], "the old key's value is gone as soon as the key changes");
         assert.equal(transport.watches.length, 2);
 
+        const rendersBefore = view.renders;
         view.update(() => transport.emit(first, ["a2"]));
         assert.deepEqual(view.items, [], "a late value of the closed watch is ignored");
+        assert.equal(view.renders, rendersBefore, "a late value of the closed watch causes no state update");
         view.update(() => transport.emit(transport.watches[1]!, ["b1"]));
         assert.deepEqual(view.items, ["b1"]);
         view.update(() => transport.emit(first, ["a3"]));
@@ -51,8 +53,9 @@ describe("SceneElementView over a live query", () => {
         view.update(() => transport.emit(watch, ["x"]));
         view.unmount();
         assert.equal(watch.closed, true);
-        assert.doesNotThrow(() => transport.emit(watch, ["late"]));
-        assert.equal(view.container.querySelectorAll("li").length, 0);
+        const rendersAfterUnmount = view.renders;
+        assert.doesNotThrow(() => view.update(() => transport.emit(watch, ["late"])));
+        assert.equal(view.renders, rendersAfterUnmount, "a value after unmount is never applied");
     });
 
     it("clears the rendered data on an identity change before any new value", () => {

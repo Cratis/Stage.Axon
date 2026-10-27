@@ -27,7 +27,8 @@ function Results(): ReactNode {
 
 const registry: ComponentRegistry = { Results };
 
-function Host(props: { readonly transport: Transport; readonly owner: string }): ReactNode {
+function Host(props: { readonly transport: Transport; readonly owner: string; readonly onRender: () => void }): ReactNode {
+    props.onRender();
     const { queryResults, state } = useLiveQueryResults(props.transport, rows, { owner: props.owner }, "items");
     return createElement("div", { "data-state": state }, createElement(SceneElementView, { element, registry, queryResults }));
 }
@@ -36,6 +37,9 @@ export class Mounted {
     readonly container = document.createElement("div");
     readonly #root: Root;
     #unmounted = false;
+
+    /** How many times the host component rendered; a stale value that is applied makes this grow. */
+    renders = 0;
 
     readonly transport: Transport;
 
@@ -47,7 +51,7 @@ export class Mounted {
     }
 
     render(owner: string): void {
-        act(() => this.#root.render(createElement(Host, { transport: this.transport, owner })));
+        act(() => this.#root.render(createElement(Host, { transport: this.transport, owner, onRender: () => { this.renders++; } })));
     }
 
     /** Runs a change that makes React update, such as a transport callback. */
