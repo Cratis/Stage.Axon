@@ -7,7 +7,7 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false)
+internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false, IReadOnlyList<string>? keys = null)
 {
     readonly ProjectionUpdates _updates = new(context, types, model.Id);
 
@@ -46,7 +46,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var staged = $"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {transaction}.bind(store, context));";
         if (adapter is null)
         {
-            method.Line(staged);
+            BindMemory(method, messageArgument, transaction, staged);
             return;
         }
         method.Block($"if (store instanceof {adapter}<?>)", persistent =>
@@ -54,7 +54,23 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
             persistent.Line($"apply(event{messageArgument}{_updates.DefaultArgument}, {adapter}.bind(store, context));");
             if (_updates.Enabled)
                 persistent.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
-        }).Line($"else {staged}");
+        });
+        if (keys is { Count: >= 2 })
+            method.Block("else", memory => BindMemory(memory, messageArgument, transaction, staged));
+        else
+            method.Line($"else {staged}");
+    }
+
+    void BindMemory(JavaCodeBuilder method, string messageArgument, string transaction, string staged)
+    {
+        if (keys is not { Count: >= 2 })
+        {
+            method.Line(staged);
+            return;
+        }
+        method.Line($"var bound = {transaction}.bind(store, context);")
+            .Line($"{transaction}.reserve(bound, {method.Reference("java.util.List")}.of({string.Join(", ", keys)}));")
+            .Line($"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, bound);");
     }
 
     void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)

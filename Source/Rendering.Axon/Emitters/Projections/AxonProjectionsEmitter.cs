@@ -112,7 +112,9 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
             {
                 var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == group.Key);
-                new ProjectionHandlerBinding(context, types, model, package).Emit(body, types.EventType(group.Key, body), method =>
+                var values = new ProjectionValues(context, types, body);
+                var keys = group.Count() < 2 ? [] : group.Select(from => values.Key(from.Key, @event) ?? throw new InvalidOperationException("Projection keys must be evaluable before transitions")).ToArray();
+                new ProjectionHandlerBinding(context, types, model, package, keys: keys).Emit(body, types.EventType(group.Key, body), method =>
                 {
                     foreach (var from in group) EmitFrom(context, types, method, projection, model, @event, from);
                 });

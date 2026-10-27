@@ -21,7 +21,7 @@ public class when_emitting_the_read_model_transaction_template : for_AxonArtifac
     }
 
     [Fact] void should_apply_after_commit_before_after_commit() => _source.ShouldContain("DefaultPhases.AFTER_COMMIT.order() - 1");
-    [Fact] void should_release_in_do_finally() => _source.ShouldContain("context.doFinally(completed -> coordinator.release(changes))");
+    [Fact] void should_release_in_do_finally() => _source.ShouldContain("context.doFinally(completed -> changes.release())");
     [Fact] void should_apply_in_the_phase_before_after_commit() => _source.ShouldContain("context.runOn(APPLY, completed -> changes.commit())");
     [Fact] void should_share_changes_within_a_context() => _source.ShouldContain("context.computeResourceIfAbsent(coordinator.<K, V>resource()");
     [Fact] void should_reserve_keys_across_contexts() => _source.ShouldContain("reservations.get(key) != owner");
@@ -37,6 +37,17 @@ public class when_emitting_the_read_model_transaction_template : for_AxonArtifac
     [Fact] void should_emit_native_concurrent_rollback_proof() => _test.ShouldContain("doesNotLetOneRollbackEraseAnotherCommittedUnitOfWork");
     [Fact] void should_emit_native_timeout_failure_proof() => _test.ShouldContain("failsTheUnitOfWorkVisiblyWhenReservationTimesOut");
     [Fact] void should_emit_native_two_key_lock_order_proof() => _test.ShouldContain("serializesTwoKeyUpdatesAcquiredInSortedOrderWithoutDeadlock");
+    [Fact] void should_expose_batch_reservation() => _source.ShouldContain("public static void reserve(ReadModelStore<?, ?> boundStore, Collection<?> keys)");
+    [Fact] void should_sort_and_deduplicate_batch_keys() => _source.ShouldContain("keys.stream().distinct().sorted(ReadModelTransaction::compareKeys)");
+    [Fact] void should_use_natural_order_for_comparable_keys() => _source.ShouldContain("left instanceof Comparable comparable) return comparable.compareTo(right)");
+    [Fact] void should_share_an_owner_across_stores_in_a_context() => _source.ShouldContain("context.computeResourceIfAbsent(OWNER, Object::new)");
+    [Fact] void should_coordinate_all_stores_on_one_monitor() => _source.ShouldContain("TimeUnit.NANOSECONDS.timedWait(MONITOR, remaining)");
+    [Fact] void should_detect_cycles() => _source.ShouldContain("Read model keys are locked in a cycle with another unit of work");
+    [Fact] void should_resolve_waits_against_current_key_ownership() => _source.ShouldContain("reservation.coordinator.reservations.get(reservation.key)");
+    [Fact] void should_release_immediately_after_applying_writes() => _source.ShouldContain("            });\n            release();");
+    [Fact] void should_emit_native_opposite_order_proof() => _test.ShouldContain("doesNotDeadlockWhenTwoUnitsOfWorkTouchTheSameKeysInOppositeOrder");
+    [Fact] void should_emit_native_cross_store_cycle_proof() => _test.ShouldContain("failsFastOnAReservationCycleAcrossStores");
+    [Fact] void should_emit_native_early_release_proof() => _test.ShouldContain("releasesReservationsBeforeAfterCommitCallbacks");
 
     [Fact]
     void should_use_imports_not_qualified_names() =>
