@@ -25,20 +25,13 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
 
     void EmitModel(LocatedSemanticSlice owner, SemanticReadModel model)
     {
-        var projection = owner.Slice.Projections.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
-        var reducer = owner.Slice.Reducers.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
-        SemanticId[] observed = projection is not null ? [.. ProjectionTransitions.From(projection).Select(from => from.EventContract)] : [.. reducer!.Transitions.Select(transition => transition.EventContract)];
-        var spec = Specification(owner, model, observed);
+        var target = ProjectorInputs(owner, model);
+        var spec = Specification(owner, model, target.Observed);
         var query = Query(owner, model);
         if (spec is null || query is null) return;
         var package = types.Package(owner);
         var modelName = JavaNames.Type(model.Name);
         var name = modelName + "Persistent";
-        var updates = new ProjectionUpdates(context, types, model.Id);
-        var arguments = projection is not null ? ProjectionHandlerShape.Arguments(projection, updates) : ", null" + updates.DefaultArgument;
-        var projector = projection is not null ? JavaNames.Type(projection.Name) + "Projector" : modelName + "ReducerProjector";
-        var reducerArgument = reducer is null ? string.Empty : $", new {package}.{modelName}Reducer() {{}}";
-        var reducerImports = reducer is null ? string.Empty : $", {package}.{modelName}ReducerConfiguration.class";
         var events = spec.GivenEvents.Select(given => AxonViewEvents.Expression(context, types, given)).ToArray();
         string Render(string source) => source.Replace("__PACKAGE__", package, StringComparison.Ordinal)
             .Replace("__RUNTIME__", types.BasePackage + ".runtime", StringComparison.Ordinal)
@@ -46,17 +39,17 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__APPLICATION__", types.BasePackage, StringComparison.Ordinal)
             .Replace("__MODEL__", package + "." + modelName, StringComparison.Ordinal).Replace("__NAME__", name, StringComparison.Ordinal)
             .Replace("__QUALIFIER__", package + "." + modelName, StringComparison.Ordinal)
-            .Replace("__PROJECTOR__", package + "." + projector, StringComparison.Ordinal)
-            .Replace("__REDUCER_ARGUMENT__", reducerArgument, StringComparison.Ordinal)
-            .Replace("__REDUCER_IMPORTS__", reducerImports, StringComparison.Ordinal)
-            .Replace("__IMPORTS__", Imports(model, projector, query) + reducerImports, StringComparison.Ordinal)
+            .Replace("__PROJECTOR__", package + "." + target.Projector, StringComparison.Ordinal)
+            .Replace("__REDUCER_ARGUMENT__", target.ReducerArgument, StringComparison.Ordinal)
+            .Replace("__REDUCER_IMPORTS__", target.ReducerImports, StringComparison.Ordinal)
+            .Replace("__IMPORTS__", Imports(model, target.Projector, query) + target.ReducerImports, StringComparison.Ordinal)
             .Replace("__ROUTE__", QueryEndpoint.Route(owner, query), StringComparison.Ordinal)
             .Replace("__EVENT__", events[0], StringComparison.Ordinal)
             .Replace("__EVENT_TYPE__", types.EventType(spec.GivenEvents[0].EventContract), StringComparison.Ordinal)
             .Replace("__COUNT__", spec.GivenEvents.Count(given => given.EventContract == spec.GivenEvents[0].EventContract).ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
             .Replace("__APPENDS__", string.Join('\n', events.Select(expression => $"            append(application, {expression});")), StringComparison.Ordinal)
-            .Replace("__EXPECTED__", string.Join('\n', events.Select(expression => $"        projector.on({expression}{arguments});")), StringComparison.Ordinal)
-            .Replace("__ARGUMENT__", arguments, StringComparison.Ordinal)
+            .Replace("__EXPECTED__", string.Join('\n', events.Select(expression => $"        projector.on({expression}{target.Arguments});")), StringComparison.Ordinal)
+            .Replace("__ARGUMENT__", target.Arguments, StringComparison.Ordinal)
             .Replace("__NORMALIZE__", PersistentViewProofNormalization.Body(context.Request.Model.Application, types, model, owner.Slice.Projections.Where(candidate => candidate.ReadModel == model.Id)), StringComparison.Ordinal)
             .Replace("__TAGS__", Tags(spec), StringComparison.Ordinal)
             .Replace("__FIXTURE_EVENTS__", string.Join(", ", events), StringComparison.Ordinal);
@@ -70,8 +63,18 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         Add("LegacyTest", PersistentViewLegacyProof.Source);
         Add("EnvelopeTest", PersistentViewEnvelopeTests.Source);
         var live = LiveQuery(owner, model);
-        if (live is not null && observed.Count(contract => contract == spec.GivenEvents[0].EventContract) == 1)
+        if (live is not null && target.Observed.Count(contract => contract == spec.GivenEvents[0].EventContract) == 1)
             Add("DefaultDispatchTest", DefaultViewDispatchProof.Source.Replace("__LIVE_QUERY__", package + "." + JavaNames.Type(live.Name), StringComparison.Ordinal));
+    }
+
+    (string Projector, string Arguments, string ReducerArgument, string ReducerImports, SemanticId[] Observed) ProjectorInputs(LocatedSemanticSlice owner, SemanticReadModel model)
+    {
+        var updates = new ProjectionUpdates(context, types, model.Id);
+        if (owner.Slice.Projections.FirstOrDefault(candidate => candidate.ReadModel == model.Id) is { } projection)
+            return (JavaNames.Type(projection.Name) + "Projector", ProjectionHandlerShape.Arguments(projection, updates), string.Empty, string.Empty, [.. ProjectionTransitions.From(projection).Select(from => from.EventContract)]);
+        var reducer = owner.Slice.Reducers.Single(candidate => candidate.ReadModel == model.Id);
+        var name = JavaNames.Type(model.Name);
+        return (name + "ReducerProjector", ", null" + updates.DefaultArgument, $", new {name}Reducer() {{}}", $", {name}ReducerConfiguration.class", [.. reducer.Transitions.Select(transition => transition.EventContract)]);
     }
 
     string Tags(SemanticSpecification spec) => string.Join('\n', spec.GivenEvents.Select(given => given.EventContract).Distinct().Select(id =>
