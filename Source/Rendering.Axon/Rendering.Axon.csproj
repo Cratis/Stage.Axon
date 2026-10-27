@@ -12,6 +12,7 @@
     <PackageReference Include="Cratis.Screenplay" />
         <EmbeddedResource Include="Emitters/Runtime/Templates/**/*.java" />
         <EmbeddedResource Include="Emitters/Scaffold/Assets/*" />
+        <EmbeddedResource Include="Emitters/Client/Templates/**/*.ts" />
     </ItemGroup>
     <ItemGroup Condition="'$(Configuration)' == 'Debug'">
         <PackageReference Include="Cratis.Screenplay.CanonicalCorpus" />

@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Text;
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
+using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
@@ -65,11 +66,13 @@ internal static class AxonAdmission
         profile.Inputs.Count(input => input.Name == AxonRendering.StrictInput) <= 1 &&
         FileHeaderInput.TryRead(profile, out _) &&
         AxonApproximationsInput.TryRead(profile, out _) &&
+        TypeScriptClientInput.TryRead(profile, out _) &&
         profile.Inputs.All(input => input.Name switch
         {
             AxonRendering.OptionsInput => input.Version == "1",
             FileHeaderInput.Name => true,
             AxonApproximationsInput.Name => input.Version == "1",
+            TypeScriptClientInput.Name => true,
             _ => ValidStrictInput(input)
         });
 
