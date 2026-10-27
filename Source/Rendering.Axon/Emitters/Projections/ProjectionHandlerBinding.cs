@@ -32,8 +32,6 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
                 // The message comes from the context so the handler keeps the dispatch shape of a context-free handler.
                 if (message) method.Line($"var message = ({eventMessage}) {body.Reference("org.axonframework.messaging.core.Message")}.fromContext(context);");
                 BindStore(method, messageArgument);
-                if (_updates.Enabled)
-                    method.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
             })
             .Block($"public {modifier}void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store);"))
             .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
@@ -43,16 +41,20 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
     {
         var adapter = PersistentViewAdmission.Supports(context, model.Id) ? method.Reference(types.BasePackage + ".persistence.JpaReadModelStore") : null;
         var transaction = method.Reference(types.BasePackage + ".runtime.ReadModelTransaction");
-        var apply = $"apply(event{messageArgument}{_updates.DefaultArgument}, ";
-        if (adapter is not null)
+
+        // The context-bound emitter already defers in-memory invalidations to AFTER_COMMIT, after the staged writes apply.
+        var staged = $"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {transaction}.bind(store, context));";
+        if (adapter is null)
         {
-            method.Line($"if (store instanceof {adapter}<?>) {apply}{adapter}.bind(store, context));")
-                .Line($"else {apply}{transaction}.bind(store, context));");
+            method.Line(staged);
+            return;
         }
-        else
+        method.Block($"if (store instanceof {adapter}<?>)", persistent =>
         {
-            method.Line($"{apply}{transaction}.bind(store, context));");
-        }
+            persistent.Line($"apply(event{messageArgument}{_updates.DefaultArgument}, {adapter}.bind(store, context));");
+            if (_updates.Enabled)
+                persistent.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
+        }).Line($"else {staged}");
     }
 
     void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)

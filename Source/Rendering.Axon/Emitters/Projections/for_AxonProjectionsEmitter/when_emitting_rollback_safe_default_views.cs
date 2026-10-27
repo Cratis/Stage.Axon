@@ -32,13 +32,15 @@ public class when_emitting_rollback_safe_default_views : Persistence.for_Persist
         });
     }
 
-    [Fact] void should_bind_default_flat_writes() => Code(_admitted, "TotalProjectionProjector").ShouldContain("ReadModelTransaction.bind(store, context)");
+    [Fact] void should_bind_default_flat_writes() => Code(_admitted, "TotalProjectionProjector").ShouldContain("else apply(event, updates, ReadModelTransaction.bind(store, context));");
+    [Fact] void should_defer_persistent_invalidations_only_in_the_persistent_branch() => Code(_admitted, "TotalProjectionProjector").ShouldContain("if (store instanceof JpaReadModelStore<?>) {\n            apply(event, null, JpaReadModelStore.bind(store, context));\n            context.runOnAfterCommit(ignored ->");
+    [Fact] void should_let_the_bound_emitter_defer_non_admitted_invalidations() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldNotContain("context.runOnAfterCommit");
     [Fact] void should_import_the_transaction() => Code(_admitted, "TotalProjectionProjector").ShouldContain("import axonviews.runtime.ReadModelTransaction;");
     [Fact] void should_not_dispatch_through_the_unbound_method() => Code(_admitted, "TotalProjectionProjector").ShouldNotContain("on(event");
     [Fact] void should_keep_the_direct_call_unannotated() => Code(_admitted, "TotalProjectionProjector").ShouldContain("}\n    public void on(Increased event, QueryUpdateEmitter updates)");
     [Fact] void should_exercise_a_non_admitted_flat_view() => PersistentViewAdmission.Supports(_nonAdmitted, ReadModelId("Total")).ShouldBeFalse();
     [Fact] void should_use_the_proven_contextual_handler_for_non_admitted_views() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldContain("@EventHandler\n    public void handle(Increased event, QueryUpdateEmitter updates, ProcessingContext context)");
-    [Fact] void should_bind_non_admitted_default_writes() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldContain("ReadModelTransaction.bind(store, context)");
+    [Fact] void should_bind_non_admitted_default_writes() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldContain("apply(event, updates, ReadModelTransaction.bind(store, context));");
     [Fact] void should_not_reference_absent_persistence() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldNotContain("JpaReadModelStore");
     [Fact] void should_not_add_an_event_message_handler_parameter() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldNotContain("EventMessage");
     [Fact] void should_document_scoped_rollback_divergence() => Code(_admitted, "BoardProjectionProjector").ShouldContain("default-profile writes are not yet rolled back with a failed unit of work");
