@@ -33,8 +33,10 @@ public final class ReadModelTransaction {
     public static <K, V> ReadModelStore<K, V> bind(ReadModelStore<K, V> store, ProcessingContext context) {
         Objects.requireNonNull(context, "A processing context is required for read model writes");
         var coordinator = coordinator(Objects.requireNonNull(store));
+        // Resolved outside the supplier: context resources must not be computed recursively.
+        var owner = context.computeResourceIfAbsent(OWNER, Object::new);
         return context.computeResourceIfAbsent(coordinator.<K, V>resource(), () -> {
-            var changes = new BoundStore<>(store, coordinator, context.computeResourceIfAbsent(OWNER, Object::new));
+            var changes = new BoundStore<>(store, coordinator, owner);
             // Axon skips later phases after a failure, so reaching APPLY means every earlier phase succeeded.
             context.runOn(APPLY, completed -> changes.commit());
             context.doFinally(completed -> changes.release());
