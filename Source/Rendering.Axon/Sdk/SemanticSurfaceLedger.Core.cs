@@ -172,32 +172,64 @@ internal static partial class SemanticSurfaceLedger
         SemanticPerformedQueryArgumentKind Key Filter
         """;
 
-    internal static IReadOnlyDictionary<string, SemanticSurfaceDisposition> Entries { get; } = Build();
+    static readonly LedgerBuilder _result = Build();
 
-    static Dictionary<string, SemanticSurfaceDisposition> Build()
+    internal static IReadOnlyDictionary<string, SemanticSurfaceDisposition> Entries => _result.Entries;
+
+    internal static IReadOnlyList<string> Conflicts => _result.Conflicts;
+
+    static LedgerBuilder Build()
     {
-        var entries = new Dictionary<string, SemanticSurfaceDisposition>(StringComparer.Ordinal);
-        AddMembers(entries, Members);
-        AddMembers(entries, ViewsMembers);
-        AddMembers(entries, ChangesMembers);
-        ClassifyImplementations(entries);
-        foreach (var member in new[] { "SemanticSpecification.ThenInvocations", "SemanticSpecificationInvocation.Command", "SemanticSpecificationInvocation.Values" })
-            entries[member] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-SPEC: expected command invocations and their argument values are not verified; scoped specification emission reports this unsupported assertion.");
-        entries["ExecutableSemanticModel.LanguageVersion"] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-VERSION");
-        entries["ExecutableSemanticModel.SemanticVersion"] = new(SemanticSurfaceDispositionKind.Warned, "STAGE-AXON-VERSION");
-        return entries;
+        var rows = new LedgerBuilder();
+        ClassifyConditions(rows);
+        ClassifyImplementations(rows);
+        ClassifyViews(rows);
+        ClassifyBehaviors(rows);
+        ClassifyMetadata(rows);
+        var views = Inventory(ViewsMembers).ToHashSet(StringComparer.Ordinal);
+        var unread = UnreadMembers.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
+        foreach (var key in Inventory(Members).Concat(views).Concat(Inventory(ChangesMembers)))
+        {
+            if (rows.Entries.ContainsKey(key)) continue;
+            var type = key[..key.IndexOf('.', StringComparison.Ordinal)];
+            var disposition = unread.Contains(key)
+                ? new SemanticSurfaceDisposition(SemanticSurfaceDispositionKind.Ignored, UnreadBehavioral, [], [], null, true)
+                : new SemanticSurfaceDisposition(
+                    SemanticSurfaceDispositionKind.Rendered,
+                    views.Contains(key) ? "Axon immutable view, event projector or typed query artifact; unsupported forms degrade at their owner."
+                        : "Read by the Axon emitters under " + EmitterFolder(type) + "; unsupported forms degrade at their owner.",
+                    [],
+                    [],
+                    null,
+                    true);
+            rows.Entries.Add(key, disposition);
+        }
+        return rows;
     }
 
-    static void AddMembers(Dictionary<string, SemanticSurfaceDisposition> entries, string members)
-    {
-        var deferred = new SemanticSurfaceDisposition(SemanticSurfaceDispositionKind.Ignored, Unclassified);
-        foreach (var line in members.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    static IEnumerable<string> Inventory(string members) => members.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .SelectMany(line =>
         {
             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var member in parts.Skip(1))
-            {
-                entries.Add($"{parts[0]}.{member}", deferred);
-            }
+            return parts.Skip(1).Select(member => $"{parts[0]}.{member}");
+        });
+
+    sealed class LedgerBuilder
+    {
+        internal Dictionary<string, SemanticSurfaceDisposition> Entries { get; } = new(StringComparer.Ordinal);
+
+        internal List<string> Conflicts { get; } = [];
+
+        internal void Rendered(string detail, string members, params Type[] readers) => Add(members, new(SemanticSurfaceDispositionKind.Rendered, detail, readers, [], null));
+
+        internal void Warned(string[] codes, string detail, string members) => Add(members, new(SemanticSurfaceDispositionKind.Warned, detail, [], codes, null));
+
+        internal void Ignored(IgnoredReason reason, string detail, string members) => Add(members, new(SemanticSurfaceDispositionKind.Ignored, detail, [], [], reason));
+
+        void Add(string members, SemanticSurfaceDisposition disposition)
+        {
+            foreach (var key in members.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+                if (!Entries.TryAdd(key, disposition)) Conflicts.Add(key);
         }
     }
 }

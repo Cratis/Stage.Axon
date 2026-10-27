@@ -6,9 +6,23 @@ namespace Cratis.Stage.Rendering.Axon.Sdk;
 internal enum SemanticSurfaceDispositionKind
 {
     Rendered,
-    Rejected,
     Warned,
     Ignored
 }
 
-internal sealed record SemanticSurfaceDisposition(SemanticSurfaceDispositionKind Kind, string Detail);
+internal enum IgnoredReason
+{
+    Identity,
+    SourceProvenance,
+    CompilerDiagnostics,
+    UnknownSentinel,
+    Advisory
+}
+
+internal sealed record SemanticSurfaceDisposition(
+    SemanticSurfaceDispositionKind Kind,
+    string Detail,
+    IReadOnlyList<Type> Readers,
+    IReadOnlyList<string> Codes,
+    IgnoredReason? Reason,
+    bool IsLegacy = false);
