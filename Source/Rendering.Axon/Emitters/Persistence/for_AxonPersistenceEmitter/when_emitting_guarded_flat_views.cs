@@ -86,6 +86,9 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_source_the_same_tag_before_appending() => Code("TotalPersistentSupport").ShouldContain("eventStore.transaction(context).source(SourcingCondition.conditionFor(EventCriteria.havingTags(tag(event))))");
     [Fact] void should_consume_the_source_in_the_append_unit_of_work() => Code("TotalPersistentSupport").ShouldContain(".reduce(0, (count, entry) -> count + 1).thenApply(count -> {");
     [Fact] void should_emit_modeled_primary_tags() => Code("TotalPersistentFixture").ShouldContain("tagged.eventSourceId().toString()");
+    [Fact] void should_use_the_module_event_tag_constant() => Code("TotalPersistentFixture").ShouldContain("return new Tag(EventTags.EVENT_SOURCE_ID, tagged.eventSourceId().toString())");
+    [Fact] void should_import_the_module_event_tags() => Code("TotalPersistentFixture").ShouldContain(".EventTags;");
+    [Fact] void should_not_emit_the_literal_tag_key() => Code("TotalPersistentFixture").ShouldNotContain("new Tag(\"eventSourceId\"");
     [Fact] void should_read_sequences_without_writing() => Code("TotalPersistentFixture").ShouldContain("connection.setReadOnly(true)");
     [Fact] void should_require_contiguous_aggregate_sequences() => Code("TotalPersistentFixture").ShouldContain("FIXTURE: C1 aggregate sequences must be exactly 0..n-1");
     [Fact]
