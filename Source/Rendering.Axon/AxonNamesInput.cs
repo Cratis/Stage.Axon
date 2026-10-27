@@ -23,6 +23,9 @@ internal static partial class AxonNamesInput
     [GeneratedRegex("\\A[A-Za-z0-9_.-]+\\z", RegexOptions.CultureInvariant, 1000)]
     private static partial Regex ArtifactIds { get; }
 
+    [GeneratedRegex("\\A[a-z][a-z0-9_]*\\z", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex PackageSegments { get; }
+
     internal static ArtifactRenderInput Create(string? javaPackage, string? projectName)
     {
         if (javaPackage is null && projectName is null)
@@ -58,11 +61,11 @@ internal static partial class AxonNamesInput
     internal static string Normalize(string javaPackage)
     {
         var segments = javaPackage.Split('.');
-        return segments.Any(segment => segment.Length == 0) ? javaPackage : string.Join('.', segments.Select(JavaNames.PackageSegment));
+        return segments.Any(segment => !segment.Any(char.IsAsciiLetterOrDigit)) ? javaPackage : string.Join('.', segments.Select(JavaNames.PackageSegment));
     }
 
     internal static bool ValidPackage(string package) => package.Length > 0 &&
-        package.Split('.').All(segment => segment.Length > 0 && JavaNames.PackageSegment(segment) == segment) &&
+        package.Split('.').All(segment => PackageSegments.IsMatch(segment) && JavaNames.PackageSegment(segment) == segment) &&
         !JavaCodeBuilder.IsFramework(package + ".");
 
     internal static bool ValidArtifactId(string artifactId) => ArtifactIds.IsMatch(artifactId);

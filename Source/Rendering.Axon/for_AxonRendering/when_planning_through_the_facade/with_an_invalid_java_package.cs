@@ -15,10 +15,15 @@ public class with_an_invalid_java_package : given.a_facade_model
     [InlineData("io.cratis.demo")]
     [InlineData("Org.SpringFramework.X")]
     [InlineData("java")]
+    [InlineData("123.orders")]
+    [InlineData("acme.123")]
+    [InlineData("acme..orders")]
+    [InlineData("")]
+    [InlineData("acme.東京")]
     void should_reject_the_names_without_artifacts(string package)
     {
         var plan = AxonRendering.Plan(Request(new() { JavaPackage = package }));
-        plan.Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-NAMES" && diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Error).ShouldBeTrue();
+        plan.Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-NAMES" && diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Error && diagnostic.Message.Contains("start with a lowercase ASCII letter", StringComparison.Ordinal)).ShouldBeTrue();
         plan.Success.ShouldBeFalse();
         plan.Artifacts.ShouldBeEmpty();
     }

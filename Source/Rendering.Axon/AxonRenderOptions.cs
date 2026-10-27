@@ -17,6 +17,9 @@ public sealed record AxonRenderOptions
 
     /// <summary>
     /// Gets the Java base package and Maven groupId override, normalized per segment. Null preserves the model-derived package.
+    /// Each segment must contain an ASCII letter or digit before normalization. Normalized segments must start with a lowercase
+    /// ASCII letter, contain only lowercase ASCII letters, digits or underscores, and remain canonical under normalization.
+    /// Framework package roots are refused with STAGE-AXON-NAMES, as are segments that fail these rules.
     /// </summary>
     public string? JavaPackage { get; init; }
 

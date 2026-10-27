@@ -64,7 +64,7 @@ internal static class AxonAdmission
         {
             if (names.JavaPackage is { } package && !AxonNamesInput.ValidPackage(package))
             {
-                diagnostics.Add(Error(AxonRefusalCodes.Names, "The Java package requires nonempty normalized segments and must not use a framework package root.", request));
+                diagnostics.Add(Error(AxonRefusalCodes.Names, "Java package segments must start with a lowercase ASCII letter, contain only lowercase ASCII letters, digits or underscores, remain canonical after normalization, and must not use a framework package root.", request));
             }
             if (names.ProjectName is { } projectName && !AxonNamesInput.ValidArtifactId(projectName))
             {

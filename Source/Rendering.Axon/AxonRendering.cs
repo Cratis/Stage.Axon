@@ -114,6 +114,9 @@ public static class AxonRendering
 
     /// <summary>
     /// Plans any executable model through the Axon target using typed options and compiler sidecars.
+    /// Java package overrides are normalized per segment; segments without ASCII letters or digits are invalid.
+    /// Normalized segments must start with a lowercase ASCII letter, contain only lowercase ASCII letters, digits or underscores,
+    /// remain canonical under normalization, and not use framework roots. Invalid names produce STAGE-AXON-NAMES.
     /// </summary>
     /// <param name="request">The model, execution plan, scopes, sidecars and options.</param>
     /// <returns>The planned artifacts, diagnostics and refusals without writing files.</returns>
