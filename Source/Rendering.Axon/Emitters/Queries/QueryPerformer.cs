@@ -31,7 +31,7 @@ internal static class QueryPerformer
         var requirement = Requirement(context, query);
         var native = InlineJavaBodies.TryResolve(context, new(requirement?.RequirementId, SemanticImplementationRole.QueryPerformer, query.Id), out var content, out _);
         if (!native) context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, reason, "answer the query with its modeled performer", query.Id.ToString());
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Performer");
+        var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Performer");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Performer");
         var store = code.Reference(context.BasePackage + ".runtime.ReadModelStore");
         if (!native) code.DiffersFromScreenplay("the modeled performer is a typed Spring extension point; implementation bodies are not translated.");
@@ -50,7 +50,7 @@ internal static class QueryPerformer
                 }));
         context.AddJava(package, name + "Performer", code.Build(), sources: query.Id);
         if (native) context.ConsumedImplementations.Add(requirement!.RequirementId);
-        var configuration = new JavaCodeBuilder(package).Declare(name + "Performer").Declare(name + "PerformerConfiguration");
+        var configuration = QueryModelReference.Create(context, package).Declare(name + "Performer").Declare(name + "PerformerConfiguration");
         configuration.Line($"@{configuration.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "PerformerConfiguration")})")
             .Block($"public class {name}PerformerConfiguration", body => body
                 .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Performer")})")

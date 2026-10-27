@@ -3,6 +3,8 @@
 
 using System.Globalization;
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Contracts.Rendering;
+using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -19,13 +21,21 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
         [SemanticPrimitiveType.DateTime] = ("java.time.OffsetDateTime", "parse")
     };
 
+    static readonly string[] _supportPackageSuffixes = ["constraints", "infrastructure", "persistence", "runtime", "runtime.persistent", "specifications"];
+
     readonly ViewConceptValues _concepts = new(application);
     internal string BasePackage { get; } = JavaNames.PackageSegment(application.Name);
+
+    internal IReadOnlySet<string> ReservedSupportPackages => _supportPackageSuffixes.Select(suffix => BasePackage + "." + suffix).ToHashSet(StringComparer.Ordinal);
 
     internal static void Add(AxonEmissionContext context, string package, string name, string source, params SemanticId[] ids) =>
         context.Artifacts.Add(Contracts.Rendering.PlannedArtifact.CreateText($"src/main/java/{package.Replace('.', '/')}/{name}.java", source, [.. ids]));
 
     internal string Package(LocatedSemanticSlice located) => BasePackage + "." + string.Join('.', located.Path.Select(JavaNames.PackageSegment));
+
+    internal ArtifactRenderDiagnostic? InspectPackage(string package, SemanticId item, string name) => ReservedSupportPackages.Contains(package)
+        ? new(AxonRefusalCodes.SupportPackage, ArtifactRenderDiagnosticSeverity.Error, $"Model item '{name}' would use reserved generated support package '{package}'.", item)
+        : null;
 
     internal string Type(SemanticTypeReference type)
     {
