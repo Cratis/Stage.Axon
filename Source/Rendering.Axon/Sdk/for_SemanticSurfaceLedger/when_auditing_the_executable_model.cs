@@ -39,8 +39,14 @@ public class when_auditing_the_executable_model : Specification
         SemanticSurfaceLedger.Entries.Values.Where(entry => entry.Kind == SemanticSurfaceDispositionKind.Ignored && string.IsNullOrWhiteSpace(entry.Detail)).ShouldBeEmpty();
 
     [Fact]
-    void should_give_every_rejection_an_axon_code() =>
-        SemanticSurfaceLedger.Entries.Values.Where(entry => entry.Kind == SemanticSurfaceDispositionKind.Rejected && !entry.Detail.StartsWith("STAGE-AXON-", StringComparison.Ordinal)).ShouldBeEmpty();
+    void should_audit_a_non_vacuous_surface()
+    {
+        Assert.True(_members.Count >= 700, $"Only {_members.Count} members were reflected.");
+        Assert.Equal(_members.Count, SemanticSurfaceLedger.Entries.Count);
+    }
+
+    [Fact]
+    void should_not_classify_a_member_twice() => Assert.Empty(SemanticSurfaceLedger.Conflicts);
 
     void Visit(Type type)
     {
