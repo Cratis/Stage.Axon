@@ -6,7 +6,7 @@ namespace Cratis.Stage.Rendering.Axon.Sdk;
 internal static partial class SemanticSurfaceLedger
 {
     internal const string Unclassified = "UNCLASSIFIED";
-    internal const string UnreadBehavioral = "UNREAD-BEHAVIORAL: no Axon emitter reads this member and it carries no code of its own; any effect is reported at the owning member, not here.";
+    internal const string UnreadBehavioral = "UNREAD-BEHAVIORAL: no Axon emitter reads this member and it carries no code of its own; effects are reported at the owning member (verified per member against the emitters' unsupported branches), not here.";
 
     const string MetadataTypes = """
         Diagnostic DiagnosticSeverity SemanticSourceMapEntry SemanticSourceMapRole SemanticSourceSpan SemanticAddressPartKind SemanticIdentityOrigin
@@ -18,17 +18,13 @@ internal static partial class SemanticSurfaceLedger
         """;
 
     const string UnreadMembers = """
-            SemanticGeneration.Case SemanticGeneration.Size SemanticGeneration.Alphabet SemanticGeneration.Pattern SemanticGeneration.Checksum
-            SemanticValidationRuleKind.Checksum SemanticValidationRuleKind.RulePredicate SemanticValidationRuleKind.CodeValidation
-            SemanticValidationRuleKind.DecimalPlaces SemanticValidationSeverity.Information SemanticEventSource.SourceKind
-            SemanticEventStream.StreamIdParts SemanticEventStream.StreamIdType SemanticEventStream.StreamKind
-            SemanticImplementationRequirement.BodyLines SemanticAttachmentResolution.UnresolvedFile SemanticAttachmentResolution.Pending
-            SemanticExecutionCapability.ImplementationBody SemanticExecutionCapability.IdentityAllocation SemanticExpressionKind.ReadPath
-            SemanticEventContextValueKind.CausedByName SemanticEventContextValueKind.CausedByUserName SemanticFixtureRoute.StreamId
-            SemanticFixtureRoute.StreamIdParts SemanticFixtureRoutePart.Part SemanticValueKind.Null SemanticClaimTargetKind.Subject
-            SemanticReadPathExpression.PropertyId SemanticImplementationRole.ConceptValidation SemanticImplementationRole.RulePredicate
-            SemanticImplementationRole.PolicyPredicate SemanticImplementationRole.ConstraintPredicate
-            SemanticImplementationRole.ValueGeneration SemanticPerformedQueryArgumentKind.Filter
+        SemanticGeneration.Case SemanticGeneration.Size SemanticGeneration.Alphabet SemanticGeneration.Pattern SemanticGeneration.Checksum
+        SemanticValidationRuleKind.Checksum SemanticValidationRuleKind.RulePredicate SemanticValidationRuleKind.CodeValidation
+        SemanticValidationRuleKind.DecimalPlaces SemanticValidationSeverity.Information SemanticImplementationRequirement.BodyLines
+        SemanticAttachmentResolution.UnresolvedFile SemanticAttachmentResolution.Pending SemanticExecutionCapability.ImplementationBody
+        SemanticExecutionCapability.IdentityAllocation SemanticExpressionKind.ReadPath SemanticEventContextValueKind.CausedByName
+        SemanticEventContextValueKind.CausedByUserName SemanticValueKind.Null SemanticClaimTargetKind.Subject SemanticReadPathExpression.PropertyId
+        SemanticPerformedQueryArgumentKind.Filter
         """;
 
     const string CaptureTypes = """
@@ -38,6 +34,19 @@ internal static partial class SemanticSurfaceLedger
     const string CaptureMembers = """
         SemanticSlice.Captures SemanticSlice.Direction SemanticSliceKind.Translate SemanticEventContract.Visibility SemanticEventContract.ContractId SemanticEventVisibility.Public
         SemanticSpecification.GivenCaptures SemanticSpecification.WhenCapture
+        """;
+
+    const string RoutingMembers = """
+        SemanticEventSource.SourceKind SemanticEventStream.StreamIdParts SemanticEventStream.StreamIdType SemanticEventStream.StreamKind
+        """;
+
+    const string FixtureRouteMembers = """
+        SemanticFixtureRoute.StreamId SemanticFixtureRoute.StreamIdParts SemanticFixtureRoutePart.Part
+        """;
+
+    const string UnplacedRoleMembers = """
+        SemanticImplementationRole.ConceptValidation SemanticImplementationRole.RulePredicate SemanticImplementationRole.PolicyPredicate
+        SemanticImplementationRole.ConstraintPredicate SemanticImplementationRole.ValueGeneration
         """;
 
     const string RefusalMembers = """
@@ -66,8 +75,13 @@ internal static partial class SemanticSurfaceLedger
         }
 
         Warn(entries, "STAGE-AXON-0601: captures, translations and public event contracts are not rendered. No source subscription, checkpoint, translation or publication is generated; the central behavior admission reports one 0601 per capture, per translate slice without captures and per public event contract, and writes a comment in the owning package-info.java. The event itself is still rendered as a private Axon event.", string.Join(' ', entries.Keys.Where(key => key.StartsWith("SemanticCapture", StringComparison.Ordinal))) + ' ' + MembersOf(entries, CaptureTypes, CaptureMembers));
+        Warn(entries, "STAGE-AXON-ROUTING: a source kind, stream kind or stream identity shape is not represented; only the primary event-source tag is used. CommandHandlerEmitter reports it for appending commands; the central behavior admission reports it for native handlers and commands that append nothing.", Split(RoutingMembers));
+        Warn(entries, "STAGE-AXON-0112: explicit fixture event routes make the generated specification unsupported; the specification is reported and disabled at its owner.", Split(FixtureRouteMembers));
+        Warn(entries, "STAGE-AXON-IMPL: no inline body slot places this implementation role; the central behavior admission reports each unconsumed requirement at its source.", Split(UnplacedRoleMembers));
         Warn(entries, "STAGE-AXON-0506: an invocation that declares refusal branches (OnRefused) reports one 0506 per branch at the owning reaction. The branches are not rendered, and the reaction is also not registered (0504).", MembersOf(entries, RefusalTypes, RefusalMembers));
     }
+
+    static string Split(string members) => string.Join(' ', members.Split([' ', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
     static string MembersOf(Dictionary<string, SemanticSurfaceDisposition> entries, string types, string members)
     {
