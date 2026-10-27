@@ -1,6 +1,6 @@
 package __RUNTIME__.persistent;
 
-import __RUNTIME__.UniqueValueStore;
+import io.cratis.stage.axon.runtime.UniqueValueStore;
 import jakarta.persistence.EntityManagerFactory;
 import org.axonframework.common.configuration.ComponentDefinition;
 import org.axonframework.common.configuration.ConfigurationEnhancer;

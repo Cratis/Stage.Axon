@@ -1,5 +1,7 @@
 package __RUNTIME__;
 
+import io.cratis.stage.axon.runtime.Caller;
+import io.cratis.stage.axon.runtime.SseBridge;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;

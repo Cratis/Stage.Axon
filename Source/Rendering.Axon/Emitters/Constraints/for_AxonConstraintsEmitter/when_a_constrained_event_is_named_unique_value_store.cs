@@ -34,6 +34,6 @@ public class when_a_constrained_event_is_named_unique_value_store : for_AxonArti
 
     [Fact] void should_import_the_constrained_application_event() => _java.ShouldContain("import sample.orders.events.UniqueValueStore;");
     [Fact] void should_keep_the_event_short() => _java.ShouldContain("if (event instanceof UniqueValueStore fact)");
-    [Fact] void should_qualify_the_runtime_store() => _java.ShouldContain("apply(sample.runtime.UniqueValueStore store,");
-    [Fact] void should_not_import_the_runtime_store() => _java.ShouldNotContain("import sample.runtime.UniqueValueStore;");
+    [Fact] void should_qualify_the_runtime_store() => _java.ShouldContain("apply(io.cratis.stage.axon.runtime.UniqueValueStore store,");
+    [Fact] void should_not_import_the_runtime_store() => _java.ShouldNotContain("import io.cratis.stage.axon.runtime.UniqueValueStore;");
 }

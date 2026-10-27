@@ -71,7 +71,7 @@ public class when_selecting_the_primary_tag : for_AxonArtifactRenderPlanner.give
         var primary = AxonEventSources.PrimaryTag(context, unknown);
         primary.ComponentName.ShouldEqual("eventSourceId");
         primary.TagKey.ShouldEqual("eventSourceId");
-        primary.JavaType.ShouldEqual(context.BasePackage + ".runtime.EventSourceId");
+        primary.JavaType.ShouldEqual("io.cratis.stage.axon.runtime.EventSourceId");
     }
 
     static int TagCount(string code) => code.Split("@EventTag", StringSplitOptions.None).Length - 1;

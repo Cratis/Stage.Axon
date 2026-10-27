@@ -22,7 +22,7 @@ public class when_an_allocating_command_is_named_event_source_id : for_AxonArtif
         var context = new AxonEmissionContext(request, new(request.Profile));
         var source = new CommandSource
         {
-            Primary = ("eventSourceId", context.BasePackage + ".runtime.EventSourceId", "eventSourceId"),
+            Primary = ("eventSourceId", "io.cratis.stage.axon.runtime.EventSourceId", "eventSourceId"),
             Type = SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text),
             TagReference = "EventTags.EVENT_SOURCE_ID"
         };
@@ -31,8 +31,8 @@ public class when_an_allocating_command_is_named_event_source_id : for_AxonArtif
     }
 
     [Fact] void should_keep_the_command_constructor_short() => _code.ShouldContain("return new EventSourceId(");
-    [Fact] void should_qualify_the_allocated_runtime_identity() => _code.ShouldContain("new sample.runtime.EventSourceId(GenerateValue.uuid().toString())");
-    [Fact] void should_qualify_the_identity_component_type() => _code.ShouldContain("sample.runtime.EventSourceId eventSourceId");
-    [Fact] void should_not_import_the_runtime_type_over_the_command() => _code.ShouldNotContain("import sample.runtime.EventSourceId;");
+    [Fact] void should_qualify_the_allocated_runtime_identity() => _code.ShouldContain("new io.cratis.stage.axon.runtime.EventSourceId(GenerateValue.uuid().toString())");
+    [Fact] void should_qualify_the_identity_component_type() => _code.ShouldContain("io.cratis.stage.axon.runtime.EventSourceId eventSourceId");
+    [Fact] void should_not_import_the_runtime_type_over_the_command() => _code.ShouldNotContain("import io.cratis.stage.axon.runtime.EventSourceId;");
     [Fact] void should_not_allocate_the_command_as_its_identity() => _code.ShouldNotContain("new EventSourceId(GenerateValue.uuid().toString())");
 }

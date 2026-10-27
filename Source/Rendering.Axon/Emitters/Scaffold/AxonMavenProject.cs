@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Stage.Rendering.Axon.Emitters.Concepts;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 
@@ -13,13 +14,14 @@ internal static class AxonMavenProject
           <modelVersion>4.0.0</modelVersion>
           <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.1.2</version><relativePath/></parent>
           <groupId>{{groupId}}</groupId><artifactId>{{artifactId}}</artifactId><version>1.0.0-SNAPSHOT</version>
-          <properties><java.version>25</java.version><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
+          <properties><java.version>25</java.version><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding><stage-axon-runtime.version>{{AxonRuntimePackage.Version}}</stage-axon-runtime.version></properties>
           <dependencyManagement><dependencies>
             <dependency><groupId>org.axonframework</groupId><artifactId>axon-framework-bom</artifactId><version>5.4.1</version><type>pom</type><scope>import</scope></dependency>
           </dependencies></dependencyManagement>
           <dependencies>
             <dependency><groupId>{{CratisFundamentals.GroupId}}</groupId><artifactId>{{CratisFundamentals.ArtifactId}}</artifactId><version>{{CratisFundamentals.Version}}</version></dependency>
             <dependency><groupId>{{CratisFundamentals.GroupId}}</groupId><artifactId>{{CratisFundamentals.JacksonArtifactId}}</artifactId><version>{{CratisFundamentals.Version}}</version></dependency>
+            <dependency><groupId>{{AxonRuntimePackage.GroupId}}</groupId><artifactId>{{AxonRuntimePackage.ArtifactId}}</artifactId><version>${stage-axon-runtime.version}</version></dependency>
             <dependency><groupId>org.axonframework.extensions.spring</groupId><artifactId>axon-spring-boot-starter</artifactId></dependency>
             <dependency><groupId>io.projectreactor</groupId><artifactId>reactor-core</artifactId></dependency>
             <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>

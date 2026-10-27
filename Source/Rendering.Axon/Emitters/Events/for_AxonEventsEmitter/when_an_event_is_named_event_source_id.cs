@@ -28,6 +28,6 @@ public class when_an_event_is_named_event_source_id : for_AxonArtifactRenderPlan
     }
 
     [Fact] void should_keep_the_application_event_name() => _code.ShouldContain("public record EventSourceId(");
-    [Fact] void should_qualify_the_runtime_identity_component() => _code.ShouldContain("sample.runtime.EventSourceId eventSourceId");
-    [Fact] void should_not_import_the_runtime_identity_over_the_event() => _code.ShouldNotContain("import sample.runtime.EventSourceId;");
+    [Fact] void should_qualify_the_runtime_identity_component() => _code.ShouldContain("io.cratis.stage.axon.runtime.EventSourceId eventSourceId");
+    [Fact] void should_not_import_the_runtime_identity_over_the_event() => _code.ShouldNotContain("import io.cratis.stage.axon.runtime.EventSourceId;");
 }

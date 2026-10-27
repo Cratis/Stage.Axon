@@ -1,5 +1,7 @@
 package __RUNTIME__;
 
+import io.cratis.stage.axon.runtime.LiveSnapshots;
+import io.cratis.stage.axon.runtime.LiveStreams;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;

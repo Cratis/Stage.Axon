@@ -14,6 +14,9 @@
         <EmbeddedResource Include="Emitters/Scaffold/Assets/*" />
         <EmbeddedResource Include="Emitters/Client/Templates/**/*.ts" />
     </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="Cratis.Stage.Rendering.Axon.Verification" />
+    </ItemGroup>
     <ItemGroup Condition="'$(Configuration)' == 'Debug'">
         <PackageReference Include="Cratis.Screenplay.CanonicalCorpus" />
         <Compile Include="../Rendering.Axon.Verification/CanonicalCorpusInputs.cs" Link="Specs/CanonicalCorpusInputs.cs" />

@@ -8,14 +8,18 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { scan, PACKAGES, PUBLISH_WORKFLOW } from './package-allowlist.mjs';
+import { scan, MAVEN_PACKAGES, PACKAGES, PUBLISH_WORKFLOW } from './package-allowlist.mjs';
 
 const script = fileURLToPath(new URL('./package-allowlist.mjs', import.meta.url));
 const repository = resolve(dirname(script), '../..');
 const workflow = '.github/workflows/build.yml';
 const renderer = PACKAGES[0];
 const projectText = `<IsPackable>true</IsPackable><AssemblyName>${renderer.id}</AssemblyName>`;
-const publishText = `dotnet pack ${renderer.project}\nnode .github/scripts/package-allowlist.mjs --packed out\ndotnet nuget push out/*.nupkg`;
+const runtime = MAVEN_PACKAGES[0];
+const runtimePom = `<project><modelVersion>4.0.0</modelVersion><groupId>${runtime.groupId}</groupId><artifactId>${runtime.artifactId}</artifactId><version>1</version><dependencies><dependency><groupId>x</groupId><artifactId>y</artifactId></dependency></dependencies></project>`;
+const deploy = `./Source/Runtime/mvnw -B -f ${runtime.pom} -Drevision=1 deploy`;
+const scanLine = 'node .github/scripts/package-allowlist.mjs';
+const publishText = `dotnet pack ${renderer.project}\n${scanLine}\n${deploy}\nnode .github/scripts/package-allowlist.mjs --packed out\ndotnet nuget push out/*.nupkg`;
 
 function fixture(t, files = {}) {
     const root = mkdtempSync(join(tmpdir(), 'axon-allowlist-test-'));
@@ -24,6 +28,7 @@ function fixture(t, files = {}) {
         [workflow]: 'run: dotnet build',
         [renderer.project]: projectText,
         [PUBLISH_WORKFLOW]: publishText,
+        [runtime.pom]: runtimePom,
         '.github/scripts/package-allowlist.mjs': '',
         '.github/scripts/package-allowlist.test.mjs': ''
     };
@@ -48,6 +53,11 @@ const violations = [
     ['registry-credentials', 'env: NUGET_API_KEY: example'],
     ['registry-credentials', 'env: NUGET_AUTH_TOKEN: example'],
     ['registry-credentials', 'run: tool --api-key example'],
+    ['registry-credentials', 'env: MAVEN_CENTRAL_USERNAME: example'],
+    ['registry-credentials', 'env: MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}'],
+    ['registry-credentials', 'env: MAVEN_GPG_PRIVATE_KEY: example'],
+    ['registry-credentials', 'env: MAVEN_GPG_PASSPHRASE: example'],
+    ['registry-credentials', 'env: MAVEN_GPG_KEY: example'],
     ['registry-credentials', 'uses: nuget/login@v1'],
     ['release-asset', 'uses: softprops/action-gh-release@v2'],
     ['release-asset', 'uses: softprops/action-gh-release@v2\nwith:\n  files: artifacts/*'],
@@ -130,8 +140,10 @@ for (const text of [null, 'node .github/scripts/package-allowlist.mjs --packed o
 test('supports injectable package and publish allowlists', t => {
     const root = fixture(t, { [renderer.project]: null, [PUBLISH_WORKFLOW]: null,
         'Custom.csproj': '<IsPackable>true</IsPackable><PackageId>Custom</PackageId>',
-        '.github/workflows/custom.yml': 'dotnet pack Custom.csproj\nnode package-allowlist.mjs --packed out\nnuget push out/x' });
-    assert.deepEqual(scan({ root, packages: [{ project: 'Custom.csproj', id: 'Custom' }], publishWorkflow: '.github/workflows/custom.yml' }).findings, []);
+        'Custom/pom.xml': runtimePom.replace('stage-axon-runtime', 'custom').replace('io.cratis', 'org.custom'), [runtime.pom]: null,
+        '.github/workflows/custom.yml': 'dotnet pack Custom.csproj\nnode package-allowlist.mjs\nmvn -f Custom/pom.xml deploy\nnode package-allowlist.mjs --packed out\nnuget push out/x' });
+    const mavenPackages = [{ pom: 'Custom/pom.xml', groupId: 'org.custom', artifactId: 'custom' }];
+    assert.deepEqual(scan({ root, packages: [{ project: 'Custom.csproj', id: 'Custom' }], mavenPackages, publishWorkflow: '.github/workflows/custom.yml' }).findings, []);
 });
 
 test('requires workflows even when other files are inspected', t => {
@@ -215,4 +227,87 @@ test('real repository CLI succeeds with a nonempty scan', () => {
     const result = cli(repository);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Package allowlist check passed: checked [1-9]\d* files \([1-9]\d* workflows\)/);
+});
+
+const deployLine = (line) => ({ [PUBLISH_WORKFLOW]: publishText.replace(deploy, line) });
+
+test('accepts the allowlisted Maven deploy', t => assert.deepEqual(findings(t, {}), []));
+
+for (const line of ['./Source/Runtime/mvnw -B deploy', './mvnw -B -f pom.xml deploy', './mvnw -B -f Source/Other/pom.xml deploy', `./mvnw -B -f ${runtime.pom} -f Other/pom.xml deploy`]) {
+    test(`rejects a Maven deploy that does not name only the allowlisted pom: ${line}`, t => {
+        assert.ok(findings(t, deployLine(line)).some(f => f.includes('[maven-scope]')));
+    });
+}
+
+test('rejects Maven secrets in the build workflow', t => {
+    assert.ok(findings(t, { [workflow]: 'env: MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}' }).some(f => f.includes('[registry-credentials]')));
+});
+
+for (const [name, pom] of [
+    ['a foreign groupId', runtimePom.replace('io.cratis', 'org.foreign')],
+    ['a foreign artifactId', runtimePom.replace('stage-axon-runtime', 'foreign')],
+    ['modules', runtimePom.replace('<version>', '<modules><module>a</module></modules><version>')],
+    ['pom packaging', runtimePom.replace('<version>', '<packaging>pom</packaging><version>')],
+    ['a missing runtime pom', null]
+]) {
+    test(`rejects ${name} in the runtime pom`, t => {
+        assert.ok(findings(t, { [runtime.pom]: pom }).some(f => f.includes('[maven-project]')));
+    });
+}
+
+test('ignores identity-like elements inside dependencies and parent', t => {
+    const pom = runtimePom.replace('<version>', '<parent><groupId>org.foreign</groupId><artifactId>foreign</artifactId></parent><packaging>jar</packaging><version>');
+    assert.deepEqual(findings(t, { [runtime.pom]: pom }), []);
+});
+
+for (const marker of ['<plugin><artifactId>central-publishing-maven-plugin</artifactId></plugin>', '<distributionManagement/>', '<artifactId>maven-deploy-plugin</artifactId>', 'nexus-staging']) {
+    test(`rejects a second pom that configures publication: ${marker}`, t => {
+        assert.ok(findings(t, { 'Source/Other/pom.xml': `<project>${marker}</project>` }).some(f => f.includes('[maven-publication]')));
+    });
+}
+
+test('allows the allowlisted pom to configure publication', t => {
+    assert.deepEqual(findings(t, { [runtime.pom]: `${runtimePom}<!-- central-publishing-maven-plugin -->` }), []);
+});
+
+for (const [name, text] of [
+    ['a deploy after nuget push', `dotnet pack ${renderer.project}\n${scanLine}\ndotnet nuget push out/*.nupkg\n${deploy}\nnode .github/scripts/package-allowlist.mjs --packed out`],
+    ['a missing pre-deploy scan', `dotnet pack ${renderer.project}\n${deploy}\nnode .github/scripts/package-allowlist.mjs --packed out\ndotnet nuget push out/*.nupkg`],
+    ['a scan after the deploy', `dotnet pack ${renderer.project}\n${deploy}\n${scanLine}\nnode .github/scripts/package-allowlist.mjs --packed out\ndotnet nuget push out/*.nupkg`],
+    ['no deploy', `dotnet pack ${renderer.project}\n${scanLine}\nnode .github/scripts/package-allowlist.mjs --packed out\ndotnet nuget push out/*.nupkg`],
+    ['two deploys', publishText.replace(deploy, `${deploy}\n${deploy}`)]
+]) {
+    test(`requires one allowlisted deploy after the scan and before nuget push: ${name}`, t => {
+        assert.ok(findings(t, { [PUBLISH_WORKFLOW]: text }).some(f => f.includes('[publish-workflow]')));
+    });
+}
+
+for (const [name, line] of [
+    ['npm publish', `${deploy} && npm publish`],
+    ['a second mvn deploy', `${deploy} && mvn deploy`],
+    ['a second wrapper deploy', `${deploy}; ./mvnw deploy`],
+    ['a piped deploy', `${deploy} | xargs mvn deploy`],
+    ['a nuget push', `${deploy}; dotnet nuget push out/x`],
+    ['a substituted publish', `${deploy} $(npm publish)`],
+    ['a backgrounded publish', `${deploy} & npm publish`]
+]) {
+    test(`rejects the approved deploy with ${name} appended`, t => {
+        assert.ok(findings(t, deployLine(line)).length > 0);
+    });
+}
+
+test('rejects a publish continued after the approved deploy on the next line', t => {
+    assert.ok(findings(t, deployLine(`${deploy} \\\n  && npm publish`)).some(f => f.includes('[registry-publish]')));
+});
+
+test('accepts the approved deploy split across continuation lines', t => {
+    assert.deepEqual(findings(t, deployLine(`./Source/Runtime/mvnw -B \\\n  -f ${runtime.pom} \\\n  -Drevision=1 deploy`)), []);
+});
+
+test('rejects a second approved deploy elsewhere in the publish workflow', t => {
+    assert.ok(findings(t, { [PUBLISH_WORKFLOW]: `${publishText}\n${deploy}` }).some(f => f.includes('[publish-workflow]')));
+});
+
+test('rejects the approved deploy command in another workflow', t => {
+    assert.ok(findings(t, { [workflow]: deploy }).some(f => f.includes('[registry-publish]')));
 });

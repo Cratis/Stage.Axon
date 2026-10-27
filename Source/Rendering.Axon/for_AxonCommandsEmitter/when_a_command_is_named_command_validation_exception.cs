@@ -25,9 +25,9 @@ public class when_a_command_is_named_command_validation_exception : for_AxonArti
         _code = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/CommandValidationExceptionSpecificationsTest.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 
-    [Fact] void should_qualify_the_exception_class_literal() => _code.ShouldContain(".isInstanceOf(sample.runtime.CommandValidationException.class);");
-    [Fact] void should_qualify_the_exception_cast() => _code.ShouldContain("var failure = (sample.runtime.CommandValidationException) error;");
-    [Fact] void should_not_import_the_runtime_type_over_the_command() => _code.ShouldNotContain("import sample.runtime.CommandValidationException;");
+    [Fact] void should_qualify_the_exception_class_literal() => _code.ShouldContain(".isInstanceOf(io.cratis.stage.axon.runtime.CommandValidationException.class);");
+    [Fact] void should_qualify_the_exception_cast() => _code.ShouldContain("var failure = (io.cratis.stage.axon.runtime.CommandValidationException) error;");
+    [Fact] void should_not_import_the_runtime_type_over_the_command() => _code.ShouldNotContain("import io.cratis.stage.axon.runtime.CommandValidationException;");
     [Fact] void should_keep_the_expectation_executable() => _code.ShouldNotContain("@Disabled");
     [Fact] void should_still_check_the_error_message() => _code.ShouldContain(".contains(\"Not allowed.\");");
 }

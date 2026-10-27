@@ -144,6 +144,8 @@ For an emitted Maven application, run its wrapper from the output directory:
 sh mvnw -B verify
 ```
 
+Apps rendered by an unreleased local renderer pin a runtime version that is not on Maven Central yet. Install `Source/Runtime` first with `sh ./mvnw -Drevision=<renderer version> install` from that directory.
+
 Then pass `target/surefire-reports` to the native-result check. A green Maven run alone does not prove that every modeled specification ran; the manifest correlation detects missing coverage.
 
 ### Current profile guarantees
