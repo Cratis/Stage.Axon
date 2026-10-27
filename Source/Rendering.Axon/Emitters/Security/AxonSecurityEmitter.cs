@@ -21,6 +21,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             .Import("org.springframework.context.annotation.Bean")
             .Import("org.springframework.context.annotation.Configuration")
             .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")
+            .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication")
             .Import("org.springframework.security.config.Customizer")
             .Import("org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity")
             .Import("org.springframework.security.config.annotation.web.builders.HttpSecurity")
@@ -31,6 +32,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             .Line("@EnableMethodSecurity")
             .Block("public class SecurityConfiguration", body => body
                 .Line("@Bean")
+                .Line("@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)")
                 .Block("SecurityFilterChain security(HttpSecurity http) throws Exception", method => method
                     .Line("return http.csrf(csrf -> csrf.disable())")
                     .Line("    .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())")
