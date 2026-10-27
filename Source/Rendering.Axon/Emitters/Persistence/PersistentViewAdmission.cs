@@ -9,6 +9,8 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 
 internal static class PersistentViewAdmission
 {
+    internal static bool Context(SemanticProjectionEventContextValue value) => new[] { "eventSourceId", "occurred", "correlationId" }.Contains(value.Path, StringComparer.Ordinal);
+
     internal static bool Supports(AxonEmissionContext context, SemanticId model)
     {
         var slices = ScopeSelection.Select(context.Request).Select(owner => owner.Slice).ToArray();
@@ -21,7 +23,7 @@ internal static class PersistentViewAdmission
 
     static bool Flat(AxonEmissionContext context, SemanticReadModel model, SemanticProjection projection)
     {
-        if (ProjectionHandlerShape.Scoped(projection) || !ProjectionTransitions.From(projection).Any()) return false;
+        if (!ProjectionHandlerShape.RootOnly(projection) || !ProjectionTransitions.From(projection).Any()) return false;
         return ProjectionTransitions.From(projection).All(from => From(context, model, from));
     }
 
@@ -34,9 +36,10 @@ internal static class PersistentViewAdmission
 
     static bool Mapping(ProjectionValues values, SemanticReadModel model, SemanticEventContract @event, SemanticProjectionMapping mapping)
     {
+        if (mapping.Source is SemanticProjectionEventContextValue source && !Context(source)) return false;
+        if (mapping.Factor is SemanticProjectionEventContextValue factor && !Context(factor)) return false;
         var target = mapping.Target.Length == 1 ? model.Properties.FirstOrDefault(property => property.Id == mapping.Target[0]) : null;
         if (target is null) return false;
-        if (mapping.Source is SemanticProjectionEventContextValue || mapping.Factor is SemanticProjectionEventContextValue) return false;
         return values.Mapping(mapping, target, @event) is not null;
     }
 }

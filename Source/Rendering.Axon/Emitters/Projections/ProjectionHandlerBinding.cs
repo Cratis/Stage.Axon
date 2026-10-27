@@ -27,19 +27,20 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var adapter = body.Reference(types.BasePackage + ".persistence.JpaReadModelStore");
         var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
         var store = body.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var updateParameter = message ? _updates.ParameterFor(body) : _updates.Parameter;
         var messageParameter = message ? $", {body.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message" : string.Empty;
         var messageArgument = message ? ", message" : string.Empty;
         var arguments = messageArgument + (_updates.Enabled ? ", updates" : string.Empty);
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
-            .Block($"public void handle({eventType} event{messageParameter}{_updates.Parameter}, {processing} context)", method =>
+            .Block($"public void handle({eventType} event{messageParameter}{updateParameter}, {processing} context)", method =>
             {
                 method.Block($"if (!(store instanceof {adapter}<?>))", memory => memory.Line($"on(event{arguments});").Line("return;"))
                     .Line($"apply(event{messageArgument}{_updates.DefaultArgument}, {adapter}.bind(store, context));");
                 if (_updates.Enabled)
                     method.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
             })
-            .Block($"public void on({eventType} event{messageParameter}{_updates.Parameter})", method => method.Line($"apply(event{arguments}, store);"))
-            .Block($"private void apply({eventType} event{messageParameter}{_updates.Parameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
+            .Block($"public void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store);"))
+            .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
     }
 
     void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)
