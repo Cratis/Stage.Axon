@@ -23,7 +23,8 @@ run(async () => {
     await java(`commit:${item.id}:s1`);
     await onlyFrameIs("s1", marker, "rejected command");
 
-    // A rolled-back unit of work that announced a change must not publish either.
+    // A rolled-back unit of work that wrote and announced a change must not publish either: the Java side leaves the
+    // rolled-back value readable in the store, so a leaked announcement delivers it as a frame before the sentinel.
     marker = watch.values().length;
     await java(`rollback:${item.id}:ghost`);
     await java(`commit:${item.id}:s2`);

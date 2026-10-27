@@ -16,7 +16,7 @@ public class when_a_compliance_marked_enum_concept_is_declared : given.a_model_w
         concept = new(SemanticId.Create(SemanticKind.Concept, "Diagnosis"), "Diagnosis", SemanticPrimitiveType.Text, ["Flu", "Cold"], []) { Compliance = new(new SemanticPersonalData(), null) };
 
     // The model validator refuses this shape today; the walk is the defense for a model that reaches Axon without it.
-    void Because() => decisions = [.. AxonBehaviorAdmission.ConceptDecisions(request.Model.Application with { Concepts = request.Model.Application.Concepts.Add(concept) })];
+    void Because() => decisions = [.. AxonBehaviorAdmission.ConceptDecisions(request.Model.Application with { Concepts = request.Model.Application.Concepts.Add(concept) }, Java.JavaNames.PackageSegment(request.Model.Application.Name))];
 
     [Fact] void should_report_compliance_on_the_concept() => decisions.Single().Owner.ShouldEqual(concept.Id);
     [Fact] void should_use_the_scalar_compliance_code() => decisions.Single().Code.ShouldEqual("STAGE-AXON-COMPLIANCE");
@@ -25,5 +25,5 @@ public class when_a_compliance_marked_enum_concept_is_declared : given.a_model_w
 
     [Fact]
     void should_not_report_an_unmarked_enum_concept() =>
-        AxonBehaviorAdmission.ConceptDecisions(request.Model.Application with { Concepts = [concept with { Compliance = null }] }).ShouldBeEmpty();
+        AxonBehaviorAdmission.ConceptDecisions(request.Model.Application with { Concepts = [concept with { Compliance = null }] }, Java.JavaNames.PackageSegment(request.Model.Application.Name)).ShouldBeEmpty();
 }

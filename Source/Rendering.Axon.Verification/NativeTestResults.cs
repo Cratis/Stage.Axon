@@ -39,12 +39,22 @@ internal static class NativeTestResults
         }
     }
 
+    internal static void RequireReports(string application, IEnumerable<string> reports)
+    {
+        var missing = RequiredReports(application).Where(test => !reports.Any(report => Path.GetFileName(report).EndsWith("." + test + ".xml", StringComparison.Ordinal))).ToArray();
+        if (missing.Length > 0)
+        {
+            throw new NativeVerificationFailed($"{application}: the surefire reports for {string.Join(", ", missing)} are missing; the native proof must run.");
+        }
+    }
+
     internal static void Verify(string repository, string output, IReadOnlyDictionary<string, DisabledTestBudget> budget)
     {
         var totals = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var (name, _) in CorpusApplications.Find(repository))
         {
             var reports = Directory.GetFiles(Path.Combine(output, name, "target/surefire-reports"), "TEST-*.xml");
+            RequireReports(name, reports);
             var disabled = Disabled(reports.Select(XDocument.Load));
             Console.WriteLine($"{name}: {reports.Length} native test reports");
             foreach (var (reason, count) in disabled)
@@ -55,6 +65,8 @@ internal static class NativeTestResults
 
         RequireWithinBudget(totals, budget);
     }
+
+    static string[] RequiredReports(string application) => application == ClientProofArtifacts.Application ? ["ClientContractTest"] : [];
 
     static bool Failed(XElement test) => test.Element("failure") is not null || test.Element("error") is not null;
 }

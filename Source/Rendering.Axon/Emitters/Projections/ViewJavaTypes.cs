@@ -10,7 +10,7 @@ using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ViewJavaTypes(SemanticApplication application)
+internal sealed class ViewJavaTypes(SemanticApplication application, string basePackage)
 {
     static readonly Dictionary<SemanticPrimitiveType, (string Type, string Method)> _parsers = new()
     {
@@ -24,7 +24,7 @@ internal sealed class ViewJavaTypes(SemanticApplication application)
     static readonly string[] _supportPackageSuffixes = ["constraints", "infrastructure", "persistence", "runtime", "runtime.persistent", "specifications"];
 
     readonly ViewConceptValues _concepts = new(application);
-    internal string BasePackage { get; } = JavaNames.PackageSegment(application.Name);
+    internal string BasePackage { get; } = basePackage;
 
     internal IReadOnlySet<string> ReservedSupportPackages => _supportPackageSuffixes.Select(suffix => BasePackage + "." + suffix).ToHashSet(StringComparer.Ordinal);
 

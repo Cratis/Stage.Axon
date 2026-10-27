@@ -144,7 +144,7 @@ public class when_admitting_reducer_specifications : a_view_request
     string? Disabled(SemanticSpecification spec)
     {
         var context = new AxonEmissionContext(_request, new(_request.Profile));
-        ReducerViewSpecifications.Emit(context, new ViewJavaTypes(_request.Model.Application), _located, _model, [spec]);
+        ReducerViewSpecifications.Emit(context, new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name)), _located, _model, [spec]);
         if (context.Specifications[spec.Id].DisabledCode is not null)
         {
             var java = Text(context.Artifacts.Single());

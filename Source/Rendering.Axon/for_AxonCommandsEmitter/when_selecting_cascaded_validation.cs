@@ -20,7 +20,7 @@ public class when_selecting_cascaded_validation : for_AxonArtifactRenderPlanner.
 
     void Because()
     {
-        types = new(request.Model.Application);
+        types = new(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name));
         date = Render(SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Date));
         text = Render(SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text));
         enumeration = Render(SemanticTypeReference.ForConcept(request.Model.Application.Concepts.First(concept => !concept.Values.IsDefaultOrEmpty).Id));

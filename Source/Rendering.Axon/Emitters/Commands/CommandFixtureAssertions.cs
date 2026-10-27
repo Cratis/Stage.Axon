@@ -8,7 +8,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandFixtureAssertions(AxonEmissionContext context, SemanticCommand command, SemanticSpecification specification)
 {
-    readonly CommandJavaTypes _types = new(context.Request.Model.Application);
+    readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
     JavaCodeBuilder? _code;
 
     internal bool CanRenderResponse() => specification.ThenReturns switch

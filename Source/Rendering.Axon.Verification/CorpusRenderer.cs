@@ -10,8 +10,10 @@ namespace Cratis.Stage.Rendering.Axon.Verification;
 
 internal static class CorpusRenderer
 {
-    /// <summary>The profile every corpus application renders with: the defaults plus the opt-in TypeScript client.</summary>
+    /// <summary>The default corpus profile: the defaults plus the opt-in TypeScript client.</summary>
     internal static ArtifactRenderProfile Profile => AxonRendering.WithTypeScriptClient(AxonRendering.CreateProfile());
+
+    internal static ArtifactRenderProfile BearerProfile => AxonRendering.WithBearerTokens(Profile);
 
     internal static async Task Render(string repository, string output)
     {
@@ -64,7 +66,7 @@ internal static class CorpusRenderer
 
     static ArtifactRenderPlan Plan(string name, LoadedSemanticModel loaded) => name switch
     {
-        IngressProofModel.Application => IngressProofModel.Plan(loaded, Profile),
+        IngressProofModel.Application => IngressProofModel.Plan(loaded, BearerProfile),
         IngressProofModel.PersistentApplication => IngressProofModel.PersistentPlan(loaded, Profile),
         _ => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: Profile)
     };

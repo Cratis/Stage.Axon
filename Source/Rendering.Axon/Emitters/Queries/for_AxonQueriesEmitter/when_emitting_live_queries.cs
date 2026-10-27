@@ -27,7 +27,7 @@ public class when_emitting_live_queries : a_view_request
         var query = located.Slice.Queries.Single(query => query.Name == "LiveTotals") with { Authorization = new SemanticPolicyReference("Unavailable") };
         var model = located.Slice.ReadModels.Single(model => model.Id == query.ReadModel);
         var securedContext = new AxonEmissionContext(_request, new(_request.Profile));
-        var types = new ViewJavaTypes(_request.Model.Application);
+        var types = new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name));
         new QueryEndpoint(securedContext, types, located, query, types.Package(located) + "." + model.Name, new(query, model, types)).Emit();
         _securedEndpoint = Text(securedContext.Artifacts.Single());
         _endpoint = Source("LiveTotalsEndpoint.java");

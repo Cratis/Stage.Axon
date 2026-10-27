@@ -20,7 +20,7 @@ internal static class ReactionInvocation
         if (ConstraintCoverage.CommandRequiresUnsupportedConstraint(context, command)) return null;
         var arguments = command.Properties.Select(property => Argument(context, invocation, input, property)).ToArray();
         if (arguments.Any(argument => argument is null)) return null;
-        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located!);
+        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located!);
         return $"commands.sendAndWait(new {package}.{JavaNames.Type(command.Name)}({string.Join(", ", arguments)}));";
     }
 

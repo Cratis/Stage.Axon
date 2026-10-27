@@ -122,7 +122,7 @@ public class when_framework_names_collide_with_application_types : given.a_view_
     [InlineData(SemanticPrimitiveType.Boolean, "Boolean")]
     void should_keep_uncaptured_parsers_short(SemanticPrimitiveType primitive, string name)
     {
-        var types = new ViewJavaTypes(_request.Model.Application);
+        var types = new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name));
         var code = new Java.JavaCodeBuilder("example");
         types.Parse(new(SemanticTypeReferenceKind.Primitive, primitive, default, false, false), "value", code).ShouldEqual($"{name}.valueOf(value)");
     }

@@ -16,7 +16,7 @@ public class when_building_type_references : for_AxonArtifactRenderPlanner.given
 
     void Establish()
     {
-        types = new(request.Model.Application);
+        types = new(request.Model.Application, JavaNames.PackageSegment(request.Model.Application.Name));
         code = new JavaCodeBuilder("example.views").Declare("ExampleView");
     }
 
@@ -66,7 +66,7 @@ public class when_building_type_references : for_AxonArtifactRenderPlanner.given
     void should_keep_a_concept_named_big_decimal_short()
     {
         var concept = request.Model.Application.Concepts[0] with { Name = "BigDecimal", Primitive = SemanticPrimitiveType.DecimalNumber, Values = [], Numbers = null };
-        var collision = new ViewJavaTypes(request.Model.Application with { Concepts = [concept] });
+        var collision = new ViewJavaTypes(request.Model.Application with { Concepts = [concept] }, JavaNames.PackageSegment(request.Model.Application.Name));
         var type = new SemanticTypeReference(SemanticTypeReferenceKind.Concept, SemanticPrimitiveType.DecimalNumber, concept.Id, false, false);
         collision.Parse(type, "text", code).ShouldEqual("new BigDecimal(new java.math.BigDecimal(text))");
         code.Build().ShouldContain($"import {types.BasePackage}.concepts.BigDecimal;");

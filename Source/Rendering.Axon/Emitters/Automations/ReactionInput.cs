@@ -28,7 +28,7 @@ internal sealed class ReactionInput(string javaType, ImmutableArray<SemanticProp
 
     internal string? Value(AxonEmissionContext context, SemanticExpression expression, SemanticTypeReference target)
     {
-        var types = new CommandJavaTypes(context.Request.Model.Application);
+        var types = new CommandJavaTypes(context.Request.Model.Application, context.BasePackage);
         var conversion = new CommandExpressions(Command(), types);
         return expression switch
         {
@@ -40,7 +40,7 @@ internal sealed class ReactionInput(string javaType, ImmutableArray<SemanticProp
     }
 
     internal string? Condition(AxonEmissionContext context, SemanticCondition condition) =>
-        new CommandConditions(Command(), new(context.Request.Model.Application)).Render(condition)?.Replace("command.", "input.", StringComparison.Ordinal);
+        new CommandConditions(Command(), new(context.Request.Model.Application, context.BasePackage)).Render(condition)?.Replace("command.", "input.", StringComparison.Ordinal);
 
     bool IsProperty(SemanticResolvedExpression reference) => reference.Source == SemanticExpressionSourceKind.Property &&
         reference.Root == (Event is null ? SemanticExpressionRootKind.Trigger : SemanticExpressionRootKind.Event);
