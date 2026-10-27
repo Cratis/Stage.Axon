@@ -26,6 +26,7 @@ public class when_visiting_families : for_AxonArtifactRenderPlanner.given.an_axo
             "AxonPersistenceEmitter",
             "AxonSecurityEmitter",
             "AxonSpecificationsEmitter",
+            "AxonClientEmitter",
             "AxonRuntimeEmitter");
 
     [Fact]

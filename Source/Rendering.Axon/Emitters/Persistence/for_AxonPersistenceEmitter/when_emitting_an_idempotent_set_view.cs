@@ -57,13 +57,23 @@ public class when_emitting_an_idempotent_set_view : Projections.for_AxonProjecti
     [Fact] void should_derive_replay_expectations_from_the_arrangement() => _support.ShouldContain("for (var replay = 0; replay < replays; replay++) projector.on(");
     [Fact] void should_expect_a_second_replay_after_reclaim() => _proof.ShouldContain("var subsequent = next(2);");
     [Fact] void should_use_a_distinct_durable_counter_view() => _support.ShouldContain("axonviews.views.counters.totals.Total.atomicity");
-    [Fact] void should_enlist_the_counter_handler_in_the_same_processor() => _support.ShouldContain("@org.axonframework.messaging.core.annotation.Namespace(\"axonviews.views.counters.totals\")");
+    [Fact]
+    void should_enlist_the_counter_handler_in_the_same_processor()
+    {
+        _support.ShouldContain("import org.axonframework.messaging.core.annotation.Namespace;");
+        _support.ShouldContain("@Namespace(\"axonviews.views.counters.totals\")");
+    }
     [Fact] void should_require_an_actual_counter_change_inside_the_handler() => _support.ShouldContain("assertEquals(before + 1, changing.get(\"count\").orElseThrow()");
     [Fact] void should_require_the_counter_change_to_roll_back() => _proof.ShouldContain("assertEquals(1, count(application), \"Non-idempotent view change must roll back\")");
     [Fact] void should_require_real_token_store_rejection() => _proof.ShouldContain("assertTrue(tokenRejected.await(20, TimeUnit.SECONDS)");
     [Fact] void should_wait_for_a_changed_row_in_both_atomicity_proofs() => _proof.ShouldContain("assertTrue(viewChanged.await(20, TimeUnit.SECONDS)");
     [Fact] void should_require_exactly_once_counter_reclaim() => _proof.ShouldContain("count(application) == 1 + 1");
-    [Fact] void should_dispatch_a_real_default_profile_event() => _dispatch.ShouldContain("EventAppender.forContext(context).append(new axonviews.views.events.Increased(");
+    [Fact]
+    void should_dispatch_a_real_default_profile_event()
+    {
+        _dispatch.ShouldContain("import axonviews.views.events.Increased;");
+        _dispatch.ShouldContain("EventAppender.forContext(context).append(new Increased(");
+    }
     [Fact] void should_import_the_pinned_default_event_appender() => _dispatch.ShouldContain("import org.axonframework.messaging.eventhandling.gateway.EventAppender;");
     [Fact] void should_import_the_pinned_persistent_event_appender() => _support.ShouldContain("import org.axonframework.messaging.eventhandling.gateway.EventAppender;");
     [Fact] void should_not_import_the_invalid_persistent_event_appender() => _support.ShouldNotContain("org.axonframework.eventsourcing.eventstore.EventAppender");
@@ -76,13 +86,23 @@ public class when_emitting_an_idempotent_set_view : Projections.for_AxonProjecti
     [Fact] void should_not_invoke_the_projector_directly_in_the_default_proof() => _dispatch.ShouldNotContain("projector.on(");
     [Fact] void should_not_invoke_the_contextual_handler_directly_in_the_default_proof() => _dispatch.ShouldNotContain(".handle(");
     [Fact] void should_keep_the_default_fixture_out_of_component_scanning() => _dispatch.ShouldContain("@TestConfiguration(proxyBeanMethods = false)");
-    [Fact] void should_import_the_actual_default_projector() => _dispatch.ShouldContain("axonviews.views.counters.totals.TotalProjectionProjector.class");
+    [Fact]
+    void should_import_the_actual_default_projector()
+    {
+        _dispatch.ShouldContain("import axonviews.views.counters.totals.TotalProjectionProjector;");
+        _dispatch.ShouldContain("TotalProjectionProjector.class");
+    }
     [Fact] void should_assert_single_handling_even_for_idempotent_sets() => _dispatch.ShouldContain("assertEquals(1, store.writes.get(),");
     [Fact] void should_assert_one_result_row() => _dispatch.ShouldContain("assertEquals(1, store.all().size(),");
     [Fact] void should_assert_invalidation_before_append_completes() => _dispatch.ShouldContain("Subscribing default processing must invalidate before append completes");
     [Fact] void should_assert_invalidation_follows_the_write() => _dispatch.ShouldContain("assertEquals(1, writesAtInvalidation.get(),");
     [Fact] void should_override_the_real_default_namespace() => _dispatch.ShouldContain("\"axon.eventhandling.processors[axonviews.views.counters.totals].mode\", \"subscribing\"");
-    [Fact] void should_guard_only_the_imported_fixture_namespace() => _dispatch.ShouldContain("axonviews.infrastructure.DefaultViewProcessorGuard.verify(configuration, Set.of(\"axonviews.views.counters.totals\"))");
+    [Fact]
+    void should_guard_only_the_imported_fixture_namespace()
+    {
+        _dispatch.ShouldContain("import axonviews.infrastructure.DefaultViewProcessorGuard;");
+        _dispatch.ShouldContain("DefaultViewProcessorGuard.verify(configuration, Set.of(\"axonviews.views.counters.totals\"))");
+    }
     [Fact] void should_assert_the_default_processor_is_not_streaming() => _dispatch.ShouldContain("FIXTURE: C2 default namespace must not resolve to a streaming processor");
     [Fact] void should_prove_default_streaming_is_refused() => _dispatch.ShouldContain("void refusesStreamingDefaultViewsBeforeReadiness()");
     [Fact] void should_keep_jpa_opt_in() => _dispatch.ShouldContain("\"spring.profiles.active\", \"default\"");

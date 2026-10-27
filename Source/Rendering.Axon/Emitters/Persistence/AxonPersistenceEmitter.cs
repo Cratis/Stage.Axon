@@ -31,7 +31,7 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
             context,
             package,
             name,
-            source.Replace("__PACKAGE__", package, StringComparison.Ordinal).Replace("__RUNTIME__", runtime, StringComparison.Ordinal),
+            PersistentJavaTemplate.Render(source.Replace("__PACKAGE__", package, StringComparison.Ordinal).Replace("__RUNTIME__", runtime, StringComparison.Ordinal)),
             ids);
         Add("ViewRow", PersistentViewEntities.Row);
         Add("ViewGeneration", PersistentViewEntities.Generation);
