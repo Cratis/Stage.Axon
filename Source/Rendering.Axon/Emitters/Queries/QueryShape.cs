@@ -15,8 +15,8 @@ internal sealed class QueryShape(SemanticKeyedQuery query, SemanticReadModel mod
         ("java.math.BigDecimal", "java.math.BigDecimal", string.Empty),
         ("java.time.LocalDate", "java.time.LocalDate", string.Empty),
         ("java.time.OffsetDateTime", "java.time.OffsetDateTime", string.Empty),
-        ("java.lang.Long", "Long.valueOf", ".valueOf"),
-        ("java.lang.Boolean", "Boolean.valueOf", ".valueOf")
+        ("java.lang.Long", "java.lang.Long", string.Empty),
+        ("java.lang.Boolean", "java.lang.Boolean", string.Empty)
     ];
 
     internal IEnumerable<(string Name, SemanticTypeReference Type, SemanticId Property)> Arguments
