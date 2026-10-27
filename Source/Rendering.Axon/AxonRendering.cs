@@ -132,6 +132,7 @@ public static class AxonRendering
     /// <param name="request">The model, execution plan, scopes, sidecars and options.</param>
     /// <returns>The planned artifacts, diagnostics and refusals without writing files.</returns>
     /// <exception cref="ArgumentNullException">The request is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The HTTP authentication mode is undefined.</exception>
     /// <exception cref="InvalidArtifactRenderContract">Header lines or scopes violate the rendering contract.</exception>
     public static ArtifactRenderPlan Plan(AxonRenderRequest request)
     {
@@ -140,6 +141,8 @@ public static class AxonRendering
         var profile = CreateProfile(strict: options.Strict, fileHeader: options.FileHeader);
         if (!options.AllowedApproximations.IsDefaultOrEmpty) profile = AllowApproximations(profile, [.. options.AllowedApproximations]);
         if (options.TypeScriptClient) profile = WithTypeScriptClient(profile);
+        if (!Enum.IsDefined(options.HttpAuthentication)) throw new ArgumentOutOfRangeException(nameof(request), options.HttpAuthentication, "The HTTP authentication mode is undefined.");
+        if (options.HttpAuthentication == AxonHttpAuthentication.BearerTokens) profile = WithBearerTokens(profile);
         if (options.JavaPackage is not null || options.ProjectName is not null)
         {
             profile = WithNames(profile, options.JavaPackage is null ? null : AxonNamesInput.Normalize(options.JavaPackage), options.ProjectName);

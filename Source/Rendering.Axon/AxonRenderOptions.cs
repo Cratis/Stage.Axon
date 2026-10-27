@@ -42,4 +42,9 @@ public sealed record AxonRenderOptions
     /// Gets whether to generate the TypeScript client. False preserves output without a client.
     /// </summary>
     public bool TypeScriptClient { get; init; }
+
+    /// <summary>
+    /// Gets the HTTP authentication mode. HTTP Basic is the default.
+    /// </summary>
+    public AxonHttpAuthentication HttpAuthentication { get; init; } = AxonHttpAuthentication.Basic;
 }
