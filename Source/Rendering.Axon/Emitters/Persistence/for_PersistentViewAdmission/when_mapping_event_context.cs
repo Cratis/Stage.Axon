@@ -36,7 +36,9 @@ public class when_mapping_event_context : given.a_flat_view
     [Fact] void should_keep_the_scoped_context_guard() => Code(_contexts["occurred"], "BoardStoreConfiguration").ShouldContain("persistentReadModelSafety");
     [Fact] void should_keep_scoped_views_refused() => PersistentViewAdmission.Supports(_contexts["occurred"], ReadModelId("Board")).ShouldBeFalse();
     [Fact] void should_bind_the_contextual_store() => Projector.ShouldContain("JpaReadModelStore.bind(store, context)");
-    [Fact] void should_resolve_the_message_and_processing_context() => Projector.ShouldContain("EventMessage message, QueryUpdateEmitter updates, ProcessingContext context)");
+    [Fact] void should_handle_with_only_the_emitter_and_processing_context() => Projector.ShouldContain(" event, QueryUpdateEmitter updates, ProcessingContext context)");
+    [Fact] void should_resolve_the_message_from_the_processing_context() => Projector.ShouldContain("var message = (EventMessage) Message.fromContext(context);");
+    [Fact] void should_not_resolve_the_message_as_a_handler_parameter() => Projector.ShouldNotContain("EventMessage message, QueryUpdateEmitter updates, ProcessingContext context)");
     [Fact] void should_use_the_delivered_timestamp() => Projector.ShouldContain("message.timestamp()");
     [Fact] void should_not_keep_projection_keys() => Projector.ShouldNotContain("Set<Object> keys");
     [Fact] void should_not_keep_pending_events() => Projector.ShouldNotContain("pending");

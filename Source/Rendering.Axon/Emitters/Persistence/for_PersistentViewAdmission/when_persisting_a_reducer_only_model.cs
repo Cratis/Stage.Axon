@@ -44,6 +44,8 @@ public class when_persisting_a_reducer_only_model : given.a_flat_view
     [Fact] void should_bind_the_handler_store() => Projector.ShouldContain("JpaReadModelStore.bind(store, context)");
     [Fact] void should_register_the_reduction_processor_namespace() => Code(_placed, "PersistentViewConfiguration").ShouldContain("\"axonviews.reduction.counters.rebuilt\"");
     [Fact] void should_dispatch_in_the_slice_namespace() => Projector.ShouldContain("@Namespace(\"axonviews.reduction.counters.rebuilt\")");
+    [Fact] void should_handle_with_only_the_processing_context() => Projector.ShouldContain("public void handle(CountRecorded event, ProcessingContext context)");
+    [Fact] void should_resolve_the_message_from_the_processing_context() => Projector.ShouldContain("var message = (EventMessage) Message.fromContext(context);");
     [Fact] void should_keep_the_memory_path_synchronized() => Projector.ShouldContain("public synchronized void on(CountRecorded event, EventMessage message");
     [Fact] void should_use_the_bound_store_for_deletion() => Projector.ShouldContain("if (next == null) store.remove(key); else store.put(key, next);");
     [Fact] void should_not_emit_notifications_without_observable_queries() => Projector.ShouldNotContain("runOnAfterCommit");

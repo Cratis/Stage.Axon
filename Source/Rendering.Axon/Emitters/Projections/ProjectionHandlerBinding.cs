@@ -29,12 +29,15 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var store = body.Reference(types.BasePackage + ".runtime.ReadModelStore");
         var modifier = synchronized ? "synchronized " : string.Empty;
         var updateParameter = _updates.ParameterFor(body);
-        var messageParameter = message ? $", {body.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message" : string.Empty;
+        var eventMessage = message ? body.Reference("org.axonframework.messaging.eventhandling.EventMessage") : string.Empty;
+        var messageParameter = message ? $", {eventMessage} message" : string.Empty;
         var messageArgument = message ? ", message" : string.Empty;
         var arguments = messageArgument + (_updates.Enabled ? ", updates" : string.Empty);
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
-            .Block($"public void handle({eventType} event{messageParameter}{updateParameter}, {processing} context)", method =>
+            .Block($"public void handle({eventType} event{updateParameter}, {processing} context)", method =>
             {
+                // The message comes from the context so the handler keeps the dispatch shape of a context-free handler.
+                if (message) method.Line($"var message = ({eventMessage}) {body.Reference("org.axonframework.messaging.core.Message")}.fromContext(context);");
                 method.Block($"if (!(store instanceof {adapter}<?>))", memory => memory.Line($"on(event{arguments});").Line("return;"))
                     .Line($"apply(event{messageArgument}{_updates.DefaultArgument}, {adapter}.bind(store, context));");
                 if (_updates.Enabled)
