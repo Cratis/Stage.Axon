@@ -67,12 +67,14 @@ internal static class AxonAdmission
         FileHeaderInput.TryRead(profile, out _) &&
         AxonApproximationsInput.TryRead(profile, out _) &&
         TypeScriptClientInput.TryRead(profile, out _) &&
+        HttpAuthenticationInput.TryRead(profile, out _) &&
         profile.Inputs.All(input => input.Name switch
         {
             AxonRendering.OptionsInput => input.Version == "1",
             FileHeaderInput.Name => true,
             AxonApproximationsInput.Name => input.Version == "1",
             TypeScriptClientInput.Name => true,
+            HttpAuthenticationInput.Name => true,
             _ => ValidStrictInput(input)
         });
 

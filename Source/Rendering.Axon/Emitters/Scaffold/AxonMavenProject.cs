@@ -7,7 +7,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 
 internal static class AxonMavenProject
 {
-    internal static string Pom(string package) => $$"""
+    internal static string Pom(string package, bool bearer = false) => $$"""
         <?xml version="1.0" encoding="UTF-8"?>
         <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <modelVersion>4.0.0</modelVersion>
@@ -23,7 +23,7 @@ internal static class AxonMavenProject
             <dependency><groupId>org.axonframework.extensions.spring</groupId><artifactId>axon-spring-boot-starter</artifactId></dependency>
             <dependency><groupId>io.projectreactor</groupId><artifactId>reactor-core</artifactId></dependency>
             <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
-            <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>
+            <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>{{(bearer ? "\n    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId></dependency>" : string.Empty)}}
             <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-validation</artifactId></dependency><dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency><dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>runtime</scope></dependency>
             <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc-test</artifactId><scope>test</scope></dependency>
             <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-test</artifactId><scope>test</scope></dependency>
