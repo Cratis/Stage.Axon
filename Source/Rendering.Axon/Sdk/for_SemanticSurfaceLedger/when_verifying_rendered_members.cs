@@ -48,7 +48,8 @@ public class when_verifying_rendered_members
     [Fact]
     public void should_verify_enum_and_type_claims_in_reader_source()
     {
-        var entries = Entries.Where(entry => IsEnumOrMarker(entry.Key) && !RenderedByDefault.Contains(entry.Key));
+        var entries = Entries.Where(entry => IsEnumOrMarker(entry.Key) && !RenderedByDefault.Contains(entry.Key)).ToArray();
+        Assert.NotEmpty(entries);
         var failures = entries.SelectMany(entry => ledger_contract.Readers(entry.Value).Where(reader => !NamesLiteral(reader, entry.Key))
             .Select(reader => entry.Key + ": literal missing from " + reader.FullName)).ToArray();
         Assert.True(failures.Length == 0, string.Join('\n', failures));
@@ -59,6 +60,16 @@ public class when_verifying_rendered_members
 
     [Fact]
     public void should_not_invent_a_body_lines_read() => Assert.False(il_reads.Reads(typeof(AxonCommandsEmitter), typeof(SemanticImplementationRequirement), "BodyLines"));
+
+    [Fact]
+    public void should_not_invent_an_enum_literal_in_a_reader() => Assert.False(NamesLiteral(typeof(CommandContractsEmitter), "SemanticEventVisibility.Private"));
+
+    [Fact]
+    public void should_only_confirm_positional_members_of_a_deconstructed_type()
+    {
+        Assert.True(il_reads.Reads(typeof(positional_reader), typeof(deconstructed_value), "First"));
+        Assert.False(il_reads.Reads(typeof(positional_reader), typeof(deconstructed_value), "Unread"));
+    }
 
     static bool IsProductionReader(Type reader)
     {
@@ -74,5 +85,19 @@ public class when_verifying_rendered_members
     {
         var literal = key.EndsWith(".$type", StringComparison.Ordinal) ? key.Split('.')[0] : key;
         return production_source.FilesOf(reader).Any(text => Regex.IsMatch(text, @"\b" + Regex.Escape(literal) + @"\b", RegexOptions.NonBacktracking));
+    }
+
+    static class positional_reader
+    {
+        internal static int Read(deconstructed_value value)
+        {
+            var (first, _) = value;
+            return first;
+        }
+    }
+
+    sealed record deconstructed_value(int First, int Second)
+    {
+        internal int Unread { get; init; }
     }
 }

@@ -8,7 +8,7 @@ internal static partial class SemanticSurfaceLedger
     static void ClassifyModel(LedgerBuilder rows)
     {
         rows.Rendered("Application selection and scope traversal determine the emitted declarations and artifact paths.", "ExecutableSemanticModel.Application SemanticApplication.Modules SemanticApplication.Id SemanticModule.Features SemanticModule.Id SemanticModule.Name SemanticFeature.Features SemanticFeature.Id SemanticFeature.Name SemanticFeature.Slices SemanticSlice.Id SemanticSlice.Name", typeof(ScopeSelection));
-        rows.Rendered("The application name supplies the generated Java base package.", "SemanticApplication.Name", typeof(Emitters.AxonEmissionContext));
+        rows.Rendered("The application name supplies the default generated Java base package when no explicit package is configured.", "SemanticApplication.Name", typeof(AxonNamesInput));
         rows.Rendered("Concept and composite declarations resolve generated command Java types.", "SemanticApplication.Concepts SemanticApplication.Types", typeof(Emitters.Commands.CommandJavaTypes));
         rows.Rendered("Application event sources resolve the primary route's tag and identifier type.", "SemanticApplication.EventSources", typeof(Emitters.Events.AxonEventSources));
         rows.Rendered("Declared application triggers produce trigger endpoints.", "SemanticApplication.Triggers", typeof(Emitters.Automations.ApplicationTriggersEmitter));
@@ -30,14 +30,14 @@ internal static partial class SemanticSurfaceLedger
     {
         const string metadata = "Identity, provenance or diagnostic metadata; no runtime behavior.";
         rows.Ignored(IgnoredReason.Identity, metadata, """
-            SemanticRevision.IsSet SemanticId.IsSet EventContractId.IsSet EventContractRevision.IsValid EventContractRevision.Value ApplicationIdentity.IsSet DocumentId.IsSet
+            SemanticRevision.IsSet SemanticId.IsSet EventContractId.IsSet EventContractRevision.IsValid ApplicationIdentity.IsSet DocumentId.IsSet
             SemanticKind.Application SemanticKind.Module SemanticKind.Feature SemanticKind.Slice SemanticKind.Concept SemanticKind.CompositeType SemanticKind.Property SemanticKind.Command
             SemanticKind.EventContract SemanticKind.ReadModel SemanticKind.Projection SemanticKind.Query SemanticKind.Specification SemanticKind.QueryArgument SemanticKind.Trigger SemanticKind.Reaction
             SemanticKind.Capture SemanticKind.EventSource SemanticKind.EventStream SemanticKind.Unknown
             SemanticAddressPartKind.Application SemanticAddressPartKind.Module SemanticAddressPartKind.Feature SemanticAddressPartKind.Slice SemanticAddressPartKind.Declaration
             SemanticAddressPartKind.Member SemanticAddressPartKind.Discriminator SemanticAddressPartKind.OwnerKind SemanticAddressPartKind.Generation SemanticAddressPartKind.Unknown
-            SemanticNullValue.$type SemanticAuthorization.$type SemanticCondition.$type
-            SemanticPolicyCondition.$type SemanticProjectionEventSourceIdentity.$type SemanticSpecificationResponse.$type
+            SemanticAuthorization.$type SemanticCondition.$type
+            SemanticPolicyCondition.$type SemanticSpecificationResponse.$type
             SemanticIdentityOrigin.Persisted SemanticIdentityOrigin.LegacyBootstrap SemanticIdentityOrigin.Unknown
             """);
         rows.Ignored(IgnoredReason.SourceProvenance, metadata, """

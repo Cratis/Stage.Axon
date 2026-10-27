@@ -47,6 +47,7 @@ internal static partial class SemanticSurfaceLedger
 
     static void ClassifyViews(LedgerBuilder rows)
     {
+        rows.Rendered("The concrete event-source identity pattern supplies the source identity for a projection value or key.", "SemanticProjectionEventSourceIdentity.$type", typeof(Emitters.Projections.ProjectionValues));
         const string persistent = "Conditional persistent support for admitted flat views with generation metadata and guarded pooled processors. Event-context values, nested targets and reducer-only models remain refused under STAGE-AXON-0308: their implementation is present but held back pending the multi-segment duplicate-apply proof. STAGE-AXON-0308 warns for unsupported shapes during default rendering and refuses them under strict rendering or persistent startup. Retained data without compatible generation metadata is refused; automatic replay and legacy adoption are not performed.";
         rows.Warned(["STAGE-AXON-0308"], persistent, "SemanticReadModel.Properties");
         rows.Warned(["STAGE-AXON-0308", "STAGE-AXON-0307"], persistent + " " + ProjectionMappingDetail, "SemanticProjectionEventContextValue.Path");

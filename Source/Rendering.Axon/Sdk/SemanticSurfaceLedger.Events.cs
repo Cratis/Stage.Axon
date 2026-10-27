@@ -9,6 +9,7 @@ internal static partial class SemanticSurfaceLedger
 {
     static void ClassifyEvents(LedgerBuilder rows)
     {
+        rows.Rendered("The revision's numeric value supplies the generated event version annotation.", "EventContractRevision.Value", typeof(AxonEventsEmitter));
         rows.Rendered("The route's source identity resolves the concept used for the primary event-source tag.", "SemanticEventSource.Id SemanticEventSource.IdentifierType", typeof(AxonEventSources));
         rows.Rendered("Contract identity, Java name and stored wire name select the emitted event artifact and event annotation.", "SemanticEventContract.Id SemanticEventContract.Name SemanticEventContract.StoredName", typeof(AxonEventsEmitter));
         rows.Rendered("Current event properties supply the generated event record components.", "SemanticEventContract.Properties", typeof(AxonEventSources));

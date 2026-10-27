@@ -16,7 +16,7 @@ internal static class ConceptGeneration
         if (string.Equals(generation.Kind, "uuid", StringComparison.OrdinalIgnoreCase) && concept.Primitive == SemanticPrimitiveType.Uuid)
         {
             if (generation != new SemanticGeneration(generation.Kind))
-                context.Degradation.Warn("STAGE-AXON-GENERATION-OPTIONS", concept.Id, "Generation options are not represented by UUID value creation.");
+                ConceptGenerationOptions.Report(context, concept, body);
             body.Line($"public static {type} create() {{ return new {type}({body.Reference(CratisFundamentals.ConceptsPackage + ".GenerateValue")}.uuid()); }}");
             return;
         }

@@ -58,7 +58,7 @@ internal static class il_reads
         try
         {
             var target = caller.Module.ResolveMethod(token, caller.DeclaringType?.GetGenericArguments(), caller.IsGenericMethod ? caller.GetGenericArguments() : null);
-            return target?.DeclaringType == declaring && (target.Name == "get_" + property || target.Name == "Deconstruct");
+            return ReadsProperty(target, declaring, property);
         }
         catch (ArgumentException)
         {
@@ -68,6 +68,13 @@ internal static class il_reads
         {
             return false;
         }
+    }
+
+    static bool ReadsProperty(MethodBase? target, Type declaring, string property)
+    {
+        if (target?.DeclaringType != declaring) return false;
+        if (target.Name == "get_" + property) return true;
+        return target.Name == "Deconstruct" && target.GetParameters().Any(parameter => parameter.IsOut && string.Equals(parameter.Name, property, StringComparison.OrdinalIgnoreCase));
     }
 
     static int OperandSize(OperandType operand, byte[] bytes, int position)
