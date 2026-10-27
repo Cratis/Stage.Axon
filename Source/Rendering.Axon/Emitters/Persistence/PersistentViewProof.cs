@@ -14,6 +14,7 @@ internal static class PersistentViewProof
         import java.net.http.HttpRequest;
         import java.net.http.HttpResponse;
         import java.util.HashSet;
+        import java.util.Set;
         import java.util.concurrent.TimeUnit;
         import org.junit.jupiter.api.Test;
         import org.springframework.boot.web.server.context.WebServerApplicationContext;
@@ -29,7 +30,7 @@ internal static class PersistentViewProof
                 var path = database();
                 var initial = expected();
                 java.util.Map<Integer, String> checkpoint;
-                java.util.Set<__MODEL__> persisted;
+                Set<__MODEL__> persisted;
                 try (var application = start(path)) {
                     var before = tokens(application);
         __APPENDS__

@@ -15,14 +15,17 @@ internal static class PersistentViewProofSupport
         import java.nio.file.Files;
         import java.nio.file.Path;
         import java.util.Base64;
+        import java.util.Collection;
         import java.util.List;
         import java.util.Map;
+        import java.util.Set;
         import java.util.TreeMap;
         import java.util.UUID;
         import java.util.concurrent.CompletableFuture;
         import java.util.concurrent.CountDownLatch;
         import java.util.concurrent.TimeUnit;
         import java.util.function.BooleanSupplier;
+        import java.util.stream.Collectors;
         import org.axonframework.common.configuration.Configuration;
         import org.axonframework.common.jpa.EntityManagerExecutor;
         import org.axonframework.eventsourcing.eventstore.EventStore;
@@ -86,8 +89,8 @@ internal static class PersistentViewProofSupport
                                     return (Void) null;
                                 })).get(10, TimeUnit.SECONDS);
             }
-            static java.util.Set<__MODEL__> normalized(java.util.Collection<__MODEL__> rows) {
-                return rows.stream().map(__NAME__Support::normalize).collect(java.util.stream.Collectors.toSet());
+            static Set<__MODEL__> normalized(Collection<__MODEL__> rows) {
+                return rows.stream().map(__NAME__Support::normalize).collect(Collectors.toSet());
             }
             private static __MODEL__ normalize(__MODEL__ row) {
                 __NORMALIZE__

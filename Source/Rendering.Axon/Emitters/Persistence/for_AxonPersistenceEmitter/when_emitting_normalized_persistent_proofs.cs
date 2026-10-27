@@ -25,6 +25,29 @@ public class when_emitting_normalized_persistent_proofs : Projections.for_AxonPr
     [Fact] void should_normalize_expected_rows() => Code("TotalPersistentTest").ShouldContain("normalized(initial)");
     [Fact] void should_normalize_multi_segment_rows() => Code("TotalPersistentMultiSegmentTest").ShouldContain("normalized(afterRetry)");
     [Fact] void should_compare_the_actual_persisted_rows_after_restart() => Code("TotalPersistentTest").ShouldContain("assertEquals(persisted, new HashSet<>(store(application).all())");
+    [Fact]
+    void should_import_the_normalization_collection_types()
+    {
+        Code("TotalPersistentSupport").ShouldContain("import java.util.Set;");
+        Code("TotalPersistentSupport").ShouldContain("import java.util.Collection;");
+        Code("TotalPersistentSupport").ShouldContain("import java.util.stream.Collectors;");
+    }
+
+    [Fact]
+    void should_use_short_names_in_normalization()
+    {
+        Code("TotalPersistentSupport").ShouldContain("static Set<");
+        Code("TotalPersistentSupport").ShouldContain("normalized(Collection<");
+        Code("TotalPersistentSupport").ShouldContain(".collect(Collectors.toSet())");
+    }
+
+    [Fact]
+    void should_import_the_persisted_row_set_type()
+    {
+        Code("TotalPersistentTest").ShouldContain("import java.util.Set;");
+        Code("TotalPersistentTest").ShouldNotContain("java.util.Set<");
+    }
+
     [Fact] void should_leave_flat_fields_unchanged() => Code("TotalPersistentSupport").ShouldContain("return row;");
     [Fact] void should_replace_every_proof_placeholder() => _context.Artifacts.Where(artifact => artifact.RelativePath.Contains("TotalPersistent", StringComparison.Ordinal)).All(artifact => !Text(artifact).Contains("__", StringComparison.Ordinal)).ShouldBeTrue();
 
