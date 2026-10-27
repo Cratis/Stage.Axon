@@ -13,12 +13,22 @@ internal static class PersistentViewAdmission
 
     internal static bool Supports(AxonEmissionContext context, SemanticId model)
     {
-        var slices = ScopeSelection.Select(context.Request).Select(owner => owner.Slice).ToArray();
+        var owners = ScopeSelection.Select(context.Request).ToArray();
+        var slices = owners.Select(owner => owner.Slice).ToArray();
         var projections = slices.SelectMany(slice => slice.Projections).Where(projection => projection.ReadModel == model).ToArray();
         var readModel = slices.SelectMany(slice => slice.ReadModels).FirstOrDefault(candidate => candidate.Id == model);
-        if (readModel is null || projections.Length == 0) return false;
-        return projections.All(projection => Flat(context, readModel, projection)) &&
-            !slices.SelectMany(slice => slice.Reducers).Any(reducer => reducer.ReadModel == model);
+        if (readModel is null) return false;
+        var reducers = owners.SelectMany(owner => owner.Slice.Reducers.Where(reducer => reducer.ReadModel == model).Select(reducer => (Owner: owner, Reducer: reducer))).ToArray();
+        if (projections.Length > 0)
+            return reducers.Length == 0 && projections.All(projection => Flat(context, readModel, projection));
+        return reducers.Length == 1 && Placed(context, reducers[0].Owner, reducers[0].Reducer);
+    }
+
+    internal static bool Placed(AxonEmissionContext context, LocatedSemanticSlice owner, SemanticReducer reducer)
+    {
+        if (reducer.From is not null || reducer.Transitions.IsEmpty) return false;
+        var admission = ReducerBodies.Admission(context, owner, reducer);
+        return admission.Blocked is null && admission.Transitions.Values.All(transition => transition.Placed);
     }
 
     static bool Flat(AxonEmissionContext context, SemanticReadModel model, SemanticProjection projection)

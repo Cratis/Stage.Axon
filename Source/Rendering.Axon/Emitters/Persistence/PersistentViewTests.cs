@@ -25,15 +25,20 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
 
     void EmitModel(LocatedSemanticSlice owner, SemanticReadModel model)
     {
-        var projection = owner.Slice.Projections.First(candidate => candidate.ReadModel == model.Id);
-        var spec = Specification(owner, model, projection);
+        var projection = owner.Slice.Projections.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
+        var reducer = owner.Slice.Reducers.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
+        SemanticId[] observed = projection is not null ? [.. ProjectionTransitions.From(projection).Select(from => from.EventContract)] : [.. reducer!.Transitions.Select(transition => transition.EventContract)];
+        var spec = Specification(owner, model, observed);
         var query = Query(owner, model);
         if (spec is null || query is null) return;
         var package = types.Package(owner);
         var modelName = JavaNames.Type(model.Name);
         var name = modelName + "Persistent";
         var updates = new ProjectionUpdates(context, types, model.Id);
-        var arguments = ProjectionHandlerShape.Arguments(projection, updates);
+        var arguments = projection is not null ? ProjectionHandlerShape.Arguments(projection, updates) : ", null" + updates.DefaultArgument;
+        var projector = projection is not null ? JavaNames.Type(projection.Name) + "Projector" : modelName + "ReducerProjector";
+        var reducerArgument = reducer is null ? string.Empty : $", new {package}.{modelName}Reducer() {{}}";
+        var reducerImports = reducer is null ? string.Empty : $", {package}.{modelName}ReducerConfiguration.class";
         var events = spec.GivenEvents.Select(given => AxonViewEvents.Expression(context, types, given)).ToArray();
         string Render(string source) => source.Replace("__PACKAGE__", package, StringComparison.Ordinal)
             .Replace("__RUNTIME__", types.BasePackage + ".runtime", StringComparison.Ordinal)
@@ -41,8 +46,10 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__APPLICATION__", types.BasePackage, StringComparison.Ordinal)
             .Replace("__MODEL__", package + "." + modelName, StringComparison.Ordinal).Replace("__NAME__", name, StringComparison.Ordinal)
             .Replace("__QUALIFIER__", package + "." + modelName, StringComparison.Ordinal)
-            .Replace("__PROJECTOR__", package + "." + JavaNames.Type(projection.Name) + "Projector", StringComparison.Ordinal)
-            .Replace("__IMPORTS__", Imports(model, projection, query), StringComparison.Ordinal)
+            .Replace("__PROJECTOR__", package + "." + projector, StringComparison.Ordinal)
+            .Replace("__REDUCER_ARGUMENT__", reducerArgument, StringComparison.Ordinal)
+            .Replace("__REDUCER_IMPORTS__", reducerImports, StringComparison.Ordinal)
+            .Replace("__IMPORTS__", Imports(model, projector, query) + reducerImports, StringComparison.Ordinal)
             .Replace("__ROUTE__", QueryEndpoint.Route(owner, query), StringComparison.Ordinal)
             .Replace("__EVENT__", events[0], StringComparison.Ordinal)
             .Replace("__EVENT_TYPE__", types.EventType(spec.GivenEvents[0].EventContract), StringComparison.Ordinal)
@@ -63,7 +70,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         Add("LegacyTest", PersistentViewLegacyProof.Source);
         Add("EnvelopeTest", PersistentViewEnvelopeTests.Source);
         var live = LiveQuery(owner, model);
-        if (live is not null && ProjectionTransitions.From(projection).Count(from => from.EventContract == spec.GivenEvents[0].EventContract) == 1)
+        if (live is not null && observed.Count(contract => contract == spec.GivenEvents[0].EventContract) == 1)
             Add("DefaultDispatchTest", DefaultViewDispatchProof.Source.Replace("__LIVE_QUERY__", package + "." + JavaNames.Type(live.Name), StringComparison.Ordinal));
     }
 
@@ -74,9 +81,8 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         return $"        if (event instanceof {types.EventType(id)} tagged) return new Tag({JavaCodeBuilder.StringLiteral(tag.TagKey)}, tagged.{tag.ComponentName}().toString());";
     }));
 
-    SemanticSpecification? Specification(LocatedSemanticSlice owner, SemanticReadModel model, SemanticProjection projection)
+    SemanticSpecification? Specification(LocatedSemanticSlice owner, SemanticReadModel model, IReadOnlyCollection<SemanticId> observed)
     {
-        var observed = ProjectionTransitions.From(projection).Select(from => from.EventContract).ToHashSet();
         return owner.Slice.Specifications.FirstOrDefault(spec => ViewSpecificationSupport.Legacy(spec, model, types) &&
             !spec.GivenEvents.IsEmpty && spec.ThenReadModels.Any(expected => expected.ReadModel == model.Id) &&
             spec.GivenEvents.All(given => observed.Contains(given.EventContract)));
@@ -90,11 +96,11 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         query.ReadModel == model.Id && query.Cardinality == SemanticQueryCardinality.Many && query.Delivery == SemanticQueryDelivery.Live && query.Authorization is null &&
         !QueryPerformer.Required(context, query) && !new QueryShape(query, model, types).Arguments.Any());
 
-    string Imports(SemanticReadModel model, SemanticProjection projection, SemanticKeyedQuery query) => string.Join(", ", new[]
+    string Imports(SemanticReadModel model, string projector, SemanticKeyedQuery query) => string.Join(", ", new[]
     {
         types.BasePackage + ".infrastructure.AxonConfiguration.class", types.BasePackage + ".infrastructure.SecurityConfiguration.class",
         types.BasePackage + ".runtime.persistent.PersistentConfiguration.class", persistence + ".PersistentViewConfiguration.class",
-        JavaNames.Type(model.Name) + "StoreConfiguration.class", JavaNames.Type(projection.Name) + "Projector.class",
+        JavaNames.Type(model.Name) + "StoreConfiguration.class", projector + ".class",
         JavaNames.Type(query.Name) + "Handler.class", JavaNames.Type(query.Name) + "Endpoint.class"
     });
 }

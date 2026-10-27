@@ -61,7 +61,12 @@ public class when_models_claim_persistence_framework_names : Projections.for_Axo
     [Fact] void should_still_import_bean() => _configuration.ShouldContain("import org.springframework.context.annotation.Bean;");
     [Fact] void should_still_import_the_event_processor_definition() => _configuration.ShouldContain("import org.axonframework.extension.spring.config.EventProcessorDefinition;");
     [Fact] void should_still_import_the_propagating_error_handler() => _configuration.ShouldContain("import org.axonframework.messaging.eventhandling.processing.errorhandling.PropagatingErrorHandler;");
-    [Fact] void should_use_the_framework_set() => _configuration.ShouldContain("Set.of(\"axonviews.views.counters.totals\")");
+    [Fact]
+    void should_use_the_framework_set()
+    {
+        _configuration.ShouldContain("Set.of(");
+        _configuration.ShouldContain("\"axonviews.views.counters.totals\"");
+    }
     [Fact] void should_use_the_framework_processor_definition() => _configuration.ShouldContain("EventProcessorDefinition.pooledStreamingMatching(");
     [Fact] void should_use_the_framework_error_handler() => _configuration.ShouldContain("config.errorHandler(PropagatingErrorHandler.INSTANCE)");
     [Fact] void should_not_declare_a_colliding_type_in_the_configuration() => _configuration.ShouldNotContain("class Set");

@@ -38,12 +38,13 @@ internal static class DefaultViewDispatchProof
         import org.springframework.boot.test.context.TestConfiguration;
         import org.springframework.context.annotation.Import;
         import static org.junit.jupiter.api.Assertions.*;
+        import static __PACKAGE__.__NAME__Support.normalized;
 
         final class __NAME__DefaultDispatchTest {
             @TestConfiguration(proxyBeanMethods = false)
             @EnableAutoConfiguration
             @Import({__APPLICATION__.infrastructure.AxonConfiguration.class, __APPLICATION__.infrastructure.SecurityConfiguration.class,
-                    __MODEL__StoreConfiguration.class, __PROJECTOR__.class, __LIVE_QUERY__Handler.class})
+                    __MODEL__StoreConfiguration.class, __PROJECTOR__.class__REDUCER_IMPORTS__, __LIVE_QUERY__Handler.class})
             static class DefaultFixture {
                 @Bean SmartInitializingSingleton defaultFixtureProcessorGuard(
                         Configuration configuration) {
@@ -135,7 +136,7 @@ internal static class DefaultViewDispatchProof
                         assertTrue(signals.getLast().invalidated());
                         assertEquals(1, writesAtInvalidation.get(), "Invalidation must follow the in-memory update");
                         var snapshot = gateway.query(new __LIVE_QUERY__(), __LIVE_QUERY__.Result.class).get(20, TimeUnit.SECONDS);
-                        assertEquals(store.all(), snapshot.rows());
+                        assertEquals(normalized(store.all()), normalized(snapshot.rows()));
                         assertEquals(2, signals.size(), "One event must emit exactly one invalidation");
                     } finally { if (active.get() != null) active.get().cancel(); }
                 }

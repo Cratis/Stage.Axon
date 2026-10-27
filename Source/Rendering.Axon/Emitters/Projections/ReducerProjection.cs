@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -98,6 +99,7 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
         foreach (var transition in reducer.Transitions) types.EventType(transition.EventContract, code);
         var values = new ProjectionValues(context, types, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "ReducerProjector")})")
+            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
             .Block($"public class {name}ReducerProjector", body =>
             {
                 body.Line($"private final {storeType}<{body.Reference("java.lang.Object")}, {name}> store;").Line($"private final {name}Reducer reducer;")
@@ -105,6 +107,18 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
                 foreach (var transition in reducer.Transitions)
                 {
                     var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == transition.EventContract);
+                    if (PersistentViewAdmission.Supports(context, model.Id))
+                    {
+                        new ProjectionHandlerBinding(context, types, model, package).Emit(
+                            body,
+                            types.EventType(transition.EventContract, body),
+                            method => method.Line($"var key = {values.Source(@event)};")
+                                .Line("var next = reducer.reduce(event, store.get(key).orElse(null), message);")
+                                .Line("if (next == null) store.remove(key); else store.put(key, next);"),
+                            message: true,
+                            synchronized: true);
+                        continue;
+                    }
                     body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
                         .Block($"public synchronized void on({types.EventType(transition.EventContract, body)} event, {body.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message{updates.ParameterFor(body)})", method =>
                         {

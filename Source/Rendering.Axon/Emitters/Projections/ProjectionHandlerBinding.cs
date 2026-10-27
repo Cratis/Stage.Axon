@@ -11,22 +11,23 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
 {
     readonly ProjectionUpdates _updates = new(context, types, model.Id);
 
-    internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false)
+    internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false, bool synchronized = false)
     {
         if (PersistentViewAdmission.Supports(context, model.Id))
         {
-            EmitContextual(body, eventType, transitions, message);
+            EmitContextual(body, eventType, transitions, message, synchronized);
             return;
         }
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
             .Block($"public void on({eventType} event{_updates.Parameter})", method => Apply(method, transitions));
     }
 
-    void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message)
+    void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message, bool synchronized)
     {
         var adapter = body.Reference(types.BasePackage + ".persistence.JpaReadModelStore");
         var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
         var store = body.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var modifier = synchronized ? "synchronized " : string.Empty;
         var updateParameter = message ? _updates.ParameterFor(body) : _updates.Parameter;
         var messageParameter = message ? $", {body.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message" : string.Empty;
         var messageArgument = message ? ", message" : string.Empty;
@@ -39,7 +40,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
                 if (_updates.Enabled)
                     method.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
             })
-            .Block($"public void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store);"))
+            .Block($"public {modifier}void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store);"))
             .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
     }
 
