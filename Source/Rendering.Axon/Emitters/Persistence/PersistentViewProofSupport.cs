@@ -86,6 +86,12 @@ internal static class PersistentViewProofSupport
                                     return (Void) null;
                                 })).get(10, TimeUnit.SECONDS);
             }
+            static java.util.Set<__MODEL__> normalized(java.util.Collection<__MODEL__> rows) {
+                return rows.stream().map(__NAME__Support::normalize).collect(java.util.stream.Collectors.toSet());
+            }
+            private static __MODEL__ normalize(__MODEL__ row) {
+                __NORMALIZE__
+            }
             static List<__MODEL__> expected() {
                 var store = new InMemoryReadModelStore<Object, __MODEL__>();
                 var projector = new __PROJECTOR__(store);

@@ -49,6 +49,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__APPENDS__", string.Join('\n', events.Select(expression => $"            append(application, {expression});")), StringComparison.Ordinal)
             .Replace("__EXPECTED__", string.Join('\n', events.Select(expression => $"        projector.on({expression}{updates.DefaultArgument});")), StringComparison.Ordinal)
             .Replace("__ARGUMENT__", updates.DefaultArgument, StringComparison.Ordinal)
+            .Replace("__NORMALIZE__", "return row;", StringComparison.Ordinal)
             .Replace("__TAGS__", Tags(spec), StringComparison.Ordinal)
             .Replace("__FIXTURE_EVENTS__", string.Join(", ", events), StringComparison.Ordinal);
         void Add(string suffix, string source) => context.Artifacts.Add(PlannedArtifact.CreateText(
