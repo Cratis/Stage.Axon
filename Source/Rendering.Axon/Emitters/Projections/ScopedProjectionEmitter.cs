@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -18,6 +19,11 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
 
     internal void Emit()
     {
+        if (ProjectionHandlerShape.RootOnly(projection) && PersistentViewAdmission.Supports(context, model.Id))
+        {
+            new RootProjectionEmitter(context, types, package, projection, model).Emit();
+            return;
+        }
         var name = JavaNames.Type(projection.Name) + "Projector";
         var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare(ChangeType(_root));
         foreach (var property in _root.All.SelectMany(node => node.Properties)) types.ClaimProjectionType(property.Type, code);

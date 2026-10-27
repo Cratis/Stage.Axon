@@ -109,14 +109,13 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
                     var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == transition.EventContract);
                     if (PersistentViewAdmission.Supports(context, model.Id))
                     {
-                        new ProjectionHandlerBinding(context, types, model, package).Emit(
+                        new ProjectionHandlerBinding(context, types, model, package, synchronized: true).Emit(
                             body,
                             types.EventType(transition.EventContract, body),
                             method => method.Line($"var key = {values.Source(@event)};")
                                 .Line("var next = reducer.reduce(event, store.get(key).orElse(null), message);")
                                 .Line("if (next == null) store.remove(key); else store.put(key, next);"),
-                            message: true,
-                            synchronized: true);
+                            message: true);
                         continue;
                     }
                     body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")

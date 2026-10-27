@@ -7,22 +7,22 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package)
+internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false)
 {
     readonly ProjectionUpdates _updates = new(context, types, model.Id);
 
-    internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false, bool synchronized = false)
+    internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false)
     {
         if (PersistentViewAdmission.Supports(context, model.Id))
         {
-            EmitContextual(body, eventType, transitions, message, synchronized);
+            EmitContextual(body, eventType, transitions, message);
             return;
         }
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
             .Block($"public void on({eventType} event{_updates.Parameter})", method => Apply(method, transitions));
     }
 
-    void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message, bool synchronized)
+    void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message)
     {
         var adapter = body.Reference(types.BasePackage + ".persistence.JpaReadModelStore");
         var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");

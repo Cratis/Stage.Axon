@@ -16,7 +16,8 @@ internal sealed class ProjectionRecords(SemanticApplication application, ViewJav
         for (var index = 0; index < path.Count; index++)
         {
             result = properties.FirstOrDefault(property => property.Id == path[index]);
-            if (result is null || (result.Type.IsCollection && index < path.Count - 1)) return null;
+            if (result is null) return null;
+            if (result.Type.IsCollection && index < path.Count - 1) return null;
             properties = application.Types.FirstOrDefault(type => type.Id == result.Type.Target)?.Properties ?? [];
         }
         return result;
