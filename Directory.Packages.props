@@ -1,10 +1,12 @@
 <Project>
   <PropertyGroup>
+    <!-- Keep equal to Cratis/cli Directory.Packages.props StageVersion; .github/workflows/cli-stage-version.yml checks it. -->
+    <StageVersion Condition="'$(StageVersion)' == ''">4.203.0</StageVersion>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageVersionOverrideEnabled>false</CentralPackageVersionOverrideEnabled>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Cratis.Stage.Contracts" Version="4.197.0" />
+    <PackageVersion Include="Cratis.Stage.Contracts" Version="$(StageVersion)" />
     <PackageVersion Include="Cratis.Screenplay" Version="4.250.0" />
     <PackageVersion Include="Cratis.Screenplay.CanonicalCorpus" Version="4.241.0" />
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" NoWarn="NU5104" />
