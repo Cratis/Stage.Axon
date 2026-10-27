@@ -47,5 +47,5 @@ public class when_verifying_ignored_members
     }
 
     [Fact]
-    public void should_not_exceed_the_shrinking_legacy_budget() => Assert.InRange(SemanticSurfaceLedger.Entries.Count(entry => ledger_contract.Legacy(entry.Value)), 0, ledger_contract.LegacyBudget);
+    public void should_not_exceed_the_shrinking_legacy_budget() => Assert.Equal(ledger_contract.LegacyBudget, SemanticSurfaceLedger.Entries.Count(entry => ledger_contract.Legacy(entry.Value)));
 }

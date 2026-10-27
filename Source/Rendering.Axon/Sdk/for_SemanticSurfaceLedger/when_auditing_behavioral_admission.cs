@@ -46,8 +46,8 @@ public class when_auditing_behavioral_admission : Specification
         SemanticSurfaceLedger.Entries["SemanticEventVisibility.Private"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Rendered);
 
     [Fact]
-    void should_render_the_reserved_atomic_mode_by_construction() =>
-        SemanticSurfaceLedger.Entries["SemanticReactionProductionMode.Atomic"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Rendered);
+    void should_not_claim_the_unread_atomic_mode_is_rendered() =>
+        SemanticSurfaceLedger.Entries["SemanticReactionProductionMode.Atomic"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Warned);
 
     [Fact]
     void should_keep_behavioral_classification_after_view_initialization() =>
