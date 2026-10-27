@@ -35,7 +35,7 @@ internal static partial class CommandEndpointEmitter
                 .Block($"public {name}Endpoint({gateway} commandGateway, {name}Rules rules)", constructor => constructor.Line("this.commandGateway = commandGateway;").Line("this.rules = rules;"))
                 .Line("@" + body.Reference("org.springframework.web.bind.annotation.PostMapping") + "(" + JavaCodeBuilder.StringLiteral(Route(located, command)) + ")");
             var expression = AxonHttpTestsEndpoints.Expression(Authorize(context, command, body));
-            AxonHttpTestsEndpoints.Register(context, new("command", "POST", Route(located, command), null, expression, [], null));
+            AxonHttpTestsEndpoints.Register(context, new("command", "POST", Route(located, command), null, expression, [], null, command.Id));
             body.Block($"public {body.Reference("java.util.concurrent.CompletableFuture")}<{returnType}> execute(@{body.Reference("org.springframework.web.bind.annotation.RequestBody")} {name} request)", method =>
                 method.Line("var command = " + (command.Properties.Any(property => property.IsGenerated) || source?.Allocated == true ? "request.forRequest();" : "request;"))
                     .Line("rules.validateInput(command);").Line($"return commandGateway.send(command, {returnType}.class);"));

@@ -60,6 +60,17 @@ public static class AxonRendering
             profile.RendererVersion,
             [.. profile.Inputs.Where(input => input.Name != AxonApproximationsInput.Name), AxonApproximationsInput.Create(codes)]);
 
+    /// <summary>Returns the profile with the generated TypeScript client requested; the client is not rendered unless it is requested.</summary>
+    /// <param name="profile">The Axon profile to extend.</param>
+    /// <returns>The profile carrying the opt-in; applying it again changes nothing.</returns>
+    public static ArtifactRenderProfile WithTypeScriptClient(ArtifactRenderProfile profile) =>
+        ArtifactRenderProfile.Create(
+            profile.Target,
+            profile.TargetVersion,
+            profile.Renderer,
+            profile.RendererVersion,
+            [.. profile.Inputs.Where(input => input.Name != TypeScriptClientInput.Name), TypeScriptClientInput.Create()]);
+
     /// <summary>Plans the selected scope from a compiler result, preserving its implementation sidecars.</summary>
     /// <param name="loaded">The compiled semantic model.</param>
     /// <param name="scope">The primary selected scope.</param>

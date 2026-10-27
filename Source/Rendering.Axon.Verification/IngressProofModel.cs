@@ -14,17 +14,17 @@ internal static class IngressProofModel
     internal const string Application = "ingress-invariants";
     internal const string PersistentApplication = "ingress-persistent";
 
-    internal static ArtifactRenderPlan Plan(LoadedSemanticModel loaded) => new AxonArtifactRenderPlanner().Plan(Request(loaded));
+    internal static ArtifactRenderPlan Plan(LoadedSemanticModel loaded, ArtifactRenderProfile? profile = null) => new AxonArtifactRenderPlanner().Plan(Request(loaded, profile));
 
-    internal static ArtifactRenderPlan PersistentPlan(LoadedSemanticModel loaded)
+    internal static ArtifactRenderPlan PersistentPlan(LoadedSemanticModel loaded, ArtifactRenderProfile? profile = null)
     {
-        var request = Request(loaded);
+        var request = Request(loaded, profile);
         var scopes = request.Model.Application.Modules.Single().Features.Single().Slices.Where(slice => !slice.Commands.IsEmpty)
             .Select(slice => new ArtifactRenderScope(ArtifactRenderScopeKind.Slice, slice.Id)).ToArray();
         return new AxonArtifactRenderPlanner().Plan(request with { Scope = scopes[0], AdditionalScopes = [.. scopes.Skip(1)] });
     }
 
-    static ArtifactRenderRequest Request(LoadedSemanticModel loaded)
+    static ArtifactRenderRequest Request(LoadedSemanticModel loaded, ArtifactRenderProfile? profile)
     {
         var slices = loaded.Model.Application.Modules.Single().Features.Single().Slices;
         var commands = slices.SelectMany(slice => slice.Commands).ToArray();
@@ -76,6 +76,6 @@ internal static class IngressProofModel
         };
         var model = ExecutableSemanticModel.Create(new(25, 0), SemanticVersion.V25, application);
         var scope = new ArtifactRenderScope(ArtifactRenderScopeKind.Application, application.Id);
-        return new(model, SemanticExecutionPlan.Compile(model).Plan!, AxonRendering.CreateProfile(), scope);
+        return new(model, SemanticExecutionPlan.Compile(model).Plan!, profile ?? AxonRendering.CreateProfile(), scope);
     }
 }

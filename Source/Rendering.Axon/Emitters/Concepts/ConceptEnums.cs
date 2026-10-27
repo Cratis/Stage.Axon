@@ -8,10 +8,15 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Concepts;
 
 internal static class ConceptEnums
 {
+    /// <summary>Whether the enumeration is written on the wire as numbers; this is the single predicate the Java and TypeScript renderings share.</summary>
+    /// <param name="concept">The enumeration concept.</param>
+    /// <returns>True when every value has a number.</returns>
+    internal static bool IsNumeric(SemanticConcept concept) => concept.Numbers is { } numbers && numbers.Length == concept.Values.Length;
+
     internal static string Emit(AxonEmissionContext context, SemanticConcept concept)
     {
         var name = JavaNames.Type(concept.Name);
-        var numeric = concept.Numbers is { } numbers && numbers.Length == concept.Values.Length;
+        var numeric = IsNumeric(concept);
         var code = JavaSemanticTypes.ConceptBuilder(context, name);
         var primitive = code.Reference(numeric ? "java.lang.Integer" : "java.lang.String");
         code.Block("public enum " + name, body =>
