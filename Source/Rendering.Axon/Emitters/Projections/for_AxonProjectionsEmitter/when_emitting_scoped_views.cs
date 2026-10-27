@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Collections.Immutable;
+using System.Reflection;
 using Cratis.Screenplay.Semantics;
 using Cratis.Screenplay.Semantics.Execution;
 using Cratis.Specifications;
@@ -12,10 +14,12 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections.for_AxonProjectionsEm
 public class when_emitting_scoped_views : given.a_view_request
 {
     AxonEmissionContext _context;
+    ImmutableHashSet<SemanticId> _unadmitted;
     string _projector;
 
     void Because()
     {
+        _unadmitted = (ImmutableHashSet<SemanticId>)typeof(SemanticExecutionPlan).GetProperty("UnadmittedArtifacts", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_request.ExecutionPlan)!;
         _context = new(_request, new(_request.Profile));
         new AxonProjectionsEmitter().Emit(_context);
         _projector = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("BoardProjectionProjector.java", StringComparison.Ordinal)));
@@ -45,12 +49,26 @@ public class when_emitting_scoped_views : given.a_view_request
     void should_match_the_reference_execution_for_every_projected_spec()
     {
         var runner = new SemanticSpecificationRunner();
-        var failures = ScopeSelection.Select(_request).Where(slice => slice.Slice.Reducers.IsEmpty).SelectMany(slice => slice.Slice.Specifications)
+        var failures = ReferenceSpecifications().Where(specification => !ReferenceUnavailable(specification))
             .Select(specification => runner.Run(_request.ExecutionPlan, specification.Id)).Where(result => !result.Passed)
             .Select(result => string.Join('\n', result.Failures) + "\nActual: " + string.Join("; ", result.Execution.World.ReadModels.SelectMany(model => model.Values).Select(value => value.TargetProperty + "=" + Describe(value.Value))));
         var messages = string.Join('\n', failures);
         Assert.True(messages.Length == 0, messages);
     }
+
+    [Fact]
+    void should_exclude_only_the_context_total_spec_from_reference_execution()
+    {
+        var excluded = ReferenceSpecifications().Where(ReferenceUnavailable).ToArray();
+        Assert.Equal(["RetainingContextAndDetails"], excluded.Select(specification => specification.Name));
+        Assert.All(excluded, specification => Assert.Contains(specification.ThenReadModels, expected => expected.ReadModel == ReadModelId("ContextTotal")));
+    }
+
+    IEnumerable<SemanticSpecification> ReferenceSpecifications() => ScopeSelection.Select(_request)
+        .Where(slice => slice.Slice.Reducers.IsEmpty).SelectMany(slice => slice.Slice.Specifications);
+
+    bool ReferenceUnavailable(SemanticSpecification specification) => specification.ThenReadModels.Any(expected =>
+        _request.ExecutionPlan.Projections.Values.Any(projection => projection.ReadModel == expected.ReadModel && _unadmitted.Contains(projection.Id)));
 
     static string Describe(SemanticValue value) => value switch
     {

@@ -73,14 +73,17 @@ module Views
           note = null
 
     slice StateView ContextTotals
+      event ContextRecorded
+        name String
+
       readmodel ContextTotal
         name String key
         occurred DateTime
         correlation Uuid optional
         details CounterDetails optional
 
-      projection ContextTotalProjection => ContextTotal
-        from Increased
+      projection ContextProjection => ContextTotal
+        from ContextRecorded
           key "global"
           name = "global"
           occurred = $eventContext.occurred
@@ -90,8 +93,8 @@ module Views
       query AllContextTotals => ContextTotal[]
 
       specification RetainingContextAndDetails
-        given Increased
-          amount = 8
+        given ContextRecorded
+          name = "global"
         then readmodel ContextTotal
           name = "global"
           details = { "note": "increased" }
