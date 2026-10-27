@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Queries;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -94,7 +95,7 @@ internal sealed class NativeQuerySpecifications(AxonEmissionContext context, Vie
     {
         var model = plan.Projection.Model;
         var projection = plan.Projection.Projection;
-        code.Line($"{code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<Object, {JavaNames.Type(model.Name)}> store = new {code.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
+        code.Line($"{code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<Object, {JavaNames.Type(model.Name)}> store = new {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
             .Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(store);");
         var arguments = ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id));
         foreach (var given in plan.Events) code.Line($"projector.on({AxonViewEvents.Expression(context, types, given, code)}{arguments});");

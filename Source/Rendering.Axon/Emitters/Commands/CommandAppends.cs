@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -65,7 +66,7 @@ internal sealed class CommandAppends(AxonEmissionContext context, SemanticComman
         {
             SemanticEventContextValueKind.EventSourceIdentity => expressions.Convert("command." + source.Member + "()" + (source.RuntimeId ? ".value()" : string.Empty), source.Type, target),
             SemanticEventContextValueKind.Occurred => expressions.Convert("occurred", SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.DateTime), target),
-            SemanticEventContextValueKind.CausedBySubject => expressions.Convert(context.BasePackage + ".runtime.Caller.current().identity()", SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text), target),
+            SemanticEventContextValueKind.CausedBySubject => expressions.Convert(AxonRuntimePackage.Type(context.BasePackage, "Caller") + ".current().identity()", SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text), target),
             _ => null
         };
     }

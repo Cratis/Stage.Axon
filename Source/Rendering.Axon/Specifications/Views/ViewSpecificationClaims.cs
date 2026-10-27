@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -37,8 +38,8 @@ internal sealed class ViewSpecificationClaims(AxonEmissionContext context, ViewJ
         types.EventType(given.EventContract, code);
         foreach (var property in contract.Properties) Literal(Value(given, property, primary.ComponentName, normalized), property.Type, code);
         if (contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName)) return;
-        if (!primary.JavaType.StartsWith(types.BasePackage + ".runtime.", StringComparison.Ordinal)) code.Reference(primary.JavaType);
-        if (given.EventSource is { } source && primary.JavaType != types.BasePackage + ".runtime.EventSourceId") Literal(source.Value, source.Type, code);
+        if (!primary.JavaType.StartsWith(AxonRuntimePackage.JavaPackage(types.BasePackage) + ".", StringComparison.Ordinal)) code.Reference(primary.JavaType);
+        if (given.EventSource is { } source && primary.JavaType != AxonRuntimePackage.Type(types.BasePackage, "EventSourceId")) Literal(source.Value, source.Type, code);
     }
 
     static SemanticValue? Value(SemanticSpecificationEvent given, SemanticProperty property, string primary, bool normalized)
