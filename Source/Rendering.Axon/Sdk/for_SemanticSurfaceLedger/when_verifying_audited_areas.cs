@@ -35,6 +35,9 @@ public class when_verifying_audited_areas
     [Fact]
     public void should_not_leave_specification_members_legacy() => Audit("SemanticSpecification SemanticSpecificationAbsentReadModel SemanticSpecificationInvocation SemanticSpecificationRedelivery SemanticSpecificationCommand SemanticSpecificationAppend SemanticSpecificationEvent SemanticFixtureRoute SemanticFixtureRoutePart SemanticSpecificationReadModel SemanticSpecificationQueryResult SemanticSpecificationError SemanticPropertyValue SemanticEventSourceIdentity SemanticValue SemanticTextValue SemanticNumberValue SemanticBooleanValue SemanticArrayValue SemanticCompositeValue SemanticValueKind SemanticNullValue SemanticCaller SemanticCallerClaim SemanticSpecificationCapture SemanticSpecificationTrigger SemanticSpecificationGeneratedValue SemanticScalarSpecificationResponse SemanticRecordSpecificationResponse SemanticSpecificationResponseField", 95);
 
+    [Fact]
+    public void should_not_leave_implementation_members_legacy() => Audit("SemanticImplementationRequirement SemanticAttachmentResolution SemanticExecutionCapability SemanticImplementationRole SemanticImplementationBodySpan", 46);
+
     static void Audit(string types, int count)
     {
         var names = types.Split(' ').ToHashSet(StringComparer.Ordinal);
