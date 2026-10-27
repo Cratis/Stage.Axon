@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -17,7 +18,7 @@ internal static class InlineImplementationDiagnostics
             .Where(requirement => !context.ConsumedImplementations.Contains(requirement.RequirementId) && selected.Any(slice => Selected(requirement, slice)))
             .OrderBy(requirement => requirement.RequirementId, StringComparer.Ordinal).ToArray();
         if (pending.Length == 0) return;
-        var code = new JavaCodeBuilder(context.BasePackage + ".runtime").Declare("UnsupportedImplementations");
+        var code = new JavaCodeBuilder(AxonRuntimePackage.InlinePackage(context)).Declare("UnsupportedImplementations");
         code.Block("public final class UnsupportedImplementations", body =>
         {
             body.Line("private UnsupportedImplementations() {}");
@@ -30,7 +31,7 @@ internal static class InlineImplementationDiagnostics
                 body.UnsupportedIntent($"execute {requirement.Role}: {reason}", path, refusal);
             }
         });
-        context.AddJava(context.BasePackage + ".runtime", "UnsupportedImplementations", code.Build(), sources: [.. pending.Select(requirement => requirement.Source.SemanticId).Distinct()]);
+        context.AddJava(AxonRuntimePackage.InlinePackage(context), "UnsupportedImplementations", code.Build(), sources: [.. pending.Select(requirement => requirement.Source.SemanticId).Distinct()]);
     }
 
     static string Reason(AxonEmissionContext context, SemanticImplementationRequirement requirement)

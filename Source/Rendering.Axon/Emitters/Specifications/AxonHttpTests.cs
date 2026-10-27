@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Globalization;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Specifications;
@@ -35,7 +36,7 @@ internal static class AxonHttpTests
 
     static void EmitRuntimeEcho(AxonEmissionContext context)
     {
-        var package = context.BasePackage + ".runtime";
+        var package = AxonRuntimePackage.InlinePackage(context);
         const string name = "RuntimeHttpExchangeTest";
         const string payload = "{\"id\":\"00000000-0000-0000-0000-000000000001\"}";
         var scenario = new AxonHttpScenario(

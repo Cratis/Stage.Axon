@@ -5,68 +5,33 @@ namespace Cratis.Stage.Rendering.Axon.Sdk;
 
 internal static partial class SemanticSurfaceLedger
 {
-    const string ViewsMembers = """
-        SemanticReducer Name ReadModel Transitions Key InitialState Result Target From
-        SemanticReducerTransition EventContract RequirementId
-        SemanticReducerKey EventSourceId
-        SemanticReducerResult StateOrDelete
-        SemanticReadModel Id Name Properties
-        SemanticProjection Id Name ReadModel Transitions Scope Target
-        SemanticProjectionTransition AffectedInstance EventContract Mappings
-        SemanticAffectedInstance Cardinality Key
-        AffectedInstanceCardinality One Unknown Many ZeroOrOne
-        SemanticKeyedQuery Argument Cardinality Delivery Id KeyProperty Name ReadModel Authorization Filters KeyParts
-        SemanticQueryKeyPart Id Name Type KeyProperty
-        SemanticQueryFilter Id Name Type Property
-        SemanticQueryFilterValue Filter Value
-        SemanticReadModelQueryArgument Id Name Type
-        SemanticQueryCardinality ZeroOrOne Many Unknown One
-        SemanticQueryDelivery Snapshot Live Unknown
-        SemanticProjectionScope Children From Joins Every JoinRemovals Nested Removals
-        SemanticProjectionChildren IdentifiedBy Property Scope
-        SemanticProjectionCompositeKey Parts Type
-        SemanticProjectionEventContextValue Path
-        SemanticProjectionEventProperty Path
-        SemanticProjectionEvery IncludeChildren Mappings SubscribesToAllEvents
-        SemanticProjectionFrom EventContract Key Mappings ParentKey
-        SemanticProjectionJoin EventContract Mappings On Key
-        SemanticProjectionJoinRemoval EventContract Key
-        SemanticProjectionKey Kind
-        SemanticProjectionKeyKind Value Unknown Composite Parts
-        SemanticProjectionPartsKey Parts
-        SemanticProjectionKeyPart Property Value
-        SemanticProjectionLiteral Value
-        SemanticProjectionMapping Operation Source Target Factor
-        SemanticProjectionNested Property Scope
-        SemanticProjectionOperation Set Add Subtract Increment Decrement Clear Unknown
-        SemanticProjectionRemoval EventContract Key ParentKey
-        SemanticProjectionValue Kind
-        SemanticProjectionValueKey Value
-        SemanticProjectionValueKind EventProperty EventSourceIdentity Literal Unknown EventContext
-        """;
-
-    static SemanticSurfaceLedger()
+    static void ClassifyViews(LedgerBuilder rows)
     {
-        var entries = (Dictionary<string, SemanticSurfaceDisposition>)Entries;
-        foreach (var line in ViewsMembers.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var member in parts.Skip(1))
-                entries[$"{parts[0]}.{member}"] = new(SemanticSurfaceDispositionKind.Rendered, "Axon immutable view, event projector or typed query artifact; unsupported forms degrade at their owner.");
-        }
-
-        SetViews(entries, SemanticSurfaceDispositionKind.Warned, "Conditional persistent support for admitted flat and nested views, including supported event-context values and reducer-only models, with generation metadata and guarded pooled processors that apply each event once across rollback, retry and restart. STAGE-AXON-0308 warns for unsupported shapes during default rendering and refuses them under strict rendering or persistent startup. Retained data without compatible generation metadata is refused; automatic replay and legacy adoption are not performed. Flat default-profile projector writes are staged until commit; direct on(...) calls remain auto-commit. Scoped projectors: default-profile writes are not yet rolled back with a failed unit of work.", "SemanticReadModel.Properties SemanticProjectionEventContextValue.Path");
-        SetViews(entries, SemanticSurfaceDispositionKind.Warned, "Conditional LF-only, SHA-256-matched pure Java transition bodies are placed verbatim. STAGE-AXON-0306 defaults return current; events are ignored until a supported body is authored. InitialState is advisory; current is null on first delivery. Reducer-only persistence is admitted for fully placed transitions without event filters. Unplaced transitions and unsupported target/from forms stay outside persistence and degrade explicitly; dependent specifications remain disabled unless fully supported. Reducer projectors: default-profile writes are not yet rolled back with a failed unit of work.", "SemanticReducer.Transitions SemanticReducer.InitialState SemanticReducer.Target SemanticReducer.From SemanticReducerTransition.RequirementId");
-        SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Declaration identity metadata; the generated artifact is attributed to its owning query.", "SemanticQueryKeyPart.Id SemanticQueryFilter.Id SemanticReadModelQueryArgument.Id");
-        SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "The generated reducer interface is named after its read model, not the modeled reducer name.", "SemanticReducer.Name");
-        SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Projection nomination is not consumed; Axon emits its own typed event projector.", "SemanticProjection.Target");
-        SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Legacy cardinality metadata does not select bulk behavior: the projector applies one event to its modeled key.", "SemanticAffectedInstance.Cardinality AffectedInstanceCardinality.One AffectedInstanceCardinality.Many AffectedInstanceCardinality.ZeroOrOne AffectedInstanceCardinality.Unknown");
-        SetViews(entries, SemanticSurfaceDispositionKind.Ignored, "Unknown sentinel has no supported Axon interpretation; it is not an additional executable variant.", "SemanticQueryCardinality.Unknown SemanticQueryDelivery.Unknown SemanticProjectionKeyKind.Unknown SemanticProjectionOperation.Unknown SemanticProjectionValueKind.Unknown");
-        ClassifyConditions(entries);
-    }
-
-    static void SetViews(Dictionary<string, SemanticSurfaceDisposition> entries, SemanticSurfaceDispositionKind kind, string detail, string members)
-    {
-        foreach (var member in members.Split(' ', StringSplitOptions.RemoveEmptyEntries)) entries[member] = new(kind, detail);
+        rows.Rendered("Read-model identity attributes artifacts and store beans; Name selects the record and store type names.", "SemanticReadModel.Id SemanticReadModel.Name", typeof(Emitters.Projections.AxonProjectionsEmitter));
+        rows.Rendered("Projection identity attributes artifacts and Name selects the projector class.", "SemanticProjection.Id SemanticProjection.Name", typeof(Emitters.Projections.ScopedProjectionEmitter));
+        rows.Rendered("The read-model reference selects the projection's modeled row type.", "SemanticProjection.ReadModel", typeof(Emitters.Projections.AxonProjectionsEmitter));
+        rows.Rendered("Legacy transitions are normalized to From entries with the modeled event and affected-instance key.", "SemanticProjectionTransition.AffectedInstance SemanticProjectionTransition.EventContract", typeof(Emitters.Projections.ProjectionTransitions));
+        rows.Warned(["STAGE-AXON-0306"], "STAGE-AXON-0306: reducer target, read model, key, result and event contracts are validated before placement; unsupported target/key/result or missing and duplicate contracts block reduction. EventSourceId and StateOrDelete are the admitted key/result variants." + DegradationModes, "SemanticReducer.ReadModel SemanticReducer.Key SemanticReducer.Result SemanticReducerTransition.EventContract SemanticReducerKey.EventSourceId SemanticReducerResult.StateOrDelete SemanticProjectionTargetKind.ReadModel SemanticProjectionTargetKind.Event");
+        rows.Rendered("Query Name selects the query record, endpoint and route; Cardinality selects the Java response shape and result checks.", "SemanticKeyedQuery.Name SemanticKeyedQuery.Cardinality", typeof(Emitters.Queries.QueryEndpoint));
+        rows.Rendered("Every query has a snapshot endpoint; Live additionally registers the streaming endpoint and helpers.", "SemanticKeyedQuery.Delivery SemanticQueryDelivery.Snapshot SemanticQueryDelivery.Live", typeof(Emitters.Queries.QueryEndpoint));
+        rows.Rendered("Query cardinalities select list, exactly-one and optional snapshot responses.", "SemanticQueryCardinality.One SemanticQueryCardinality.Many", typeof(Emitters.Queries.QueryEndpoint));
+        rows.Rendered("ZeroOrOne enforces an at-most-one query result before returning the optional response.", "SemanticQueryCardinality.ZeroOrOne", typeof(Emitters.Queries.AxonQueriesEmitter));
+        rows.Rendered("Key parts, scalar arguments and filters supply query component names, types and row-property predicates.", "SemanticKeyedQuery.KeyProperty SemanticQueryKeyPart.Name SemanticQueryKeyPart.Type SemanticQueryKeyPart.KeyProperty SemanticQueryFilter.Name SemanticQueryFilter.Type SemanticQueryFilter.Property SemanticReadModelQueryArgument.Name SemanticReadModelQueryArgument.Type", typeof(Emitters.Queries.QueryShape));
+        rows.Warned(["STAGE-AXON-0401"], QueryDetail + " Key arguments bind their modeled property; Filter arguments are not admitted by the native performer shape resolver.", "SemanticPerformedQueryArgumentKind.Key SemanticPerformedQueryArgumentKind.Filter");
+        rows.Rendered("Scoped projection traversal builds the nested/child node tree from modeled properties, scopes and child identity references.", "SemanticProjectionScope.Children SemanticProjectionScope.Nested SemanticProjectionChildren.IdentifiedBy SemanticProjectionChildren.Property SemanticProjectionChildren.Scope SemanticProjectionNested.Property SemanticProjectionNested.Scope", typeof(Emitters.Projections.ProjectionScopeNode));
+        rows.Rendered("Scoped event handlers use From entries, joins, removals and Every to generate key matching, hydration and ancestor updates; persistent admission is separate.", "SemanticProjectionScope.From SemanticProjectionScope.Joins SemanticProjectionScope.Every SemanticProjectionScope.JoinRemovals SemanticProjectionScope.Removals SemanticProjectionEvery.IncludeChildren SemanticProjectionEvery.SubscribesToAllEvents SemanticProjectionFrom.EventContract SemanticProjectionFrom.ParentKey SemanticProjectionJoin.EventContract SemanticProjectionJoin.On SemanticProjectionJoin.Key SemanticProjectionJoinRemoval.EventContract SemanticProjectionJoinRemoval.Key SemanticProjectionRemoval.EventContract SemanticProjectionRemoval.Key SemanticProjectionRemoval.ParentKey", typeof(Emitters.Projections.ProjectionScopeMethods));
+        rows.Warned(["STAGE-AXON-0305"], ProjectionKeyDetail + " Key variants dispatch by concrete semantic type, not by independently reading the redundant Kind discriminator.", "SemanticProjectionKeyKind.Value SemanticProjectionKeyKind.Composite SemanticProjectionKeyKind.Parts");
+        rows.Warned(["STAGE-AXON-0307"], ProjectionMappingDetail + " Value variants dispatch by concrete semantic type, not by independently reading the redundant Kind discriminator.", "SemanticProjectionOperation.Set SemanticProjectionOperation.Add SemanticProjectionOperation.Subtract SemanticProjectionOperation.Increment SemanticProjectionOperation.Decrement SemanticProjectionOperation.Clear SemanticProjectionValueKind.EventProperty SemanticProjectionValueKind.EventSourceIdentity SemanticProjectionValueKind.Literal SemanticProjectionValueKind.EventContext");
+        rows.Rendered("The concrete event-source identity pattern supplies the source identity for a projection value or key.", "SemanticProjectionEventSourceIdentity.$type", typeof(Emitters.Projections.ProjectionValues));
+        const string persistent = "Conditional persistent support for admitted flat and nested views, including supported event-context values and reducer-only models, with generation metadata and guarded pooled processors that apply each event once across rollback, retry and restart. STAGE-AXON-0308 warns for unsupported shapes during default rendering and refuses them under strict rendering or persistent startup. Retained data without compatible generation metadata is refused; automatic replay and legacy adoption are not performed. Flat default-profile projector writes are staged until commit; direct on(...) calls remain auto-commit. Scoped projectors: default-profile writes are not yet rolled back with a failed unit of work.";
+        rows.Warned(["STAGE-AXON-0308"], persistent, "SemanticReadModel.Properties");
+        rows.Warned(["STAGE-AXON-0308", "STAGE-AXON-0307"], persistent + " " + ProjectionMappingDetail, "SemanticProjectionEventContextValue.Path");
+        rows.Warned(["STAGE-AXON-0306", "STAGE-AXON-0308"], "Conditional LF-only, SHA-256-matched pure Java transition bodies are placed verbatim. STAGE-AXON-0306 defaults return current; events are ignored until a supported body is authored. InitialState is advisory; current is null on first delivery. Reducer-only persistence is admitted for fully placed transitions without event filters. Unplaced transitions and unsupported target/from forms stay outside persistence under STAGE-AXON-0308 and degrade explicitly; dependent specifications remain disabled unless fully supported. Reducer projectors: default-profile writes are not yet rolled back with a failed unit of work.", "SemanticReducer.Transitions SemanticReducer.InitialState SemanticReducer.Target SemanticReducer.From SemanticReducerTransition.RequirementId");
+        rows.Ignored(IgnoredReason.Identity, "Declaration identity metadata; the generated artifact is attributed to its owning query.", "SemanticQueryKeyPart.Id SemanticQueryFilter.Id SemanticReadModelQueryArgument.Id");
+        rows.Ignored(IgnoredReason.Advisory, "The generated reducer interface is named after its read model, not the modeled reducer name.", "SemanticReducer.Name");
+        rows.Ignored(IgnoredReason.Advisory, "Projection nomination is not consumed; Axon emits its own typed event projector.", "SemanticProjection.Target");
+        rows.Ignored(IgnoredReason.Advisory, "Legacy cardinality metadata does not select bulk behavior: the projector applies one event to its modeled key.", "SemanticAffectedInstance.Cardinality AffectedInstanceCardinality.One AffectedInstanceCardinality.Many AffectedInstanceCardinality.ZeroOrOne");
+        rows.Ignored(IgnoredReason.UnknownSentinel, "Legacy cardinality metadata does not select bulk behavior: the projector applies one event to its modeled key.", "AffectedInstanceCardinality.Unknown");
+        rows.Ignored(IgnoredReason.UnknownSentinel, "Unknown sentinel has no supported Axon interpretation; it is not an additional executable variant.", "SemanticQueryCardinality.Unknown SemanticQueryDelivery.Unknown SemanticProjectionKeyKind.Unknown SemanticProjectionOperation.Unknown SemanticProjectionValueKind.Unknown");
     }
 }

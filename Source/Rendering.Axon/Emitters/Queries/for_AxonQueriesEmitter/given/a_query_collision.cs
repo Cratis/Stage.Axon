@@ -21,7 +21,7 @@ public class a_query_collision : a_view_request
         var located = ScopeSelection.Select(_request).Single(slice => slice.Slice.Queries.Any(query => query.Name == "FindTotal"));
         _query = located.Slice.Queries.Single(query => query.Name == "FindTotal");
         _model = located.Slice.ReadModels.Single(model => model.Id == _query.ReadModel);
-        _package = new ViewJavaTypes(_request.Model.Application).Package(located);
+        _package = new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name)).Package(located);
     }
 
     protected void Render(SemanticConcept? concept = null)

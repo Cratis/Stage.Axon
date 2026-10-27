@@ -24,7 +24,7 @@ public class when_rendering_a_composite_key_with_imports : for_NativeViewSpecifi
             new(identifier.Id, new SemanticTextValue("6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021")),
             new(label.Id, new SemanticTextValue("Fittings"))]);
         var code = new JavaCodeBuilder("example.specs");
-        _expression = ViewExpectedKeys.Expression(key, model, new ViewJavaTypes(_request.Model.Application), code);
+        _expression = ViewExpectedKeys.Expression(key, model, new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name)), code);
         _java = code.Line(_expression).Build();
     }
 

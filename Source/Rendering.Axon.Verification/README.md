@@ -41,9 +41,11 @@ The boot smoke starts each packaged application, checks its intentional root HTT
 
 ## Ingress and atomicity proofs
 
-The `ingress-invariants` and `ingress-persistent` verification fixtures bring the corpus to 25 applications without changing the original 23 application names. They use the same semantic preparation: a case-insensitive uniqueness constraint, authenticated-caller event mapping, required own-stream protected reads, and an unsupported cross-stream read. They have no disabled specifications; `disabled-tests.json` remains `{}`.
+The `ingress-invariants` and `ingress-persistent` verification fixtures extend the original 23 application names. They use the same semantic preparation: a case-insensitive uniqueness constraint, authenticated-caller event mapping, required own-stream protected reads, and an unsupported cross-stream read. They have no disabled specifications; `disabled-tests.json` remains `{}`.
 
-`ingress-invariants` retains its scoped projection and runs the memory and authorization proofs only. It is not started in the persistent profile by the ingress proofs. `ingress-persistent` selects only command slices from the same valid semantic model: protected reads still retain their removal-aware event-stream state, but no view, projector or unsupported persistent view store is emitted. Only this viewless app receives the JPA uniqueness/rollback and persistent protected-read proof subclasses. Semantic validation requires the removals for protected reads; dropping them is not a valid flat-view workaround. The boot smoke expects 25 distinct applications.
+The in-memory `ingress-invariants` app renders with bearer-token authentication.
+
+`ingress-invariants` retains its scoped projection and runs the memory and authorization proofs only. It is not started in the persistent profile by the ingress proofs. `ingress-persistent` selects only command slices from the same valid semantic model: protected reads still retain their removal-aware event-stream state, but no view, projector or unsupported persistent view store is emitted. Only this viewless app receives the JPA uniqueness/rollback and persistent protected-read proof subclasses. Semantic validation requires the removals for protected reads; dropping them is not a valid flat-view workaround. The boot smoke boots every application listed in the rendered `applications.json`.
 
 Default Surefire discovery runs generated gateway uniqueness races against the actual JPA store, protected-read races in memory and persistent profiles, and HTTP/gateway method-security checks. Every race repeats 25 times with eight contenders, bounded barriers/latches and bounded termination; no sleeps or direct test appends are used. A spy calls the real JPA reservation before forcing a rollback; another rendezvous follows generated decision loading and validation. Tests assert recorded event counts and ownership, not merely returned exceptions. Protected-read losing exception classes are printed by the native tests.
 
@@ -52,3 +54,16 @@ The authorization tests deny anonymous and wrong-role commands before claims or 
 An in-memory uniqueness reservation may reject a contender even when its owner later rolls back; the JPA rollback proof does not promise that the in-memory store retries that contender. Authorization proofs record observed HTTP denial statuses without defining the transport's error-status or envelope policy.
 
 These are native CI proofs, not evidence from .NET rendering alone. Local verification renders their sources and runs emitter/harness specs; Java/Maven execution and the actual concurrency outcomes must be checked in CI.
+
+## React and Scene proof host
+
+`ClientProof/scene` is a proof-local React and Scene host over the transport-neutral interface in `Source/Rendering.Axon/Emitters/Client/Templates/transport.ts`. It is not generated and not published, and its files are not embedded in the harness. `sceneDispatcher.ts` implements Scene's `executeCommand` over `Transport.execute`: `validation` maps to `validationErrors`, every other outcome, including `cancelled`, maps to `exceptionMessages`, and duplicate or unknown command names throw. `useLiveQueryResults.ts` watches a live query as Scene `queryResults`, closes on unmount and on a key change, and clears and ignores older values on an identity change.
+
+The jsdom tests use an in-memory transport and order events with bounded barriers, never sleeps. The dependencies are exact pins with a committed lockfile (`lockfileVersion` 3, `registry.npmjs.org` only). Use Node 24.20.0, which bundles npm 11.19.0, the same as CI:
+
+```bash
+cd Source/Rendering.Axon.Verification/ClientProof/scene
+npm ci --ignore-scripts --no-audit --no-fund && npm exec -- tsc -p . --noEmit && node --test "test/"*.test.ts
+```
+
+CI runs this in the java job after the Maven verify. The host type-checks under TypeScript 7.0.2 with `moduleResolution: bundler`; no TypeScript 5.9 fallback was needed.

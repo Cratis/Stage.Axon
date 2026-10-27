@@ -7,6 +7,7 @@ using Cratis.Stage.Rendering.Axon.Emitters.Constraints;
 using Cratis.Stage.Rendering.Axon.Emitters.Decisions;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -15,7 +16,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandHandlerEmitter(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource? source)
 {
-    readonly CommandJavaTypes _types = new(context.Request.Model.Application);
+    readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
 
     bool _usesClock;
 
@@ -46,7 +47,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     void ClaimTypes(JavaCodeBuilder code, CommandResponses response)
     {
         code.ClaimExpressions([response.ReturnType, response.Value ?? string.Empty]);
-        if (Constrained) code.ClaimExpressions([context.BasePackage + ".runtime.UniqueValueStore", context.BasePackage + ".runtime.InMemoryUniqueValueStore", context.BasePackage + ".infrastructure.ModeledConstraints"]);
+        if (Constrained) code.ClaimExpressions([AxonRuntimePackage.Type(context.BasePackage, "UniqueValueStore"), AxonRuntimePackage.Type(context.BasePackage, "InMemoryUniqueValueStore"), context.BasePackage + ".infrastructure.ModeledConstraints"]);
         foreach (var produced in command.Produces)
         {
             var contract = CommandAppends.Contract(context, produced.EventContract);
@@ -58,17 +59,17 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     {
         body.Line($"private final {name}Rules rules;");
         if (_usesClock) body.Line($"private final {body.Reference("java.time.Clock")} clock;");
-        if (Constrained) body.Line($"private final {body.Reference(context.BasePackage + ".runtime.UniqueValueStore")} uniqueValues;");
+        if (Constrained) body.Line($"private final {body.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueStore"))} uniqueValues;");
         var parameters = $"{name}Rules rules" + (_usesClock ? $", {body.Reference("java.time.Clock")} clock" : string.Empty);
         body.Block($"public {name}Handler({parameters})", constructor =>
         {
             constructor.Line("this.rules = rules;");
             if (_usesClock) constructor.Line("this.clock = clock;");
-            if (Constrained) constructor.Line($"this.uniqueValues = new {constructor.Reference(context.BasePackage + ".runtime.InMemoryUniqueValueStore")}();");
+            if (Constrained) constructor.Line($"this.uniqueValues = new {constructor.Reference(AxonRuntimePackage.Type(context.BasePackage, "InMemoryUniqueValueStore"))}();");
         });
         if (!Constrained) return;
         body.Line($"@{body.Reference("org.springframework.beans.factory.annotation.Autowired")}")
-            .Block($"public {name}Handler({parameters}, {body.Reference(context.BasePackage + ".runtime.UniqueValueStore")} uniqueValues)", constructor =>
+            .Block($"public {name}Handler({parameters}, {body.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueStore"))} uniqueValues)", constructor =>
             {
                 constructor.Line("this.rules = rules;");
                 if (_usesClock) constructor.Line("this.clock = clock;");

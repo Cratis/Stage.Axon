@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Emitters;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -36,12 +37,12 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
     internal static bool DeclaresRefusalBranches(SemanticInvocation invocation) => !invocation.OnRefused.IsDefaultOrEmpty;
 
     internal static IReadOnlyList<AxonBehaviorDecision> Classify(ArtifactRenderRequest request) =>
-        [.. InScope(request, ConceptDecisions(request.Model.Application).Concat(ImplementationDecisions(request)).Concat(ScopeSelection.Select(request).SelectMany(located => SliceDecisions(Package(request, located), located.Slice))))
+        [.. InScope(request, ConceptDecisions(request.Model.Application, AxonNamesInput.BasePackage(request)).Concat(ImplementationDecisions(request)).Concat(ScopeSelection.Select(request).SelectMany(located => SliceDecisions(Package(request, located), located.Slice))))
             .DistinctBy(decision => (decision.Code, decision.Owner, decision.ModelPath))];
 
-    internal static IEnumerable<AxonBehaviorDecision> ConceptDecisions(SemanticApplication application)
+    internal static IEnumerable<AxonBehaviorDecision> ConceptDecisions(SemanticApplication application, string basePackage)
     {
-        var package = JavaNames.PackageSegment(application.Name) + ".concepts";
+        var package = basePackage + ".concepts";
         foreach (var concept in application.Concepts.Where(concept => !concept.Values.IsDefaultOrEmpty && concept.Compliance is { Personal: not null } or { Secret: not null }))
         {
             yield return new(
@@ -96,7 +97,7 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
     // Requirement roles no inline-body slot selects are never reported by InlineImplementationDiagnostics.
     static IEnumerable<AxonBehaviorDecision> ImplementationDecisions(ArtifactRenderRequest request)
     {
-        var package = JavaNames.PackageSegment(request.Model.Application.Name) + ".runtime";
+        var package = AxonRuntimePackage.InlinePackage(AxonNamesInput.BasePackage(request));
         var requirements = request.ImplementationRequirements.IsDefault ? [] : request.ImplementationRequirements;
         foreach (var requirement in requirements.Where(requirement => requirement.Role is not (SemanticImplementationRole.CommandHandler or SemanticImplementationRole.ReactionEffect or SemanticImplementationRole.QueryPerformer or SemanticImplementationRole.ReducerTransition)))
         {
@@ -134,7 +135,7 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
     }
 
     static string Package(ArtifactRenderRequest request, LocatedSemanticSlice located) =>
-        JavaNames.PackageSegment(request.Model.Application.Name) + "." + JavaNames.PackageSegment(located.Module.Name);
+        AxonNamesInput.BasePackage(request) + "." + JavaNames.PackageSegment(located.Module.Name);
 
     static AxonBehaviorDecision Decision(string package, SemanticId owner, string modelPath, string intent, string reason) =>
         new(AxonRefusalCodes.TranslationCapture, package, owner, modelPath, intent, reason);

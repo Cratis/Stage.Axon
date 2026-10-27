@@ -28,7 +28,7 @@ public class when_proofs_share_guarded_processors : Projections.for_AxonProjecti
             .Where(model => PersistentViewAdmission.Supports(_context, model.Id))
             .Select(model => (Owner: owner, Model: model))).ToArray();
         models.Length.ShouldBeGreaterThan(0);
-        var types = new ViewJavaTypes(_request.Model.Application);
+        var types = new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name));
         var supports = _context.Artifacts.Where(artifact => artifact.RelativePath.EndsWith("PersistentSupport.java", StringComparison.Ordinal)).ToArray();
         supports.Length.ShouldBeGreaterThan(0);
         foreach (var support in supports)

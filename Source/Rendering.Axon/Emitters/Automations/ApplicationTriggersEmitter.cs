@@ -12,7 +12,7 @@ internal static class ApplicationTriggersEmitter
     internal static void Emit(AxonEmissionContext context, IReadOnlyList<(string Type, Cratis.Screenplay.Semantics.SemanticReaction Reaction)> reactions)
     {
         var package = context.BasePackage + ".triggers";
-        var types = new CommandJavaTypes(context.Request.Model.Application);
+        var types = new CommandJavaTypes(context.Request.Model.Application, context.BasePackage);
         foreach (var trigger in context.Request.Model.Application.Triggers)
         {
             var handlers = reactions.SelectMany(reaction => reaction.Reaction.Triggers.Select((candidate, index) => (reaction.Type, Trigger: candidate, Index: index)))

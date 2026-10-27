@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -43,7 +44,7 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
 
     void Fields(JavaCodeBuilder code, string name)
     {
-        var store = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var store = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
         var key = code.Reference("java.lang.Object");
         var clock = code.Reference("java.time.Clock");
         code.Line($"private final {store}<{key}, {_root.Type}> store;")
