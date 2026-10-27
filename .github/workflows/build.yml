@@ -68,13 +68,13 @@ jobs:
           node-version: '24.20.0'
       - name: Build the standalone verification harness
         run: dotnet build Stage.Axon.slnx -c Debug
-      - name: Render all 23 corpus applications
+      - name: Render all 26 corpus applications
         run: >-
           dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj
           -c Debug --no-build -- render "${{ runner.temp }}/axon-corpus"
       - name: Run the generated HTTP transport proofs
         run: node --test "Source/Rendering.Axon/Emitters/Client/Tests/*.test.mjs"
-      - name: Type-check every generated TypeScript client
+      - name: Type-check every generated TypeScript client and the client-proof scenarios
         working-directory: ${{ runner.temp }}/axon-corpus
         shell: bash
         run: |
@@ -87,6 +87,9 @@ jobs:
           for config in "${configs[@]}"; do
             "$tsc" -p "$PWD/$config" --noEmit
           done
+          proof=client-proof/client/test/tsconfig.json
+          [ -e "$proof" ] || { echo "No client-proof scenario tsconfig.json found"; exit 1; }
+          "$tsc" -p "$PWD/$proof" --noEmit
       - name: Compile and execute every generated Maven module
         working-directory: ${{ runner.temp }}/axon-corpus
         run: sh ./mvnw -B -fae verify
