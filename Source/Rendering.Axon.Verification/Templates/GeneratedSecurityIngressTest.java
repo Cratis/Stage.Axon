@@ -29,8 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
@@ -95,7 +97,10 @@ class GeneratedSecurityIngressTest {
         var id = UUID.randomUUID();
         var expected = new ActiveAccounts(new AccountId(id), "seeded", "alice");
         store.put(expected.id(), expected);
-        http.perform(get(QUERY).param("id", id.toString()).with(user("alice").roles("Writer")))
+        var response = http.perform(get(QUERY).param("id", id.toString()).with(user("alice").roles("Writer")))
+                .andExpect(request().asyncStarted()).andReturn();
+        response.getAsyncResult(10000);
+        http.perform(asyncDispatch(response))
                 .andExpect(status().is2xxSuccessful()).andExpect(jsonPath("$.alias").value("seeded"));
         var result = GeneratedIngressSupport.as("alice", "Writer", () -> queries.query(
                 new AccountSnapshot(new AccountId(id)), AccountSnapshot.Result.class).get(10, TimeUnit.SECONDS));

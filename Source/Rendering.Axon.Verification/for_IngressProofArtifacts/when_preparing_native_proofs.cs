@@ -48,6 +48,9 @@ public partial class when_preparing_native_proofs : Specification
     [Fact] void should_run_the_persistent_protected_read_probe() => _sources["GeneratedPersistentProtectedReadTest.java"].ShouldContain("@ActiveProfiles(\"persistent\")");
     [Fact] void should_inherit_the_persistent_unique_races() => _sources["GeneratedPersistentUniqueConcurrencyTest.java"].ShouldContain("extends PersistentUniqueConcurrencyTest");
     [Fact] void should_check_actual_recorded_caller_identity() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain("assertEquals(\"alice\", fact.actor())");
+    [Fact] void should_wait_for_the_authorized_http_query() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain(".andExpect(request().asyncStarted()).andReturn();\n        response.getAsyncResult(10000);");
+    [Fact] void should_assert_the_dispatched_http_query_body() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain("http.perform(asyncDispatch(response))\n                .andExpect(status().is2xxSuccessful()).andExpect(jsonPath(\"$.alias\").value(\"seeded\"))");
+    [Fact] void should_keep_the_authorized_gateway_query_assertion() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain("assertEquals(List.of(expected), result.rows())");
     [Fact] void should_not_define_an_unauthorized_http_status() => _all.ShouldNotContain("isUnauthorized()");
     [Fact] void should_not_define_a_forbidden_http_status() => _all.ShouldNotContain("isForbidden()");
     [Fact] void should_report_observed_denial_statuses() => _all.ShouldContain("response.getStatus()");
