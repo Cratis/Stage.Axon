@@ -28,7 +28,7 @@ internal static class ReadModelRecords
     static string Component(ViewJavaTypes types, SemanticProperty property, JavaCodeBuilder code)
     {
         var name = JavaNames.Member(property.Name);
-        var json = name == property.Name ? string.Empty : $"@{code.Reference("com.fasterxml.jackson.annotation.JsonProperty")}({JavaCodeBuilder.StringLiteral(property.Name)}) ";
+        var json = JavaJsonNames.Annotation(property.Name, code);
         return $"{json}{types.Type(property.Type, code)} {name}";
     }
 }

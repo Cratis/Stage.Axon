@@ -21,9 +21,6 @@ internal static class CommandContractsEmitter
     internal static string Package(CommandJavaTypes types, LocatedSemanticSlice located) =>
         string.Join('.', new[] { types.BasePackage, JavaNames.PackageSegment(located.Module.Name) }.Concat(located.Features.Select(feature => JavaNames.PackageSegment(feature.Name))).Append(JavaNames.PackageSegment(located.Slice.Name)));
 
-    internal static string JsonProperty(string name, JavaCodeBuilder code) => JavaNames.Member(name) == name
-        ? string.Empty : $"@{code.Reference("com.fasterxml.jackson.annotation.JsonProperty")}({JavaCodeBuilder.StringLiteral(name)}) ";
-
     internal static string Code(AxonEmissionContext context, SemanticCommand command, string package, CommandSource? source)
     {
         var types = new CommandJavaTypes(context.Request.Model.Application, context.BasePackage);

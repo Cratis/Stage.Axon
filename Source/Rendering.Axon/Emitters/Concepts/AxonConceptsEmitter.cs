@@ -30,7 +30,7 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
         foreach (var composite in context.Request.Model.Application.Types) code.Declare(JavaNames.Type(composite.Name));
         var fields = properties.ToArray();
         foreach (var property in fields) JavaSemanticTypes.Claim(context, property.Type, code, package);
-        var parameters = string.Join(", ", fields.Select(property => $"{JsonProperty(property.Name, code)}{JavaSemanticTypes.TypeFor(context, property.Type, code, package)} {JavaNames.Member(property.Name)}"));
+        var parameters = string.Join(", ", fields.Select(property => $"{JavaJsonNames.Annotation(property.Name, code)}{JavaSemanticTypes.TypeFor(context, property.Type, code, package)} {JavaNames.Member(property.Name)}"));
         return code.Line($"public record {name}({parameters}) {{}}").Build();
     }
 
@@ -59,8 +59,4 @@ internal sealed class AxonConceptsEmitter : IAxonEmitter
                 ConceptGeneration.Emit(context, concept, body);
             }).Build();
     }
-
-    static string JsonProperty(string name, JavaCodeBuilder builder) => JavaNames.Member(name) == name
-        ? string.Empty
-        : $"@{builder.Reference("com.fasterxml.jackson.annotation.JsonProperty")}({JavaCodeBuilder.StringLiteral(name)}) ";
 }
