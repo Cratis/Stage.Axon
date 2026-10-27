@@ -17,7 +17,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
 
     public void Emit(AxonEmissionContext context)
     {
-        var types = new ViewJavaTypes(context.Request.Model.Application);
+        var types = new ViewJavaTypes(context.Request.Model.Application, context.BasePackage);
         var namespaces = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var located in ScopeSelection.Select(context.Request))
         {

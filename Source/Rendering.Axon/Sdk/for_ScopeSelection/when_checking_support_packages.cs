@@ -29,7 +29,7 @@ public class when_checking_support_packages : Emitters.Projections.for_AxonProje
             var application = _request.Model.Application;
             application = application with { Modules = [.. application.Modules.Select(module => module with { Name = name, Features = [.. module.Features.Select(Feature)] })] };
             var context = new AxonEmissionContext(_request, new(_request.Profile));
-            var types = new ViewJavaTypes(application);
+            var types = new ViewJavaTypes(application, Java.JavaNames.PackageSegment(application.Name));
             foreach (var owner in ScopeSelection.Locate(application))
             {
                 foreach (var package in new[] { types.Package(owner), AxonEventsEmitter.Package(context, owner.Module) })
@@ -46,7 +46,7 @@ public class when_checking_support_packages : Emitters.Projections.for_AxonProje
     [Fact]
     void should_never_derive_a_support_package()
     {
-        var reserved = new ViewJavaTypes(_request.Model.Application).ReservedSupportPackages;
+        var reserved = new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name)).ReservedSupportPackages;
         _packages.ShouldNotBeEmpty();
         _packages.Exists(reserved.Contains).ShouldBeFalse();
     }

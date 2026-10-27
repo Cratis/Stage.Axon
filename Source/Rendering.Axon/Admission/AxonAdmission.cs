@@ -59,12 +59,25 @@ internal static class AxonAdmission
         {
             diagnostics.Add(Error(AxonRefusalCodes.RefusalMode, "Axon requires a known refusal policy.", request));
         }
+
+        if (AxonNamesInput.TryRead(profile, out var names) && names is not null)
+        {
+            if (names.JavaPackage is { } package && !AxonNamesInput.ValidPackage(package))
+            {
+                diagnostics.Add(Error(AxonRefusalCodes.Names, "Java package segments must start with a lowercase ASCII letter, contain only lowercase ASCII letters, digits or underscores, remain canonical after normalization, and must not use a framework package root.", request));
+            }
+            if (names.ProjectName is { } projectName && !AxonNamesInput.ValidArtifactId(projectName))
+            {
+                diagnostics.Add(Error(AxonRefusalCodes.Names, "The Maven artifactId requires one or more ASCII letters, digits, underscores, dots or hyphens.", request));
+            }
+        }
     }
 
     static bool ValidInputs(ArtifactRenderProfile profile) =>
         profile.Inputs.Count(input => input.Name == AxonRendering.OptionsInput) == 1 &&
         profile.Inputs.Count(input => input.Name == AxonRendering.StrictInput) <= 1 &&
         FileHeaderInput.TryRead(profile, out _) &&
+        AxonNamesInput.TryRead(profile, out _) &&
         AxonApproximationsInput.TryRead(profile, out _) &&
         TypeScriptClientInput.TryRead(profile, out _) &&
         HttpAuthenticationInput.TryRead(profile, out _) &&
@@ -72,6 +85,7 @@ internal static class AxonAdmission
         {
             AxonRendering.OptionsInput => input.Version == "1",
             FileHeaderInput.Name => true,
+            AxonNamesInput.Name => input.Version == "1",
             AxonApproximationsInput.Name => input.Version == "1",
             TypeScriptClientInput.Name => true,
             HttpAuthenticationInput.Name => true,
@@ -97,8 +111,8 @@ internal static class AxonAdmission
     static IEnumerable<ArtifactRenderDiagnostic> InspectSupportPackages(ArtifactRenderRequest request)
     {
         var application = request.Model.Application;
-        var types = new ViewJavaTypes(application);
         var context = new AxonEmissionContext(request, new(request.Profile));
+        var types = new ViewJavaTypes(application, context.BasePackage);
         var declarations = application.Concepts.Select(concept => (Package: types.BasePackage + ".concepts", concept.Id, concept.Name))
             .Concat(application.Types.Select(type => (types.BasePackage + ".types", type.Id, type.Name)))
             .Concat(application.Triggers.Select(trigger => (types.BasePackage + ".triggers", trigger.Id, trigger.Name)));

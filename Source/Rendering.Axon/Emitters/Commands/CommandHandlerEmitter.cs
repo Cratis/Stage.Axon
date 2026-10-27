@@ -15,7 +15,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandHandlerEmitter(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource? source)
 {
-    readonly CommandJavaTypes _types = new(context.Request.Model.Application);
+    readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
 
     bool _usesClock;
 

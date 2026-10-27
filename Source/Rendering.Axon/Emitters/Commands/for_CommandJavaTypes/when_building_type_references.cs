@@ -15,7 +15,7 @@ public class when_building_type_references : for_AxonArtifactRenderPlanner.given
 
     void Establish()
     {
-        types = new(request.Model.Application);
+        types = new(request.Model.Application, JavaNames.PackageSegment(request.Model.Application.Name));
         code = new JavaCodeBuilder("example.commands").Declare("ExampleCommand");
     }
 
@@ -41,7 +41,7 @@ public class when_building_type_references : for_AxonArtifactRenderPlanner.given
     void should_claim_application_names_before_framework_types()
     {
         var concept = request.Model.Application.Concepts[0] with { Name = "UUID" };
-        var collision = new CommandJavaTypes(request.Model.Application with { Concepts = [concept] });
+        var collision = new CommandJavaTypes(request.Model.Application with { Concepts = [concept] }, JavaNames.PackageSegment(request.Model.Application.Name));
         var conceptType = new SemanticTypeReference(SemanticTypeReferenceKind.Concept, concept.Primitive, concept.Id, false, false);
         collision.Claim(conceptType, code);
         collision.Type(Primitive(SemanticPrimitiveType.Uuid), code).ShouldEqual("java.util.UUID");
@@ -83,7 +83,7 @@ public class when_building_type_references : for_AxonArtifactRenderPlanner.given
     void should_keep_a_decimal_concept_short_when_its_framework_type_collides()
     {
         var concept = request.Model.Application.Concepts[0] with { Name = "BigDecimal", Primitive = SemanticPrimitiveType.DecimalNumber, Values = [], Numbers = null };
-        var collision = new CommandJavaTypes(request.Model.Application with { Concepts = [concept] });
+        var collision = new CommandJavaTypes(request.Model.Application with { Concepts = [concept] }, JavaNames.PackageSegment(request.Model.Application.Name));
         var type = new SemanticTypeReference(SemanticTypeReferenceKind.Concept, concept.Primitive, concept.Id, false, false);
         collision.Literal(new SemanticNumberValue(1m), type, code).ShouldEqual("new BigDecimal(new java.math.BigDecimal(\"1\"))");
         code.Build().ShouldContain($"import {types.BasePackage}.concepts.BigDecimal;");

@@ -7,12 +7,12 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 
 internal static class AxonMavenProject
 {
-    internal static string Pom(string package, bool bearer = false) => $$"""
+    internal static string Pom(string groupId, string artifactId, bool bearer = false) => $$"""
         <?xml version="1.0" encoding="UTF-8"?>
         <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <modelVersion>4.0.0</modelVersion>
           <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.1.2</version><relativePath/></parent>
-          <groupId>{{package}}</groupId><artifactId>{{package}}-application</artifactId><version>1.0.0-SNAPSHOT</version>
+          <groupId>{{groupId}}</groupId><artifactId>{{artifactId}}</artifactId><version>1.0.0-SNAPSHOT</version>
           <properties><java.version>25</java.version><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
           <dependencyManagement><dependencies>
             <dependency><groupId>org.axonframework</groupId><artifactId>axon-framework-bom</artifactId><version>5.4.1</version><type>pom</type><scope>import</scope></dependency>

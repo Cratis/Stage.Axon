@@ -29,7 +29,7 @@ public class when_rendering_portable_validation : for_AxonArtifactRenderPlanner.
         context = new(request, new(request.Profile));
     }
 
-    void Because() => rules = new CommandRulesEmitter(context, command, new(request.Model.Application)).Render("sample.commands");
+    void Because() => rules = new CommandRulesEmitter(context, command, new(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name))).Render("sample.commands");
 
     [Fact] void should_use_jakarta_validation() => rules.ShouldContain("import jakarta.validation.Validator;");
     [Fact] void should_preserve_optional_rule_null_semantics() => rules.ShouldContain("command.label() == null || (command.label().length() >= 3)");

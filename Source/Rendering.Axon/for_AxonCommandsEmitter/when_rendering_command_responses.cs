@@ -25,7 +25,7 @@ public class when_rendering_command_responses : for_AxonArtifactRenderPlanner.gi
         var slice = ScopeSelection.Select(request).First(slice => !slice.Slice.Commands.IsEmpty).Slice;
         var seed = slice.Commands[0];
         var property = seed.Properties[0];
-        var types = new CommandJavaTypes(request.Model.Application);
+        var types = new CommandJavaTypes(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name));
         var context = new AxonEmissionContext(request, new(request.Profile));
         var scalarCommand = seed with { Response = new SemanticScalarCommandResponse(property.Id, property.Type) };
         scalar = new(scalarCommand, types);

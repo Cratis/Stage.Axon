@@ -28,7 +28,7 @@ public class when_mapping_nested_targets : given.a_flat_view
         var details = application.Types.Single(type => type.Name == "BoardDetails");
         _note = details.Properties.Single(property => property.Name == "note").Id;
         _title = application.Types.Single(type => type.Name == "Card").Properties.Single(property => property.Name == "title").Id;
-        _records = new(application, new(application));
+        _records = new(application, new(application, Java.JavaNames.PackageSegment(application.Name)));
         _context = Render(slice => slice.Name == "Boards" ? slice with
         {
             Specifications = [],
