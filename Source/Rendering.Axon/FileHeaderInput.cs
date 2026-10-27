@@ -16,7 +16,7 @@ internal static class FileHeaderInput
     {
         if (lines.IsDefaultOrEmpty || !ValidLines(lines))
         {
-            throw new InvalidArtifactRenderContract("A file header input requires one or more single-line, non-null lines.");
+            throw new InvalidArtifactRenderContract("A file header input requires one or more single-line, non-null lines without Java Unicode escapes (\\u).");
         }
 
         return ArtifactRenderInput.Create(Name, "1", [.. JsonSerializer.SerializeToUtf8Bytes(lines.ToArray())]);
@@ -44,6 +44,7 @@ internal static class FileHeaderInput
         }
     }
 
+    // Java translates \uXXXX escapes before lexing, so \u000a inside a line comment would end it; refuse any \u in header text.
     static bool ValidLines(IEnumerable<string> lines) =>
-        lines.All(line => line?.Contains('\n') == false && !line.Contains('\r'));
+        lines.All(line => line?.Contains('\n') == false && !line.Contains('\r') && !line.Contains("\\u", StringComparison.Ordinal));
 }

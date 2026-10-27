@@ -50,6 +50,8 @@ public class when_selecting_a_file_header : given.an_axon_request
     [Theory]
     [InlineData("two\nlines")]
     [InlineData("two\rlines")]
+    [InlineData("two\\u000alines")]
+    [InlineData("two\\uuuu000Dlines")]
     [InlineData(null)]
     public void should_reject_header_lines_that_are_not_single_line_text(string? line) =>
         Assert.Throws<InvalidArtifactRenderContract>(() => AxonRendering.CreateProfile(fileHeader: [line!]));
@@ -61,6 +63,7 @@ public class when_selecting_a_file_header : given.an_axon_request
     [InlineData("1", "[null]")]
     [InlineData("1", "[\"two\\nlines\"]")]
     [InlineData("1", "[\"two\\rlines\"]")]
+    [InlineData("1", "[\"two\\\\u000alines\"]")]
     [InlineData("1", "[ \"noncanonical\" ]")]
     [InlineData("2", "[\"Example\"]")]
     public void should_refuse_malformed_header_inputs(string version, string json)

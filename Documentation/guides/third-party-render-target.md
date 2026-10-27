@@ -130,7 +130,7 @@ static void CheckApplication(
 
 The experimental Axon target emits Java records, Spring components, Axon command handlers, and JUnit tests. Create its profile through `AxonRendering.CreateProfile()` and plan through `AxonArtifactRenderPlanner`; do not depend on its internal emitters as extension APIs.
 
-Generated files have no license header by default. To supply your own header for Java sources and tests, use `AxonRendering.CreateProfile(fileHeader: ["Copyright (c) Example", "All rights reserved."])`. Each plain-text line becomes a `//` comment, followed by a blank line. Header lines must be non-null and contain no line breaks. Resources and build files do not receive this optional header; the header is part of the hashed render profile.
+Generated files have no license header by default. To supply your own header for Java sources and tests, use `AxonRendering.CreateProfile(fileHeader: ["Copyright (c) Example", "All rights reserved."])`. Each plain-text line becomes a `//` comment, followed by a blank line. Header lines must be non-null and contain no line breaks or `\u` sequences (Java reads Unicode escapes inside comments). Resources and build files do not receive this optional header; the header is part of the hashed render profile.
 
 Generated applications use `org.axonframework.extensions.spring:axon-spring-boot-starter`, managed by `org.axonframework:axon-framework-bom:5.4.1`, with `axon-spring-boot-starter-test` from the same Spring extension group for tests. This starter bundles Spring integration and Axon messaging, modeling, and event sourcing without an Axon Server connector; generated applications do not require Axon Server.
 
