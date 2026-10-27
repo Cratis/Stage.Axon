@@ -20,6 +20,9 @@ public class when_verifying_audited_areas
     [Fact]
     public void should_not_leave_event_members_legacy() => Audit("SemanticEventSource SemanticEventStream SemanticStreamIdPart SemanticEventContract SemanticEventRevision SemanticEventVisibility", 29);
 
+    [Fact]
+    public void should_not_leave_command_members_legacy() => Audit("SemanticProducedEvent SemanticPropertyMapping SemanticStateChangeDestination SemanticResolvedExpression SemanticExpression SemanticExpressionKind SemanticRefusalExpression SemanticExpressionRootKind SemanticExpressionSourceKind SemanticEventContextExpression SemanticEventContextValueKind SemanticValueExpression SemanticRequirement SemanticComparison SemanticComparisonOperator SemanticConditionOperand SemanticLogicalCondition SemanticLogicalOperator SemanticConstraint SemanticConstraintTarget SemanticConstraintKind SemanticConstraintScope SemanticCommandResponse SemanticScalarCommandResponse SemanticRecordCommandResponse SemanticCommandResponseField SemanticSpecificationResponse SemanticCommandReadMode SemanticDecisionRead SemanticDecisionReadPresence SemanticReadPathExpression SemanticCommand SemanticCommandHandler SemanticCodeValidation SemanticCommandRoute SemanticCommandRoutePart", 111);
+
     static void Audit(string types, int count)
     {
         var names = types.Split(' ').ToHashSet(StringComparer.Ordinal);

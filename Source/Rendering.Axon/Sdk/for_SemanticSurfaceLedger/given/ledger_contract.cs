@@ -8,7 +8,7 @@ namespace Cratis.Stage.Rendering.Axon.Sdk.for_SemanticSurfaceLedger.given;
 
 internal static class ledger_contract
 {
-    internal const int LegacyBudget = 218;
+    internal const int LegacyBudget = 167;
 
     internal static IReadOnlyDictionary<string, Type> Types { get; } = new[] { typeof(ExecutableSemanticModel).Assembly, typeof(SemanticImplementationRequirement).Assembly }
         .Distinct().SelectMany(assembly => assembly.GetTypes()).Where(type => !type.IsNested && type.Namespace?.StartsWith("Cratis.Screenplay", StringComparison.Ordinal) == true)
