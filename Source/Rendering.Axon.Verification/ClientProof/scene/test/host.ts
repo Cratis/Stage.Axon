@@ -37,7 +37,10 @@ export class Mounted {
     readonly #root: Root;
     #unmounted = false;
 
-    constructor(readonly transport: Transport, owner: string) {
+    readonly transport: Transport;
+
+    constructor(transport: Transport, owner: string) {
+        this.transport = transport;
         document.body.append(this.container);
         this.#root = createRoot(this.container);
         this.render(owner);

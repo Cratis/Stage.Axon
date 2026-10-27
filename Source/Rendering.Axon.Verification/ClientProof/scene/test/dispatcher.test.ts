@@ -32,7 +32,7 @@ describe("Scene command outcome mapping", () => {
         it("maps " + outcome.status + " to exceptionMessages", () => {
             const mapped = toCommandOutcome(outcome);
             assert.deepEqual(mapped, { isSuccess: false, exceptionMessages: [message] });
-            assert.equal(mapped.validationErrors, undefined);
+            assert.equal("validationErrors" in mapped, false);
         });
     }
 });
