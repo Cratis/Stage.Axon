@@ -42,7 +42,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__PROJECTOR__", package + "." + target.Projector, StringComparison.Ordinal)
             .Replace("__REDUCER_ARGUMENT__", target.ReducerArgument, StringComparison.Ordinal)
             .Replace("__REDUCER_IMPORTS__", target.ReducerImports, StringComparison.Ordinal)
-            .Replace("__IMPORTS__", Imports(package, model, target.Projector, query) + target.ReducerImports, StringComparison.Ordinal)
+            .Replace("__IMPORTS__", Imports(package, query), StringComparison.Ordinal)
             .Replace("__ROUTE__", QueryEndpoint.Route(owner, query), StringComparison.Ordinal)
             .Replace("__EVENT__", events[0], StringComparison.Ordinal)
             .Replace("__EVENT_TYPE__", types.EventType(spec.GivenEvents[0].EventContract), StringComparison.Ordinal)
@@ -100,11 +100,26 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         query.ReadModel == model.Id && query.Cardinality == SemanticQueryCardinality.Many && query.Delivery == SemanticQueryDelivery.Live && query.Authorization is null &&
         !QueryPerformer.Required(context, query) && !new QueryShape(query, model, types).Arguments.Any());
 
-    string Imports(string package, SemanticReadModel model, string projector, SemanticKeyedQuery query) => string.Join(", ", new[]
+    string Imports(string package, SemanticKeyedQuery query) => string.Join(", ", new[]
     {
         types.BasePackage + ".infrastructure.AxonConfiguration.class", types.BasePackage + ".infrastructure.SecurityConfiguration.class",
         types.BasePackage + ".runtime.persistent.PersistentConfiguration.class", persistence + ".PersistentViewConfiguration.class",
-        package + "." + JavaNames.Type(model.Name) + "StoreConfiguration.class", package + "." + projector + ".class",
         package + "." + JavaNames.Type(query.Name) + "Handler.class", package + "." + JavaNames.Type(query.Name) + "Endpoint.class"
-    });
+    }.Concat(PersistentProjectorImports()).Distinct(StringComparer.Ordinal));
+
+    IEnumerable<string> PersistentProjectorImports()
+    {
+        foreach (var owner in ScopeSelection.Select(context.Request))
+        {
+            foreach (var model in owner.Slice.ReadModels.Where(model => PersistentViewAdmission.Supports(context, model.Id)))
+            {
+                var package = types.Package(owner);
+                var target = ProjectorInputs(owner, model);
+                yield return package + "." + JavaNames.Type(model.Name) + "StoreConfiguration.class";
+                yield return package + "." + target.Projector + ".class";
+                if (owner.Slice.Reducers.Any(reducer => reducer.ReadModel == model.Id))
+                    yield return package + "." + JavaNames.Type(model.Name) + "ReducerConfiguration.class";
+            }
+        }
+    }
 }
