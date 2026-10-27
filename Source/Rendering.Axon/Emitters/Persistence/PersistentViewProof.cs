@@ -188,7 +188,7 @@ internal static class PersistentViewProof
                 observedOwner = null;
                 observedOwners.clear();
                 journal.clear();
-                journalRun = "run1";
+                journalRun = "run1 db=" + path.getParent().getFileName();
                 try {
                     try (var application = startMultiSegment(path)) {
                         assertInstanceOf(__PERSISTENCE__.JpaReadModelStore.class, store(application));
@@ -228,7 +228,7 @@ internal static class PersistentViewProof
                         System.out.println("AXON35 end of run1" + dump(application));
                     }
                     failure = Failure.NONE;
-                    journalRun = "run2";
+                    journalRun = "run2 db=" + path.getParent().getFileName();
                     try (var application = startMultiSegment(path)) {
                         System.out.println("AXON35 start of run2" + dump(application));
                         await(() -> normalized(store(application).all()).equals(normalized(afterRetry)) && count(application) == __COUNT__ + 1,
