@@ -45,7 +45,7 @@ public class when_models_claim_java_lang_names : Projections.for_AxonProjections
             _persistent.Add(PersistentViewAdmission.Supports(context, modelId));
             var plan = new AxonArtifactRenderPlanner().Plan(request);
             _plans.Add(plan);
-            var types = new ViewJavaTypes(application);
+            var types = new ViewJavaTypes(application, JavaNames.PackageSegment(application.Name));
             void Capture(string package, IEnumerable<string> names)
             {
                 foreach (var typeName in names)
@@ -69,7 +69,7 @@ public class when_models_claim_java_lang_names : Projections.for_AxonProjections
     [Fact]
     void should_keep_every_modeled_type_outside_support_packages()
     {
-        var packages = new ViewJavaTypes(_request.Model.Application).ReservedSupportPackages;
+        var packages = new ViewJavaTypes(_request.Model.Application, JavaNames.PackageSegment(_request.Model.Application.Name)).ReservedSupportPackages;
         _modeled.Count.ShouldBeGreaterThan(15);
         foreach (var (artifact, package) in _modeled)
         {

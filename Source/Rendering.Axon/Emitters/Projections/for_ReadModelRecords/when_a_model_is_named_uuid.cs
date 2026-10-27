@@ -15,7 +15,7 @@ public class when_a_model_is_named_uuid : for_AxonArtifactRenderPlanner.given.an
 
     void Because()
     {
-        var types = new ViewJavaTypes(request.Model.Application);
+        var types = new ViewJavaTypes(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name));
         var model = ScopeSelection.Select(request).SelectMany(slice => slice.Slice.ReadModels).First();
         var property = model.Properties[0] with { Name = "identity", Type = new(SemanticTypeReferenceKind.Primitive, SemanticPrimitiveType.Uuid, default, false, false) };
         collision = ReadModelRecords.Code(types, "example.views", model with { Name = "UUID", Properties = [property] });

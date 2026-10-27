@@ -29,10 +29,10 @@ public class when_models_are_named_like_runtime_helpers : given.a_view_request
             var context = new AxonEmissionContext(_request with { Model = model }, new(_request.Profile));
             new AxonProjectionsEmitter().Emit(context);
             var owner = Sdk.ScopeSelection.Select(_request).Single(slice => slice.Slice.ReadModels.Any(model => model.Name == "Total"));
-            var package = new ViewJavaTypes(application).Package(owner).Replace('.', '/');
+            var package = new ViewJavaTypes(application, Java.JavaNames.PackageSegment(application.Name)).Package(owner).Replace('.', '/');
             _configurations[name] = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith(package + "/" + name + "StoreConfiguration.java", StringComparison.Ordinal)));
             var scopedOwner = Sdk.ScopeSelection.Select(_request).Single(slice => slice.Slice.ReadModels.Any(model => model.Name == "Board"));
-            var scopedPackage = new ViewJavaTypes(application).Package(scopedOwner).Replace('.', '/');
+            var scopedPackage = new ViewJavaTypes(application, Java.JavaNames.PackageSegment(application.Name)).Package(scopedOwner).Replace('.', '/');
             _guardConfigurations[name] = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith(scopedPackage + "/" + name + "StoreConfiguration.java", StringComparison.Ordinal)));
             if (name == "ReadModelStore")
             {

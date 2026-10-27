@@ -17,7 +17,7 @@ public class when_lowering_nullable_equality : for_AxonArtifactRenderPlanner.giv
 
     void Because()
     {
-        var types = new CommandJavaTypes(loaded.Model.Application);
+        var types = new CommandJavaTypes(loaded.Model.Application, Java.JavaNames.PackageSegment(loaded.Model.Application.Name));
         var text = new SemanticTypeReference(SemanticTypeReferenceKind.Primitive, SemanticPrimitiveType.Text, default, false, true);
         var number = text with { Primitive = SemanticPrimitiveType.DecimalNumber };
         equal = new CommandValidationPredicates(types, new(default, SemanticValidationRuleKind.Equal, new SemanticTextValue("expected"), null), text, "command.label()").Render();
@@ -35,7 +35,7 @@ public class when_lowering_nullable_equality : for_AxonArtifactRenderPlanner.giv
     [Fact]
     void should_import_objects_in_builder_aware_comparisons()
     {
-        var types = new CommandJavaTypes(loaded.Model.Application);
+        var types = new CommandJavaTypes(loaded.Model.Application, Java.JavaNames.PackageSegment(loaded.Model.Application.Name));
         var code = new Java.JavaCodeBuilder("example.rules").Declare("Rules");
         var type = new SemanticTypeReference(SemanticTypeReferenceKind.Primitive, SemanticPrimitiveType.Text, default, false, true);
         new CommandValidationPredicates(types, new(default, SemanticValidationRuleKind.Equal, new SemanticTextValue("expected"), null), type, "command.label()").Render(code).ShouldEqual("Objects.equals(command.label(), \"expected\")");
@@ -45,7 +45,7 @@ public class when_lowering_nullable_equality : for_AxonArtifactRenderPlanner.giv
     [Fact]
     void should_qualify_a_colliding_uuid_default_check()
     {
-        var types = new CommandJavaTypes(loaded.Model.Application);
+        var types = new CommandJavaTypes(loaded.Model.Application, Java.JavaNames.PackageSegment(loaded.Model.Application.Name));
         var code = new Java.JavaCodeBuilder("example.rules").Declare("UUID");
         var type = new SemanticTypeReference(SemanticTypeReferenceKind.Primitive, SemanticPrimitiveType.Uuid, default, false, false);
         new CommandValidationPredicates(types, new(default, SemanticValidationRuleKind.NotEmpty, null, null), type, "command.identity()").Render(code).ShouldEqual("(command.identity() != null && !command.identity().equals(new java.util.UUID(0L, 0L)))");

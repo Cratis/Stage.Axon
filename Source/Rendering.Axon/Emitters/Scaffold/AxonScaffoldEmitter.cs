@@ -11,7 +11,7 @@ internal sealed class AxonScaffoldEmitter : IAxonEmitter
 
     public void Emit(AxonEmissionContext context)
     {
-        context.Artifacts.Add(PlannedArtifact.CreateText("pom.xml", AxonMavenProject.Pom(context.BasePackage)));
+        context.Artifacts.Add(PlannedArtifact.CreateText("pom.xml", AxonMavenProject.Pom(context.BasePackage, context.ArtifactId)));
         AddAsset(context, "mvnw", "mvnw");
         AddAsset(context, "mvnw.cmd", "mvnw.cmd");
         AddAsset(context, "maven-wrapper.properties", ".mvn/wrapper/maven-wrapper.properties");

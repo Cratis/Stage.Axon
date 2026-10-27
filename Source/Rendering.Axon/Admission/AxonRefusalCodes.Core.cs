@@ -8,6 +8,7 @@ internal static partial class AxonRefusalCodes
 {
     internal const string Version = "STAGE-AXON-VERSION";
     internal const string Profile = "STAGE-AXON-PROFILE";
+    internal const string Names = "STAGE-AXON-NAMES";
     internal const string Scope = "STAGE-AXON-SCOPE";
     internal const string Scaffold = "STAGE-AXON-SCAFFOLD";
     internal const string GapMode = "STAGE-AXON-GAP-MODE";

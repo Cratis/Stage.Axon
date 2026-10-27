@@ -11,7 +11,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandPreparation(AxonEmissionContext context, SemanticCommand command, CommandSource? source)
 {
-    readonly CommandJavaTypes _types = new(context.Request.Model.Application);
+    readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
 
     internal void Emit(JavaCodeBuilder body)
     {

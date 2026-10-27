@@ -28,7 +28,7 @@ public class when_rendering_unsupported_validation : for_AxonArtifactRenderPlann
         context = new(request, new(request.Profile));
     }
 
-    void Because() => rules = new CommandRulesEmitter(context, command, new(request.Model.Application)).Render("sample.commands");
+    void Because() => rules = new CommandRulesEmitter(context, command, new(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name))).Render("sample.commands");
 
     [Fact] void should_warn_instead_of_breaking_the_render() => context.Degradation.UnsupportedConstructs.Single().Severity.ShouldEqual(ArtifactRenderDiagnosticSeverity.Warning);
     [Fact] void should_use_a_registered_code() => context.Degradation.UnsupportedConstructs.Single().Code.ShouldEqual(AxonRefusalCodes.CommandValidation);

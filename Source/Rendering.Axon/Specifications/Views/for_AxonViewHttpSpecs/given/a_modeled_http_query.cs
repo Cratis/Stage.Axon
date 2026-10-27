@@ -24,7 +24,7 @@ public class a_modeled_http_query : Emitters.Projections.for_AxonProjectionsEmit
         var specification = located.Slice.Specifications.Single(spec => spec.Name == "IncreasingTheTotal");
         var model = located.Slice.ReadModels.Single();
         AxonSpecificationsEmitter.Register(context, specification.Id, "example.ViewTest", "increasingTheTotal");
-        new AxonViewHttpSpecs(context, new ViewJavaTypes(application), located, model).Register(located.Slice.Projections.Single(), specification);
+        new AxonViewHttpSpecs(context, new ViewJavaTypes(application, Java.JavaNames.PackageSegment(application.Name)), located, model).Register(located.Slice.Projections.Single(), specification);
         AxonHttpTests.Emit(context);
         return Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ModeledHttpRoundTripTest.java", StringComparison.Ordinal)));
     }

@@ -16,7 +16,9 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
 
     internal AxonDegradation Degradation { get; } = degradation;
 
-    internal string BasePackage => JavaNames.PackageSegment(Request.Model.Application.Name);
+    internal string BasePackage { get; } = AxonNamesInput.BasePackage(request);
+
+    internal string ArtifactId => AxonNamesInput.ArtifactId(Request, BasePackage);
 
     internal List<PlannedArtifact> Artifacts { get; } = [];
 
