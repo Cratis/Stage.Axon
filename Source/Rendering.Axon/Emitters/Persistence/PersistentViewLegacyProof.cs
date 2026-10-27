@@ -28,7 +28,8 @@ internal static class PersistentViewLegacyProof
                     var path = database();
                     try (var application = start(path)) {
         __APPENDS__
-                        await(() -> !store(application).all().isEmpty() && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
+                        await(() -> !store(application).all().isEmpty() && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")),
+                                () -> ": expected rows: " + normalized(expected()) + ", actual rows: " + normalized(store(application).all()) + ", count: " + count(application) + ", tokens: " + tokens(application));
                     }
                     // Deliberately construct isolated legacy/incompatible test databases, never a live application database.
                     try (var connection = DriverManager.getConnection(url(path), "sa", ""); var statement = connection.createStatement()) {

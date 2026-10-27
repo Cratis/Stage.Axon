@@ -51,8 +51,8 @@ public class when_emitting_live_queries : a_view_request
     [Fact] void should_keep_the_active_count() => Source("LiveTotalsStreams.java").ShouldContain("int activeCount() { return group.activeCount(); }");
     [Fact] void should_leave_shutdown_to_the_runtime() => Source("LiveTotalsStreams.java").ShouldNotContain("ApplicationListener");
     [Fact] void should_invalidate_after_projecting_an_event() => _projector.ShouldContain("LiveTotals.Result::invalidation");
-    [Fact] void should_resolve_updates_from_the_handler_context() => _projector.ShouldContain("event, org.axonframework.messaging.queryhandling.QueryUpdateEmitter updates)");
-    [Fact] void should_not_require_a_global_update_emitter() => _projector.ShouldNotContain("private final org.axonframework.messaging.queryhandling.QueryUpdateEmitter");
+    [Fact] void should_resolve_updates_from_the_handler_context() => _projector.ShouldContain("event, QueryUpdateEmitter updates)");
+    [Fact] void should_not_require_a_global_update_emitter() => _projector.ShouldNotContain("private final QueryUpdateEmitter");
     [Fact] void should_emit_an_initial_and_update_native_test() => Source("LiveTotalsSubscriptionTest.java").ShouldContain("shouldDeliverInitialSnapshotAndUpdateAndCancelAxonPublisher");
     [Fact] void should_serialize_expected_sse_values_with_the_application_concept_mapper() => Source("LiveTotalsSseTest.java").ShouldContain("var mapper = application.getBean(JsonMapper.class);");
     [Fact] void should_emit_an_http_sse_probe() => Source("LiveTotalsSseTest.java").ShouldContain("shouldDeliverInitialDataAndOneUpdateOverHttpSse");

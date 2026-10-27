@@ -11,6 +11,10 @@ internal static class ProjectionHandlerShape
         (scope.Every is not null || new[] { scope.Children.Length, scope.Nested.Length, scope.Joins.Length, scope.Removals.Length, scope.JoinRemovals.Length }.Any(count => count > 0) ||
         scope.From.Any(from => from.Key is not SemanticProjectionValueKey || from.Mappings.Any(mapping => mapping.Target.Length > 1 || mapping.Source is SemanticProjectionEventContextValue)));
 
+    internal static bool RootOnly(SemanticProjection projection) => projection.Scope is not { } scope ||
+        (scope.Every is null && new[] { scope.Children.Length, scope.Nested.Length, scope.Joins.Length, scope.Removals.Length, scope.JoinRemovals.Length }.All(count => count == 0) &&
+        scope.From.All(from => from.Key is SemanticProjectionValueKey));
+
     internal static string Arguments(SemanticProjection projection, ProjectionUpdates updates, string emitter = "null") =>
         (Scoped(projection) ? ", null" : string.Empty) + (updates.Enabled ? ", " + emitter : string.Empty);
 }

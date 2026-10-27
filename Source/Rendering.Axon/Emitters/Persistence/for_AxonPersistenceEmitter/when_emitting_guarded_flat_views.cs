@@ -16,7 +16,8 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
 
     void Because()
     {
-        _context = new(_request, new(_request.Profile));
+        var request = _request with { ImplementationContents = _request.ImplementationContents.Clear() };
+        _context = new(request, new(request.Profile));
         new AxonScaffoldEmitter().Emit(_context);
         new AxonProjectionsEmitter().Emit(_context);
         new AxonQueriesEmitter().Emit(_context);
@@ -25,11 +26,11 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
 
     [Fact] void should_admit_the_flat_projection() => PersistentViewAdmission.Supports(_context, ReadModelId("Total")).ShouldBeTrue();
     [Fact] void should_refuse_scoped_projections() => PersistentViewAdmission.Supports(_context, ReadModelId("Board")).ShouldBeFalse();
-    [Fact] void should_refuse_reducers() => PersistentViewAdmission.Supports(_context, ReadModelId("RebuiltTotal")).ShouldBeFalse();
+    [Fact] void should_refuse_unplaced_reducers() => PersistentViewAdmission.Supports(_context, ReadModelId("RebuiltTotal")).ShouldBeFalse();
     [Fact] void should_preserve_early_scoped_refusal() => Code("BoardStoreConfiguration").ShouldContain("public static PersistentReadModelSafety persistentReadModelSafety()");
-    [Fact] void should_preserve_early_reducer_refusal() => Code("RebuiltTotalStoreConfiguration").ShouldContain("public static PersistentReadModelSafety persistentReadModelSafety()");
+    [Fact] void should_preserve_early_unplaced_reducer_refusal() => Code("RebuiltTotalStoreConfiguration").ShouldContain("public static PersistentReadModelSafety persistentReadModelSafety()");
     [Fact] void should_remove_only_the_flat_guard() => Code("TotalStoreConfiguration").ShouldNotContain("persistentReadModelSafety");
-    [Fact] void should_keep_the_direct_call_signature() => Code("TotalProjectionProjector").ShouldContain("public void on(Increased event, org.axonframework.messaging.queryhandling.QueryUpdateEmitter updates)");
+    [Fact] void should_keep_the_direct_call_signature() => Code("TotalProjectionProjector").ShouldContain("public void on(Increased event, QueryUpdateEmitter updates)");
     [Fact] void should_bind_the_actual_handler_context() => Code("TotalProjectionProjector").ShouldContain("JpaReadModelStore.bind(store, context)");
     [Fact] void should_request_the_handler_context() => Code("TotalProjectionProjector").ShouldContain("QueryUpdateEmitter updates, ProcessingContext context)");
     [Fact] void should_defer_live_notifications_until_commit() => Code("TotalProjectionProjector").ShouldContain("context.runOnAfterCommit");
@@ -86,7 +87,12 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_emit_modeled_primary_tags() => Code("TotalPersistentFixture").ShouldContain("tagged.eventSourceId().toString()");
     [Fact] void should_read_sequences_without_writing() => Code("TotalPersistentFixture").ShouldContain("connection.setReadOnly(true)");
     [Fact] void should_require_contiguous_aggregate_sequences() => Code("TotalPersistentFixture").ShouldContain("FIXTURE: C1 aggregate sequences must be exactly 0..n-1");
-    [Fact] void should_compare_all_sequences_to_the_append_count() => Code("TotalPersistentFixture").ShouldContain("assertEquals(java.util.stream.LongStream.range(0, count).boxed().toList(), sequences");
+    [Fact]
+    void should_compare_all_sequences_to_the_append_count()
+    {
+        Code("TotalPersistentFixture").ShouldContain("import java.util.stream.LongStream;");
+        Code("TotalPersistentFixture").ShouldContain("assertEquals(LongStream.range(0, count).boxed().toList(), sequences");
+    }
     [Fact] void should_require_the_actual_pooled_processor() => Code("TotalPersistentFixture").ShouldContain("assertInstanceOf(PooledStreamingEventProcessor.class, processor, \"FIXTURE: C2");
     [Fact] void should_require_token_progress_and_a_view_row() => Code("TotalPersistentFixture").ShouldContain("FIXTURE: C3 token must advance and modeled view row must exist before injection");
     [Fact]
