@@ -20,18 +20,26 @@ public partial class when_emitting_the_http_contract_test : for_AxonArtifactRend
 
     [Theory]
     [InlineData("HttpContractTest")]
+    [InlineData("HttpIdentityContractTest")]
+    [InlineData("HttpBrowserContractTest")]
     void should_emit_the_template_under_src_test(string name) => _context.Artifacts.Exists(artifact => artifact.RelativePath.StartsWith("src/test/java/", StringComparison.Ordinal) && artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)).ShouldBeTrue();
 
     [Theory]
     [InlineData("HttpContractTest")]
+    [InlineData("HttpIdentityContractTest")]
+    [InlineData("HttpBrowserContractTest")]
     void should_import_its_nested_test_types(string name) => Source(name).ShouldContain("@Import(");
 
     [Theory]
     [InlineData("HttpContractTest")]
+    [InlineData("HttpIdentityContractTest")]
+    [InlineData("HttpBrowserContractTest")]
     void should_not_dirty_the_shared_context(string name) => Source(name).ShouldNotContain("DirtiesContext");
 
     [Theory]
     [InlineData("HttpContractTest")]
+    [InlineData("HttpIdentityContractTest")]
+    [InlineData("HttpBrowserContractTest")]
     void should_not_qualify_types_in_its_body(string name)
     {
         var body = string.Join('\n', Source(name).Split('\n').Where(line => !line.StartsWith("package ", StringComparison.Ordinal) && !line.StartsWith("import ", StringComparison.Ordinal)));
