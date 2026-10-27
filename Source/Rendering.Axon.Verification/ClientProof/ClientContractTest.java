@@ -1,6 +1,7 @@
 package __RUNTIME__;
 
 import __APPLICATION__.work.items.overview.WorkItems;
+import __RUNTIME_MODULE__.LiveStreams;
 import org.axonframework.common.configuration.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

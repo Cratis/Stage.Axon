@@ -30,5 +30,5 @@ public class when_the_primary_identity_is_named_unique_value_store : for_AxonArt
     [Fact] void should_append_one_event_directly() => _handler.ShouldContain("appender.append(command.event());");
     [Fact] void should_use_the_short_runtime_store_name() => _handler.ShouldContain("private final UniqueValueStore uniqueValues;");
     [Fact] void should_use_the_short_runtime_constructor_parameter() => _handler.ShouldContain("AppendProducedEventHandler(UniqueValueStore uniqueValues)");
-    [Fact] void should_import_the_runtime_store() => _handler.ShouldContain("import sample.runtime.UniqueValueStore;");
+    [Fact] void should_import_the_runtime_store() => _handler.ShouldContain("import io.cratis.stage.axon.runtime.UniqueValueStore;");
 }

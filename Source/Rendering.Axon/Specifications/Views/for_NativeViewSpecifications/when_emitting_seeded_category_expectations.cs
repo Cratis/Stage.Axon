@@ -29,7 +29,7 @@ public class when_emitting_seeded_category_expectations : given.a_native_view_re
     [Fact] void should_emit_short_assertions() => _java.ShouldContain("Assertions.assertTrue(");
     [Fact] void should_import_equality() => _java.ShouldContain("import java.util.Objects;");
     [Fact] void should_import_caller_cleanup() => _java.ShouldContain("import org.springframework.security.core.context.SecurityContextHolder;");
-    [Fact] void should_not_import_unused_source_identity() => _java.ShouldNotContain("import nativeviews.runtime.EventSourceId;");
+    [Fact] void should_not_import_unused_source_identity() => _java.ShouldNotContain("import io.cratis.stage.axon.runtime.EventSourceId;");
     [Fact] void should_not_invent_a_query() => _java.ShouldNotContain("new AllCategories(");
     [Fact] void should_not_claim_http_query_coverage() => _context.HttpScenarios.ContainsKey(_spec.Id).ShouldBeFalse();
 }

@@ -19,39 +19,18 @@ public class when_emitting_the_live_query_templates : for_AxonArtifactRenderPlan
     }
 
     [Theory]
-    [InlineData("LiveSnapshots")]
-    [InlineData("LiveStreams")]
-    [InlineData("LiveCapacityException")]
-    void should_emit_the_runtime_type_in_main(string name) => Find("src/main/java/", name).ShouldNotBeNull();
-
-    [Theory]
-    [InlineData("LiveSnapshotsTest")]
     [InlineData("LiveQueryContractTest")]
     void should_emit_the_proof_under_src_test(string name) => Find("src/test/java/", name).ShouldNotBeNull();
 
     [Theory]
-    [InlineData("LiveSnapshots")]
-    [InlineData("LiveStreams")]
-    [InlineData("LiveCapacityException")]
-    [InlineData("LiveSnapshotsTest")]
     [InlineData("LiveQueryContractTest")]
     void should_not_carry_a_license_header(string name) => Text(name).ShouldNotContain("Copyright");
 
     [Fact] void should_not_dirty_the_shared_context() => Text("LiveQueryContractTest").ShouldNotContain("DirtiesContext");
     [Fact] void should_not_disable_any_proof() => Text("LiveQueryContractTest").ShouldNotContain("@Disabled");
-    [Fact] void should_answer_a_full_server_with_a_problem() => Text("ProblemDetailsAdvice").ShouldContain("live-capacity");
-    [Fact] void should_keep_the_publisher_overload() => Text("SseBridge").ShouldContain("public static <T> SseEmitter stream(Flow.Publisher<T> publisher)");
-    [Fact] void should_queue_a_comment_so_initialisation_commits_the_response() => Text("SseBridge").ShouldContain("emitter.send(SseEmitter.event().comment(\"open\"));");
-    [Fact] void should_queue_the_comment_before_delivery_starts() => Precedes(Text("SseBridge"), "commitOnInitialise(emitter);", "publisher.subscribe(subscriber);").ShouldBeTrue();
     [Fact] void should_stress_streams_whose_snapshot_is_ready_at_once() => Text("LiveQueryContractTest").ShouldContain("attempt < 200");
     [Fact] void should_fail_the_stress_proof_on_a_logged_server_error() => Text("LiveQueryContractTest").ShouldContain("output.getAll().contains(\"NullPointerException\")");
     [Fact] void should_prove_the_heartbeat_apart_from_the_opening_comment() => Text("LiveQueryContractTest").ShouldContain("!line.equals(\":heartbeat\")");
-
-    static bool Precedes(string text, string first, string second)
-    {
-        var index = text.IndexOf(first, StringComparison.Ordinal);
-        return index >= 0 && index < text.IndexOf(second, StringComparison.Ordinal);
-    }
 
     PlannedArtifact? Find(string root, string name) => _context.Artifacts.FirstOrDefault(artifact => artifact.RelativePath.StartsWith(root, StringComparison.Ordinal) && artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal));
 

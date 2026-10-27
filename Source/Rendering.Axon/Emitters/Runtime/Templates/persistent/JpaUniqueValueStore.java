@@ -1,8 +1,8 @@
 package __RUNTIME__.persistent;
 
-import __RUNTIME__.UniqueValueConflict;
-import __RUNTIME__.UniqueValueStore;
-import __RUNTIME__.UniqueValues;
+import io.cratis.stage.axon.runtime.UniqueValueConflict;
+import io.cratis.stage.axon.runtime.UniqueValueStore;
+import io.cratis.stage.axon.runtime.UniqueValues;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceException;
