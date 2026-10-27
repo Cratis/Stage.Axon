@@ -80,16 +80,18 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Guard Contracts and Screenplay versions against the CLI
+        run: node .github/scripts/cli-version-guard.mjs
       - name: Require a non-placeholder release version
         run: test -n "$RELEASE_VERSION" && test "$RELEASE_VERSION" != '0.0.0'
       - name: Remove any existing artifacts
         run: rm -rf "$NUGET_OUTPUT"
       - name: Create the renderer NuGet package
         run: dotnet pack Source/Rendering.Axon/Rendering.Axon.csproj -c Release -o "$NUGET_OUTPUT" -p:Version="$RELEASE_VERSION" -p:ContinuousIntegrationBuild=true
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
       - name: Verify the packed set before publication
         run: node .github/scripts/package-allowlist.mjs --packed "$NUGET_OUTPUT"
       - name: NuGet login (OIDC → temp API key)

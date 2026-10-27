@@ -17,7 +17,9 @@ jobs:
         with:
           node-version: '22'
       - name: Test the CI guards (synthetic fixtures only)
-        run: node --test .github/scripts/packable-guard.test.mjs .github/scripts/package-allowlist.test.mjs .github/scripts/cli-stage-version.test.mjs
+        run: node --test .github/scripts/packable-guard.test.mjs .github/scripts/package-allowlist.test.mjs .github/scripts/cli-version-guard.test.mjs
+      - name: Guard Contracts and Screenplay versions against the CLI
+        run: node .github/scripts/cli-version-guard.mjs
       - name: Guard package publication against the allowlist
         run: node .github/scripts/package-allowlist.mjs
       - uses: actions/setup-dotnet@v4
