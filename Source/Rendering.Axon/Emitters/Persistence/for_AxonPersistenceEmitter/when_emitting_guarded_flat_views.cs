@@ -33,7 +33,8 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_keep_the_direct_call_signature() => Code("TotalProjectionProjector").ShouldContain("public void on(Increased event, QueryUpdateEmitter updates)");
     [Fact] void should_bind_the_actual_handler_context() => Code("TotalProjectionProjector").ShouldContain("JpaReadModelStore.bind(store, context)");
     [Fact] void should_request_the_handler_context() => Code("TotalProjectionProjector").ShouldContain("QueryUpdateEmitter updates, ProcessingContext context)");
-    [Fact] void should_defer_live_notifications_until_commit() => Code("TotalProjectionProjector").ShouldContain("context.runOnAfterCommit");
+    [Fact] void should_let_the_bound_emitter_defer_live_notifications() => Code("TotalProjectionProjector").ShouldContain("apply(event, updates, JpaReadModelStore.bind(store, context));");
+    [Fact] void should_not_register_nested_after_commit_handlers() => Code("TotalProjectionProjector").ShouldNotContain("runOnAfterCommit");
     [Fact] void should_provide_only_qualified_persistent_stores() => Code("TotalStoreConfiguration").ShouldContain("return new JpaReadModelStore<>(factory, mapper, \"axonviews.views.counters.totals.Total\", Total.class)");
     [Fact] void should_depend_on_generation_admission() => Code("TotalStoreConfiguration").ShouldContain("PersistentViewConfiguration generation");
     [Fact] void should_pin_pooled_processing() => Code("PersistentViewConfiguration").ShouldContain("EventProcessorDefinition.pooledStreamingMatching(");

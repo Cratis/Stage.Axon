@@ -49,12 +49,8 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
             method.Line(staged);
             return;
         }
-        method.Block($"if (store instanceof {adapter}<?>)", persistent =>
-        {
-            persistent.Line($"apply(event{messageArgument}{_updates.DefaultArgument}, {adapter}.bind(store, context));");
-            if (_updates.Enabled)
-                persistent.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
-        }).Line($"else {staged}");
+        method.Block($"if (store instanceof {adapter}<?>)", persistent => persistent.Line($"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {adapter}.bind(store, context));"))
+            .Line($"else {staged}");
     }
 
     void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)
