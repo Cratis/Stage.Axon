@@ -30,15 +30,18 @@ internal static class PersistentViewAdmission
     static bool From(AxonEmissionContext context, SemanticReadModel model, SemanticProjectionFrom from)
     {
         var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(candidate => candidate.Id == from.EventContract);
-        var values = new ProjectionValues(context, new ViewJavaTypes(context.Request.Model.Application));
-        return values.Key(from.Key, @event) is not null && from.Mappings.All(mapping => Mapping(values, model, @event, mapping));
+        var application = context.Request.Model.Application;
+        var types = new ViewJavaTypes(application);
+        var values = new ProjectionValues(context, types);
+        var records = new ProjectionRecords(application, types);
+        return values.Key(from.Key, @event) is not null && from.Mappings.All(mapping => Mapping(values, records, model, @event, mapping));
     }
 
-    static bool Mapping(ProjectionValues values, SemanticReadModel model, SemanticEventContract @event, SemanticProjectionMapping mapping)
+    static bool Mapping(ProjectionValues values, ProjectionRecords records, SemanticReadModel model, SemanticEventContract @event, SemanticProjectionMapping mapping)
     {
         if (mapping.Source is SemanticProjectionEventContextValue source && !Context(source)) return false;
         if (mapping.Factor is SemanticProjectionEventContextValue factor && !Context(factor)) return false;
-        var target = mapping.Target.Length == 1 ? model.Properties.FirstOrDefault(property => property.Id == mapping.Target[0]) : null;
+        var target = records.Property(model.Properties, mapping.Target);
         if (target is null) return false;
         return values.Mapping(mapping, target, @event) is not null;
     }

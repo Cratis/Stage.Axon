@@ -13,10 +13,10 @@ internal sealed class ProjectionRecords(SemanticApplication application, ViewJav
     internal SemanticProperty? Property(IReadOnlyList<SemanticProperty> properties, IReadOnlyList<SemanticId> path)
     {
         SemanticProperty? result = null;
-        foreach (var id in path)
+        for (var index = 0; index < path.Count; index++)
         {
-            result = properties.FirstOrDefault(property => property.Id == id);
-            if (result is null) return null;
+            result = properties.FirstOrDefault(property => property.Id == path[index]);
+            if (result is null || (result.Type.IsCollection && index < path.Count - 1)) return null;
             properties = application.Types.FirstOrDefault(type => type.Id == result.Type.Target)?.Properties ?? [];
         }
         return result;
