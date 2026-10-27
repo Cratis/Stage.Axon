@@ -22,6 +22,13 @@ internal static partial class SemanticSurfaceLedger
 
     static void ClassifyBehaviors(LedgerBuilder rows)
     {
+        rows.Rendered("Application trigger identity, name and properties select the registered trigger record and HTTP endpoint.", "SemanticApplicationTrigger.Id SemanticApplicationTrigger.Name SemanticApplicationTrigger.Properties", typeof(Emitters.Automations.ApplicationTriggersEmitter));
+        rows.Rendered("Reaction identity and name determine the automation artifact and its diagnostic attribution.", "SemanticReaction.Id SemanticReaction.Name", typeof(Emitters.Automations.AxonAutomationsEmitter));
+        rows.Warned(["STAGE-AXON-0504", "STAGE-AXON-0506"], ReactionDetail + " Command resolution and argument mappings must prepare completely; unsupported mappings prevent reaction registration.", "SemanticInvocation.Command SemanticInvocation.Mappings");
+        rows.Rendered("Event, application-trigger and lifecycle trigger kinds select the corresponding handler annotations; effect and guard admission is separate.", "SemanticReactionTriggerKind.Event SemanticReactionTriggerKind.ApplicationTrigger SemanticReactionTriggerKind.Startup SemanticReactionTriggerKind.Shutdown", typeof(Emitters.Automations.ReactionScheduling));
+        rows.Warned(["STAGE-AXON-0504", "STAGE-AXON-0506"], ReactionDetail + " Unknown trigger kinds have no handler annotation and fail preparation.", "SemanticReactionTriggerKind.Unknown");
+        rows.Rendered("System identity is explicitly admitted by trigger preparation; dispatch establishes the modeled roles.", "SemanticReactionIdentityKind.System", typeof(Emitters.Automations.ReactionTriggerEmitter));
+        rows.Warned(["STAGE-AXON-0504", "STAGE-AXON-0506"], ReactionDetail + " Observer Source and Stream are not read independently: any nonnull reaction.From fails effect preparation and is reported at the reaction owner.", "SemanticObserverFilter.Source SemanticObserverFilter.Stream");
         rows.Warned(["STAGE-AXON-0601"], CaptureDetail, """
             SemanticSlice.Captures SemanticSlice.Direction SemanticSliceKind.Translate SemanticEventContract.ContractId SemanticEventContract.Visibility
             SemanticCapture.Appends SemanticCapture.Children SemanticCapture.Id SemanticCapture.Key SemanticCapture.Map SemanticCapture.Name SemanticCapture.Nested SemanticCapture.EventsSource

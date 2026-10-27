@@ -26,6 +26,9 @@ public class when_verifying_audited_areas
     [Fact]
     public void should_not_leave_security_members_legacy() => Audit("SemanticAuthenticatedCondition SemanticAnonymousCondition SemanticAuthorization SemanticCondition SemanticPolicyCondition SemanticOpaquePolicyCondition SemanticNotPolicyCondition SemanticPolicy SemanticPolicyReference SemanticClaimCondition SemanticClaimTargetKind SemanticRoleCondition SemanticLogicalAuthorization SemanticLogicalPolicyCondition", 23);
 
+    [Fact]
+    public void should_not_leave_automation_members_legacy() => Audit("SemanticApplicationTrigger SemanticInvocation SemanticInvocationRefusal SemanticReaction SemanticReactionTrigger SemanticReactionTriggerKind SemanticCapture SemanticCaptureAppend SemanticCaptureChildren SemanticCaptureNested SemanticCaptureRecord SemanticCaptureField SemanticCaptureFieldKind SemanticCaptureCondition SemanticCaptureConditionKind SemanticCaptureMap SemanticCaptureMapKind SemanticCaptureMapping SemanticCaptureTemplatePart SemanticCaptureTranslation SemanticCaptureEventsSource SemanticReactionIdentity SemanticReactionIdentityKind SemanticObserverFilter SemanticTranslationDirection", 99);
+
     static void Audit(string types, int count)
     {
         var names = types.Split(' ').ToHashSet(StringComparer.Ordinal);
