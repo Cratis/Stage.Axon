@@ -36,7 +36,7 @@ internal static partial class SemanticSurfaceLedger
             SemanticKind.Capture SemanticKind.EventSource SemanticKind.EventStream SemanticKind.Unknown
             SemanticAddressPartKind.Application SemanticAddressPartKind.Module SemanticAddressPartKind.Feature SemanticAddressPartKind.Slice SemanticAddressPartKind.Declaration
             SemanticAddressPartKind.Member SemanticAddressPartKind.Discriminator SemanticAddressPartKind.OwnerKind SemanticAddressPartKind.Generation SemanticAddressPartKind.Unknown
-            SemanticNullValue.$type SemanticAuthenticatedCondition.$type SemanticAnonymousCondition.$type SemanticAuthorization.$type SemanticCondition.$type
+            SemanticNullValue.$type SemanticAuthorization.$type SemanticCondition.$type
             SemanticPolicyCondition.$type SemanticProjectionEventSourceIdentity.$type SemanticSpecificationResponse.$type
             SemanticIdentityOrigin.Persisted SemanticIdentityOrigin.LegacyBootstrap SemanticIdentityOrigin.Unknown
             """);
