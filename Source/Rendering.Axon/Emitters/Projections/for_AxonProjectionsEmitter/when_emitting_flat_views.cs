@@ -21,6 +21,7 @@ public class when_emitting_flat_views : given.a_view_request
 
     [Fact] void should_emit_an_immutable_model() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/Total.java", StringComparison.Ordinal))).ShouldContain("public record Total(");
     [Fact] void should_use_an_atomic_store_update() => _projector.ShouldContain("store.update(\"global\", current -> {");
+    [Fact] void should_not_reserve_a_batch_for_single_key_handlers() => _projector.ShouldNotContain("ReadModelTransaction.reserve(");
     [Fact] void should_emit_both_event_handlers() => _projector.Split("@EventHandler", StringSplitOptions.None).Length.ShouldEqual(3);
     [Fact] void should_add_the_event_value() => _projector.ShouldContain("+ event.amount()");
     [Fact] void should_subtract_the_event_value() => _projector.ShouldContain("- event.amount()");
