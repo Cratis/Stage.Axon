@@ -1,6 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+type CounterDetails
+  note String
+
 module Views
   feature Counters
     slice StateChange Increase
@@ -68,3 +71,27 @@ module Views
           amount = 5
           count = 0
           note = null
+
+    slice StateView ContextTotals
+      readmodel ContextTotal
+        name String key
+        occurred DateTime
+        correlation Uuid optional
+        details CounterDetails optional
+
+      projection ContextTotalProjection => ContextTotal
+        from Increased
+          key "global"
+          name = "global"
+          occurred = $eventContext.occurred
+          correlation = $eventContext.correlationId
+          details.note = "increased"
+
+      query AllContextTotals => ContextTotal[]
+
+      specification RetainingContextAndDetails
+        given Increased
+          amount = 8
+        then readmodel ContextTotal
+          name = "global"
+          details = { "note": "increased" }
