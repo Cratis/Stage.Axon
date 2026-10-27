@@ -9,7 +9,7 @@ using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Admission;
 
-/// <summary>Reports behavioral members no emitter reads (captures, translations, public events, refusal branches) so none is dropped silently.</summary>
+/// <summary>Reports behavioral members no emitter reads (captures, translations, public events, refusal branches, routing, unplaced roles) so none is dropped silently. Every report is a pure function of the model and the selected scope, so the walk runs before all emitters and later emitters can see its diagnostics.</summary>
 internal sealed class AxonBehaviorAdmission : IAxonEmitter
 {
     public bool IsImplemented => true;
@@ -22,8 +22,7 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
         {
             var package = group.Key;
             var builder = new JavaCodeBuilder(package);
-            var reportable = group.Where(decision => !AlreadyReported(context, decision)).ToArray();
-            if (reportable.Length == 0) continue;
+            var reportable = group.ToArray();
             foreach (var decision in reportable)
             {
                 context.Degradation.Unsupported(decision.Code, decision.Owner, decision.Reason, decision.Intent, decision.ModelPath);
@@ -37,7 +36,7 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
     internal static bool DeclaresRefusalBranches(SemanticInvocation invocation) => !invocation.OnRefused.IsDefaultOrEmpty;
 
     internal static IReadOnlyList<AxonBehaviorDecision> Classify(ArtifactRenderRequest request) =>
-        [.. ConceptDecisions(request.Model.Application).Concat(ImplementationDecisions(request)).Concat(ScopeSelection.Select(request).SelectMany(located => SliceDecisions(Package(request, located), located.Slice)))
+        [.. InScope(request, ConceptDecisions(request.Model.Application).Concat(ImplementationDecisions(request)).Concat(ScopeSelection.Select(request).SelectMany(located => SliceDecisions(Package(request, located), located.Slice))))
             .DistinctBy(decision => (decision.Code, decision.Owner, decision.ModelPath))];
 
     internal static IEnumerable<AxonBehaviorDecision> ConceptDecisions(SemanticApplication application)
@@ -137,11 +136,53 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
     static string Package(ArtifactRenderRequest request, LocatedSemanticSlice located) =>
         JavaNames.PackageSegment(request.Model.Application.Name) + "." + JavaNames.PackageSegment(located.Module.Name);
 
-    static bool AlreadyReported(AxonEmissionContext context, AxonBehaviorDecision decision) =>
-        context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == decision.Owner && (diagnostic.Code == decision.Code || decision.Code == AxonRefusalCodes.Implementation));
-
     static AxonBehaviorDecision Decision(string package, SemanticId owner, string modelPath, string intent, string reason) =>
         new(AxonRefusalCodes.TranslationCapture, package, owner, modelPath, intent, reason);
+
+    // One scope predicate for every family: an owner is reported only if it lives in a selected slice or is an application-level concept (which the concepts emitter renders whatever the scope).
+    static IEnumerable<AxonBehaviorDecision> InScope(ArtifactRenderRequest request, IEnumerable<AxonBehaviorDecision> decisions)
+    {
+        var owners = new HashSet<SemanticId>(request.Model.Application.Concepts.Select(concept => concept.Id));
+        foreach (var located in ScopeSelection.Select(request)) Collect(located.Slice, owners, []);
+        return decisions.Where(decision => owners.Contains(decision.Owner));
+    }
+
+    // A default (uninitialized) ImmutableArray throws when enumerated; treat it as empty.
+    static List<object?> Items(System.Collections.IEnumerable items)
+    {
+        var list = new List<object?>();
+        try
+        {
+            foreach (var item in items) list.Add(item);
+        }
+        catch (InvalidOperationException)
+        {
+            list.Clear();
+        }
+
+        return list;
+    }
+
+    static void Collect(object? node, HashSet<SemanticId> ids, HashSet<object> seen)
+    {
+        switch (node)
+        {
+            case null or string or Enum:
+                return;
+            case { } primitive when primitive.GetType().IsPrimitive:
+                return;
+            case SemanticId id:
+                ids.Add(id);
+                return;
+            case System.Collections.IEnumerable items:
+                foreach (var item in Items(items)) Collect(item, ids, seen);
+                return;
+            default:
+                if (!seen.Add(node)) return;
+                foreach (var property in node.GetType().GetProperties().Where(property => property.GetIndexParameters().Length == 0)) Collect(property.GetValue(node), ids, seen);
+                return;
+        }
+    }
 }
 
 internal sealed record AxonBehaviorDecision(string Code, string Package, SemanticId Owner, string ModelPath, string Intent, string Reason);

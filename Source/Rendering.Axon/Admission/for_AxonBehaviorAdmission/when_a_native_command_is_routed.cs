@@ -40,16 +40,6 @@ public class when_a_native_command_is_routed : given.a_model_with_behaviors
     }
 
     [Fact]
-    void should_not_duplicate_a_routing_diagnostic_the_command_emitter_recorded()
-    {
-        request = request with { Profile = AxonRendering.CreateProfile() };
-        context = new(request, new(request.Profile));
-        context.Degradation.Unsupported(Routing, command.Id, "already reported");
-        AxonBehaviorAdmission.Apply(context, Decisions());
-        context.Degradation.UnsupportedConstructs.Count(diagnostic => diagnostic.Code == Routing).ShouldEqual(1);
-    }
-
-    [Fact]
     void should_not_report_an_appending_declarative_command() =>
         AxonBehaviorAdmission.SliceDecisions("sample.orders", Seed() with { Commands = [command with { Handler = null }] }).Where(decision => decision.Code == Routing).ShouldBeEmpty();
 

@@ -7,6 +7,7 @@ internal static class AxonEmitters
 {
     internal static IReadOnlyList<IAxonEmitter> Ordered { get; } =
     [
+        new Admission.AxonBehaviorAdmission(),
         new Scaffold.AxonScaffoldEmitter(),
         new Concepts.AxonConceptsEmitter(),
         new Events.AxonEventsEmitter(),
@@ -19,7 +20,6 @@ internal static class AxonEmitters
         new Automations.AxonAutomationsEmitter(),
         new Persistence.AxonPersistenceEmitter(),
         new Security.AxonSecurityEmitter(),
-        new Admission.AxonBehaviorAdmission(),
         new Specifications.AxonSpecificationsEmitter(),
         new Runtime.AxonRuntimeEmitter()
     ];
