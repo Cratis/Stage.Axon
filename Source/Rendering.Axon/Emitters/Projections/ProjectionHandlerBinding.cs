@@ -13,18 +13,13 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
 
     internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false)
     {
-        if (PersistentViewAdmission.Supports(context, model.Id))
-        {
-            EmitContextual(body, eventType, transitions, message);
-            return;
-        }
-        body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
-            .Block($"public void on({eventType} event{_updates.ParameterFor(body)})", method => Apply(method, transitions));
+        EmitContextual(body, eventType, transitions, message);
     }
 
     void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message)
     {
-        var adapter = body.Reference(types.BasePackage + ".persistence.JpaReadModelStore");
+        var adapter = PersistentViewAdmission.Supports(context, model.Id) ? body.Reference(types.BasePackage + ".persistence.JpaReadModelStore") : null;
+        var transaction = body.Reference(types.BasePackage + ".runtime.ReadModelTransaction");
         var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
         var store = body.Reference(types.BasePackage + ".runtime.ReadModelStore");
         var modifier = synchronized ? "synchronized " : string.Empty;
@@ -38,8 +33,16 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
             {
                 // The message comes from the context so the handler keeps the dispatch shape of a context-free handler.
                 if (message) method.Line($"var message = ({eventMessage}) {body.Reference("org.axonframework.messaging.core.Message")}.fromContext(context);");
-                method.Block($"if (!(store instanceof {adapter}<?>))", memory => memory.Line($"on(event{arguments});").Line("return;"))
-                    .Line($"apply(event{messageArgument}{_updates.DefaultArgument}, {adapter}.bind(store, context));");
+                var apply = $"apply(event{messageArgument}{_updates.DefaultArgument}, ";
+                if (adapter is not null)
+                {
+                    method.Line($"if (store instanceof {adapter}<?>) {apply}{adapter}.bind(store, context));")
+                        .Line($"else {apply}{transaction}.bind(store, context));");
+                }
+                else
+                {
+                    method.Line($"{apply}{transaction}.bind(store, context));");
+                }
                 if (_updates.Enabled)
                     method.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
             })

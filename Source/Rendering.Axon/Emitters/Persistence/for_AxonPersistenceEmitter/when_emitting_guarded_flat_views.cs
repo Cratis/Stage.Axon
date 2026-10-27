@@ -38,7 +38,7 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_depend_on_generation_admission() => Code("TotalStoreConfiguration").ShouldContain("PersistentViewConfiguration generation");
     [Fact] void should_pin_pooled_processing() => Code("PersistentViewConfiguration").ShouldContain("EventProcessorDefinition.pooledStreamingMatching(");
     [Fact] void should_pin_propagating_errors() => Code("PersistentViewConfiguration").ShouldContain("config.errorHandler(PropagatingErrorHandler.INSTANCE)");
-    [Fact] void should_preserve_immediate_memory_notifications() => Code("TotalProjectionProjector").ShouldContain("if (!(store instanceof JpaReadModelStore<?>))");
+    [Fact] void should_stage_memory_writes_until_commit() => Code("TotalProjectionProjector").ShouldContain("ReadModelTransaction.bind(store, context)");
     [Fact] void should_refuse_async_writes() => Code("JpaReadModelStore").ShouldContain("Thread.currentThread() != handlerThread");
     [Fact] void should_test_async_refusal() => Code("TotalPersistentStoreTest").ShouldContain("CompletableFuture.runAsync(() -> bound.put(key, value))");
     [Fact] void should_refuse_contextless_writes() => Code("JpaReadModelStore").ShouldContain("if (context == null) throw new IllegalStateException");
