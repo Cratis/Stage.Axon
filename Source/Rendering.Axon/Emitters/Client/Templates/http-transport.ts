@@ -1,5 +1,5 @@
 import { problemTypes } from "./problems.ts";
-import { readFrames } from "./sse.ts";
+import { FrameTooLarge, readFrames } from "./sse.ts";
 import {
     DecodeError,
     type CommandDescriptor,
@@ -373,9 +373,9 @@ class Watch<K extends object, R> implements Subscription {
         return payload === null && this.query.absent !== undefined ? this.query.absent() : this.query.decode(payload, "$");
     }
 
-    // A malformed frame ends the watch; any other failure reconnects.
+    // A malformed or oversized frame ends the watch; any other failure reconnects.
     failed(error: unknown): void {
-        if (error instanceof DecodeError || error instanceof SyntaxError) {
+        if (error instanceof DecodeError || error instanceof SyntaxError || error instanceof FrameTooLarge) {
             this.stop();
             this.state("failed");
         } else {
