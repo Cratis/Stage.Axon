@@ -18,8 +18,6 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
 
     void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message)
     {
-        var adapter = PersistentViewAdmission.Supports(context, model.Id) ? body.Reference(types.BasePackage + ".persistence.JpaReadModelStore") : null;
-        var transaction = body.Reference(types.BasePackage + ".runtime.ReadModelTransaction");
         var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
         var store = body.Reference(types.BasePackage + ".runtime.ReadModelStore");
         var modifier = synchronized ? "synchronized " : string.Empty;
@@ -33,21 +31,28 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
             {
                 // The message comes from the context so the handler keeps the dispatch shape of a context-free handler.
                 if (message) method.Line($"var message = ({eventMessage}) {body.Reference("org.axonframework.messaging.core.Message")}.fromContext(context);");
-                var apply = $"apply(event{messageArgument}{_updates.DefaultArgument}, ";
-                if (adapter is not null)
-                {
-                    method.Line($"if (store instanceof {adapter}<?>) {apply}{adapter}.bind(store, context));")
-                        .Line($"else {apply}{transaction}.bind(store, context));");
-                }
-                else
-                {
-                    method.Line($"{apply}{transaction}.bind(store, context));");
-                }
+                BindStore(method, messageArgument);
                 if (_updates.Enabled)
                     method.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
             })
             .Block($"public {modifier}void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store);"))
             .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
+    }
+
+    void BindStore(JavaCodeBuilder method, string messageArgument)
+    {
+        var adapter = PersistentViewAdmission.Supports(context, model.Id) ? method.Reference(types.BasePackage + ".persistence.JpaReadModelStore") : null;
+        var transaction = method.Reference(types.BasePackage + ".runtime.ReadModelTransaction");
+        var apply = $"apply(event{messageArgument}{_updates.DefaultArgument}, ";
+        if (adapter is not null)
+        {
+            method.Line($"if (store instanceof {adapter}<?>) {apply}{adapter}.bind(store, context));")
+                .Line($"else {apply}{transaction}.bind(store, context));");
+        }
+        else
+        {
+            method.Line($"{apply}{transaction}.bind(store, context));");
+        }
     }
 
     void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)
