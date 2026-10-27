@@ -1,0 +1,77 @@
+domain Stage.IngressInvariants
+
+concept AccountId : Uuid
+
+policy IsWriter
+  require role "Writer"
+
+module Accounts
+  feature Registry
+    slice StateChange Register
+      command RegisterAccount
+        id AccountId identifier
+        alias String
+        actor String
+        authorize IsWriter
+
+        produces AccountRegistered
+          for id
+          alias = alias
+          actor = actor
+
+      event AccountRegistered
+        alias String
+        actor String
+
+    slice StateChange Close
+      command CloseAccount
+        id AccountId identifier
+        reason String
+        authorize IsWriter
+
+        produces AccountClosed
+          for id
+          reason = reason
+
+      event AccountClosed
+        reason String
+
+    slice StateChange Consume
+      command ConsumeAccount
+        id AccountId identifier
+        reason String
+        authorize IsWriter
+
+        produces AccountConsumed
+          for id
+          reason = reason
+
+      event AccountConsumed
+        reason String
+
+    slice StateChange CrossStream
+      command CloseOtherAccount
+        id AccountId identifier
+        other AccountId
+        reason String
+        authorize IsWriter
+
+        produces AccountClosed
+          for id
+          reason = reason
+
+    slice StateView Active
+      readmodel ActiveAccounts
+        id AccountId
+        alias String
+        actor String
+
+      query AccountSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsWriter
+
+      projection ActiveAccountsProjection => ActiveAccounts
+        from AccountRegistered
+          id = $eventSourceId
+          alias = alias
+          actor = actor
