@@ -42,7 +42,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__PROJECTOR__", package + "." + target.Projector, StringComparison.Ordinal)
             .Replace("__REDUCER_ARGUMENT__", target.ReducerArgument, StringComparison.Ordinal)
             .Replace("__REDUCER_IMPORTS__", target.ReducerImports, StringComparison.Ordinal)
-            .Replace("__IMPORTS__", Imports(model, target.Projector, query) + target.ReducerImports, StringComparison.Ordinal)
+            .Replace("__IMPORTS__", Imports(package, model, target.Projector, query) + target.ReducerImports, StringComparison.Ordinal)
             .Replace("__ROUTE__", QueryEndpoint.Route(owner, query), StringComparison.Ordinal)
             .Replace("__EVENT__", events[0], StringComparison.Ordinal)
             .Replace("__EVENT_TYPE__", types.EventType(spec.GivenEvents[0].EventContract), StringComparison.Ordinal)
@@ -74,7 +74,8 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             return (JavaNames.Type(projection.Name) + "Projector", ProjectionHandlerShape.Arguments(projection, updates), string.Empty, string.Empty, [.. ProjectionTransitions.From(projection).Select(from => from.EventContract)]);
         var reducer = owner.Slice.Reducers.Single(candidate => candidate.ReadModel == model.Id);
         var name = JavaNames.Type(model.Name);
-        return (name + "ReducerProjector", ", null" + updates.DefaultArgument, $", new {name}Reducer() {{}}", $", {name}ReducerConfiguration.class", [.. reducer.Transitions.Select(transition => transition.EventContract)]);
+        var qualifiedName = types.Package(owner) + "." + name;
+        return (name + "ReducerProjector", ", null" + updates.DefaultArgument, $", new {qualifiedName}Reducer() {{}}", $", {qualifiedName}ReducerConfiguration.class", [.. reducer.Transitions.Select(transition => transition.EventContract)]);
     }
 
     string Tags(SemanticSpecification spec) => string.Join('\n', spec.GivenEvents.Select(given => given.EventContract).Distinct().Select(id =>
@@ -99,11 +100,11 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         query.ReadModel == model.Id && query.Cardinality == SemanticQueryCardinality.Many && query.Delivery == SemanticQueryDelivery.Live && query.Authorization is null &&
         !QueryPerformer.Required(context, query) && !new QueryShape(query, model, types).Arguments.Any());
 
-    string Imports(SemanticReadModel model, string projector, SemanticKeyedQuery query) => string.Join(", ", new[]
+    string Imports(string package, SemanticReadModel model, string projector, SemanticKeyedQuery query) => string.Join(", ", new[]
     {
         types.BasePackage + ".infrastructure.AxonConfiguration.class", types.BasePackage + ".infrastructure.SecurityConfiguration.class",
         types.BasePackage + ".runtime.persistent.PersistentConfiguration.class", persistence + ".PersistentViewConfiguration.class",
-        JavaNames.Type(model.Name) + "StoreConfiguration.class", projector + ".class",
-        JavaNames.Type(query.Name) + "Handler.class", JavaNames.Type(query.Name) + "Endpoint.class"
+        package + "." + JavaNames.Type(model.Name) + "StoreConfiguration.class", package + "." + projector + ".class",
+        package + "." + JavaNames.Type(query.Name) + "Handler.class", package + "." + JavaNames.Type(query.Name) + "Endpoint.class"
     });
 }
