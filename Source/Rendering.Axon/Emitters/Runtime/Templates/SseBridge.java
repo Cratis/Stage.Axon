@@ -1,6 +1,7 @@
 package __RUNTIME__;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -16,12 +17,27 @@ public final class SseBridge {
 
     public static <T> SseEmitter stream(Flow.Publisher<T> publisher, Duration timeout) {
         var emitter = new SseEmitter(timeout.toMillis());
+        commitOnInitialise(emitter);
         var subscriber = new StreamSubscriber<T>(emitter);
         emitter.onCompletion(subscriber::cancel);
         emitter.onTimeout(subscriber::cancel);
         emitter.onError(ignored -> subscriber.cancel());
         publisher.subscribe(subscriber);
         return emitter;
+    }
+
+    /**
+     * Spring keeps sends made before it initialises the emitter and writes them on the request thread, under the emitter's
+     * write lock, while it initialises it. Queuing one comment first makes that initialisation always commit the response,
+     * so no other thread writes the headers while the request thread is still leaving the servlet filters. Every later
+     * send, heartbeat and completion takes the same lock, so it reaches the response only after that commit.
+     */
+    private static void commitOnInitialise(SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event().comment("open"));
+        } catch (IOException unreachable) {
+            throw new UncheckedIOException(unreachable);
+        }
     }
 
     private static final class StreamSubscriber<T> implements Flow.Subscriber<T> {

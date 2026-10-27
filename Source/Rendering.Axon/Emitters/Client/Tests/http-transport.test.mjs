@@ -1,30 +1,7 @@
 // Runtime proofs for the generated HTTP transport: node --test, a fake fetch, no dependencies.
-// The templates are copied next to a problems.ts that lists the URNs the server answers with.
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 import { test } from "node:test";
-
-const templates = new URL("../Templates/", import.meta.url);
-const dir = mkdtempSync(join(tmpdir(), "axon-client-"));
-for (const name of ["transport", "http-transport", "sse"]) copyFileSync(new URL(name + ".ts", templates), join(dir, name + ".ts"));
-const urn = (type) => "urn:cratis:stage-axon:problem:" + type;
-writeFileSync(join(dir, "problems.ts"), `export const problemTypes = {
-    conflict: "${urn("conflict")}",
-    liveCapacity: "${urn("live-capacity")}",
-    queryCardinality: "${urn("query-cardinality")}",
-    queryResultMissing: "${urn("query-result-missing")}",
-    validation: "${urn("validation")}"
-} as const;
-`);
-const { createHttpTransport } = await import(pathToFileURL(join(dir, "http-transport.ts")).href);
-
-const route = { id: "GET /rows", method: "GET", path: "/rows", produces: [], kind: "query", consumes: [], responses: [], parameters: [], cardinality: "zeroOrOne", authorization: null, problems: [], response: "json" };
-const descriptor = { id: "GET /rows", cardinality: "zeroOrOne", live: false, decode: (value) => value, absent: () => null };
-const transportFor = (fetch) => createHttpTransport([route], { baseUrl: "http://server", authorization: () => undefined, fetch });
-const problem = (status, type) => new Response(JSON.stringify({ type: urn(type), detail: "d" }), { status, headers: { "Content-Type": "application/problem+json" } });
+import { descriptor, problem, transportFor } from "./support.mjs";
 
 test("an absent zero-or-one snapshot answered with an empty 404 is ok(null)", async () => {
     const outcome = await transportFor(async () => new Response(null, { status: 404 })).snapshot(descriptor, {});
