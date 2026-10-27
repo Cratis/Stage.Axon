@@ -203,11 +203,14 @@ class LiveQueryContractTest {
     @Test
     void closingTheHttpStreamReleasesTheAxonSubscription() throws Exception {
         STATE.put("disconnect", "v0");
+        var opened = System.nanoTime();
         var stream = open("disconnect", null);
         assertEquals("[\"v0\"]", stream.nextData());
         assertEquals(1, live.active());
         stream.close();
-        assertTrue(cancelled.await(5, TimeUnit.SECONDS), "The Axon subscription outlived the client");
+        assertTrue(cancelled.await(3, TimeUnit.SECONDS), "The Axon subscription outlived the client");
+        // The lifetime is 5s and also cancels, so only a release before it elapsed proves the disconnect did it.
+        assertTrue(System.nanoTime() - opened < TimeUnit.MILLISECONDS.toNanos(4500), "The release came from the stream lifetime, not the disconnect");
         awaitActive(0);
     }
 
