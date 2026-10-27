@@ -5,7 +5,9 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Screenplay.Semantics.Execution;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
+using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
@@ -43,11 +45,20 @@ public class when_models_claim_java_lang_names : Projections.for_AxonProjections
             _persistent.Add(PersistentViewAdmission.Supports(context, modelId));
             var plan = new AxonArtifactRenderPlanner().Plan(request);
             _plans.Add(plan);
-            var owner = ScopeSelection.Select(request).Single(slice => slice.Slice.ReadModels.Any(model => model.Id == modelId));
             var types = new ViewJavaTypes(application);
-            foreach (var package in new[] { types.Package(owner), types.BasePackage + ".views.events", types.BasePackage + ".concepts" })
+            void Capture(string package, IEnumerable<string> names)
             {
-                _modeled.Add((plan.Artifacts.Single(artifact => artifact.RelativePath == $"src/main/java/{package.Replace('.', '/')}/{name}.java"), package));
+                foreach (var typeName in names)
+                {
+                    _modeled.Add((plan.Artifacts.Single(artifact => artifact.RelativePath == $"src/main/java/{package.Replace('.', '/')}/{JavaNames.Type(typeName)}.java"), package));
+                }
+            }
+            Capture(types.BasePackage + ".concepts", application.Concepts.Select(concept => concept.Name));
+            Capture(types.BasePackage + ".types", application.Types.Select(type => type.Name));
+            foreach (var owner in ScopeSelection.Select(request))
+            {
+                Capture(types.Package(owner), owner.Slice.ReadModels.Select(model => model.Name));
+                Capture(AxonEventsEmitter.Package(context, owner.Module), owner.Slice.Events.Select(contract => contract.Name));
             }
         }
     }
@@ -59,7 +70,7 @@ public class when_models_claim_java_lang_names : Projections.for_AxonProjections
     void should_keep_every_modeled_type_outside_support_packages()
     {
         var packages = new ViewJavaTypes(_request.Model.Application).ReservedSupportPackages;
-        _modeled.Count.ShouldEqual(15);
+        _modeled.Count.ShouldBeGreaterThan(15);
         foreach (var (artifact, package) in _modeled)
         {
             packages.Contains(package).ShouldBeFalse();
@@ -89,6 +100,7 @@ public class when_models_claim_java_lang_names : Projections.for_AxonProjections
             Code("/persistence/JpaReadModelStore.java").ShouldContain("Object");
             Code("/persistence/JpaReadModelStore.java").ShouldContain("Exception");
             Code("/runtime/InMemoryReadModelStore.java").ShouldContain("Object");
+            Code("/runtime/RuntimeTest.java").ShouldContain("private final Integer value;");
             Code("/runtime/persistent/PersistentReadModelSafety.java").ShouldContain("private final String model;");
         }
     }
