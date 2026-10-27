@@ -2,7 +2,9 @@ package __RUNTIME__;
 
 import java.net.URI;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -40,6 +42,14 @@ public class ProblemDetailsAdvice extends ResponseEntityExceptionHandler {
         problem.setProperty("cardinality", exception.cardinality());
         problem.setProperty("count", exception.count());
         return problem;
+    }
+
+    @ExceptionHandler(LiveCapacityException.class)
+    public ResponseEntity<ProblemDetail> liveCapacity(LiveCapacityException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .header("Retry-After", "5")
+            .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+            .body(problem(HttpStatus.SERVICE_UNAVAILABLE, "live-capacity", exception.getMessage()));
     }
 
     private static ProblemDetail problem(HttpStatus status, String type, String detail) {

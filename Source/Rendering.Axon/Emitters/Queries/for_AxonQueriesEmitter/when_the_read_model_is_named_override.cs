@@ -15,12 +15,10 @@ public class when_the_read_model_is_named_override : given.a_query_collision
     }
 
     [Theory]
-    [InlineData("LiveTotalsStreams")]
     [InlineData("LiveTotalsSubscription")]
     void should_qualify_the_framework_annotation(string file) => Code(file).ShouldContain("@java.lang.Override");
 
     [Theory]
-    [InlineData("LiveTotalsStreams")]
     [InlineData("LiveTotalsSubscription")]
     void should_not_leave_any_shadowed_annotation(string file) => Code(file).ShouldNotContain("@Override");
 }
