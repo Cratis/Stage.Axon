@@ -52,3 +52,16 @@ The authorization tests deny anonymous and wrong-role commands before claims or 
 An in-memory uniqueness reservation may reject a contender even when its owner later rolls back; the JPA rollback proof does not promise that the in-memory store retries that contender. Authorization proofs record observed HTTP denial statuses without defining the transport's error-status or envelope policy.
 
 These are native CI proofs, not evidence from .NET rendering alone. Local verification renders their sources and runs emitter/harness specs; Java/Maven execution and the actual concurrency outcomes must be checked in CI.
+
+## React and Scene proof host
+
+`ClientProof/scene` is a proof-local React and Scene host over the transport-neutral interface in `Source/Rendering.Axon/Emitters/Client/Templates/transport.ts`. It is not generated and not published, and its files are not embedded in the harness. `sceneDispatcher.ts` implements Scene's `executeCommand` over `Transport.execute`: `validation` maps to `validationErrors`, every other outcome, including `cancelled`, maps to `exceptionMessages`, and duplicate or unknown command names throw. `useLiveQueryResults.ts` watches a live query as Scene `queryResults`, closes on unmount and on a key change, and clears and ignores older values on an identity change.
+
+The jsdom tests use an in-memory transport and order events with bounded barriers, never sleeps. The dependencies are exact pins with a committed lockfile (`lockfileVersion` 3, `registry.npmjs.org` only). Use Node 24.20.0, which bundles npm 11.19.0, the same as CI:
+
+```bash
+cd Source/Rendering.Axon.Verification/ClientProof/scene
+npm ci --ignore-scripts --no-audit --no-fund && npm exec -- tsc -p . --noEmit && node --test "test/"*.test.ts
+```
+
+CI runs this in the java job after the Maven verify. The host type-checks under TypeScript 7.0.2 with `moduleResolution: bundler`; no TypeScript 5.9 fallback was needed.
