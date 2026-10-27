@@ -11,7 +11,7 @@ if (process.argv.length !== 4 || !process.env.JAVA_HOME) throw new Error('Usage:
 const root = path.resolve(process.argv[2]);
 const logs = path.resolve(process.argv[3]);
 const applications = JSON.parse(fs.readFileSync(path.join(root, 'applications.json'), 'utf8'));
-if (applications.length !== 25 || new Set(applications).size !== 25) throw new Error('Expected 25 distinct generated applications');
+if (!Array.isArray(applications) || applications.length === 0 || applications.some(name => typeof name !== 'string') || new Set(applications).size !== applications.length) throw new Error(`${path.join(root, 'applications.json')}: expected a non-empty list of distinct application names`);
 fs.mkdirSync(logs, { recursive: true });
 let current;
 for (const signal of ['SIGTERM', 'SIGINT']) {

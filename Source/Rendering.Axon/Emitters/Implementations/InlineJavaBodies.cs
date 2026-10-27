@@ -61,13 +61,17 @@ internal static class InlineJavaBodies
         slot.Slice is { } slice && slot.MemberPrefix is { } prefix && requirement.Role == slot.Role && requirement.Source.SemanticId == slice &&
         requirement.Owner.Kind == SemanticKind.Slice && requirement.Member?.StartsWith(prefix, StringComparison.Ordinal) == true;
 
+    static string ForeignLanguage(string language) =>
+        $"The Axon target only realizes Java bodies; language '{language}' is not supported. Supply the body in Java (or render it with a target that realizes this language) and render again.";
+
     static string ContractReason(SemanticImplementationRequirement requirement, SemanticImplementationRole role, SemanticId owner, SemanticKind ownerKind)
     {
         (bool Invalid, string Reason)[] checks =
         [
             (requirement.Role != role || requirement.Source.SemanticId != owner, "The implementation role or semantic owner does not match the slot."),
             (requirement.Owner.Kind != ownerKind, "The implementation address does not identify the slot's owner kind."),
-            (requirement.Language != "java", "Only the registered java language has a native Axon body slot."),
+            (requirement.Language is null, "The implementation language is unknown. Supply the body in Java and render again."),
+            (requirement.Language != "java", ForeignLanguage(requirement.Language!)),
             (requirement.File is not null, "File-backed implementations have no supported native body slot."),
             (requirement.ContextVersion != 1 || requirement.ResultVersion != 1, "The implementation context or result contract revision is unsupported."),
             (requirement.IsAmbiguous || requirement.IsProvisional, "Ambiguous or provisional implementation identities cannot be placed."),
