@@ -76,10 +76,11 @@ function noValue<R>(): R {
     return undefined as R;
 }
 
-async function readProblem(response: Response): Promise<{ problem: Problem; errors: readonly ValidationFailure[]; count: number }> {
+// `text` is the body when the caller already read it.
+async function readProblem(response: Response, text?: string): Promise<{ problem: Problem; errors: readonly ValidationFailure[]; count: number }> {
     let body: Record<string, unknown> = {};
     try {
-        const parsed: unknown = JSON.parse(await response.text());
+        const parsed: unknown = JSON.parse(text ?? await response.text());
         if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) body = Object.fromEntries(Object.entries(parsed));
     } catch {
         // An empty or non-JSON body carries no problem details.
@@ -106,10 +107,10 @@ function retryAfterSeconds(response: Response): number | undefined {
     return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
 }
 
-async function failure<T>(response: Response): Promise<Outcome<T>> {
+async function failure<T>(response: Response, text?: string): Promise<Outcome<T>> {
     if (response.status === 401) return { status: "unauthenticated" };
     if (response.status === 403) return { status: "forbidden" };
-    const { problem, errors, count } = await readProblem(response);
+    const { problem, errors, count } = await readProblem(response, text);
     switch (problem.type) {
         case problemTypes.validation: return { status: "validation", errors };
         case problemTypes.conflict: return { status: "conflict", problem };
@@ -200,7 +201,13 @@ class HttpTransport implements Transport {
                 credentials: "omit",
                 signal: linked
             });
-            if (!response.ok) return failure<R>(response);
+            if (!response.ok) {
+                if (response.status !== 404 || query.absent === undefined) return failure<R>(response);
+                // A zero-or-one query that finds nothing answers 404 with an empty body; a problem body stays a failure.
+                const missing = await response.text();
+                return missing.trim() === "" ? { status: "ok", value: query.absent() } : failure<R>(response, missing);
+            }
+
             const text = await response.text();
             // A zero-or-one query that finds nothing answers with an empty body or null.
             if (query.absent !== undefined && (text.trim() === "" || text.trim() === "null")) return { status: "ok", value: query.absent() };
@@ -228,7 +235,9 @@ class HttpTransport implements Transport {
         this.identity.signal.addEventListener("abort", abort, { once: true });
         try {
             const outcome = await work(link.signal);
-            return epoch === this.epoch ? outcome : cancelled("identity");
+            // Reading an error body swallows an abort, so cancellation is checked again before any outcome is returned.
+            if (epoch !== this.epoch) return cancelled("identity");
+            return isAborted(caller) ? cancelled("aborted") : outcome;
         } catch (error) {
             if (epoch !== this.epoch) return cancelled("identity");
             if (isAborted(caller)) return cancelled("aborted");
@@ -322,38 +331,55 @@ class Watch<K extends object, R> implements Subscription {
             }
 
             if (!response.ok || response.body === null) {
-                const seconds = retryAfterSeconds(response);
-                await response.body?.cancel().catch(() => undefined);
-                if (current()) this.retry(seconds === undefined ? undefined : Math.min(seconds * 1000, maxRetryAfterMs));
+                await this.rejected(response, current);
                 return;
             }
 
             this.watchdog(connection, generation);
-            let first = true;
-            for await (const frame of readFrames(response.body, this.owner.maxFrameChars)) {
-                if (!current()) return;
-                this.watchdog(connection, generation);
-                if (frame.kind === "comment") continue;
-                const payload: unknown = JSON.parse(frame.data);
-                const value = payload === null && this.query.absent !== undefined ? this.query.absent() : this.query.decode(payload, "$");
-                if (first) {
-                    first = false;
-                    this.attempts = 0;
-                    this.state("live");
-                }
-
-                this.observer.value(value, epoch);
-            }
-
+            await this.deliver(response.body, connection, generation, epoch, current);
             if (current()) this.retry(undefined);
         } catch (error) {
+            if (current()) this.failed(error);
+        }
+    }
+
+    // The server refused the stream: reconnect after its Retry-After, or the backoff.
+    async rejected(response: Response, current: () => boolean): Promise<void> {
+        const seconds = retryAfterSeconds(response);
+        await response.body?.cancel().catch(() => undefined);
+        if (current()) this.retry(seconds === undefined ? undefined : Math.min(seconds * 1000, maxRetryAfterMs));
+    }
+
+    // Hands each frame of the open stream to the observer while the connection is still current.
+    async deliver(body: ReadableStream<Uint8Array>, connection: AbortController, generation: number, epoch: number, current: () => boolean): Promise<void> {
+        let first = true;
+        for await (const frame of readFrames(body, this.owner.maxFrameChars)) {
             if (!current()) return;
-            if (error instanceof DecodeError || error instanceof SyntaxError) {
-                this.stop();
-                this.state("failed");
-            } else {
-                this.retry(undefined);
+            this.watchdog(connection, generation);
+            if (frame.kind === "comment") continue;
+            const value = this.decodeFrame(frame.data);
+            if (first) {
+                first = false;
+                this.attempts = 0;
+                this.state("live");
             }
+
+            this.observer.value(value, epoch);
+        }
+    }
+
+    decodeFrame(data: string): R {
+        const payload: unknown = JSON.parse(data);
+        return payload === null && this.query.absent !== undefined ? this.query.absent() : this.query.decode(payload, "$");
+    }
+
+    // A malformed frame ends the watch; any other failure reconnects.
+    failed(error: unknown): void {
+        if (error instanceof DecodeError || error instanceof SyntaxError) {
+            this.stop();
+            this.state("failed");
+        } else {
+            this.retry(undefined);
         }
     }
 

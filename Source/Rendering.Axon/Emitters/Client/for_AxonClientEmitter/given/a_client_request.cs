@@ -28,7 +28,18 @@ public class a_client_request : Axon.for_AxonArtifactRenderPlanner.given.an_axon
         });
     }
 
+    protected static SemanticApplication ChangeSlices(SemanticApplication application, Func<SemanticSlice, SemanticSlice> change) => application with
+    {
+        Modules = [.. application.Modules.Select(module => module with { Features = [.. module.Features.Select(feature => ChangeFeature(feature, change))] })]
+    };
+
     protected IEnumerable<string> ClientPaths => plan.Artifacts.Select(artifact => artifact.RelativePath).Where(path => path.StartsWith("client/", StringComparison.Ordinal));
 
     protected string Text(string path) => Encoding.UTF8.GetString(plan.Artifacts.Single(artifact => artifact.RelativePath == path).Bytes.AsSpan());
+
+    static SemanticFeature ChangeFeature(SemanticFeature feature, Func<SemanticSlice, SemanticSlice> change) => feature with
+    {
+        Features = [.. feature.Features.Select(child => ChangeFeature(child, change))],
+        Slices = [.. feature.Slices.Select(change)]
+    };
 }
