@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Flow;
 import java.util.concurrent.ScheduledExecutorService;
@@ -32,6 +33,8 @@ public final class LiveStreams implements ApplicationListener<ContextClosedEvent
         thread.setDaemon(true);
         return thread;
     });
+    /** Runs the blocking heartbeat sends, so a slow client never occupies the shared scheduler thread. */
+    private final ExecutorService sender = Executors.newVirtualThreadPerTaskExecutor();
 
     public LiveStreams(
             @Value("${stage.axon.live.max-streams:1024}") int maxStreams,
@@ -51,6 +54,7 @@ public final class LiveStreams implements ApplicationListener<ContextClosedEvent
         closing.set(true);
         sessions.forEach(OpenStream::stop);
         scheduler.shutdownNow();
+        sender.shutdownNow();
     }
 
     public final class Group {
@@ -61,18 +65,22 @@ public final class LiveStreams implements ApplicationListener<ContextClosedEvent
         public int activeCount() { return count.get(); }
 
         public SseEmitter open(Flow.Publisher<Object> publisher) {
-            if (maxStreams > 0 && total.incrementAndGet() > maxStreams) {
+            if (total.incrementAndGet() > maxStreams && maxStreams > 0) {
                 total.decrementAndGet();
                 throw new LiveCapacityException();
             }
-            if (maxStreams <= 0) total.incrementAndGet();
             count.incrementAndGet();
             var session = new OpenStream(this);
-            sessions.add(session);
-            if (closing.get()) session.stop();
-            var emitter = SseBridge.stream(downstream -> publisher.subscribe(session.forwardTo(downstream)), timeout);
-            session.attach(emitter);
-            return emitter;
+            try {
+                sessions.add(session);
+                if (closing.get()) session.stop();
+                var emitter = SseBridge.stream(downstream -> publisher.subscribe(session.forwardTo(downstream)), timeout);
+                session.attach(emitter);
+                return emitter;
+            } catch (RuntimeException | Error failure) {
+                session.stop();
+                throw failure;
+            }
         }
     }
 
@@ -81,6 +89,7 @@ public final class LiveStreams implements ApplicationListener<ContextClosedEvent
         private final AtomicReference<Flow.Subscription> subscription = new AtomicReference<>();
         private final AtomicBoolean cancelled = new AtomicBoolean();
         private volatile SseEmitter emitter;
+        private final AtomicBoolean beating = new AtomicBoolean();
         private volatile ScheduledFuture<?> beat;
 
         private OpenStream(Group group) { this.group = group; }
@@ -109,16 +118,25 @@ public final class LiveStreams implements ApplicationListener<ContextClosedEvent
             if (cancelled.get() || closing.get()) { value.complete(); return; }
             if (!heartbeat.isZero() && !heartbeat.isNegative()) {
                 try {
-                    beat = scheduler.scheduleWithFixedDelay(this::beat, heartbeat.toMillis(), heartbeat.toMillis(), TimeUnit.MILLISECONDS);
+                    beat = scheduler.scheduleWithFixedDelay(this::tick, heartbeat.toMillis(), heartbeat.toMillis(), TimeUnit.MILLISECONDS);
                 } catch (RuntimeException rejected) { stop(); return; }
                 if (cancelled.get()) beat.cancel(false);
             }
         }
 
+        private void tick() {
+            if (cancelled.get() || !beating.compareAndSet(false, true)) return;
+            try {
+                sender.execute(this::beat);
+            } catch (RuntimeException rejected) { beating.set(false); }
+        }
+
         private void beat() {
             try {
                 emitter.send(SseEmitter.event().comment("heartbeat"));
-            } catch (IOException | IllegalStateException failure) { cancel(); }
+            } catch (IOException | IllegalStateException failure) {
+                cancel();
+            } finally { beating.set(false); }
         }
 
         private void cancel() {
