@@ -4,6 +4,7 @@ import __APPLICATION__.accounts.registry.consume.ConsumeAccount;
 import __APPLICATION__.accounts.registry.consume.ConsumeAccountRules;
 import __APPLICATION__.accounts.registry.crossstream.CloseOtherAccount;
 import __APPLICATION__.concepts.AccountId;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -60,7 +61,8 @@ abstract class GeneratedProtectedReadTest {
                             outcomes.add(actual.getClass().getName());
                             assertTrue(actual instanceof ConcurrencyException
                                     || actual instanceof AppendEventsTransactionRejectedException
-                                    || actual instanceof CommandValidationException,
+                                    || actual instanceof CommandValidationException
+                                    || actual instanceof SQLIntegrityConstraintViolationException,
                                     () -> "Unexpected protected-decision outcome: " + actual);
                             return false;
                         }
