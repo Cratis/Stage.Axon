@@ -12,7 +12,7 @@ public class when_a_reducer_model_claims_the_test_name : given.a_native_view_req
     void Because()
     {
         var model = _located.Slice.ReadModels.Single(model => model.Name == "Categories") with { Name = "Test" };
-        ReducerViewSpecifications.Emit(_context, new ViewJavaTypes(_request.Model.Application), _located, model, [_spec]);
+        ReducerViewSpecifications.Emit(_context, new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name)), _located, model, [_spec]);
         _java = Text(_context.Artifacts.Single());
     }
 

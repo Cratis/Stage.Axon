@@ -17,7 +17,7 @@ public class when_a_populated_given_concept_is_named_read_model_store : for_Axon
         Prepare(true);
         var query = _located.Slice.Queries.Single(query => query.Name == "AllCategories") with { Authorization = null };
         var model = _located.Slice.ReadModels.Single();
-        AxonViewLiveSpecs.Emit(_context, new ViewJavaTypes(_request.Model.Application), _located, query, _located, model);
+        AxonViewLiveSpecs.Emit(_context, new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name)), _located, query, _located, model);
         _subscription = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/AllCategoriesSubscriptionTest.java", StringComparison.Ordinal)));
         _sse = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/AllCategoriesSseTest.java", StringComparison.Ordinal)));
     }

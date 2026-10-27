@@ -10,7 +10,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
 internal sealed class ReactionSpecificationValues(AxonEmissionContext context)
 {
-    readonly CommandJavaTypes _types = new(context.Request.Model.Application);
+    readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
 
     internal string? Trigger(SemanticApplicationTrigger trigger, SemanticSpecificationTrigger occurrence)
     {

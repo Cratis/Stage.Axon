@@ -13,7 +13,7 @@ internal static class CommandStreamEmitter
 {
     internal static void Emit(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource source)
     {
-        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located);
+        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located);
         var name = JavaNames.Type(command.Name) + "Stream";
         var decisions = new CommandDecisionReads(context, command, source).Prepare() ?? [];
         var required = decisions.SelectMany(read => read.Events.All).ToHashSet();
@@ -23,7 +23,7 @@ internal static class CommandStreamEmitter
         var code = new JavaCodeBuilder(package).Declare(name);
         var events = contracts.ToDictionary(contract => contract.Id, contract => AxonEventsEmitter.TypeFor(context, contract.Id, code, package));
         if (source.JavaType.StartsWith(context.BasePackage + ".", StringComparison.Ordinal)) code.Reference(source.JavaType);
-        var sourceType = new CommandJavaTypes(context.Request.Model.Application).Reference(source.JavaType, code);
+        var sourceType = new CommandJavaTypes(context.Request.Model.Application, context.BasePackage).Reference(source.JavaType, code);
         var tag = source.ReferenceTag(code, package);
         code.Line($"@{code.Reference("org.axonframework.eventsourcing.annotation.EventSourcedEntity")}(tagKey = {tag})")
             .Line($"@{code.Reference("org.axonframework.extension.spring.stereotype.EventSourced")}(idType = {sourceType}.class, tagKey = {tag})")

@@ -14,7 +14,7 @@ internal static class QueryModelReference
     internal static JavaCodeBuilder Create(AxonEmissionContext context, string package)
     {
         var code = new JavaCodeBuilder(package);
-        var types = new ViewJavaTypes(context.Request.Model.Application);
+        var types = new ViewJavaTypes(context.Request.Model.Application, context.BasePackage);
         var slices = ScopeSelection.Select(context.Request).Where(located => types.Package(located) == package);
         var models = slices.SelectMany(located => located.Slice.ReadModels).Select(model => JavaNames.Type(model.Name));
         var queries = slices.SelectMany(located => located.Slice.Queries.Concat(QueryPerformer.Queries(context, located)))

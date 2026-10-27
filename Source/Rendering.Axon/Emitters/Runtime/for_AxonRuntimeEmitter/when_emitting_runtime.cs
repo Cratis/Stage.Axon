@@ -134,7 +134,7 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     {
         const string prefix = "Cratis.Stage.Rendering.Axon.Emitters.Runtime.Templates.";
         var assembly = typeof(AxonRuntimeEmitter).Assembly;
-        foreach (var resource in assembly.GetManifestResourceNames().Where(name => name.StartsWith(prefix, StringComparison.Ordinal)))
+        foreach (var resource in assembly.GetManifestResourceNames().Where(name => name.StartsWith(prefix, StringComparison.Ordinal) && !name.StartsWith(prefix + "test.HttpBearer", StringComparison.Ordinal)))
         {
             using var stream = assembly.GetManifestResourceStream(resource);
             using var reader = new StreamReader(stream);

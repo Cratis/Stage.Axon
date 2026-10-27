@@ -17,7 +17,7 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
     {
         var models = ScopeSelection.Select(context.Request).SelectMany(owner => owner.Slice.ReadModels).ToArray();
         if (!models.Any(model => PersistentViewAdmission.Supports(context, model.Id))) return;
-        var types = new ViewJavaTypes(context.Request.Model.Application);
+        var types = new ViewJavaTypes(context.Request.Model.Application, context.BasePackage);
         var package = types.BasePackage + ".persistence";
         var runtime = types.BasePackage + ".runtime";
         var ids = models.Select(model => model.Id).ToArray();

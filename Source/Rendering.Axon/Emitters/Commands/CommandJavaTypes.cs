@@ -6,7 +6,7 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
-internal sealed class CommandJavaTypes(SemanticApplication application)
+internal sealed class CommandJavaTypes(SemanticApplication application, string basePackage)
 {
     static readonly IReadOnlyDictionary<SemanticPrimitiveType, string> _primitives = new Dictionary<SemanticPrimitiveType, string>
     {
@@ -19,7 +19,7 @@ internal sealed class CommandJavaTypes(SemanticApplication application)
         [SemanticPrimitiveType.DateTime] = "java.time.OffsetDateTime"
     };
 
-    internal string BasePackage { get; } = JavaNames.PackageSegment(application.Name);
+    internal string BasePackage { get; } = basePackage;
 
     internal string Type(SemanticTypeReference type)
     {
