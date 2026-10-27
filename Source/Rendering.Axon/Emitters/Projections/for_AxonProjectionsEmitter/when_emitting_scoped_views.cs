@@ -61,7 +61,14 @@ public class when_emitting_scoped_views : given.a_view_request
     {
         var excluded = ReferenceSpecifications().Where(ReferenceUnavailable).ToArray();
         Assert.Equal(["RetainingContextAndDetails"], excluded.Select(specification => specification.Name));
-        Assert.All(excluded, specification => Assert.Contains(specification.ThenReadModels, expected => expected.ReadModel == ReadModelId("ContextTotal")));
+        Assert.All(excluded, specification => Assert.All(specification.ThenReadModels, expected => Assert.Equal(ReadModelId("ContextTotal"), expected.ReadModel)));
+    }
+
+    [Fact]
+    void should_keep_a_spec_with_the_same_name_but_an_admitted_read_model_in_reference_execution()
+    {
+        var specification = ReferenceSpecifications().Single(candidate => candidate.Name == "RetainingContextAndDetails");
+        ReferenceUnavailable(specification with { ThenReadModels = [specification.ThenReadModels[0] with { ReadModel = ReadModelId("Total") }] }).ShouldBeFalse();
     }
 
     IEnumerable<SemanticSpecification> ReferenceSpecifications() => ScopeSelection.Select(_request)

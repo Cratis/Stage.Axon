@@ -54,7 +54,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__TAGS__", Tags(spec), StringComparison.Ordinal)
             .Replace("__FIXTURE_EVENTS__", string.Join(", ", events), StringComparison.Ordinal);
         void Add(string suffix, string source) => context.Artifacts.Add(PlannedArtifact.CreateText(
-            $"src/test/java/{package.Replace('.', '/')}/{name}{suffix}.java", Render(source), [model.Id, spec.Id]));
+            $"src/test/java/{package.Replace('.', '/')}/{name}{suffix}.java", PersistentJavaTemplate.Render(Render(source)), [model.Id, spec.Id]));
         Add("Support", PersistentViewProofSupport.Source);
         Add("Fixture", PersistentViewFixtureContract.Source);
         Add("Test", PersistentViewProof.Source);

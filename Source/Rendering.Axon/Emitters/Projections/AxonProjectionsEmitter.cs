@@ -35,9 +35,9 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         new AxonViewSpecsEmitter().Emit(context);
         if (namespaces.Count > 0)
         {
-            context.AddJava(types.BasePackage + ".infrastructure", "DefaultViewProcessorGuard", DefaultViewProcessorGuard.Source
+            context.AddJava(types.BasePackage + ".infrastructure", "DefaultViewProcessorGuard", PersistentJavaTemplate.Render(DefaultViewProcessorGuard.Source
                 .Replace("__PACKAGE__", types.BasePackage + ".infrastructure", StringComparison.Ordinal)
-                .Replace("__NAMESPACES__", string.Join(", ", namespaces.Select(JavaCodeBuilder.StringLiteral)), StringComparison.Ordinal));
+                .Replace("__NAMESPACES__", string.Join(", ", namespaces.Select(JavaCodeBuilder.StringLiteral)), StringComparison.Ordinal)));
         }
         if (ScopeSelection.Select(context.Request).Any(owner => !owner.Slice.ReadModels.IsEmpty))
             context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/axon-views.properties", string.Join('\n', namespaces.Select(name => $"axon.eventhandling.processors[{name}].mode=${{stage.axon.view-processor-mode:subscribing}}")) + "\n", []));
@@ -65,7 +65,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         ViewJavaTypes.Add(context, package, name, ReadModelRecords.Code(types, package, model), model.Id);
         if (PersistentViewAdmission.Supports(context, model.Id))
         {
-            context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default read-model rows are volatile; durable checkpoints may skip prior events. The persistent profile supports guarded flat projections only, with generation checks and processor-bound transactions; scoped/reducer recovery remains refused.");
+            context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default read-model rows are volatile; durable checkpoints may skip prior events. The persistent profile supports admitted root projections and fully placed reducer-only models, with generation checks and processor-bound transactions; scoped and unsupported reducer recovery remain refused.");
             PersistentProjectionStore.Emit(context, types, package, model);
             return;
         }

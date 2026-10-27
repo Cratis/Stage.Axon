@@ -33,8 +33,8 @@ public class when_importing_projection_types : given.a_view_request
         _collidingModel = Text(collision.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/Board.java", StringComparison.Ordinal)));
     }
 
-    [Fact] void should_preserve_qualified_persistence_and_query_update_parameters() => _flatProjector.ShouldContain("public void on(Increased event, org.axonframework.messaging.queryhandling.QueryUpdateEmitter updates)");
-    [Fact] void should_not_add_update_imports_to_the_frozen_binding() => _flatProjector.ShouldNotContain("import org.axonframework.messaging.queryhandling.QueryUpdateEmitter;");
+    [Fact] void should_shorten_persistence_and_query_update_parameters() => _flatProjector.ShouldContain("public void on(Increased event, QueryUpdateEmitter updates)");
+    [Fact] void should_import_the_update_emitter_for_the_binding() => _flatProjector.ShouldContain("import org.axonframework.messaging.queryhandling.QueryUpdateEmitter;");
     [Fact] void should_import_nested_records() => _projector.ShouldContain("import axonviews.types.BoardDetails;");
     [Fact] void should_import_child_records() => _projector.ShouldContain("import axonviews.types.Card;");
     [Fact] void should_import_concepts_for_keys() => _projector.ShouldContain("import axonviews.concepts.BoardId;");

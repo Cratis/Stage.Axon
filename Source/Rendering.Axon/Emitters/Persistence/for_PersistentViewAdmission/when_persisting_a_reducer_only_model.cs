@@ -49,6 +49,8 @@ public class when_persisting_a_reducer_only_model : given.a_flat_view
     [Fact] void should_not_emit_notifications_without_observable_queries() => Projector.ShouldNotContain("runOnAfterCommit");
     [Fact] void should_construct_the_reducer_in_expected_rows() => Code(_placed, "RebuiltTotalPersistentSupport").ShouldContain("ReducerProjector(store, new RebuiltTotalReducer() {})");
     [Fact] void should_not_inline_the_reducer_configuration_package() => Code(_placed, "RebuiltTotalPersistentSupport").ShouldNotContain("axonviews.reduction.counters.rebuilt.RebuiltTotalReducerConfiguration.class");
+    [Fact] void should_share_projector_construction_between_expected_and_replayed_rows() => Code(_placed, "RebuiltTotalPersistentSupport").Split("var projector = projector(store);", StringSplitOptions.None).Length.ShouldEqual(3);
+    [Fact] void should_share_projector_construction_with_the_bound_failure_path() => Code(_placed, "RebuiltTotalPersistentSupport").ShouldContain("projector(bound).on(event, null);");
     [Fact] void should_import_the_reducer_configuration() => Code(_placed, "RebuiltTotalPersistentSupport").ShouldContain("RebuiltTotalReducerConfiguration.class");
     [Fact] void should_emit_an_enabled_recovery_proof() => Code(_placed, "RebuiltTotalPersistentTest").ShouldNotContain("@Disabled");
     [Fact] void should_emit_an_enabled_multisegment_proof() => Code(_placed, "RebuiltTotalPersistentMultiSegmentTest").ShouldNotContain("@Disabled");

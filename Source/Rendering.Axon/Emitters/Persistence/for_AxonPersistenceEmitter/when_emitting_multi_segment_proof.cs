@@ -41,7 +41,12 @@ public class when_emitting_multi_segment_proof : Projections.for_AxonProjections
         Support.ShouldContain("orElseThrow(() -> new AssertionError(\"FIXTURE: pooled witness requires an owning segment\"))");
     }
     [Fact] void should_remember_ownership_by_the_actual_event_tag() => Support.ShouldContain("observedOwners.put(tag(event), owner)");
-    [Fact] void should_select_the_observed_owner_for_the_event_to_fail() => Proof.ShouldContain("var owner = observedOwners.get(tag(new axonviews.views.events.Increased(");
+    [Fact]
+    void should_select_the_observed_owner_for_the_event_to_fail()
+    {
+        Proof.ShouldContain("import axonviews.views.events.Increased;");
+        Proof.ShouldContain("var owner = observedOwners.get(tag(new Increased(");
+    }
     [Fact] void should_require_an_observed_owner() => Proof.ShouldContain("assertNotNull(owner, \"FIXTURE: arrangement must observe the failed event's owning segment\")");
     [Fact] void should_require_exactly_four_checkpoint_keys() => Proof.ShouldContain("assertEquals(4, checkpoint.size(), \"FIXTURE: multi-segment proof requires four processor segments\")");
     [Fact] void should_require_the_owner_in_the_checkpoint() => Proof.ShouldContain("assertTrue(checkpoint.containsKey(owner), \"FIXTURE: observed owner must have a checkpoint\")");

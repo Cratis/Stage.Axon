@@ -19,7 +19,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
             return;
         }
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
-            .Block($"public void on({eventType} event{_updates.Parameter})", method => Apply(method, transitions));
+            .Block($"public void on({eventType} event{_updates.ParameterFor(body)})", method => Apply(method, transitions));
     }
 
     void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message)
@@ -28,7 +28,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
         var store = body.Reference(types.BasePackage + ".runtime.ReadModelStore");
         var modifier = synchronized ? "synchronized " : string.Empty;
-        var updateParameter = message ? _updates.ParameterFor(body) : _updates.Parameter;
+        var updateParameter = _updates.ParameterFor(body);
         var messageParameter = message ? $", {body.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message" : string.Empty;
         var messageArgument = message ? ", message" : string.Empty;
         var arguments = messageArgument + (_updates.Enabled ? ", updates" : string.Empty);

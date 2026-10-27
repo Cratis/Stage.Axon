@@ -95,16 +95,19 @@ internal static class PersistentViewProofSupport
             private static __MODEL__ normalize(__MODEL__ row) {
                 __NORMALIZE__
             }
+            static __PROJECTOR__ projector(ReadModelStore<Object, __MODEL__> store) {
+                return new __PROJECTOR__(store__REDUCER_ARGUMENT__);
+            }
             static List<__MODEL__> expected() {
                 var store = new InMemoryReadModelStore<Object, __MODEL__>();
-                var projector = new __PROJECTOR__(store__REDUCER_ARGUMENT__);
+                var projector = projector(store);
         __EXPECTED__
                 assertFalse(store.all().isEmpty(), "Proof must construct nonempty modeled rows");
                 return store.all();
             }
             static List<__MODEL__> next(int replays) {
                 var store = new InMemoryReadModelStore<Object, __MODEL__>();
-                var projector = new __PROJECTOR__(store__REDUCER_ARGUMENT__);
+                var projector = projector(store);
                 // Reconstruct the same key by replaying the modeled arrangement, not by guessing a row property.
         __EXPECTED__
                 for (var replay = 0; replay < replays; replay++) projector.on(__EVENT____ARGUMENT__);
@@ -178,7 +181,7 @@ internal static class PersistentViewProofSupport
                     assertEquals(before + 1, changing.get("count").orElseThrow(), "Actual handler must flush a changed view row");
                     if (failure != Failure.NONE) viewChanged.countDown();
                     if (failure == Failure.HANDLER) {
-                        new __PROJECTOR__(bound__REDUCER_ARGUMENT__).on(event__ARGUMENT__);
+                        projector(bound).on(event__ARGUMENT__);
                         throw new IllegalStateException("deliberate handler failure after view write");
                     }
                 }
