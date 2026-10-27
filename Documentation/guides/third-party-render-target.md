@@ -255,3 +255,29 @@ The native harness pairs `ingress-invariants` with a viewless `ingress-persisten
 HTTP and non-HTTP gateway tests exercise anonymous, wrong-role and authorized callers. A denied command must leave both claims and recorded facts unchanged. Accepted facts must carry the authenticated caller through the modeled caused-by-subject mapping even when a request supplies a forged principal. Snapshot-query checks cover both paths; live-query opening guards are covered separately by emitter specs, not by a new live-stream ownership test.
 
 Run the default CI Maven verification to establish these runtime properties. Passing .NET emitter specs or a successful corpus render only establish that the guards and proof sources were emitted; they do not establish Spring proxy enforcement, caller propagation, transaction rollback or concurrent append behavior.
+
+### Generated HTTP contract
+
+Routes. Commands are `POST /api/<module>/<feature>/…/<command-name>`; module and feature segments are lower-cased with non-alphanumerics removed (`TimeOff` becomes `timeoff`) and the command name is kebab-cased. Queries are `GET /api/<module>/<feature>/…/<query-name>` with kebab-cased segments throughout (`TimeOff` becomes `time-off`). A live query adds the same route with `Accept: text/event-stream`. Query arguments are query-string parameters.
+
+| Outcome | Status | Body |
+| --- | --- | --- |
+| Command without a response | 200 | empty |
+| Command with a record or scalar response | 200 | JSON |
+| `many` query | 200 | JSON array (empty array when there are no rows) |
+| `one` query | 200 | JSON object; no row is 404 `query-result-missing`, several rows is 500 `query-cardinality` |
+| `zeroOrOne` query | 200 JSON object, or an empty 404 when absent; several rows is 500 `query-cardinality` |
+| Validation failure | 400 | `application/problem+json`, `type` `urn:cratis:stage-axon:problem:validation`, `errors` array |
+| Uniqueness conflict | 409 | problem, `conflict` |
+| Illegal argument | 400 | problem, `invalid-argument` |
+| Unsupported operation | 501 | problem, `unsupported` |
+| Malformed JSON, missing required parameter | 400 | framework problem details |
+| Non-JSON command body | 415 | framework problem details |
+
+Failures raised asynchronously by the command or query handler map to the same responses as synchronous ones. Cardinality problems carry `cardinality` and `count` but never row data.
+
+Identity and denial. The caller is the authenticated principal; identities in bodies or headers are ignored. Without credentials, protected endpoints answer 401, with the wrong role 403, and `denyAll()` endpoints 403 for everyone authenticated. Requests from browsers (`Sec-Fetch-Mode` or `X-Requested-With` present) get a plain 401 without `WWW-Authenticate: Basic`, so no credential prompt is shown; other clients still receive the Basic challenge.
+
+Browsers. Credentials travel in the `Authorization` header, so the event stream uses fetch-based streaming rather than `EventSource`. Credentials in URLs (`access_token`, `authorization`) are never accepted. CORS is deny-by-default: list origins in `stage.axon.cors.allowed-origins` (comma separated) to allow them; credentialed cookies are not shared. There are no cookie sessions and no CSRF tokens; commands accept only `application/json`, so form and `text/plain` cross-site posts are rejected with 415. Cookie sessions and CSRF tokens are a follow-up.
+
+`src/main/resources/http-contract.json` lists every generated route (method, path, `produces`, parameters, cardinality, authorization and problem types) for client generation. The generated `HttpContractRoutesTest` asserts that the routes, the contract file and the live Spring mappings agree, and that `hasRole`/`denyAll()` endpoints deny anonymous and unauthorized callers. TypeScript generation is not part of this contract. These tests run only in the CI native lane; emission specs in .NET do not prove them.

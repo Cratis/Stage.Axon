@@ -22,6 +22,8 @@ internal static class AxonHttpTests
     internal static void Emit(AxonEmissionContext context)
     {
         EmitRuntimeEcho(context);
+        AxonHttpTestsContract.Emit(context);
+        AxonHttpContractJson.Emit(context);
         if (context.HttpScenarios.Count == 0) return;
         var package = context.BasePackage + ".specifications";
         const string name = "ModeledHttpRoundTripTest";

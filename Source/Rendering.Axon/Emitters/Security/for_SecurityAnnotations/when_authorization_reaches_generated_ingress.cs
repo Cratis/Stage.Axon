@@ -58,7 +58,7 @@ public class when_authorization_reaches_generated_ingress : for_AxonArtifactRend
 
     [Fact]
     void should_only_require_http_security_in_servlet_contexts() => Source("SecurityConfiguration").ShouldContain(
-        "@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)\n    SecurityFilterChain security(HttpSecurity http)");
+        "@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)\n    SecurityFilterChain security(HttpSecurity http, ");
 
     [Fact]
     void should_keep_method_security_enabled_in_non_web_contexts() => Source("SecurityConfiguration").ShouldContain(
