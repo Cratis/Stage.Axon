@@ -13,5 +13,6 @@
         <PackageReference Include="Cratis.Screenplay.CanonicalCorpus" />
         <None Update="disabled-tests.json" CopyToOutputDirectory="PreserveNewest" />
         <EmbeddedResource Include="Templates/*.java" />
+        <EmbeddedResource Include="ClientProof/**/*" LogicalName="ClientProof/%(RecursiveDir)%(Filename)%(Extension)" />
     </ItemGroup>
 </Project>

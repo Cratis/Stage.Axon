@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -289,9 +290,7 @@ class LiveQueryContractTest {
             assertTrue(response.headers().allValues("X-Content-Type-Options").size() <= 1, "Two threads wrote the headers of open " + attempt);
             assertEquals(":open", stream.nextLine(WAIT));
             assertEquals("[\"ready\"]", stream.nextData());
-            while (stream.nextLine(WAIT) != null) {
-                assertTrue(stream.lines().size() < 10, "Open " + attempt + " did not end after its snapshot");
-            }
+            stream.awaitCompletion(attempt);
             stream.close();
         }
         awaitActive(0);
@@ -379,6 +378,26 @@ class LiveQueryContractTest {
                 return line;
             } catch (TimeoutException timeout) {
                 return null;
+            }
+        }
+
+        void awaitCompletion(int attempt) throws Exception {
+            var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(WAIT);
+            while (true) {
+                var remaining = Math.max(1, deadline - System.nanoTime());
+                String line;
+                try {
+                    line = CompletableFuture.supplyAsync(() -> {
+                        try { return reader.readLine(); } catch (IOException failed) { throw new UncheckedIOException(failed); }
+                    }).get(remaining, TimeUnit.NANOSECONDS);
+                } catch (TimeoutException timeout) {
+                    throw new AssertionError("Open " + attempt + " did not complete within " + WAIT + " seconds", timeout);
+                } catch (ExecutionException failed) {
+                    throw new AssertionError("Open " + attempt + " ended with a read failure instead of completing", failed.getCause());
+                }
+                if (line == null) return;
+                lines.add(line);
+                assertTrue(lines.size() < 10, "Open " + attempt + " did not end after its snapshot");
             }
         }
 
