@@ -1,6 +1,7 @@
 package __RUNTIME__;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -10,7 +11,11 @@ public final class SseBridge {
     private SseBridge() {}
 
     public static <T> SseEmitter stream(Flow.Publisher<T> publisher) {
-        var emitter = new SseEmitter(1_800_000L);
+        return stream(publisher, Duration.ofMinutes(30));
+    }
+
+    public static <T> SseEmitter stream(Flow.Publisher<T> publisher, Duration timeout) {
+        var emitter = new SseEmitter(timeout.toMillis());
         var subscriber = new StreamSubscriber<T>(emitter);
         emitter.onCompletion(subscriber::cancel);
         emitter.onTimeout(subscriber::cancel);
