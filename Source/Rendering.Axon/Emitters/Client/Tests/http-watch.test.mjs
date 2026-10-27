@@ -373,3 +373,103 @@ test("a heartbeat and a data frame each reset the idle watchdog, replacing the p
     assert.equal(scheduler.armed, before + 2);
     assert.deepEqual(scheduler.delays().filter(delay => delay === 3000), [3000]);
 });
+
+test("an identity change inside state(connecting) leaves the new connection's watchdog armed and no stale timer", async () => {
+    const scheduler = manualScheduler();
+    const fetch = hangingFetch();
+    const observer = recorder();
+    const record = observer.state;
+    let changed = false;
+    observer.state = (state, epoch) => {
+        record(state, epoch);
+        if (!changed && state === "connecting") { changed = true; transport.changeIdentity(); }
+    };
+    const transport = transportFor(fetch, { scheduler, heartbeatMs: 1000 });
+    transport.watch(liveQuery, {}, observer);
+    await until(() => fetch.calls.length === 1);
+    await settle();
+    assert.equal(fetch.calls.length, 1);
+    assert.deepEqual(scheduler.delays(), [3000]);
+    scheduler.fire(3000);
+    await until(() => scheduler.delays().includes(1000));
+    assert.equal(fetch.calls[0].init.signal.aborted, true);
+    assert.deepEqual(scheduler.delays(), [1000]);
+});
+
+// Every observer callback, with how to reach it. `fetches` is how many fetches are expected after an identity change or after a close/abort.
+const callbacks = [
+    { trigger: "state:connecting", fetches: { identity: 1, away: 0 } },
+    { trigger: "state:live", fetches: { identity: 2, away: 1 }, data: "data: 1\n\ndata: 2\n\n" },
+    { trigger: "value:1", fetches: { identity: 2, away: 1 }, data: "data: 1\n\ndata: 2\n\n" },
+    { trigger: "state:reconnecting", fetches: { identity: 2, away: 1 }, refuse: true },
+    { trigger: "cleared", fetches: { identity: 2, away: 1 }, data: "data: 1\n\n", clear: true }
+];
+const actions = {
+    identity: (transport) => transport.changeIdentity(),
+    close: (transport) => [...transport.watches][0].close(),
+    abort: (_transport, controller) => controller.abort()
+};
+
+for (const scenario of callbacks) {
+    for (const [name, act] of Object.entries(actions)) {
+        test("a " + name + " inside " + scenario.trigger + " stops the old attempt and leaves one working current attempt", async () => {
+            const scheduler = manualScheduler();
+            const streams = [];
+            const fetch = scriptedFetch(...Array.from({ length: 6 }, (_, index) => async (init) => {
+                if (scenario.refuse && index === 0) return new Response("", { status: 503 });
+                const stream = sseStream(init);
+                streams.push(stream);
+                return stream.response();
+            }));
+            const transport = transportFor(fetch, { scheduler, heartbeatMs: 1000 });
+            const controller = new AbortController();
+            const observer = recorder();
+            const wrapped = {};
+            let fired = false;
+            let triggerEpoch = -1;
+            let triggerIndex = -1;
+            for (const kind of ["state", "value", "cleared"]) {
+                const original = observer[kind];
+                wrapped[kind] = (...args) => {
+                    original(...args);
+                    const event = observer.events[observer.events.length - 1];
+                    if (!fired && event.startsWith(scenario.trigger)) {
+                        fired = true;
+                        triggerIndex = observer.events.length;
+                        triggerEpoch = Number(event.split("@")[1]);
+                        act(transport, controller);
+                    }
+                };
+            }
+
+            transport.watch(liveQuery, {}, wrapped, controller.signal);
+            if (scenario.clear) {
+                await until(() => streams.length === 1);
+                streams[0].push(scenario.data);
+                await until(() => observer.values().length === 1);
+                transport.changeIdentity();
+            } else if (scenario.data !== undefined) {
+                await until(() => streams.length === 1);
+                streams[0].push(scenario.data);
+            }
+
+            await until(() => fired);
+            await settle();
+            assert.equal(fetch.calls.length, name === "identity" ? scenario.fetches.identity : scenario.fetches.away);
+            const later = observer.events.slice(triggerIndex);
+            const idle = scheduler.delays().filter(delay => delay === 3000);
+            if (name === "identity") {
+                assert.ok(later.every(event => Number(event.split("@")[1]) > triggerEpoch), "stale callback after identity change: " + later);
+                assert.equal(idle.length <= 1, true);
+                const before = observer.values().length;
+                streams[streams.length - 1].push("data: \"new\"\n\n");
+                await until(() => observer.values().length === before + 1);
+                assert.equal(observer.events[observer.events.length - 1], "value:\"new\"@" + (triggerEpoch + 1));
+                assert.equal(scheduler.delays().filter(delay => delay === 3000).length, 1);
+            } else {
+                assert.ok(later.every(event => event.startsWith("state:closed")), "callback after " + name + ": " + later);
+                assert.deepEqual(scheduler.delays(), []);
+            }
+        });
+    }
+}

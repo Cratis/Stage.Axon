@@ -316,7 +316,7 @@ class Watch<K extends object, R> implements Subscription {
     }
 
     open(): void {
-        if (this.route === undefined || !this.query.live) this.state("failed");
+        if (this.route === undefined || !this.query.live) this.end("failed");
         else void this.connect();
     }
 
@@ -325,8 +325,8 @@ class Watch<K extends object, R> implements Subscription {
         if (this.closed) return;
         this.stop();
         this.attempts = 0;
-        this.observer.cleared(this.owner.epoch);
-        this.open();
+        const attempt = this.begin();
+        if (this.notify(attempt, () => this.observer.cleared(attempt.epoch))) this.open();
     }
 
     close(): void {
@@ -347,18 +347,33 @@ class Watch<K extends object, R> implements Subscription {
         this.connection = undefined;
     }
 
-    state(state: LiveState): void {
-        this.observer.state(state, this.owner.epoch);
+    // The only way an observer callback is made. A callback may change the identity, close the watch or abort the caller,
+    // so the answer says whether the attempt is still current; the caller must stop when it is not.
+    notify(attempt: Attempt, callback: () => void): boolean {
+        if (!attempt.current()) return false;
+        callback();
+        return attempt.current();
+    }
+
+    // Stops the watch's connection and reports a terminal state.
+    end(state: LiveState): void {
+        this.stop();
+        const attempt = this.begin();
+        this.notify(attempt, () => this.observer.state(state, attempt.epoch));
+    }
+
+    state(attempt: Attempt, state: LiveState): boolean {
+        return this.notify(attempt, () => this.observer.state(state, attempt.epoch));
     }
 
     async connect(): Promise<void> {
         this.stop();
         const attempt = this.begin();
-        this.state(this.attempts === 0 ? "connecting" : "reconnecting");
+        if (!this.state(attempt, this.attempts === 0 ? "connecting" : "reconnecting")) return;
         try {
             await this.stream(attempt);
         } catch (error) {
-            if (attempt.current()) this.failed(error);
+            if (attempt.current()) this.failed(attempt, error);
         }
     }
 
@@ -371,6 +386,7 @@ class Watch<K extends object, R> implements Subscription {
     }
 
     async stream(attempt: Attempt): Promise<void> {
+        if (!attempt.current()) return;
         // The watchdog also covers the connect phase, so a fetch that never answers is reopened.
         this.watchdog(attempt);
         const response = await this.owner.fetcher(this.owner.url(this.route!, this.key), {
@@ -381,8 +397,7 @@ class Watch<K extends object, R> implements Subscription {
         });
         if (!attempt.current()) return;
         if (response.status === 401 || response.status === 403) {
-            this.stop();
-            this.state("failed");
+            this.end("failed");
             return;
         }
 
@@ -393,14 +408,14 @@ class Watch<K extends object, R> implements Subscription {
 
         this.watchdog(attempt);
         await this.deliver(response.body, attempt);
-        if (attempt.current()) this.retry(undefined);
+        this.retry(attempt, undefined);
     }
 
     // The server refused the stream: reconnect after its Retry-After, or the backoff.
     async rejected(response: Response, attempt: Attempt): Promise<void> {
         const seconds = retryAfterSeconds(response);
         await response.body?.cancel().catch(() => undefined);
-        if (attempt.current()) this.retry(seconds === undefined ? undefined : Math.min(seconds * 1000, maxRetryAfterMs));
+        this.retry(attempt, seconds === undefined ? undefined : Math.min(seconds * 1000, maxRetryAfterMs));
     }
 
     // Hands each frame of the open stream to the observer while the connection is still current.
@@ -414,12 +429,10 @@ class Watch<K extends object, R> implements Subscription {
             if (first) {
                 first = false;
                 this.attempts = 0;
-                this.state("live");
-                // The state callback may have changed the identity or closed the watch.
-                if (!attempt.current()) return;
+                if (!this.state(attempt, "live")) return;
             }
 
-            this.observer.value(value, attempt.epoch);
+            if (!this.notify(attempt, () => this.observer.value(value, attempt.epoch))) return;
         }
     }
 
@@ -429,31 +442,30 @@ class Watch<K extends object, R> implements Subscription {
     }
 
     // A malformed or oversized frame ends the watch; any other failure reconnects.
-    failed(error: unknown): void {
-        if (endsWatch(error)) {
-            this.stop();
-            this.state("failed");
-        } else {
-            this.retry(undefined);
-        }
+    failed(attempt: Attempt, error: unknown): void {
+        if (endsWatch(error)) this.end("failed");
+        else this.retry(attempt, undefined);
     }
 
     // Reopens a stream that stayed silent for three heartbeats; comment frames count as activity.
+    // A superseded attempt does nothing, so it can never cancel or replace the timer of the current one.
     watchdog(attempt: Attempt): void {
+        if (!attempt.current()) return;
         this.cancelIdle?.();
         this.cancelIdle = this.owner.scheduler.schedule(() => {
-            if (attempt.generation === this.generation) attempt.connection.abort();
+            if (attempt.current()) attempt.connection.abort();
         }, this.owner.heartbeatMs * 3);
     }
 
-    retry(serverDelayMs: number | undefined): void {
+    retry(attempt: Attempt, serverDelayMs: number | undefined): void {
+        if (!attempt.current()) return;
         this.stop();
         const delay = serverDelayMs ?? Math.min(maxBackoffMs, 1000 * 2 ** this.attempts);
         this.attempts += 1;
-        this.state("reconnecting");
-        const generation = this.generation;
+        const waiting = this.begin();
+        if (!this.state(waiting, "reconnecting")) return;
         this.cancelRetry = this.owner.scheduler.schedule(() => {
-            if (generation === this.generation && !this.closed) void this.connect();
+            if (waiting.current()) void this.connect();
         }, delay);
     }
 }
