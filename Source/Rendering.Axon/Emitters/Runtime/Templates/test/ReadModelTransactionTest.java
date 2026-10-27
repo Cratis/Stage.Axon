@@ -1,5 +1,6 @@
 package __RUNTIME__;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -168,6 +169,74 @@ class ReadModelTransactionTest {
             second.get(20, TimeUnit.SECONDS);
         }
         Assertions.assertEquals(List.of(2L, 2L), store.all());
+    }
+
+    @Test void doesNotDeadlockWhenTwoUnitsOfWorkTouchTheSameKeysInOppositeOrder() {
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            var store = new InMemoryReadModelStore<String, Long>();
+            var entered = new CountDownLatch(2);
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                var deliveries = List.of(List.of("a", "b"), List.of("b", "a")).stream().map(keys -> executor.submit(() -> run(context -> {
+                    var bound = ReadModelTransaction.bind(store, context);
+                    entered.countDown();
+                    await(entered);
+                    ReadModelTransaction.reserve(bound, keys);
+                    for (var key : keys) bound.update(key, value -> value == null ? 1L : value + 1);
+                }))).toList();
+                for (var delivery : deliveries) delivery.get(4, TimeUnit.SECONDS);
+            }
+            Assertions.assertEquals(2L, store.get("a").orElseThrow());
+            Assertions.assertEquals(2L, store.get("b").orElseThrow());
+        });
+    }
+
+    @Test void failsFastOnAReservationCycleAcrossStores() {
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
+            var first = new InMemoryReadModelStore<String, Long>();
+            var second = new InMemoryReadModelStore<String, Long>();
+            var held = new CountDownLatch(2);
+            var committed = new AtomicInteger();
+            var rejected = new AtomicInteger();
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                var deliveries = List.of(List.of(first, second), List.of(second, first)).stream().map(stores -> executor.submit(() -> {
+                    try {
+                        run(context -> {
+                            var own = ReadModelTransaction.bind(stores.get(0), context);
+                            var other = ReadModelTransaction.bind(stores.get(1), context);
+                            own.put("row", 1L);
+                            held.countDown();
+                            await(held);
+                            other.put("row", 2L);
+                        });
+                        committed.incrementAndGet();
+                    } catch (Exception failure) {
+                        Assertions.assertInstanceOf(IllegalStateException.class, cause(failure));
+                        Assertions.assertEquals("Read model keys are locked in a cycle with another unit of work", cause(failure).getMessage());
+                        rejected.incrementAndGet();
+                    }
+                })).toList();
+                for (var delivery : deliveries) delivery.get(1, TimeUnit.SECONDS);
+            }
+            Assertions.assertEquals(1, committed.get());
+            Assertions.assertEquals(1, rejected.get());
+            Assertions.assertEquals(3L, first.get("row").orElseThrow() + second.get("row").orElseThrow());
+        });
+    }
+
+    @Test void releasesReservationsBeforeAfterCommitCallbacks() {
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
+            var store = new InMemoryReadModelStore<String, Long>();
+            var nestedCommitted = new AtomicBoolean();
+            run(context -> {
+                ReadModelTransaction.bind(store, context).put("row", 1L);
+                context.runOnAfterCommit(completed -> {
+                    run(nested -> ReadModelTransaction.bind(store, nested).update("row", value -> value + 1));
+                    nestedCommitted.set(true);
+                });
+            });
+            Assertions.assertTrue(nestedCommitted.get());
+            Assertions.assertEquals(2L, store.get("row").orElseThrow());
+        });
     }
 
     @Test void refusesMissingContextAndTransactionalScans() {

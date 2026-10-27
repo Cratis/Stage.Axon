@@ -7,9 +7,17 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false)
+internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false, IReadOnlyList<string>? keys = null)
 {
     readonly ProjectionUpdates _updates = new(context, types, model.Id);
+
+    /// <summary>
+    /// Gets the keys to reserve before a multi-transition handler runs; none when a key cannot be evaluated, so the transition degrades on its own.
+    /// </summary>
+    /// <param name="keys">The evaluated key expressions, null where a key cannot be emitted.</param>
+    /// <returns>The keys to reserve, or an empty list.</returns>
+    internal static IReadOnlyList<string> PreReserved(IReadOnlyList<string?> keys) =>
+        keys.Count >= 2 && keys.All(key => key is not null) ? [.. keys.OfType<string>()] : [];
 
     internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false)
     {
@@ -46,11 +54,26 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var staged = $"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {transaction}.bind(store, context));";
         if (adapter is null)
         {
+            BindMemory(method, messageArgument, transaction, staged);
+            return;
+        }
+        method.Block($"if (store instanceof {adapter}<?>)", persistent => persistent.Line($"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {adapter}.bind(store, context));"));
+        if (keys is { Count: >= 2 })
+            method.Block("else", memory => BindMemory(memory, messageArgument, transaction, staged));
+        else
+            method.Line($"else {staged}");
+    }
+
+    void BindMemory(JavaCodeBuilder method, string messageArgument, string transaction, string staged)
+    {
+        if (keys is not { Count: >= 2 })
+        {
             method.Line(staged);
             return;
         }
-        method.Block($"if (store instanceof {adapter}<?>)", persistent => persistent.Line($"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {adapter}.bind(store, context));"))
-            .Line($"else {staged}");
+        method.Line($"var bound = {transaction}.bind(store, context);")
+            .Line($"{transaction}.reserve(bound, {method.Reference("java.util.List")}.of({string.Join(", ", keys)}));")
+            .Line($"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, bound);");
     }
 
     void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)
