@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -17,7 +18,7 @@ const projectText = `<IsPackable>true</IsPackable><AssemblyName>${renderer.id}</
 const publishText = `dotnet pack ${renderer.project}\nnode .github/scripts/package-allowlist.mjs --packed out\ndotnet nuget push out/*.nupkg`;
 
 function fixture(t, files = {}) {
-    const root = mkdtempSync(join(repository, '.ai-work/axon-publish/allowlist-test-'));
+    const root = mkdtempSync(join(tmpdir(), 'axon-allowlist-test-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     const defaults = {
         [workflow]: 'run: dotnet build',

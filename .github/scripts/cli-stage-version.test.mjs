@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -14,7 +15,7 @@ const stage = version => `<StageVersion Condition="'$(StageVersion)' == ''">${ve
 const local = version => `${stage(version)}\n<PackageVersion Include="Cratis.Stage.Contracts" Version="$(StageVersion)" />`;
 
 function cli(t, localText = local('4.203.0'), cliText = stage('4.203.0'), args = []) {
-    const root = mkdtempSync(new URL('../../.ai-work/axon-publish/version-test-', import.meta.url));
+    const root = mkdtempSync(join(tmpdir(), 'axon-version-test-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     mkdirSync(root, { recursive: true });
     writeFileSync(join(root, 'Directory.Packages.props'), localText);
