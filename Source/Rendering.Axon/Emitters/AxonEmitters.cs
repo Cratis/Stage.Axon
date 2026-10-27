@@ -19,6 +19,7 @@ internal static class AxonEmitters
         new Automations.AxonAutomationsEmitter(),
         new Persistence.AxonPersistenceEmitter(),
         new Security.AxonSecurityEmitter(),
+        new Admission.AxonBehaviorAdmission(),
         new Specifications.AxonSpecificationsEmitter(),
         new Runtime.AxonRuntimeEmitter()
     ];
