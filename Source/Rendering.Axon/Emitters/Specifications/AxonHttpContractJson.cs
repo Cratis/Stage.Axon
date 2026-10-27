@@ -31,7 +31,7 @@ internal static class AxonHttpContractJson
         _ => []
     };
 
-    static Dictionary<string, object?> Describe(HttpEndpoint endpoint)
+    internal static Dictionary<string, object?> Describe(HttpEndpoint endpoint)
     {
         var stream = endpoint.Kind == "stream";
         return new Dictionary<string, object?>

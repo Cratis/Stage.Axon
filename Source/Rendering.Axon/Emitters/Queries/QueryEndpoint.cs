@@ -85,15 +85,15 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
 
     void Register(string? expression, string route)
     {
-        var parameters = shape.Arguments.Select(argument => new HttpParameter(argument.Name, !argument.Type.IsOptional)).ToArray();
+        var parameters = shape.Arguments.Select(argument => new HttpParameter(argument.Name, !argument.Type.IsOptional, argument.Type)).ToArray();
         var cardinality = query.Cardinality switch
         {
             SemanticQueryCardinality.Many => "many",
             SemanticQueryCardinality.One => "one",
             _ => "zeroOrOne"
         };
-        AxonHttpTestsEndpoints.Register(context, new("query", "GET", route, null, expression, parameters, cardinality));
+        AxonHttpTestsEndpoints.Register(context, new("query", "GET", route, null, expression, parameters, cardinality, query.Id));
         if (query.Delivery == SemanticQueryDelivery.Live)
-            AxonHttpTestsEndpoints.Register(context, new("stream", "GET", route, "text/event-stream", expression, parameters, cardinality));
+            AxonHttpTestsEndpoints.Register(context, new("stream", "GET", route, "text/event-stream", expression, parameters, cardinality, query.Id));
     }
 }

@@ -63,12 +63,30 @@ jobs:
           java-version: '25'
           cache: maven
           cache-dependency-path: Source/Rendering.Axon/Emitters/Scaffold/AxonMavenProject.cs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
       - name: Build the standalone verification harness
         run: dotnet build Stage.Axon.slnx -c Debug
       - name: Render all 23 corpus applications
         run: >-
           dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj
           -c Debug --no-build -- render "${{ runner.temp }}/axon-corpus"
+      - name: Run the generated HTTP transport proofs
+        run: node --test "Source/Rendering.Axon/Emitters/Client/Tests/*.test.mjs"
+      - name: Type-check every generated TypeScript client
+        working-directory: ${{ runner.temp }}/axon-corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/typescript" --ignore-scripts --no-audit --no-fund typescript@7.0.2
+          tsc="$RUNNER_TEMP/typescript/node_modules/.bin/tsc"
+          "$tsc" --version
+          configs=(*/client/tsconfig.json)
+          [ -e "${configs[0]}" ] || { echo "No generated client tsconfig.json found"; exit 1; }
+          for config in "${configs[@]}"; do
+            "$tsc" -p "$PWD/$config" --noEmit
+          done
       - name: Compile and execute every generated Maven module
         working-directory: ${{ runner.temp }}/axon-corpus
         run: sh ./mvnw -B -fae verify
