@@ -29,7 +29,7 @@ public class when_a_query_is_named_pre_authorize : a_query_collision
     }
 
     [Fact] void should_qualify_the_annotation_because_of_the_collision() => _endpoint.ShouldContain("@org.springframework.security.access.prepost.PreAuthorize(\"hasRole('Sales')\")");
-    [Fact] void should_still_carry_the_expression_into_the_contract() => AxonHttpTestsEndpoints.For(_context).Where(endpoint => endpoint.Kind == "query").All(endpoint => endpoint.Authorization == "hasRole('Sales')").ShouldBeTrue();
+    [Fact] void should_still_carry_the_expression_into_the_contract() => AxonHttpTestsEndpoints.For(_context).Single(endpoint => endpoint.Kind == "query" && endpoint.Path.EndsWith("/pre-authorize", StringComparison.Ordinal)).Authorization.ShouldEqual("hasRole('Sales')");
     [Fact] void should_still_emit_the_denial_checks() => _test.ShouldContain("protected_endpoints_deny_anonymous_and_unauthorized_callers");
     [Fact] void should_contain_the_contract_file() => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("http-contract.json", StringComparison.Ordinal)).Bytes.AsSpan()).ShouldContain("\"authorization\":\"hasRole('Sales')\"");
 }
