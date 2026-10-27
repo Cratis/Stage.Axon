@@ -54,7 +54,7 @@ final class GeneratedIngressSupport {
                 EventCriteria.havingTags(Tag.of(EventTags.ACCOUNT_ID, owner.toString()))));
         try {
             return stream.filter(entry -> !(entry.message() instanceof TerminalEventMessage))
-                    .collect(ArrayList<EventMessage>::new, (all, entry) -> all.add(entry.message())).get(10, TimeUnit.SECONDS);
+                    .collect(ArrayList<EventMessage>::new, (all, entry) -> all.add(entry)).get(10, TimeUnit.SECONDS);
         } finally { stream.close(); }
     }
 

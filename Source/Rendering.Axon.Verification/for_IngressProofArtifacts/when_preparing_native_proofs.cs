@@ -31,6 +31,8 @@ public class when_preparing_native_proofs : Specification
     [Fact] void should_resolve_the_runtime_package() => _all.ShouldNotContain("__RUNTIME__");
     [Fact] void should_not_add_license_headers_to_java() => _all.ShouldNotContain("Copyright (c) Cratis");
     [Fact] void should_drive_real_generated_commands() => _all.ShouldContain("gateway.send(command, Void.class)");
+    [Fact] void should_collect_event_messages_directly() => _sources["GeneratedIngressSupport.java"].ShouldContain(".collect(ArrayList<EventMessage>::new, (all, entry) -> all.add(entry))");
+    [Fact] void should_filter_terminal_entries_before_collecting_messages() => _sources["GeneratedIngressSupport.java"].ShouldContain("stream.filter(entry -> !(entry.message() instanceof TerminalEventMessage))");
     [Fact] void should_never_append_directly_from_proofs() => _all.ShouldNotContain("appender.append(");
     [Fact] void should_never_construct_append_units_of_work() => _all.ShouldNotContain("executeWithResult(");
     [Fact] void should_use_bounded_native_contenders() => _all.ShouldContain("observed.await(5, TimeUnit.SECONDS)");
