@@ -25,6 +25,9 @@ public class when_planning_the_client_proof_application : Specification
     [Fact] void should_allow_at_most_one_row_for_the_optional_query() => Source("WorkItemByIdHandler").ShouldContain("QueryResults.atMostOne(rows)");
     [Fact] void should_stream_the_optional_query() => Source("WorkItemByIdEndpoint").ShouldContain("TEXT_EVENT_STREAM_VALUE");
     [Fact] void should_not_stream_the_by_name_query() => Source("WorkItemByNameEndpoint").ShouldNotContain("TEXT_EVENT_STREAM_VALUE");
+    [Fact] void should_serve_the_live_list_as_json() => Source("AllWorkItemsEndpoint").ShouldContain("@GetMapping(\"/api/work/items/all-work-items\")");
+    [Fact] void should_stream_the_live_list_on_the_same_route() => Source("AllWorkItemsEndpoint").ShouldContain("TEXT_EVENT_STREAM_VALUE");
+    [Fact] void should_return_a_typed_list_snapshot() => Source("AllWorkItemsEndpoint").ShouldContain("ResponseEntity<List<WorkItems>>");
     [Fact] void should_return_the_record_from_the_create_command() => Source("CreateWorkItemHandler").ShouldContain("return new CreateWorkItemResponse(");
     [Fact] void should_return_nothing_from_the_rename_command() => Source("RenameWorkItemEndpoint").ShouldContain("CompletableFuture<Void>");
     [Fact] void should_claim_the_unique_name() => Source("ModeledConstraints").ShouldContain("UniqueWorkItemName");

@@ -75,6 +75,9 @@ module Work
         by name String
         authorize IsEditor
 
+      query AllWorkItems => observable WorkItems[]
+        authorize IsEditor
+
       projection WorkItemsProjection => WorkItems
         from WorkItemCreated
           workItemId = $eventSourceId

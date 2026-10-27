@@ -52,6 +52,7 @@ class ClientContractTest {
     @Test void validation() throws Exception { scenario("validation"); }
     @Test void conflict() throws Exception { scenario("conflict"); }
     @Test void cardinality() throws Exception { scenario("cardinality"); }
+    @Test void listViewSnapshotMatchesTheStream() throws Exception { scenario("list-view"); }
     @Test void raceBetweenTheInitialReadAndACommit() throws Exception { scenario("race"); }
     @Test void rollbacksPublishNothing() throws Exception { scenario("rollback"); }
     @Test void cancellationStopsTheServerSide() throws Exception { scenario("cancellation"); }
