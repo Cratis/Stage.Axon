@@ -106,6 +106,15 @@ public class when_emitting_an_idempotent_set_view : Projections.for_AxonProjecti
     [Fact] void should_assert_the_default_processor_is_not_streaming() => _dispatch.ShouldContain("FIXTURE: C2 default namespace must not resolve to a streaming processor");
     [Fact] void should_prove_default_streaming_is_refused() => _dispatch.ShouldContain("void refusesStreamingDefaultViewsBeforeReadiness()");
     [Fact] void should_keep_jpa_opt_in() => _dispatch.ShouldContain("\"spring.profiles.active\", \"default\"");
+    [Fact] void should_fail_after_real_projector_staging() => _dispatch.ShouldContain("ReadModelTransaction.bind(store, completed).get(\"global\").isPresent()");
+    [Fact] void should_inject_failure_in_prepare_commit() => _dispatch.ShouldContain("context.onPrepareCommit(completed ->");
+    [Fact] void should_confirm_the_actual_rollback_failure() => _dispatch.ShouldContain("messages.toString().contains(\"rollback-injected\")");
+    [Fact] void should_assert_rollback_has_not_reached_the_wrapped_store() => _dispatch.ShouldContain("assertEquals(writes, store.writes.get(), \"A rolled-back delivery must never reach the wrapped store\")");
+    [Fact] void should_assert_rollback_does_not_change_a_query_snapshot() => _dispatch.ShouldContain("assertEquals(normalized(before), normalized(snapshot.rows()), \"Query snapshot must exclude rolled-back state\")");
+    [Fact] void should_assert_rollback_does_not_invalidate_live_queries() => _dispatch.ShouldContain("assertEquals(emissions, signals.size(), \"Rollback must not emit a live invalidation\")");
+    [Fact] void should_prove_rollback_for_both_absent_and_committed_rows() => _dispatch.Split("assertRollbackInvisible(application, store, gateway, signals);", StringSplitOptions.None).Length.ShouldEqual(3);
+    [Fact] void should_prove_exactly_once_redelivery_even_for_set_mappings() => _dispatch.ShouldContain("assertEquals(2, store.writes.get(), \"Redelivery must apply once, including idempotent set mappings\")");
+    [Fact] void should_prove_redelivery_invalidates_after_committed_writes() => _dispatch.ShouldContain("assertEquals(2, writesAtInvalidation.get(), \"Committed redelivery must write before invalidation\")");
 
     [Fact] void should_import_default_map() => _dispatch.ShouldContain("import java.util.Map;");
     [Fact] void should_use_short_default_map() => _dispatch.ShouldContain("spring.setDefaultProperties(Map.of(");
