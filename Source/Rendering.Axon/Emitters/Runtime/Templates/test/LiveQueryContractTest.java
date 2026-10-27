@@ -22,7 +22,9 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import org.axonframework.common.configuration.Configuration;
@@ -33,12 +35,15 @@ import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -247,7 +252,7 @@ class LiveQueryContractTest {
         var stream = open("heartbeat", null);
         assertEquals("[\"v0\"]", stream.nextData());
         String line;
-        do line = stream.nextLine(5); while (line != null && !line.startsWith(":"));
+        do line = stream.nextLine(5); while (line != null && !line.equals(":heartbeat"));
         assertNotNull(line, "No heartbeat comment arrived");
     }
 
@@ -268,6 +273,30 @@ class LiveQueryContractTest {
         awaitActive(1);
         var third = open("capacity", null);
         assertEquals("[\"v0\"]", third.nextData());
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void streamsWhoseSnapshotIsReadyAtOnceAlwaysOpen(CapturedOutput output) throws Exception {
+        for (var attempt = 0; attempt < 200; attempt++) {
+            // Sweeps the first send across the moment the request thread leaves the servlet filters.
+            var delay = (attempt % 40) * 25_000L;
+            var response = client.send(readyRequest(delay), HttpResponse.BodyHandlers.ofInputStream());
+            var stream = new Sse(response.body());
+            streams.add(stream);
+            assertEquals(200, response.statusCode(), "Open " + attempt + " failed with the snapshot ready after " + delay + "ns");
+            assertTrue(response.headers().firstValue("Content-Type").orElse("").startsWith(MediaType.TEXT_EVENT_STREAM_VALUE));
+            assertTrue(response.headers().allValues("X-Content-Type-Options").size() <= 1, "Two threads wrote the headers of open " + attempt);
+            assertEquals(":open", stream.nextLine(WAIT));
+            assertEquals("[\"ready\"]", stream.nextData());
+            while (stream.nextLine(WAIT) != null) {
+                assertTrue(stream.lines().size() < 10, "Open " + attempt + " did not end after its snapshot");
+            }
+            stream.close();
+        }
+        awaitActive(0);
+        assertFalse(output.getAll().contains("NullPointerException"), "A stream failed on the server");
+        assertFalse(output.getAll().contains("Servlet.service()"), "A stream failed with a server error");
     }
 
     private Flow.Publisher<ProbeResult> results(String key, UnaryOperator<Publisher<ProbeResult>> observe) {
@@ -315,6 +344,10 @@ class LiveQueryContractTest {
         var builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/_live/probe?key=" + key)).header("Accept", MediaType.TEXT_EVENT_STREAM_VALUE);
         if (lastEventId != null) builder.header("Last-Event-ID", lastEventId);
         return builder.GET().build();
+    }
+
+    private HttpRequest readyRequest(long delay) {
+        return HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/_live/ready?delay=" + delay)).header("Accept", MediaType.TEXT_EVENT_STREAM_VALUE).GET().build();
     }
 
     private Sse open(String key, String lastEventId) throws Exception {
@@ -448,6 +481,29 @@ class LiveQueryContractTest {
                 () -> observe().apply(gateway.subscriptionQuery(query, ProbeResult.class)),
                 ProbeResult::invalidated,
                 () -> gateway.query(query, ProbeResult.class));
+            return open(results);
+        }
+
+        /** A live query whose only snapshot is ready after {@code delay} nanoseconds and that then ends the stream. */
+        @GetMapping(value = "/_live/ready", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+        SseEmitter ready(@RequestParam long delay) {
+            var snapshot = new ProbeResult(List.of("ready"), false);
+            Publisher<ProbeResult> source = target -> target.onSubscribe(new Subscription() {
+                private final AtomicBoolean started = new AtomicBoolean();
+                @Override public void request(long amount) {
+                    if (!started.compareAndSet(false, true)) return;
+                    Thread.ofVirtual().start(() -> {
+                        LockSupport.parkNanos(delay);
+                        target.onNext(snapshot);
+                        target.onComplete();
+                    });
+                }
+                @Override public void cancel() {}
+            });
+            return open(LiveSnapshots.of(() -> source, ProbeResult::invalidated, () -> CompletableFuture.completedFuture(snapshot)));
+        }
+
+        private SseEmitter open(Flow.Publisher<ProbeResult> results) {
             return group.open(downstream -> results.subscribe(new Flow.Subscriber<ProbeResult>() {
                 @Override public void onSubscribe(Flow.Subscription value) { downstream.onSubscribe(value); }
                 @Override public void onNext(ProbeResult value) { downstream.onNext(value.rows()); }
