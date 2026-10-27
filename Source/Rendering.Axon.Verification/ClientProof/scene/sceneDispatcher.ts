@@ -6,7 +6,7 @@ type CommandOutcome = Awaited<ReturnType<NonNullable<BrowserDispatcherHost["exec
 /** A command the Scene document can name, and the descriptor that runs it. */
 export interface SceneCommand {
     readonly name: string;
-    readonly command: CommandDescriptor<never, unknown>;
+    readonly command: CommandDescriptor<unknown, unknown>;
 }
 
 function describe(outcome: Exclude<Outcome<unknown>, { readonly status: "ok" } | { readonly status: "validation" }>): string {
@@ -31,7 +31,7 @@ export function toCommandOutcome(outcome: Outcome<unknown>): CommandOutcome {
 
 /** Scene `executeCommand` over `Transport.execute`. Duplicate names throw here; an unknown name rejects the call. */
 export function createSceneExecuteCommand(transport: Transport, commands: readonly SceneCommand[]): NonNullable<BrowserDispatcherHost["executeCommand"]> {
-    const byName = new Map<string, CommandDescriptor<never, unknown>>();
+    const byName = new Map<string, CommandDescriptor<unknown, unknown>>();
     for (const entry of commands) {
         if (byName.has(entry.name)) throw new Error("Duplicate Scene command name '" + entry.name + "'");
         byName.set(entry.name, entry.command);
@@ -39,6 +39,6 @@ export function createSceneExecuteCommand(transport: Transport, commands: readon
     return async (name, args) => {
         const command = byName.get(name);
         if (command === undefined) throw new Error("Unknown Scene command '" + name + "'");
-        return toCommandOutcome(await transport.execute(command, args as never));
+        return toCommandOutcome(await transport.execute(command, args));
     };
 }

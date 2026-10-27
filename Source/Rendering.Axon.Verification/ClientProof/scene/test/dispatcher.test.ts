@@ -4,7 +4,8 @@ import { createSceneExecuteCommand, toCommandOutcome } from "../sceneDispatcher.
 import type { CommandDescriptor, Outcome } from "../../../../Rendering.Axon/Emitters/Client/Templates/transport.ts";
 import { FakeTransport, within } from "./fakeTransport.ts";
 
-const rename: CommandDescriptor<never, unknown> = { id: "Rename" };
+// Shaped like a generated descriptor: a concrete request body and a void result, so tsc proves the registry accepts it.
+const rename: CommandDescriptor<{ readonly name: string }, void> = { id: "Rename" };
 const problem = { type: undefined, status: 409, detail: "taken" };
 
 describe("Scene command outcome mapping", () => {
