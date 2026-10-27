@@ -27,7 +27,7 @@ public class when_planning_the_inline_java_bodies_application : Specification
     [Fact] void should_place_the_performer_body() => Source("DoubledTotalsPerformer").ShouldContain("// inline-java-bodies: query performer");
     [Fact] void should_place_the_reducer_body() => Source("RebuiltTotalReducer").ShouldContain("// inline-java-bodies: reducer transition");
     [Fact] void should_import_the_produced_event_for_the_handler_body() => Source("RecordCountHandler").ShouldContain("import corpusinlinejavabodies.bodies.events.CountRecorded;");
-    [Fact] void should_not_disable_any_generated_test() => _plan.Artifacts.Where(artifact => artifact.RelativePath.Contains("/src/test/", StringComparison.Ordinal)).Any(artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan()).Contains("@Disabled", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_not_disable_any_generated_test() => _plan.Artifacts.Any(artifact => artifact.RelativePath.Contains("/src/test/", StringComparison.Ordinal) && Encoding.UTF8.GetString(artifact.Bytes.AsSpan()).Contains("@Disabled", StringComparison.Ordinal)).ShouldBeFalse();
 
     [Theory]
     [InlineData("STAGE-AXON-IMPL")]
