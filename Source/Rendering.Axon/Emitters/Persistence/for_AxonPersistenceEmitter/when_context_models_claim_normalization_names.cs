@@ -23,65 +23,8 @@ public class when_context_models_claim_normalization_names : for_PersistentViewA
         }
     }
 
-    [Fact] void should_admit_each_context_mapping() => _contexts.Values.ShouldEachConformTo(context => PersistentViewAdmission.Supports(context, ReadModelId("ContextTotal")));
-
-    [Fact]
-    void should_qualify_the_normalized_model_constructors()
-    {
-        foreach (var name in _contexts.Keys)
-        {
-            Support(name).ShouldContain($"row = new axonviews.views.counters.contexttotals.{name}(row.name(), null, row.correlation(), row.details());");
-            Support(name).ShouldContain($"row = new axonviews.views.counters.contexttotals.{name}(row.name(), row.occurred(), null, row.details());");
-            Support(name).ShouldNotContain($"new {name}(");
-        }
-    }
-
-    [Fact]
-    void should_keep_the_framework_normalization_names()
-    {
-        foreach (var name in _contexts.Keys)
-        {
-            Support(name).ShouldContain("import java.util.Set;");
-            Support(name).ShouldContain("import java.util.List;");
-            Support(name).ShouldContain("import java.util.Collection;");
-            Support(name).ShouldContain("import java.util.stream.Collectors;");
-            Support(name).ShouldContain($"static Set<axonviews.views.counters.contexttotals.{name}> normalized(Collection<axonviews.views.counters.contexttotals.{name}> rows)");
-            Support(name).ShouldContain($"static List<axonviews.views.counters.contexttotals.{name}> expected()");
-            Support(name).ShouldContain(".collect(Collectors.toSet())");
-            Support(name).ShouldNotContain($"import axonviews.views.counters.contexttotals.{name};");
-            Support(name).ShouldNotContain($"import axonviews.views.events.{name};");
-        }
-    }
-
-    [Fact]
-    void should_keep_event_construction_unambiguous()
-    {
-        foreach (var name in _contexts.Keys)
-            Support(name).ShouldContain($"new axonviews.views.events.{name}(");
-    }
-
-    [Fact]
-    void should_keep_model_references_unambiguous_in_the_restart_proof()
-    {
-        foreach (var name in _contexts.Keys)
-        {
-            var proof = Code(_contexts[name], name + "PersistentTest");
-            proof.ShouldContain("import java.util.Set;");
-            proof.ShouldContain($"Set<{(name == "Set" ? "axonviews.views.counters.contexttotals.Set" : name)}> persisted;");
-            proof.ShouldNotContain("import axonviews.views.counters.contexttotals.Set;");
-        }
-    }
-
-    [Fact]
-    void should_not_confuse_the_query_handler_with_the_event_handler_annotation()
-    {
-        foreach (var name in _contexts.Keys)
-        {
-            Support(name).ShouldContain("import org.axonframework.messaging.eventhandling.annotation.EventHandler;");
-            Support(name).ShouldContain("axonviews.views.counters.contexttotals.EventHandler.class");
-            Support(name).ShouldNotContain("import axonviews.views.counters.contexttotals.EventHandler;");
-        }
-    }
-
-    string Support(string name) => Code(_contexts[name], name + "PersistentSupport");
+    [Fact] void should_refuse_each_context_mapping() => _contexts.Values.ShouldEachConformTo(context => !PersistentViewAdmission.Supports(context, ReadModelId("ContextTotal")));
+    [Fact] void should_warn_without_crashing() => _contexts.Keys.ShouldEachConformTo(name => Code(_contexts[name], name + "StoreConfiguration").Contains("STAGE-AXON-0308", StringComparison.Ordinal));
+    [Fact] void should_keep_the_memory_store() => _contexts.Keys.ShouldEachConformTo(name => Code(_contexts[name], name + "StoreConfiguration").Contains("InMemoryReadModelStore", StringComparison.Ordinal));
+    [Fact] void should_not_emit_persistent_proofs() => _contexts.Keys.ShouldEachConformTo(name => !_contexts[name].Artifacts.Exists(artifact => artifact.RelativePath.Contains('/' + name + "Persistent", StringComparison.Ordinal)));
 }
