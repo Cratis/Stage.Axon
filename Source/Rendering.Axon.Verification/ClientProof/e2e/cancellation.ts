@@ -10,10 +10,13 @@ run(async () => {
     await eventually(() => watch.values().pop()?.title === "t0", "the initial snapshot");
 
     const reads = Number(await java("reads"));
+    const marker = watch.events.length;
     watch.subscription.close();
     watch.subscription.close();
     await java("active:0");
     await java(`commit:${item.id}:later`);
+
+    expect(watch.events.slice(marker).filter(event => event.kind === "value").length, 0, "the value frames delivered to the closed watch");
 
     // One snapshot is exactly one read: the closed watch did not read for the commit.
     const snapshot = await transport.snapshot(workItemById, { workItemId: item.id });

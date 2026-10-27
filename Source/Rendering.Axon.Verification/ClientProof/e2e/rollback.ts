@@ -10,20 +10,22 @@ run(async () => {
     const watch = observe(transport, workItemById, { workItemId: item.id });
     await eventually(() => watch.values().pop()?.title === "t0", "the initial snapshot");
 
-    async function nextFrameIs(title: string, before: number): Promise<void> {
-        await eventually(() => watch.values().length > before, "a frame after the sentinel");
-        expect(watch.values()[before]?.title, title, "the first frame after the rollback");
+    // Everything the watch delivers from ${marker} on must be exactly the sentinel: the marker is taken before the
+    // action under test, so a ghost frame published before the action completes is inside the slice.
+    async function onlyFrameIs(title: string, marker: number, what: string): Promise<void> {
+        await eventually(() => watch.values().slice(marker).some(value => value?.title === title), "the sentinel after the " + what);
+        expect(watch.values().slice(marker).map(value => value?.title), [title], "the value frames after the " + what);
     }
 
-    // A refused command (409) must not publish anything: the next frame is the sentinel commit.
+    // A refused command (409) must not publish anything: the only frame is the sentinel commit.
+    let marker = watch.values().length;
     expect((await transport.execute(createWorkItem, newItem({ name: item.name }))).status, "conflict", "the duplicate name");
-    let before = watch.values().length;
     await java(`commit:${item.id}:s1`);
-    await nextFrameIs("s1", before);
+    await onlyFrameIs("s1", marker, "rejected command");
 
     // A rolled-back unit of work that announced a change must not publish either.
+    marker = watch.values().length;
     await java(`rollback:${item.id}:ghost`);
-    before = watch.values().length;
     await java(`commit:${item.id}:s2`);
-    await nextFrameIs("s2", before);
+    await onlyFrameIs("s2", marker, "rollback");
 });
