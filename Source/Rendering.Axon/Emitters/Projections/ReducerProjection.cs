@@ -102,7 +102,8 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
             .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
             .Block($"public class {name}ReducerProjector", body =>
             {
-                body.Line($"private final {storeType}<{body.Reference("java.lang.Object")}, {name}> store;").Line($"private final {name}Reducer reducer;")
+                body.DiffersFromScreenplay("default-profile writes are not yet rolled back with a failed unit of work.")
+                    .Line($"private final {storeType}<{body.Reference("java.lang.Object")}, {name}> store;").Line($"private final {name}Reducer reducer;")
                     .Block($"public {name}ReducerProjector(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + name)}) {storeType}<{body.Reference("java.lang.Object")}, {name}> store, {name}Reducer reducer)", constructor => constructor.Line("this.store = store;").Line("this.reducer = reducer;"));
                 foreach (var transition in reducer.Transitions)
                 {
