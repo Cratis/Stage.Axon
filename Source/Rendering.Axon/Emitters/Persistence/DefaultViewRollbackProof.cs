@@ -6,7 +6,8 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 internal static class DefaultViewRollbackProof
 {
     internal const string Source = """
-            // Fail after all discovered handlers ran, regardless of their discovery order.
+            // Fail after all discovered handlers ran, regardless of their discovery order. Default
+            // delivery already runs in PREPARE_COMMIT, so the failure is injected in COMMIT, before APPLY.
             @Namespace("__PACKAGE__")
             static final class RejectingDelivery {
                 final ReadModelStore<Object, __MODEL__> store;
@@ -17,7 +18,7 @@ internal static class DefaultViewRollbackProof
                 public void handle(__EVENT_TYPE__ event, ProcessingContext context) {
                     if (!reject.getAndSet(false)) return;
                     var before = List.copyOf(store.all());
-                    context.onPrepareCommit(completed -> {
+                    context.runOnCommit(completed -> {
                         assertTrue(ReadModelTransaction.bind(store, completed).get(__KEY__).isPresent(),
                                 "FIXTURE: the real projector must have staged its row before rollback");
                         assertEquals(before, store.all(), "Uncommitted projector state must remain invisible");

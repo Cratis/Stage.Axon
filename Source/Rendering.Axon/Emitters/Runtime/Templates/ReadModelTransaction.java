@@ -30,7 +30,8 @@ public final class ReadModelTransaction {
         var coordinator = coordinator(Objects.requireNonNull(store));
         return context.computeResourceIfAbsent(coordinator.<K, V>resource(), () -> {
             var changes = new BoundStore<>(store, coordinator);
-            context.runOn(APPLY, completed -> { if (completed.isCommitted()) changes.commit(); });
+            // Axon skips later phases after a failure, so reaching APPLY means every earlier phase succeeded.
+            context.runOn(APPLY, completed -> changes.commit());
             context.doFinally(completed -> coordinator.release(changes));
             return changes;
         });

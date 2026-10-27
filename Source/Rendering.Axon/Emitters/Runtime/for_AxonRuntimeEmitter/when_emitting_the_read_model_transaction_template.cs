@@ -22,7 +22,7 @@ public class when_emitting_the_read_model_transaction_template : for_AxonArtifac
 
     [Fact] void should_apply_after_commit_before_after_commit() => _source.ShouldContain("DefaultPhases.AFTER_COMMIT.order() - 1");
     [Fact] void should_release_in_do_finally() => _source.ShouldContain("context.doFinally(completed -> coordinator.release(changes))");
-    [Fact] void should_apply_only_when_committed() => _source.ShouldContain("if (completed.isCommitted()) changes.commit()");
+    [Fact] void should_apply_in_the_phase_before_after_commit() => _source.ShouldContain("context.runOn(APPLY, completed -> changes.commit())");
     [Fact] void should_share_changes_within_a_context() => _source.ShouldContain("context.computeResourceIfAbsent(coordinator.<K, V>resource()");
     [Fact] void should_reserve_keys_across_contexts() => _source.ShouldContain("reservations.get(key) != owner");
     [Fact] void should_bound_the_reservation_wait() => _source.ShouldContain("TimeUnit.SECONDS.toNanos(10)");
