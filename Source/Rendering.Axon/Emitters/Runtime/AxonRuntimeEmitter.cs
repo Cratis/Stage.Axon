@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Security;
+using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 
@@ -14,6 +16,8 @@ internal sealed class AxonRuntimeEmitter : IAxonEmitter
     public void Emit(AxonEmissionContext context)
     {
         var bearer = HttpAuthenticationInput.Bearer(context.Request.Profile);
+        var roles = DemoIdentityRoles.From(context);
+        var rolePolicy = roles.Length == 0 ? "denyAll()" : "hasRole('" + roles[0].Replace("'", "''", StringComparison.Ordinal) + "')";
         var assembly = typeof(AxonRuntimeEmitter).Assembly;
         foreach (var resource in assembly.GetManifestResourceNames().Where(name => name.StartsWith(Prefix, StringComparison.Ordinal)).Order(StringComparer.Ordinal))
         {
@@ -27,7 +31,9 @@ internal sealed class AxonRuntimeEmitter : IAxonEmitter
             using var stream = assembly.GetManifestResourceStream(resource)!;
             using var reader = new StreamReader(stream);
             var source = reader.ReadToEnd().Replace("__RUNTIME__", context.BasePackage + ".runtime", StringComparison.Ordinal)
-                .Replace("__SECURITY__", context.BasePackage + ".infrastructure", StringComparison.Ordinal);
+                .Replace("__SECURITY__", context.BasePackage + ".infrastructure", StringComparison.Ordinal)
+                .Replace("__DEMO_AUTHORITY_TEXT__", JavaCodeBuilder.StringLiteral(string.Join(',', roles.Select(role => "ROLE_" + role))), StringComparison.Ordinal)
+                .Replace("__DEMO_ROLE_POLICY__", JavaCodeBuilder.StringLiteral(rolePolicy), StringComparison.Ordinal);
             context.AddJava(package, name, SortImports(source), test);
         }
     }

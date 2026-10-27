@@ -20,6 +20,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
         }
         var bearer = HttpAuthenticationInput.Bearer(context.Request.Profile);
         EmitConfiguration(context, bearer);
+        DemoIdentityConfiguration.Emit(context);
         if (bearer) EmitAudienceGuard(context);
     }
 
@@ -28,6 +29,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
         var builder = new JavaCodeBuilder(context.BasePackage + ".infrastructure").Declare("SecurityConfiguration")
             .Import("org.springframework.context.annotation.Bean")
             .Import("org.springframework.context.annotation.Configuration")
+            .Import("org.springframework.context.annotation.Profile")
             .Import("org.springframework.beans.factory.annotation.Value")
             .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")
             .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication")
@@ -53,6 +55,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             .Block("public class SecurityConfiguration", body =>
             {
                 body.Line("@Bean")
+                .Line("@Profile(\"!demo\")")
                 .Line("@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)")
                 .Block("SecurityFilterChain security(HttpSecurity http, @Value(\"${stage.axon.cors.allowed-origins:}\") String allowedOrigins" + (bearer ? ", ObjectProvider<JwtDecoder> decoders" : string.Empty) + ") throws Exception", method => Chain(method, bearer))
                 .Line()
