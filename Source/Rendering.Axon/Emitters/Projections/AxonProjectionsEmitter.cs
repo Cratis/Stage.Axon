@@ -65,7 +65,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         ViewJavaTypes.Add(context, package, name, ReadModelRecords.Code(types, package, model), model.Id);
         if (PersistentViewAdmission.Supports(context, model.Id))
         {
-            context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default read-model rows are volatile; durable checkpoints may skip prior events. The persistent profile supports admitted root projections and fully placed reducer-only models, with generation checks and processor-bound transactions; scoped and unsupported reducer recovery remain refused.");
+            context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default read-model rows are volatile; durable checkpoints may skip prior events. The persistent profile supports guarded flat projections only, with generation checks and processor-bound transactions; scoped/reducer recovery remains refused.");
             PersistentProjectionStore.Emit(context, types, package, model);
             return;
         }
