@@ -33,8 +33,10 @@ internal static class PersistentViewAdmission
 
     static bool Flat(AxonEmissionContext context, SemanticReadModel model, SemanticProjection projection)
     {
-        if (!ProjectionHandlerShape.RootOnly(projection) || !ProjectionTransitions.From(projection).Any()) return false;
-        return ProjectionTransitions.From(projection).All(from => From(context, model, from));
+        var transitions = ProjectionTransitions.From(projection).ToArray();
+        if (!ProjectionHandlerShape.RootOnly(projection) || transitions.Length == 0) return false;
+        if (!ProjectionHandlerShape.Scoped(projection) && transitions.Any(from => from.Mappings.Any(mapping => mapping.Factor is SemanticProjectionEventContextValue))) return false;
+        return transitions.All(from => From(context, model, from));
     }
 
     static bool From(AxonEmissionContext context, SemanticReadModel model, SemanticProjectionFrom from)
