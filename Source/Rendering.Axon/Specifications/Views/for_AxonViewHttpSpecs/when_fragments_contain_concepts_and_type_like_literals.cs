@@ -37,7 +37,7 @@ public class when_fragments_contain_concepts_and_type_like_literals : for_AxonVi
     {
         var model = _located.Slice.ReadModels.Single();
         AxonSpecificationsEmitter.Register(_context, _spec.Id, "example.ViewTest", "listingTheRegisteredCategory");
-        new AxonViewHttpSpecs(_context, new ViewJavaTypes(_request.Model.Application), _located, model).Register(_located.Slice.Projections.Single(), _spec);
+        new AxonViewHttpSpecs(_context, new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name)), _located, model).Register(_located.Slice.Projections.Single(), _spec);
         AxonHttpTests.Emit(_context);
         code = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ModeledHttpRoundTripTest.java", StringComparison.Ordinal)));
     }

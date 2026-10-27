@@ -24,7 +24,7 @@ public class when_emitting_live_view_tests : for_NativeViewSpecifications.given.
     {
         var query = _located.Slice.Queries.Single(query => query.Name == "LiveTotals");
         var model = _located.Slice.ReadModels.Single(model => model.Id == query.ReadModel);
-        AxonViewLiveSpecs.Emit(_context, new ViewJavaTypes(_request.Model.Application), _located, query, _located, model);
+        AxonViewLiveSpecs.Emit(_context, new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name)), _located, query, _located, model);
         _java = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("SubscriptionTest.java", StringComparison.Ordinal)));
         _sse = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("SseTest.java", StringComparison.Ordinal)));
     }

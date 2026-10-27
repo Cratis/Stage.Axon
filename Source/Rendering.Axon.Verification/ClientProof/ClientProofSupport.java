@@ -184,14 +184,21 @@ final class ClientProofSupport {
             }).get(WAIT, TimeUnit.SECONDS);
         }
 
-        /** Announces a change inside a unit of work that then fails, so the change is never committed. */
-        private void rollBack(String id, String title) {
+        /**
+         * Writes a change and announces it inside a unit of work that then fails. The write is visible in the store before the
+         * outcome is known, so a server that publishes the announcement before the rollback would re-read and deliver the
+         * rolled-back value. The original row is put back after a window long enough for such a leak to reach a watcher.
+         */
+        private void rollBack(String id, String title) throws Exception {
+            var original = store.get(id).orElseThrow();
             var failed = configuration.getComponent(UnitOfWorkFactory.class).create().executeWithResult(processing -> {
-                processing.runOnCommit(ignored -> store.update(id, row -> row.withTitle(title)));
+                store.update(id, row -> row.withTitle(title));
                 QueryUpdateEmitter.forContext(processing).emit(WorkItemById.class, query -> true, WorkItemById.Result::invalidation);
                 return CompletableFuture.<Object>failedFuture(new IllegalStateException("rollback"));
             });
             assertThrows(ExecutionException.class, () -> failed.get(WAIT, TimeUnit.SECONDS));
+            Thread.sleep(500);
+            store.put(id, original);
         }
 
         private void awaitActive(int expected) throws InterruptedException {

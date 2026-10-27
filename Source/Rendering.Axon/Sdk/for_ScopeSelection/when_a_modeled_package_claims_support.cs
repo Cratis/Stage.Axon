@@ -13,7 +13,7 @@ public class when_a_modeled_package_claims_support : Emitters.Projections.for_Ax
 {
     ViewJavaTypes _types;
 
-    void Establish() => _types = new(_request.Model.Application);
+    void Establish() => _types = new(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name));
 
     [Fact]
     void should_refuse_each_reserved_package_in_both_modes()

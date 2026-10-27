@@ -15,7 +15,7 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
     {
         var specifications = located.Slice.Specifications.Where(specification => specification.When?.Command == command.Id).ToArray();
         if (specifications.Length == 0) return;
-        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located);
+        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located);
         var name = JavaNames.Type(command.Name) + "SpecificationsTest";
         var commandName = JavaNames.Type(command.Name);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(commandName).Declare(commandName + "Rules").Declare(commandName + "Handler");
@@ -73,7 +73,7 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         {
             FixtureClock(method);
             method.Line($"var configuration = {method.Reference("org.axonframework.eventsourcing.configuration.EventSourcingConfigurer")}.create();");
-            if (source is not null) method.Line($"configuration.registerEntity({method.Reference("org.axonframework.eventsourcing.configuration.EventSourcedEntityModule")}.autodetected({new CommandJavaTypes(context.Request.Model.Application).Reference(source.JavaType, method)}.class, {name}Stream.class));");
+            if (source is not null) method.Line($"configuration.registerEntity({method.Reference("org.axonframework.eventsourcing.configuration.EventSourcedEntityModule")}.autodetected({new CommandJavaTypes(context.Request.Model.Application, context.BasePackage).Reference(source.JavaType, method)}.class, {name}Stream.class));");
             method.Line($"configuration.messaging(messaging -> messaging.registerCommandHandlingModule({method.Reference("org.axonframework.messaging.commandhandling.configuration.CommandHandlingModule")}.named({JavaCodeBuilder.StringLiteral(name)})")
                 .Line($"    .commandHandlers().autodetectedCommandHandlingComponent(components -> handler({(usesClock ? "clock" : string.Empty)})).build()));")
                 .Line($"fixture = {method.Reference("org.axonframework.test.fixture.AxonTestFixture")}.with(configuration);").Line("return fixture;");

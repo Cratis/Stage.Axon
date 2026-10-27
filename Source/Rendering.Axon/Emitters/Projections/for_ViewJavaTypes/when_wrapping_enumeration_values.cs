@@ -20,8 +20,8 @@ public class when_wrapping_enumeration_values : Specification
         var model = loaded.Model.Application;
         var concept = model.Concepts.Single(candidate => candidate.Name == "RequestState");
         reference = ScopeSelection.Locate(model).SelectMany(owner => owner.Slice.ReadModels).SelectMany(readModel => readModel.Properties).First(property => property.Type.Target == concept.Id).Type;
-        types = new(model);
-        numeric = new(model with { Concepts = [.. model.Concepts.Select(candidate => candidate.Id == concept.Id ? candidate with { Numbers = [10, 20, 30, 40, 50] } : candidate)] });
+        types = new(model, Java.JavaNames.PackageSegment(model.Name));
+        numeric = new(model with { Concepts = [.. model.Concepts.Select(candidate => candidate.Id == concept.Id ? candidate with { Numbers = [10, 20, 30, 40, 50] } : candidate)] }, Java.JavaNames.PackageSegment(model.Name));
     }
 
     [Fact] void should_use_the_string_enum_factory() => types.Wrap(reference, "\"submitted\"").ShouldEqual("sample.concepts.RequestState.fromValue(\"submitted\")");

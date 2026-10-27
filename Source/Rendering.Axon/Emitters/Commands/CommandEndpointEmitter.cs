@@ -24,10 +24,10 @@ internal static partial class CommandEndpointEmitter
 
     internal static void Emit(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource? source)
     {
-        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application), located);
+        var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located);
         var name = JavaNames.Type(command.Name);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Rules").Declare(name + "Endpoint");
-        var returnType = ReturnType(command, new(context.Request.Model.Application), code);
+        var returnType = ReturnType(command, new(context.Request.Model.Application, context.BasePackage), code);
         var gateway = code.Reference("org.axonframework.messaging.commandhandling.gateway.CommandGateway");
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.RestController")}").Block($"public class {name}Endpoint", body =>
         {
