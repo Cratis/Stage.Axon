@@ -128,6 +128,8 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var name = JavaNames.Type(projection.Name) + "Projector";
         var updates = new ProjectionUpdates(context, types, model.Id);
         var code = new JavaCodeBuilder(package).Declare(modelName).Declare(name);
+        var policies = new ProjectionPolicyNames(context.Request.Model.Application, ProjectionTransitions.From(projection).Select(from => from.EventContract));
+        policies.Declare(code);
         foreach (var property in model.Properties) types.ClaimProjectionType(property.Type, code);
         var storeType = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
         updates.Claim(code, package);
@@ -143,7 +145,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
                 var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == group.Key);
                 var values = new ProjectionValues(context, types, body);
                 var keys = group.Count() < 2 ? [] : ProjectionHandlerBinding.PreReserved([.. group.Select(from => values.Key(from.Key, @event))]);
-                new ProjectionHandlerBinding(context, types, model, package, keys: keys, sequence: new ProjectionSequencing(context, types, model).Projection(group, body)).Emit(
+                new ProjectionHandlerBinding(context, types, model, package, keys: keys, sequence: new ProjectionSequencing(context, types, model).Projection(group, body, policies)).Emit(
                     body,
                     types.EventType(group.Key, body),
                     method =>

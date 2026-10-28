@@ -58,6 +58,8 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
         var name = JavaNames.Type(model.Name);
         var updates = new ProjectionUpdates(context, types, model.Id);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Reducer").Declare(name + "ReducerProjector");
+        var policies = new ProjectionPolicyNames(context.Request.Model.Application, reducer.Transitions.Select(transition => transition.EventContract));
+        policies.Declare(code);
         var storeType = code.Reference(AxonRuntimePackage.Type(context, "ReadModelStore"));
         updates.Claim(code, package);
         foreach (var transition in reducer.Transitions) types.EventType(transition.EventContract, code);
@@ -71,7 +73,7 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
                 foreach (var transition in reducer.Transitions)
                 {
                     var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == transition.EventContract);
-                    new ProjectionHandlerBinding(context, types, model, package, synchronized: true, sequence: new ProjectionSequencing(context, types, model).Reducer(@event, body)).Emit(
+                    new ProjectionHandlerBinding(context, types, model, package, synchronized: true, sequence: new ProjectionSequencing(context, types, model).Reducer(@event, body, policies)).Emit(
                         body,
                         types.EventType(transition.EventContract, body),
                         method => method.Line($"var key = {values.Source(@event)};")
