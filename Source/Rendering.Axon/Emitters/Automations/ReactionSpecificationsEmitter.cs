@@ -51,6 +51,7 @@ internal sealed class ReactionSpecificationsEmitter(AxonEmissionContext context,
                 }
                 else
                 {
+                    if (!scenario.CallerAdmitted) test.DiffersFromScreenplay("The modeled caller does not hold the SYSTEM role the application-trigger endpoint requires, so this specification is not run.");
                     test.UnsupportedIntent("verify the complete application-trigger reaction fixtures", specification.Id.ToString(), Refusal)
                         .Line("throw new UnsupportedOperationException(\"Unsupported application-trigger reaction fixtures\");");
                 }

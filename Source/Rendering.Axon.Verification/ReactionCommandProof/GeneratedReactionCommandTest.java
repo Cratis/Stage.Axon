@@ -57,7 +57,7 @@ class GeneratedReactionCommandTest {
     void anEventLeadsToTheCommandBeingHandledByTheLiveProcessor() throws Exception {
         var counter = UUID.randomUUID().toString();
         gateway.sendAndWait(new RecordCount(new CounterId(counter), 7L));
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertEquals(1, acknowledged(counter)));
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertEquals(2, acknowledged(counter)));
     }
 
     @Test
@@ -65,7 +65,7 @@ class GeneratedReactionCommandTest {
         assertEquals(1, recorded(HISTORY), "The history event must really be in the store");
         var live = UUID.randomUUID().toString();
         gateway.sendAndWait(new RecordCount(new CounterId(live), 7L));
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertEquals(1, acknowledged(live)));
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertEquals(2, acknowledged(live)));
         assertEquals(0, acknowledged(HISTORY), "A new reaction processor starts at the latest token, not at history");
     }
 

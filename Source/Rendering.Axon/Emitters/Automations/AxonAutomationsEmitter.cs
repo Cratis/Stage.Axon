@@ -16,11 +16,12 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
     {
         var selected = ScopeSelection.Select(context.Request);
         var registered = new List<RegisteredReaction>();
+        var processors = new HashSet<string>(StringComparer.Ordinal);
         foreach (var located in selected)
         {
             foreach (var reaction in located.Slice.Reactions)
             {
-                if (EmitReaction(context, located, reaction) is not { } emitted) continue;
+                if (EmitReaction(context, located, reaction, processors) is not { } emitted) continue;
                 registered.Add(emitted);
                 new ReactionSpecificationsEmitter(context, located, reaction).Emit();
             }
@@ -28,7 +29,7 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         ApplicationTriggersEmitter.Emit(context, registered);
     }
 
-    static RegisteredReaction? EmitReaction(AxonEmissionContext context, LocatedSemanticSlice located, SemanticReaction reaction)
+    static RegisteredReaction? EmitReaction(AxonEmissionContext context, LocatedSemanticSlice located, SemanticReaction reaction, HashSet<string> processors)
     {
         var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located);
         var name = JavaNames.Type(reaction.Name) + "Reaction";
@@ -55,20 +56,24 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
                     constructor.Line("this.commands = commands;");
                     if (usesClock) constructor.Line("this.clock = clock;");
                 });
-                if (registered && reaction.Triggers.Any(trigger => trigger.Kind == SemanticReactionTriggerKind.Event)) EmitProcessor(package, body);
                 EmitMethods(reaction, emitter, triggers, body);
             });
+        if (registered && reaction.Triggers.Any(trigger => trigger.Kind == SemanticReactionTriggerKind.Event) && processors.Add(package)) EmitProcessor(context, package);
         if (!registered) context.Degradation.Unsupported("STAGE-AXON-0504", reaction.Id, $"Reaction '{reaction.Name}' is not registered: a trigger's effects, routing, guards or identity cannot be preserved.");
         context.AddJava(package, name, code.Build(), sources: [reaction.Id, .. reaction.Triggers.Where(trigger => trigger.Source != default).Select(trigger => trigger.Source)]);
         return registered ? new(reaction, emitter, triggers!) : null;
     }
 
-    // A reaction sends commands, so its processor starts at the latest token and never reacts to history.
-    static void EmitProcessor(string package, JavaCodeBuilder body)
+    // One definition per reaction namespace: a reaction sends commands, so its processor starts at the latest token and never reacts to history.
+    static void EmitProcessor(AxonEmissionContext context, string package)
     {
-        var definition = body.Reference("org.axonframework.extension.spring.config.EventProcessorDefinition");
-        body.Line("@" + body.Reference("org.springframework.context.annotation.Bean") + "(" + JavaCodeBuilder.StringLiteral(package + ".reactions") + ")")
-            .Block($"static {definition} processor()", method => method.Line($"return {definition}.pooledStreamingMatching(" + JavaCodeBuilder.StringLiteral(package + ".reactions") + ").customized(config -> config.initialToken(source -> source.latestToken(null)));"));
+        var code = new JavaCodeBuilder(package).Declare("ReactionsProcessorConfiguration");
+        var definition = code.Reference("org.axonframework.extension.spring.config.EventProcessorDefinition");
+        var namespaceName = JavaCodeBuilder.StringLiteral(package + ".reactions");
+        code.Line("@" + code.Reference("org.springframework.context.annotation.Configuration") + "(value = " + JavaCodeBuilder.StringLiteral(package + ".reactions.configuration") + ", proxyBeanMethods = false)")
+            .Block("class ReactionsProcessorConfiguration", body => body.Line("@" + body.Reference("org.springframework.context.annotation.Bean") + "(" + namespaceName + ")")
+                .Block($"{definition} processor()", method => method.Line($"return {definition}.pooledStreamingMatching(" + namespaceName + ").customized(config -> config.initialToken(source -> source.latestToken(null)));")));
+        context.AddJava(package, "ReactionsProcessorConfiguration", code.Build());
     }
 
     static void EmitMethods(SemanticReaction reaction, ReactionTriggerEmitter emitter, PreparedReactionTrigger?[] triggers, JavaCodeBuilder body)

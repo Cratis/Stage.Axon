@@ -13,7 +13,10 @@ internal sealed class ReactionSpecificationScenario(AxonEmissionContext context,
     readonly string? _input = new ReactionSpecificationValues(context).Trigger(context.Request.Model.Application.Triggers.Single(candidate => candidate.Id == specification.WhenTrigger!.Trigger), specification.WhenTrigger!);
     readonly string?[] _expected = [.. specification.ThenEvents.Select(new ReactionSpecificationValues(context).Event)];
 
-    internal bool CanEmit => FixturesSupported() && TargetSupported() && _input is not null && _expected.All(value => value is not null);
+    // The trigger endpoint is system-only, so only a caller holding the SYSTEM role (or none, which runs as the system) can enter it.
+    internal bool CallerAdmitted => specification.GivenCaller is null || (specification.GivenCaller.Authenticated && specification.GivenCaller.Roles.Contains("SYSTEM"));
+
+    internal bool CanEmit => CallerAdmitted && FixturesSupported() && TargetSupported() && _input is not null && _expected.All(value => value is not null);
 
     internal void Claim(JavaCodeBuilder code) => ReactionJavaReferences.Claim(code, _expected.OfType<string>().Concat(_input is null ? [] : new[] { _input }));
 

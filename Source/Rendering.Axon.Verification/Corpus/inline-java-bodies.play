@@ -59,6 +59,11 @@ module Bodies
           invokes AcknowledgeCount
             id = id
             amount = amount
+      reaction AcknowledgeAgain
+        when CountRecorded
+          invokes AcknowledgeCount
+            id = id
+            amount = amount
 
     slice StateView Totals
       readmodel RebuiltTotal

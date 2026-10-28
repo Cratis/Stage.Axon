@@ -25,6 +25,7 @@ public class when_rendering_a_schedule : given.a_planned_screenplay
     [Fact] void should_use_a_spring_scheduled_method() => Source("NightlySweepReaction").ShouldContain("@Scheduled(fixedRateString = \"PT86400S\")");
     [Fact] void should_describe_the_difference_from_screenplay() => Source("NightlySweepReaction").ShouldContain("// Differs from Screenplay:");
     [Fact] void should_warn_about_the_schedule() => plan.Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0507" && diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Warning).ShouldBeTrue();
-    [Fact] void should_not_define_an_event_processor() => Source("NightlySweepReaction").ShouldNotContain("EventProcessorDefinition");
+    [Fact] void should_not_define_an_event_processor() => Exists("ReactionsProcessorConfiguration").ShouldBeFalse();
+    [Fact] void should_not_define_a_processor_in_the_reaction() => Source("NightlySweepReaction").ShouldNotContain("EventProcessorDefinition");
     [Fact] void should_enable_scheduling_on_the_application() => Source("Application").ShouldContain("@EnableScheduling");
 }
