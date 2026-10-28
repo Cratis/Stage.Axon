@@ -18,7 +18,7 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located);
         var name = JavaNames.Type(command.Name) + "SpecificationsTest";
         var commandName = JavaNames.Type(command.Name);
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(commandName).Declare(commandName + "Rules").Declare(commandName + "Handler");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(commandName).Declare(commandName + "Handler");
         ClaimSource(code, commandName);
         ClaimFixtures(code, specifications);
         ClaimAssertions(code, specifications);

@@ -1,10 +1,8 @@
 package __RUNTIME__;
 
 import __APPLICATION__.accounts.registry.consume.ConsumeAccount;
-import __APPLICATION__.accounts.registry.consume.ConsumeAccountRules;
 import __APPLICATION__.accounts.registry.crossstream.CloseOtherAccount;
 import __APPLICATION__.concepts.AccountId;
-import __RUNTIME_MODULE__.CommandValidationException;
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.ArrayList;
 import java.util.UUID;
@@ -13,27 +11,50 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.axonframework.common.configuration.Configuration;
 import org.axonframework.eventsourcing.eventstore.AppendEventsTransactionRejectedException;
+import org.axonframework.messaging.commandhandling.CommandMessage;
 import org.axonframework.messaging.commandhandling.gateway.CommandGateway;
+import org.axonframework.messaging.core.MessageHandlerInterceptor;
 import org.axonframework.modelling.ConcurrencyException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.reset;
 
+@Import(GeneratedProtectedReadTest.Seam.class)
 @Timeout(60)
 abstract class GeneratedProtectedReadTest {
     @Autowired private CommandGateway gateway;
     @Autowired private Configuration configuration;
-    @MockitoSpyBean private ConsumeAccountRules rules;
+    private static final AtomicReference<CyclicBarrier> BARRIER = new AtomicReference<>();
+
+    @TestConfiguration
+    static class Seam {
+        @Bean
+        MessageHandlerInterceptor<CommandMessage> holdBetweenReadAndAppend() {
+            return (message, context, chain) -> {
+                var barrier = BARRIER.get();
+                if (barrier != null && message.payload() instanceof ConsumeAccount) {
+                    context.runOnPostInvocation(invoked -> {
+                        try {
+                            barrier.await(5, TimeUnit.SECONDS);
+                        } catch (Exception failure) {
+                            throw new IllegalStateException("contenders did not interleave", failure);
+                        }
+                    });
+                }
+                return chain.proceed(message, context);
+            };
+        }
+    }
 
     @Test
     void generatedProtectedDecisionsCommitOneConsumer() throws Exception {
@@ -42,13 +63,7 @@ abstract class GeneratedProtectedReadTest {
             var id = UUID.randomUUID();
             GeneratedIngressSupport.register(gateway, id, UUID.randomUUID().toString()).get(10, TimeUnit.SECONDS);
             assertEquals(1, GeneratedIngressSupport.facts(configuration, id).size(), "The protected read must be seeded");
-            var observed = new CyclicBarrier(8);
-            reset(rules);
-            doAnswer(invocation -> {
-                invocation.callRealMethod();
-                observed.await(5, TimeUnit.SECONDS);
-                return null;
-            }).when(rules).validate(any(ConsumeAccount.class));
+            BARRIER.set(new CyclicBarrier(8));
             var workers = Executors.newFixedThreadPool(8);
             try {
                 var calls = new ArrayList<CompletableFuture<Boolean>>();
@@ -62,7 +77,7 @@ abstract class GeneratedProtectedReadTest {
                             outcomes.add(actual.getClass().getName());
                             assertTrue(actual instanceof ConcurrencyException
                                     || actual instanceof AppendEventsTransactionRejectedException
-                                    || actual instanceof CommandValidationException
+                                    || actual instanceof IllegalArgumentException
                                     || actual instanceof SQLIntegrityConstraintViolationException,
                                     () -> "Unexpected protected-decision outcome: " + actual);
                             return false;
@@ -76,7 +91,7 @@ abstract class GeneratedProtectedReadTest {
             } finally {
                 workers.shutdownNow();
                 assertTrue(workers.awaitTermination(5, TimeUnit.SECONDS), "Every protected-read contender must terminate");
-                reset(rules);
+                BARRIER.set(null);
             }
         }
         assertTrue(!outcomes.isEmpty(), "The proof must observe losing decisions");
@@ -102,7 +117,7 @@ abstract class GeneratedProtectedReadTest {
         var owner = UUID.randomUUID();
         var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.send(gateway,
                 new ConsumeAccount(new AccountId(owner), "must not append")).get(10, TimeUnit.SECONDS));
-        assertInstanceOf(CommandValidationException.class, GeneratedIngressSupport.root(failure));
+        assertInstanceOf(IllegalArgumentException.class, GeneratedIngressSupport.root(failure));
         assertEquals(0, GeneratedIngressSupport.facts(configuration, owner).size());
     }
 }

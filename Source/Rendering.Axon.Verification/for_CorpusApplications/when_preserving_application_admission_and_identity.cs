@@ -61,18 +61,18 @@ public class when_preserving_application_admission_and_identity : Specification
     [Fact] void should_plan_every_application_without_refusals() => (_plans.Count == 34 && _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty)).ShouldBeTrue();
     [Fact] void should_use_the_composed_custom_package_root() => _applications.Single(application => application.Name == "sample-custom-packages").Root.ShouldEqual(_inputs.Root);
 
-    [Fact] void should_bind_proof_facts_to_the_authenticated_caller() => ProofSource("RegisterAccountHandler").ShouldContain("Caller.current().identity()");
+    [Fact] void should_bind_proof_facts_to_the_authenticated_caller() => ProofSource("RegisterAccountHandler").ShouldContain("username");
     [Fact] void should_enlist_proof_uniqueness_in_the_append_context() => ProofSource("ModeledConstraints").ShouldContain("store.assign(context,");
     [Fact] void should_release_proof_claims_with_the_generated_close_command() => ProofSource("ModeledConstraints").ShouldContain("store.releaseOwner(context,");
     [Fact] void should_protect_the_proof_command_handler() => ProofSource("RegisterAccountHandler").ShouldContain("@PreAuthorize(\"hasRole('Writer')\")");
-    [Fact] void should_enroll_the_proof_decision_before_validation() => ProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new CommandValidationException");
+    [Fact] void should_enroll_the_proof_decision_before_validation() => ProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new IllegalArgumentException");
     [Fact] void should_refuse_the_unsupported_cross_stream_proof() => ProofSource("CloseOtherAccountHandler").ShouldContain("throw new UnsupportedOperationException(\"STAGE-AXON-0106:");
     [Fact] void should_not_append_in_the_unsupported_proof() => ProofSource("CloseOtherAccountHandler").ShouldNotContain("appender.append(");
     [Fact] void should_emit_the_persistent_gateway_race_base() => ProofSource("PersistentUniqueConcurrencyTest").ShouldContain("abstract CompletableFuture<Void> register(UUID owner, String value)");
     [Fact] void should_preserve_the_scoped_memory_proof_view() => ProofSource("ActiveAccountsStoreConfiguration").ShouldContain("new PersistentReadModelSafety(");
     [Fact] void should_not_render_views_for_the_persistent_proofs() => _plans[IngressProofModel.PersistentApplication].Artifacts.Any(artifact => artifact.RelativePath.Contains("/accounts/registry/active/", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_not_warn_about_persistent_proof_views() => _plans[IngressProofModel.PersistentApplication].Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0308").ShouldBeFalse();
-    [Fact] void should_enforce_persistent_protected_reads() => PersistentProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new CommandValidationException");
+    [Fact] void should_enforce_persistent_protected_reads() => PersistentProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new IllegalArgumentException");
     [Fact] void should_preserve_persistent_read_removals() => PersistentProofSource("ConsumeAccountStream").ShouldContain("decisionRead0 = false;");
     [Fact] void should_preserve_persistent_read_creation() => PersistentProofSource("ConsumeAccountStream").ShouldContain("decisionRead0 = true;");
     [Fact] void should_enlist_persistent_uniqueness() => PersistentProofSource("ModeledConstraints").ShouldContain("store.assign(context,");

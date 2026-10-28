@@ -12,7 +12,7 @@ namespace Cratis.Stage.Rendering.Axon.Verification.for_IngressProofArtifacts;
 
 public partial class when_comparing_the_runtime_module_package_with_generated_output : Specification
 {
-    [GeneratedRegex(@"^import (?<package>[a-z][a-z0-9.]*)\.CommandValidationException;$", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture | RegexOptions.Multiline, 1000)]
+    [GeneratedRegex(@"^import (?<package>[a-z][a-z0-9.]*)\.(?:ReadModelStore|UniqueValueStore|InMemoryReadModelStore);$", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture | RegexOptions.Multiline, 1000)]
     private static partial Regex RuntimeImport { get; }
 
     CanonicalCorpusInputs _inputs;
