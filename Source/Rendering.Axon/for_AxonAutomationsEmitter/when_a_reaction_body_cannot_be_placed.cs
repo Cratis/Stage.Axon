@@ -59,40 +59,52 @@ public class when_a_reaction_body_cannot_be_placed : Specification
         _request.ImplementationRequirements.Count(requirement => requirement.Role == SemanticImplementationRole.ReactionEffect).ShouldEqual(1);
 
     [Fact]
-    void should_carry_the_specific_reason_in_the_not_registered_warning()
+    void should_report_the_reaction_as_not_registered_without_repeating_the_reason()
     {
         var context = Render(false);
         var diagnostic = context.Degradation.UnsupportedConstructs.Single(candidate => candidate.Code == "STAGE-AXON-0504");
         diagnostic.Severity.ShouldEqual(ArtifactRenderDiagnosticSeverity.Warning);
         diagnostic.Message.ShouldContain("Notifier");
-        diagnostic.Message.ShouldContain("language 'csharp' is not supported");
+        diagnostic.Message.ShouldNotContain("language 'csharp'");
         context.Degradation.Refusals.IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
-    void should_carry_the_specific_reason_in_the_generated_comment() =>
-        Java(Render(false)).ShouldContain("language 'csharp' is not supported");
-
-    [Fact]
-    void should_carry_the_specific_reason_into_the_unsupported_summary()
+    void should_report_the_language_reason_once_through_the_audit()
     {
         var context = Render(false);
-        UnsupportedSummary.Emit(context);
-        var row = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan()).Split('\n').Single(line => line.StartsWith("| STAGE-AXON-0504", StringComparison.Ordinal));
-        row.ShouldContain("Notifier");
-        row.ShouldContain("language 'csharp' is not supported");
+        var reported = context.Degradation.UnsupportedConstructs.Where(candidate => candidate.Message.Contains("language 'csharp' is not supported", StringComparison.Ordinal)).ToArray();
+        reported.Length.ShouldEqual(1);
+        reported[0].Code.ShouldEqual(AxonRefusalCodes.ImplementationLanguage);
     }
 
     [Fact]
-    void should_refuse_in_strict_mode() =>
-        Render(true).Degradation.Refusals.Any(refusal => refusal.Codes.Contains("STAGE-AXON-0504")).ShouldBeTrue();
-
-    [Fact]
-    void should_report_the_reason_once_because_the_slice_owned_body_is_not_in_the_unplaced_audit()
+    void should_keep_diagnostics_and_intents_aligned()
     {
         var context = Render(false);
-        context.Degradation.UnsupportedConstructs.Count(candidate => candidate.Message.Contains("language 'csharp' is not supported", StringComparison.Ordinal)).ShouldEqual(1);
-        context.Degradation.UnsupportedConstructs.Any(candidate => candidate.Code == AxonRefusalCodes.ImplementationLanguage || candidate.Code == AxonRefusalCodes.Implementation).ShouldBeFalse();
+        context.Degradation.UnsupportedConstructs.Select(diagnostic => diagnostic.Code).ShouldEqual(context.Degradation.Intents.Select(intent => intent.Code));
+    }
+
+    [Fact]
+    void should_carry_the_reason_once_in_the_generated_comments() =>
+        Comments(Render(false)).Split("language 'csharp' is not supported").Length.ShouldEqual(2);
+
+    [Fact]
+    void should_carry_the_reason_once_in_the_unsupported_summary()
+    {
+        var context = Render(false);
+        UnsupportedSummary.Emit(context);
+        var rows = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan()).Split('\n').Where(line => line.Contains("language 'csharp' is not supported", StringComparison.Ordinal)).ToArray();
+        rows.Length.ShouldEqual(1);
+        rows[0].StartsWith($"| {AxonRefusalCodes.ImplementationLanguage}", StringComparison.Ordinal).ShouldBeTrue();
+    }
+
+    [Fact]
+    void should_refuse_in_strict_mode()
+    {
+        var codes = Render(true).Degradation.Refusals.SelectMany(refusal => refusal.Codes).ToArray();
+        codes.ShouldContain("STAGE-AXON-0504");
+        codes.ShouldContain(AxonRefusalCodes.ImplementationLanguage);
     }
 
     AxonEmissionContext Render(bool strict)
@@ -104,6 +116,6 @@ public class when_a_reaction_body_cannot_be_placed : Specification
         return context;
     }
 
-    static string Java(AxonEmissionContext context) =>
-        string.Concat(context.Artifacts.Where(artifact => artifact.RelativePath.EndsWith("/NotifierReaction.java", StringComparison.Ordinal)).Select(artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan())));
+    static string Comments(AxonEmissionContext context) =>
+        string.Concat(context.Artifacts.Where(artifact => artifact.RelativePath.EndsWith(".java", StringComparison.Ordinal)).Select(artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan())));
 }

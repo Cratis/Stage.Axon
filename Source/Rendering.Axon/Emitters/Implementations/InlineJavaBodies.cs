@@ -11,7 +11,22 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 /// Identifies a body slot. <paramref name="Slice"/> and <paramref name="MemberPrefix"/> additionally accept the shape the Screenplay compiler
 /// produces for reaction triggers: a slice-owned requirement whose member begins with the owning reaction's name.
 /// </summary>
-internal sealed record InlineBodySlot(string? RequirementId, SemanticImplementationRole Role, SemanticId Owner, SemanticId? Slice = null, string? MemberPrefix = null);
+internal sealed record InlineBodySlot(string? RequirementId, SemanticImplementationRole Role, SemanticId Owner, SemanticId? Slice = null, string? MemberPrefix = null)
+{
+    /// <summary>Creates the one slot a reaction trigger body is placed into and audited against: reaction-owned, or slice-owned with the reaction's name as member prefix.</summary>
+    /// <param name="requirementId">The trigger's implementation requirement identifier.</param>
+    /// <param name="reaction">The reaction owning the trigger.</param>
+    /// <param name="slice">The identifier of the slice containing the reaction.</param>
+    /// <returns>The reaction slot.</returns>
+    internal static InlineBodySlot ForReaction(string? requirementId, SemanticReaction reaction, SemanticId? slice) =>
+        new(requirementId, SemanticImplementationRole.ReactionEffect, reaction.Id, slice, reaction.Name + "/");
+
+    /// <summary>Gets whether the requirement addresses this slot, either directly owned or slice-owned with the member prefix.</summary>
+    /// <param name="requirement">The requirement to test.</param>
+    /// <returns><see langword="true"/> when the requirement belongs to the slot.</returns>
+    internal bool Addresses(SemanticImplementationRequirement requirement) =>
+        requirement.Role == Role && (requirement.Source.SemanticId == Owner || InlineJavaBodies.SliceOwned(requirement, this));
+}
 
 internal static class InlineJavaBodies
 {
@@ -48,6 +63,10 @@ internal static class InlineJavaBodies
     internal static IEnumerable<SemanticImplementationRequirement> Requirements(AxonEmissionContext context) =>
         context.Request.ImplementationRequirements.IsDefault ? [] : context.Request.ImplementationRequirements;
 
+    internal static bool SliceOwned(SemanticImplementationRequirement requirement, InlineBodySlot slot) =>
+        slot.Slice is { } slice && slot.MemberPrefix is { } prefix && requirement.Role == slot.Role && requirement.Source.SemanticId == slice &&
+        requirement.Owner.Kind == SemanticKind.Slice && requirement.Member?.StartsWith(prefix, StringComparison.Ordinal) == true;
+
     static SemanticKind OwnerKind(SemanticImplementationRole role) => role switch
     {
         SemanticImplementationRole.CommandHandler => SemanticKind.Command,
@@ -56,10 +75,6 @@ internal static class InlineJavaBodies
         SemanticImplementationRole.ReducerTransition => SemanticKind.Slice,
         _ => SemanticKind.Unknown
     };
-
-    static bool SliceOwned(SemanticImplementationRequirement requirement, InlineBodySlot slot) =>
-        slot.Slice is { } slice && slot.MemberPrefix is { } prefix && requirement.Role == slot.Role && requirement.Source.SemanticId == slice &&
-        requirement.Owner.Kind == SemanticKind.Slice && requirement.Member?.StartsWith(prefix, StringComparison.Ordinal) == true;
 
     static string ForeignLanguage(string language) =>
         $"The Axon target only realizes Java bodies; language '{language}' is not supported. Supply the body in Java (or render it with a target that realizes this language) and render again.";
