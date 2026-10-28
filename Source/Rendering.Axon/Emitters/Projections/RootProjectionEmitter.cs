@@ -16,6 +16,8 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
     {
         var name = JavaNames.Type(projection.Name) + "Projector";
         var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type);
+        var policies = new ProjectionPolicyNames(context.Request.Model.Application, ProjectionTransitions.From(projection).Select(from => from.EventContract));
+        policies.Declare(code);
         foreach (var property in model.Properties) types.ClaimProjectionType(property.Type, code);
         new ProjectionUpdates(context, types, model.Id).Claim(code, package);
         foreach (var from in ProjectionTransitions.From(projection)) types.EventType(from.EventContract, code);
@@ -29,7 +31,7 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
                     var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(candidate => candidate.Id == group.Key);
                     var values = new ProjectionValues(context, types, body);
                     var keys = group.Count() < 2 ? [] : ProjectionHandlerBinding.PreReserved([.. group.Select(from => values.Key(from.Key, @event))]);
-                    new ProjectionHandlerBinding(context, types, model, package, keys: keys).Emit(
+                    new ProjectionHandlerBinding(context, types, model, package, keys: keys, sequence: new ProjectionSequencing(context, types, model).Projection(group, body, policies)).Emit(
                     body,
                     types.EventType(group.Key, body),
                     method =>

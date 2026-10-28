@@ -8,7 +8,7 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false, IReadOnlyList<string>? keys = null)
+internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false, IReadOnlyList<string>? keys = null, ProjectionHandlerBinding.ProjectionSequence? sequence = null, string? scopeState = null)
 {
     readonly ProjectionUpdates _updates = new(context, types, model.Id);
 
@@ -23,6 +23,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
     internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false)
     {
         EmitContextual(body, eventType, transitions, message);
+        if (PersistentViewAdmission.Supports(context, model.Id)) EmitSequencing(body, sequence!);
     }
 
     void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message)
@@ -35,6 +36,11 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var messageParameter = message ? $", {eventMessage} message" : string.Empty;
         var messageArgument = message ? ", message" : string.Empty;
         var arguments = messageArgument + (_updates.Enabled ? ", updates" : string.Empty);
+        var (scopeParameter, scopeArgument) = ScopeSignature(body, store);
+        if (PersistentViewAdmission.Supports(context, model.Id))
+        {
+            body.Line($"@{body.Reference("org.axonframework.messaging.core.annotation.SequencingPolicy")}(type = {sequence!.Name}.class)");
+        }
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
             .Block($"public void handle({eventType} event{updateParameter}, {processing} context)", method =>
             {
@@ -42,12 +48,40 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
                 if (message) method.Line($"var message = ({eventMessage}) {body.Reference("org.axonframework.messaging.core.Message")}.fromContext(context);");
                 BindStore(method, messageArgument);
             })
-            .Block($"public {modifier}void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store);"))
-            .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
+            .Block($"public {modifier}void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store{scopeArgument});"))
+            .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store{scopeParameter})", method => Apply(method, transitions));
+    }
+
+    (string Parameter, string Argument) ScopeSignature(JavaCodeBuilder body, string store) =>
+        scopeState is null ? (string.Empty, string.Empty) : ($", {store}<{body.Reference("java.lang.Object")}, {scopeState}> scope", ", scope");
+
+    void EmitSequencing(JavaCodeBuilder body, ProjectionSequence sequence)
+    {
+        var policy = body.Reference("org.axonframework.messaging.core.sequencing.SequencingPolicy");
+        var message = body.Reference("org.axonframework.messaging.eventhandling.EventMessage");
+        var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
+        var optional = body.Reference("java.util.Optional");
+        var routing = new ProjectionSequencing(context, types, model);
+        var key = routing.UsesModelSequence ? null : sequence.Key;
+        var identifier = key ?? JavaCodeBuilder.StringLiteral(routing.Namespace);
+        body.Block($"public static final class {sequence.Name} implements {policy}<{message}>", nested =>
+        {
+            nested.Line("@Override")
+                .Block($"public {optional}<{nested.Reference("java.lang.Object")}> sequenceIdentifierFor({message} message, {processing} context)", method =>
+                {
+                    if (key is not null)
+                    {
+                        method.Line($"var event = message.payloadAs({sequence.EventType}.class, context.component({method.Reference("org.axonframework.messaging.eventhandling.conversion.EventConverter")}.class));");
+                    }
+                    method.Line($"return {optional}.of({identifier});");
+                });
+        });
     }
 
     void BindStore(JavaCodeBuilder method, string messageArgument)
     {
+        if (scopeState is not null && PersistentViewAdmission.Supports(context, model.Id))
+            throw new InvalidOperationException($"Scoped projector state is not staged for persistent-admitted model {model.Id}.");
         var adapter = PersistentViewAdmission.Supports(context, model.Id) ? method.Reference(types.BasePackage + ".persistence.JpaReadModelStore") : null;
         var transaction = method.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelTransaction"));
 
@@ -67,6 +101,14 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
 
     void BindMemory(JavaCodeBuilder method, string messageArgument, string transaction, string staged)
     {
+        if (scopeState is not null)
+        {
+            // The scope state is staged beside the rows and reserved first, so units of work on one projector serialize without a monitor.
+            method.Line($"var state = {transaction}.bind(scope, context);")
+                .Line($"{transaction}.reserve(state, {method.Reference("java.util.List")}.of(\"scope\"));")
+                .Line($"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {transaction}.bind(store, context), state);");
+            return;
+        }
         if (keys is not { Count: >= 2 })
         {
             method.Line(staged);
@@ -80,6 +122,10 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
     void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)
     {
         transitions(method);
-        _updates.Notify(method, package);
+
+        // A scoped body notifies only when it modified a row.
+        if (scopeState is null) _updates.Notify(method, package);
     }
+
+    internal sealed record ProjectionSequence(string Name, string EventType, string? Key);
 }

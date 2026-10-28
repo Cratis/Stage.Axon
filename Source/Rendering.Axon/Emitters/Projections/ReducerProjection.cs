@@ -95,6 +95,8 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
         var name = JavaNames.Type(model.Name);
         var updates = new ProjectionUpdates(context, types, model.Id);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Reducer").Declare(name + "ReducerProjector");
+        var policies = new ProjectionPolicyNames(context.Request.Model.Application, reducer.Transitions.Select(transition => transition.EventContract));
+        policies.Declare(code);
         var storeType = code.Reference(AxonRuntimePackage.Type(context, "ReadModelStore"));
         updates.Claim(code, package);
         foreach (var transition in reducer.Transitions) types.EventType(transition.EventContract, code);
@@ -103,33 +105,22 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
             .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
             .Block($"public class {name}ReducerProjector", body =>
             {
-                body.DiffersFromScreenplay("default-profile writes are not yet rolled back with a failed unit of work.")
-                    .Line($"private final {storeType}<{body.Reference("java.lang.Object")}, {name}> store;").Line($"private final {name}Reducer reducer;")
+                body.Line($"private final {storeType}<{body.Reference("java.lang.Object")}, {name}> store;").Line($"private final {name}Reducer reducer;")
                     .Block($"public {name}ReducerProjector(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + name)}) {storeType}<{body.Reference("java.lang.Object")}, {name}> store, {name}Reducer reducer)", constructor => constructor.Line("this.store = store;").Line("this.reducer = reducer;"));
                 foreach (var transition in reducer.Transitions)
                 {
                     var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == transition.EventContract);
-                    if (PersistentViewAdmission.Supports(context, model.Id))
-                    {
-                        new ProjectionHandlerBinding(context, types, model, package, synchronized: true).Emit(
-                            body,
-                            types.EventType(transition.EventContract, body),
-                            method => method.Line($"var key = {values.Source(@event)};")
-                                .Line("var next = reducer.reduce(event, store.get(key).orElse(null), message);")
-                                .Line("if (next == null) store.remove(key); else store.put(key, next);"),
-                            message: true);
-                        continue;
-                    }
-                    body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
-                        .Block($"public synchronized void on({types.EventType(transition.EventContract, body)} event, {body.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message{updates.ParameterFor(body)})", method =>
-                        {
-                            method.Line($"var key = {values.Source(@event)};")
-                                .Line("var next = reducer.reduce(event, store.get(key).orElse(null), message);")
-                                .Line("if (next == null) store.remove(key); else store.put(key, next);");
-                            updates.Notify(method, package);
-                        });
+                    new ProjectionHandlerBinding(context, types, model, package, synchronized: true, sequence: new ProjectionSequencing(context, types, model).Reducer(@event, body, policies)).Emit(
+                        body,
+                        types.EventType(transition.EventContract, body),
+                        method => method.Line($"var key = {values.Source(@event)};")
+                            .Line("var next = reducer.reduce(event, store.get(key).orElse(null), message);")
+                            .Line("if (next == null) store.remove(key); else store.put(key, next);"),
+                        message: true);
                 }
             });
         context.AddJava(package, name + "ReducerProjector", code.Build(), sources: model.Id);
+        var owner = ScopeSelection.Select(context.Request).First(candidate => candidate.Slice.Reducers.Any(candidateReducer => candidateReducer.ReadModel == model.Id));
+        new ProjectorRollbackTests(context, types).Emit(owner, model, name + "ReducerProjector", $"new {name}ReducerProjector(store, new {name}Reducer() {{}})", [.. reducer.Transitions.Select(transition => transition.EventContract)]);
     }
 }

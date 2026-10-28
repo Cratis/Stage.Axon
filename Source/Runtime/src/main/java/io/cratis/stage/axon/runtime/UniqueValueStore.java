@@ -8,6 +8,9 @@ public interface UniqueValueStore {
     void release(String constraint, Object value, Object owner);
     void assign(ProcessingContext context,
                 String constraint, List<?> values, Object owner, boolean ignoreCasing, String message);
+    default void occurOnce(ProcessingContext context, String constraint, Object owner, String message) {
+        throw new UnsupportedOperationException("Event occurrence uniqueness requires an atomic runtime store");
+    }
     void releaseOwner(ProcessingContext context,
                       String constraint, Object owner);
 }

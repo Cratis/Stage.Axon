@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Security.Cryptography;
 using System.Text;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
@@ -26,6 +27,13 @@ public class when_fingerprinting_view_generations : Projections.for_AxonProjecti
     [Fact] void should_be_independent_of_artifact_iteration_order() => _original.ShouldEqual(_reordered);
     [Fact] void should_change_with_the_generated_contract() => _original.ShouldNotEqual(_changed);
     [Fact] void should_emit_a_nonempty_format_versioned_fingerprint() => Assert.Matches("FINGERPRINT = \"[0-9A-F]{64}\";", _original);
+    [Fact]
+    void should_refuse_the_previous_routing_generation()
+    {
+        const string contract = "src/main/java/sample/Event.java\nrecord Event(long value) {}\nsrc/main/java/sample/Model.java\nrecord Model(long value) {}";
+        var previous = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("flat-view-json-v1\n" + contract)));
+        _original.ShouldNotContain(previous);
+    }
 
     string Fingerprint(params PlannedArtifact[] sources)
     {

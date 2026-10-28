@@ -36,6 +36,16 @@ public class when_emitting_multi_key_flat_handlers : Persistence.for_PersistentV
         code.ShouldContain("else {\n        var bound = ReadModelTransaction.bind(store, context);");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    void should_sequence_multi_key_handlers_by_the_model_namespace(bool root)
+    {
+        var code = Projector(root);
+        code.ShouldContain("return Optional.of(\"axonviews.views.counters.totals.Total\");");
+        code.ShouldNotContain("return Optional.of(String.valueOf(event.eventSourceId()");
+    }
+
     string Projector(bool root)
     {
         var context = new AxonEmissionContext(_request, new(_request.Profile));
@@ -57,7 +67,7 @@ public class when_emitting_multi_key_flat_handlers : Persistence.for_PersistentV
         }
         var values = new ProjectionValues(context, types, body);
         var keys = projection.Scope.From.Select(from => values.Key(from.Key, @event)!).ToArray();
-        new ProjectionHandlerBinding(context, types, model, "axonviews.features.totals.views", keys: keys).Emit(body, types.EventType(@event.Id, body), method =>
+        new ProjectionHandlerBinding(context, types, model, "axonviews.features.totals.views", keys: keys, sequence: new(new ProjectionPolicyNames(context.Request.Model.Application, [@event.Id]).For(@event.Id), types.EventType(@event.Id, body), null)).Emit(body, types.EventType(@event.Id, body), method =>
         {
             foreach (var key in keys) method.Line($"store.update({key}, current -> {{").Line("    return current;").Line("});");
         });
