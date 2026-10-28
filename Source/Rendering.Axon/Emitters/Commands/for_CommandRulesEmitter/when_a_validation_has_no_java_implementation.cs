@@ -26,7 +26,9 @@ public class when_a_validation_has_no_java_implementation : for_AxonArtifactRend
         var seed = located.Slice.Commands[0];
         var command = seed with { Validations = [new(seed.Properties[0].Id, SemanticValidationRuleKind.CodeValidation, null, "Invalid")] };
         context = new(request, new(request.Profile));
-        rules = new CommandRulesEmitter(context, command, new(request.Model.Application, context.BasePackage)).Render("example.commands");
+        var builder = new Java.JavaCodeBuilder("example.commands");
+        new CommandDomainChecks(context, command, new(request.Model.Application, context.BasePackage)).Emit(builder);
+        rules = builder.Build();
         var specification = located.Slice.Specifications.First(specification => specification.When?.Command == command.Id);
         rejection = Render(located, command, specification with { ThenErrors = [new(null, "Invalid")], ThenEvents = [] });
         success = Render(located, command, specification);
@@ -35,7 +37,7 @@ public class when_a_validation_has_no_java_implementation : for_AxonArtifactRend
         summary = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan());
     }
 
-    [Fact] void should_leave_the_unimplemented_rule_as_a_no_op() => rules.ShouldNotContain("validation.reject(\"\"");
+    [Fact] void should_leave_the_unimplemented_rule_as_a_no_op() => rules.ShouldNotContain("throw new UnsupportedOperationException");
     [Fact] void should_explain_the_difference() => rules.ShouldContain("// Differs from Screenplay: " + Reason);
     [Fact] void should_warn() => context.Degradation.UnsupportedConstructs[0].Severity.ShouldEqual(ArtifactRenderDiagnosticSeverity.Warning);
     [Fact] void should_use_the_validation_code() => context.Degradation.UnsupportedConstructs[0].Code.ShouldEqual("STAGE-AXON-IMPL-VALIDATION");
