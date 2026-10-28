@@ -3,6 +3,7 @@
 
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 
@@ -10,10 +11,17 @@ internal sealed class AxonScaffoldEmitter : IAxonEmitter
 {
     public bool IsImplemented => true;
 
-    public void Emit(AxonEmissionContext context)
+    public void Emit(AxonEmissionContext context) => Emit(context, AxonRuntimePackage.Version);
+
+    internal static void Emit(AxonEmissionContext context, string runtimeVersion)
     {
+        if (AxonMavenProject.IsLocalVersion(runtimeVersion))
+        {
+            context.Degradation.Warn("STAGE-AXON-LOCAL-RUNTIME", context.Request.Model.Application.Id, AxonMavenProject.LocalBuildWarning(runtimeVersion));
+        }
+
         var bearer = HttpAuthenticationInput.Bearer(context.Request.Profile);
-        context.Artifacts.Add(PlannedArtifact.CreateText("pom.xml", AxonMavenProject.Pom(context.BasePackage, context.ArtifactId, bearer)));
+        context.Artifacts.Add(PlannedArtifact.CreateText("pom.xml", AxonMavenProject.Pom(context.BasePackage, context.ArtifactId, bearer, runtimeVersion)));
         AddAsset(context, "mvnw", "mvnw");
         AddAsset(context, "mvnw.cmd", "mvnw.cmd");
         AddAsset(context, "maven-wrapper.properties", ".mvn/wrapper/maven-wrapper.properties");
