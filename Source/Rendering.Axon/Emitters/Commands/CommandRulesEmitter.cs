@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
@@ -102,9 +103,7 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
     void Unsupported(JavaCodeBuilder builder, string intent)
     {
         var path = command.Id + "/validation";
-        context.Degradation.Unsupported(AxonRefusalCodes.CommandValidation, command.Id, $"Axon cannot yet {intent}.", intent, path);
-
-        // Keep unsupported guards fail-closed: a warning is not permission to execute an unvalidated command.
-        builder.UnsupportedIntent(intent, path, AxonRefusalCodes.CommandValidation).Line($"validation.reject(\"\", {JavaCodeBuilder.StringLiteral(AxonRefusalCodes.CommandValidation + ": " + intent)});");
+        builder.DiffersFromScreenplay(UnimplementedValidation.Report(context, command.Id, intent, path))
+            .UnsupportedIntent(intent, path, AxonRefusalCodes.ImplementationValidation);
     }
 }
