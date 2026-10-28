@@ -28,6 +28,7 @@ internal static class PersistentViewAdmission
 
     internal static string? RefusalReason(AxonEmissionContext context, SemanticId model)
     {
+        if (ReducerModelAvailability.For(context).Reason(model) is not null) return "its read model is quarantined because a reducer is unavailable";
         var (projections, reducers) = Writers(context, model);
         var readModel = ScopeSelection.Select(context.Request).SelectMany(owner => owner.Slice.ReadModels).FirstOrDefault(candidate => candidate.Id == model);
         if (readModel is null) return "its shape is not admitted for persistence";
@@ -45,7 +46,7 @@ internal static class PersistentViewAdmission
     internal static bool Placed(AxonEmissionContext context, LocatedSemanticSlice owner, SemanticReducer reducer)
     {
         if (reducer.From is not null || reducer.Transitions.IsEmpty) return false;
-        var admission = ReducerBodies.Admission(context, owner, reducer);
+        var admission = ReducerModelAvailability.For(context).Admission(reducer);
         return admission.Blocked is null && admission.Transitions.Values.All(transition => transition.Placed);
     }
 

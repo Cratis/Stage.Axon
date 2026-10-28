@@ -20,6 +20,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
     {
         var types = new ViewJavaTypes(context.Request.Model.Application, context.BasePackage);
         var namespaces = new SortedSet<string>(StringComparer.Ordinal);
+        var availability = ReducerModelAvailability.For(context);
         foreach (var located in ScopeSelection.Select(context.Request))
         {
             var package = types.Package(located);
@@ -27,7 +28,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             foreach (var projection in located.Slice.Projections)
             {
                 var model = located.Slice.ReadModels.FirstOrDefault(candidate => candidate.Id == projection.ReadModel);
-                if (model is null) continue;
+                if (model is null || availability.Reason(model.Id) is not null) continue;
                 EmitProjector(context, types, package, projection, model);
                 namespaces.Add(package);
             }
@@ -49,12 +50,14 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         foreach (var reducer in located.Slice.Reducers)
         {
             var model = located.Slice.ReadModels.FirstOrDefault(candidate => candidate.Id == reducer.ReadModel);
-            var admission = ReducerBodies.Admission(context, located, reducer);
+            var availability = ReducerModelAvailability.For(context);
+            var admission = availability.Admission(reducer);
             if (model is null || admission.Blocked is not null)
             {
                 context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model?.Id ?? located.Slice.Id, admission.Blocked ?? "The reducer read model is outside its slice.");
                 continue;
             }
+            if (availability.Reason(model.Id) is not null) continue;
             new ReducerProjection(context, types).Emit(located, model, reducer, admission);
             yield return types.Package(located);
         }
@@ -64,6 +67,12 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
     {
         var name = JavaNames.Type(model.Name);
         ViewJavaTypes.Add(context, package, name, ReadModelRecords.Code(types, package, model), model.Id);
+        if (ReducerModelAvailability.For(context).Reason(model.Id) is { } unavailable)
+        {
+            context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model.Id, "Read model quarantined: " + unavailable + " No projector is registered; all store operations and dependent queries refuse. Restore supported reducer bodies and explicitly migrate or rebuild incompatible retained data before recovery.");
+            UnavailableReadModelStore.Emit(context, package, model, unavailable);
+            return;
+        }
         if (PersistentViewAdmission.Writerless(context, model.Id))
         {
             var guardPersistent = PersistentViewAdmission.HasQueryPerformer(context, model.Id);
