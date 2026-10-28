@@ -6,7 +6,12 @@ import __APPLICATION__.accounts.aliases.quietclaim.ClaimAliasQuietly;
 import __APPLICATION__.accounts.aliases.quietrelease.ReleaseAliasQuietly;
 import __APPLICATION__.accounts.aliases.release.ReleaseAlias;
 import __APPLICATION__.accounts.events.AliasClaimed;
+import __APPLICATION__.accounts.events.AccountOpened;
 import __APPLICATION__.accounts.events.EventTags;
+import __APPLICATION__.accounts.openings.close.CloseAccount;
+import __APPLICATION__.accounts.openings.failingopen.OpenAccountThenFail;
+import __APPLICATION__.accounts.openings.modeledopen.OpenAccountModeled;
+import __APPLICATION__.accounts.openings.open_.OpenAccount;
 import __APPLICATION__.concepts.AccountId;
 import __RUNTIME_MODULE__.UniqueValueConflict;
 import java.util.ArrayList;
@@ -37,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class GeneratedNativeUniqueTest {
+__BASE_MODIFIER__class GeneratedNativeUniqueTest {
     private static final int CONTENDERS = 8;
     private static final int REPETITIONS = 25;
     private final ExecutorService workers = Executors.newFixedThreadPool(CONTENDERS);
@@ -152,6 +157,73 @@ class GeneratedNativeUniqueTest {
         send(new ReleaseAlias(owner));
         claim(other, alias);
         assertEquals(1, facts(other).size());
+    }
+
+    @Test
+    void exactlyOneConcurrentOpeningWins() throws Exception {
+        for (var repetition = 0; repetition < REPETITIONS; repetition++) {
+            var owner = new AccountId(unique());
+            var ready = new CountDownLatch(CONTENDERS);
+            var start = new CountDownLatch(1);
+            var calls = new ArrayList<CompletableFuture<Boolean>>();
+            for (var index = 0; index < CONTENDERS; index++) {
+                Object command = index % 2 == 0 ? new OpenAccount(owner) : new OpenAccountModeled(owner);
+                calls.add(CompletableFuture.supplyAsync(() -> {
+                    ready.countDown();
+                    await(start);
+                    try { send(command); return true; }
+                    catch (Exception failure) {
+                        assertInstanceOf(UniqueValueConflict.class, root(failure));
+                        return false;
+                    }
+                }, workers));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS), "All contenders must arrive");
+            start.countDown();
+            var winners = 0;
+            for (var call : calls) if (call.get(10, TimeUnit.SECONDS)) winners++;
+            assertEquals(1, winners);
+            var facts = facts(owner);
+            assertEquals(1, facts.size());
+            assertInstanceOf(AccountOpened.class, facts.getFirst().payload());
+        }
+    }
+
+    @Test
+    void nativeOpeningBlocksModeledOpening() throws Exception {
+        var owner = new AccountId(unique());
+        send(new OpenAccount(owner));
+        conflict(new OpenAccountModeled(owner));
+        assertEquals(1, facts(owner).size());
+    }
+
+    @Test
+    void modeledOpeningBlocksNativeOpening() throws Exception {
+        var owner = new AccountId(unique());
+        send(new OpenAccountModeled(owner));
+        conflict(new OpenAccount(owner));
+        assertEquals(1, facts(owner).size());
+    }
+
+    @Test
+    void closingReleasesTheOpening() throws Exception {
+        var owner = new AccountId(unique());
+        send(new OpenAccount(owner));
+        send(new CloseAccount(owner));
+        send(new OpenAccountModeled(owner));
+        assertEquals(3, facts(owner).size());
+        conflict(new OpenAccount(owner));
+    }
+
+    @Test
+    void rolledBackOpeningKeepsNoReservation() throws Exception {
+        var owner = new AccountId(unique());
+        var failure = assertThrows(Exception.class, () -> send(new OpenAccountThenFail(owner)));
+        assertInstanceOf(IllegalStateException.class, root(failure));
+        assertEquals("forced rollback", root(failure).getMessage());
+        assertEquals(0, facts(owner).size());
+        send(new OpenAccountModeled(owner));
+        assertEquals(1, facts(owner).size());
     }
 
     private void claim(AccountId owner, String alias) throws Exception {

@@ -28,18 +28,20 @@ public abstract class when_a_native_handler_is_constrained : for_AxonArtifactRen
     protected virtual SemanticConstraintKind Kind => SemanticConstraintKind.UniquePropertyValue;
     protected virtual string CreateBody(string append) => "/* native-constraint-body */\nappender.append(" + append + ");";
 
+    protected virtual SemanticConstraint CreateConstraint(SemanticEventContract contract, SemanticEventContract producedContract) =>
+        new("CustomerUnique", Kind, SemanticConstraintScope.EventSequence, [new(contract.Id, Kind == SemanticConstraintKind.UniquePropertyValue ? [contract.Properties.Single(property => property.Name == "customer").Id] : [])], Releases ? [producedContract.Id] : [], false, null);
+
     protected static string Text(PlannedArtifact artifact) => Encoding.UTF8.GetString(artifact.Bytes.AsSpan());
 
     void Establish()
     {
         var slices = ScopeSelection.Select(request).ToArray();
         var contract = slices.SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Name == "OrderPlaced");
-        var property = contract.Properties.Single(candidate => candidate.Name == "customer");
         var producedContract = Releases ? slices.SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Name == "OrderMoved") : contract;
         command = slices.SelectMany(slice => slice.Slice.Commands).First(candidate => candidate.Produces.Any(produced => produced.EventContract == producedContract.Id));
         requirementId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{command.Id}|CommandHandler|0:")));
         command = command with { Handler = new(requirementId, 1) };
-        constraint = new("CustomerUnique", Kind, SemanticConstraintScope.EventSequence, [new(contract.Id, Kind == SemanticConstraintKind.UniquePropertyValue ? [property.Id] : [])], Releases ? [producedContract.Id] : [], false, null);
+        constraint = CreateConstraint(contract, producedContract);
         SemanticFeature Feature(SemanticFeature feature) => feature with
         {
             Features = [.. feature.Features.Select(Feature)],
@@ -114,5 +116,7 @@ public abstract class when_a_native_handler_is_constrained : for_AxonArtifactRen
         context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
         Text(context.Artifacts[^1]).ShouldContain(requirementId);
         Text(context.Artifacts[^1]).ShouldContain(AxonRefusalCodes.Implementation);
+        UnsupportedSummary.Emit(context);
+        Text(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md")).ShouldContain(AxonRefusalCodes.Constraint);
     }
 }

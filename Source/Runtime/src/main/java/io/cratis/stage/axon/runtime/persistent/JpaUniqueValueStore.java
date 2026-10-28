@@ -47,6 +47,23 @@ public final class JpaUniqueValueStore implements UniqueValueStore {
     }
 
     @Override
+    public void occurOnce(ProcessingContext context, String constraint, Object owner, String message) {
+        execute(context, manager -> {
+            var identity = UniqueValues.owner(owner);
+            var key = constraint.length() + ":" + constraint + identity;
+            if (manager.find(UniqueClaim.class, key) != null) throw new UniqueValueConflict(message);
+            // Flush a preceding release before inserting the same primary key again.
+            manager.flush();
+            manager.persist(new UniqueClaim(key, constraint, identity));
+            try { manager.flush(); }
+            catch (PersistenceException failure) {
+                if (isDuplicate(failure)) throw new UniqueValueConflict(message);
+                throw failure;
+            }
+        });
+    }
+
+    @Override
     public void releaseOwner(ProcessingContext context, String constraint, Object owner) {
         execute(context, manager -> removeOwner(manager, constraint, UniqueValues.owner(owner), null));
     }

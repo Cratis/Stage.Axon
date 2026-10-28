@@ -94,8 +94,16 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
         {
             var contract = CommandAppends.Contract(context, target.EventContract);
             var owner = AxonEventSources.PrimaryTag(context, contract).ComponentName;
-            var values = target.Properties.Select(id => "fact." + JavaNames.Member(contract.Properties.Single(property => property.Id == id).Name) + "()");
-            body.Line($"if (event instanceof {AxonEventsEmitter.TypeFor(context, contract.Id, body, package)} fact) store.assign(context, {key}, {body.Reference("java.util.Arrays")}.asList({string.Join(", ", values)}), fact.{owner}(), {constraint.IgnoreCasing.ToString().ToLowerInvariant()}, {message});");
+            var type = AxonEventsEmitter.TypeFor(context, contract.Id, body, package);
+            if (constraint.Kind == SemanticConstraintKind.UniqueEventOccurrence)
+            {
+                body.Line($"if (event instanceof {type} fact) store.occurOnce(context, {key}, fact.{owner}(), {message});");
+            }
+            else
+            {
+                var values = target.Properties.Select(id => "fact." + JavaNames.Member(contract.Properties.Single(property => property.Id == id).Name) + "()");
+                body.Line($"if (event instanceof {type} fact) store.assign(context, {key}, {body.Reference("java.util.Arrays")}.asList({string.Join(", ", values)}), fact.{owner}(), {constraint.IgnoreCasing.ToString().ToLowerInvariant()}, {message});");
+            }
         }
         foreach (var id in constraint.ReleasedBy)
         {

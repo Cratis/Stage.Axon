@@ -31,6 +31,11 @@ public partial class when_writing_the_constraint_proof : Specification
     [Fact] void should_prove_swallowed_conflicts() => source.ShouldContain("void swallowedConflictStillFails()");
     [Fact] void should_prove_swallowed_delegate_failures() => source.ShouldContain("void swallowedDelegateFailureKeepsTheOriginalClaim()");
     [Fact] void should_not_disable_native_tests() => source.ShouldNotContain("@Disabled");
+    [Fact] void should_race_occurrences() => source.ShouldContain("exactlyOneConcurrentOpeningWins");
+    [Fact] void should_share_native_and_modeled_occurrence_enforcement() => source.ShouldContain("new OpenAccountModeled(owner)");
+    [Fact] void should_reuse_the_suite_in_the_persistent_profile() => ConstraintProofArtifacts.JavaSources(ConstraintProofArtifacts.PersistentApplication)["GeneratedPersistentNativeUniqueTest.java"].ShouldContain("extends GeneratedNativeUniqueTest");
+    [Fact] void should_make_the_persistent_base_abstract() => ConstraintProofArtifacts.JavaSources(ConstraintProofArtifacts.PersistentApplication)["GeneratedNativeUniqueTest.java"].ShouldContain("abstract class GeneratedNativeUniqueTest");
+    [Fact] void should_resolve_persistent_placeholders() => ConstraintProofArtifacts.JavaSources(ConstraintProofArtifacts.PersistentApplication).Values.Any(source => source.Contains("__", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact]
     void should_import_all_qualified_types() => source.Split('\n')
         .Any(line => !line.StartsWith("import ", StringComparison.Ordinal) && !line.StartsWith("package ", StringComparison.Ordinal) && QualifiedType.IsMatch(line)).ShouldBeFalse();

@@ -90,3 +90,58 @@ module Accounts
           appender.append(new AliasClaimed(command.id(), command.id(), command.alias()));
           throw new IllegalStateException("forced rollback");
           ```
+
+  feature Openings
+    slice StateChange Open
+      command OpenAccount
+        id AccountId identifier
+        produces AccountOpened
+          for id
+          id = id
+        handler
+          ```java
+          appender.append(new AccountOpened(command.id(), command.id()));
+          ```
+      event AccountOpened
+        id AccountId
+      constraint OneOpening
+        unique event AccountOpened
+        released by AccountClosed
+      specification OpeningAnAccount
+        when OpenAccount
+          id = "opening"
+        then AccountOpened
+          for "opening"
+          id = "opening"
+
+    slice StateChange ModeledOpen
+      command OpenAccountModeled
+        id AccountId identifier
+        produces AccountOpened
+          for id
+          id = id
+
+    slice StateChange Close
+      command CloseAccount
+        id AccountId identifier
+        produces AccountClosed
+          for id
+          id = id
+        handler
+          ```java
+          appender.append(new AccountClosed(command.id(), command.id()));
+          ```
+      event AccountClosed
+        id AccountId
+
+    slice StateChange FailingOpen
+      command OpenAccountThenFail
+        id AccountId identifier
+        produces AccountOpened
+          for id
+          id = id
+        handler
+          ```java
+          appender.append(new AccountOpened(command.id(), command.id()));
+          throw new IllegalStateException("forced rollback");
+          ```
