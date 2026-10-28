@@ -15,7 +15,10 @@ internal static class IngressProofArtifacts
     {
         var assembly = typeof(IngressProofArtifacts).Assembly;
         var prefix = assembly.GetName().Name + ".Templates.";
-        return assembly.GetManifestResourceNames().Where(name => name.StartsWith(prefix, StringComparison.Ordinal) && name.EndsWith(".java", StringComparison.Ordinal))
+
+        // The reducer quarantine proof has its own application/package substitutions and writer.
+        return assembly.GetManifestResourceNames().Where(name => name.StartsWith(prefix, StringComparison.Ordinal)
+                && name.EndsWith(".java", StringComparison.Ordinal) && name != prefix + "GeneratedReducerFailureTest.java")
             .ToDictionary(
                 name => name[prefix.Length..],
                 name =>
