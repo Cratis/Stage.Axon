@@ -35,7 +35,7 @@ abstract class GeneratedReactionConstraintTest extends GeneratedReactionProofSup
     }
 
     @Test
-    void liveReactionClaimsAndRefusesAnotherOwner() throws Exception {
+    void liveReactionClaimRefusesAConflictingAppendFromAnotherOwner() throws Exception {
         var owner = UUID.randomUUID().toString();
         var loser = UUID.randomUUID().toString();
         var value = UUID.randomUUID().toString();
