@@ -85,6 +85,12 @@ public partial class when_preparing_native_proofs : Specification
     [Fact] void should_resolve_all_template_packages() => _all.ShouldNotContain("__APPLICATION__");
     [Fact] void should_resolve_the_runtime_package() => _all.ShouldNotContain("__RUNTIME__");
     [Fact] void should_resolve_the_runtime_module_package() => _all.ShouldNotContain("__RUNTIME_MODULE__");
+    [Fact]
+    void should_import_runtime_module_types_where_they_are_used() => _sources
+        .Where(source => source.Value.Contains("ReadModelStore<", StringComparison.Ordinal)
+            && !source.Value.Contains($"import {IngressProofArtifacts.RuntimeModulePackage}.ReadModelStore;", StringComparison.Ordinal))
+        .Select(source => source.Key)
+        .ShouldBeEmpty();
     [Fact] void should_not_add_license_headers_to_java() => _all.ShouldNotContain("Copyright (c) Cratis");
     [Fact] void should_drive_real_generated_commands() => _all.ShouldContain("gateway.send(command, Void.class)");
     [Fact] void should_collect_event_messages_directly() => _sources["GeneratedIngressSupport.java"].ShouldContain(".collect(ArrayList<EventMessage>::new, (all, entry) -> all.add(entry))");
