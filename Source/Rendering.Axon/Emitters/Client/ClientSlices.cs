@@ -5,7 +5,6 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Emitters.Queries;
 using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
-using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Client;
@@ -158,7 +157,7 @@ internal sealed class ClientSlices
         var file = site.Slice.File;
         var command = site.Command;
         var members = command.Properties.Where(property => !property.IsGenerated)
-            .Select(property => new TsMember(JavaNames.Member(property.Name), _types.Resolve(file, property.Type, property.Id, $"{command.Name}.{property.Name}", false), property.Type.IsOptional)).ToArray();
+            .Select(property => new TsMember(property.Name, _types.Resolve(file, property.Type, property.Id, $"{command.Name}.{property.Name}", false), property.Type.IsOptional)).ToArray();
         ClientShapes.Interface(file, site.Names.Body, members);
         var (result, decode) = Response(site);
         var descriptor = file.Import("transport.ts", "CommandDescriptor", true);
