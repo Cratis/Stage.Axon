@@ -111,7 +111,7 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
                     var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == transition.EventContract);
                     if (PersistentViewAdmission.Supports(context, model.Id))
                     {
-                        new ProjectionHandlerBinding(context, types, model, package, synchronized: true).Emit(
+                        new ProjectionHandlerBinding(context, types, model, package, synchronized: true, sequence: new ProjectionSequencing(context, types, model).Reducer(@event, body)).Emit(
                             body,
                             types.EventType(transition.EventContract, body),
                             method => method.Line($"var key = {values.Source(@event)};")

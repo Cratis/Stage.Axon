@@ -26,7 +26,7 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
         var contract = string.Join('\n', context.Artifacts.Where(artifact => artifact.RelativePath.StartsWith("src/main/java/", StringComparison.Ordinal))
             .OrderBy(artifact => artifact.RelativePath, StringComparer.Ordinal)
             .Select(artifact => artifact.RelativePath + "\n" + Encoding.UTF8.GetString(artifact.Bytes.AsSpan())));
-        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("flat-view-json-v1\n" + contract)));
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("flat-view-json-v2-row-sequenced\n" + contract)));
         void Add(string name, string source) => ViewJavaTypes.Add(
             context,
             package,
