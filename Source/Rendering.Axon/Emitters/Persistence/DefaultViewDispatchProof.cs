@@ -9,6 +9,13 @@ internal static class DefaultViewDispatchProof
         package __PACKAGE__;
 
         import __RUNTIME__.ReadModelStore;
+        import __RUNTIME__.ReadModelTransaction;
+        import java.util.concurrent.atomic.AtomicBoolean;
+        import org.axonframework.messaging.core.annotation.Namespace;
+        import org.axonframework.messaging.core.unitofwork.ProcessingContext;
+        import org.axonframework.messaging.eventhandling.annotation.EventHandler;
+        import org.springframework.beans.factory.annotation.Qualifier;
+        import org.springframework.context.ConfigurableApplicationContext;
         import java.util.Arrays;
         import java.util.List;
         import java.util.Map;
@@ -44,7 +51,7 @@ internal static class DefaultViewDispatchProof
             @TestConfiguration(proxyBeanMethods = false)
             @EnableAutoConfiguration
             @Import({__APPLICATION__.infrastructure.AxonConfiguration.class, __APPLICATION__.infrastructure.SecurityConfiguration.class,
-                    __MODEL__StoreConfiguration.class, __PROJECTOR__.class__REDUCER_IMPORTS__, __LIVE_QUERY__Handler.class})
+                    __MODEL__StoreConfiguration.class, __PROJECTOR__.class__REDUCER_IMPORTS__, __LIVE_QUERY__Handler.class, RejectingDelivery.class})
             static class DefaultFixture {
                 @Bean SmartInitializingSingleton defaultFixtureProcessorGuard(
                         Configuration configuration) {
@@ -72,6 +79,8 @@ internal static class DefaultViewDispatchProof
                 @Override public void clear() { writes.incrementAndGet(); delegate.clear(); }
                 @Override public __MODEL__ update(Object key, UnaryOperator<__MODEL__> update) { writes.incrementAndGet(); return delegate.update(key, update); }
             }
+
+        __ROLLBACK_PROOF__
 
             @Test void refusesStreamingDefaultViewsBeforeReadiness() {
                 var spring = new SpringApplication(DefaultFixture.class);
@@ -124,11 +133,10 @@ internal static class DefaultViewDispatchProof
                         assertFalse(signals.getFirst().invalidated());
                         assertTrue(signals.getFirst().rows().isEmpty());
                         assertEquals(0, store.writes.get());
+                        // An absent row must remain absent after a real staged write is rolled back.
+                        assertRollbackInvisible(application, store, gateway, signals);
                         // Only Axon's discovered @EventHandler may dispatch this event and resolve ProcessingContext.
-                        application.getBean(UnitOfWorkFactory.class).create().executeWithResult(context -> {
-                            EventAppender.forContext(context).append(__EVENT__);
-                            return CompletableFuture.<Void>completedFuture(null);
-                        }).get(20, TimeUnit.SECONDS);
+                        appendDefault(application);
                         assertNull(failure.get());
                         assertEquals(1, store.writes.get(), "Both on and handle must not be discovered for the same event");
                         assertEquals(1, store.all().size(), "The discovered handler must create one row");
@@ -138,6 +146,16 @@ internal static class DefaultViewDispatchProof
                         var snapshot = gateway.query(new __LIVE_QUERY__(), __LIVE_QUERY__.Result.class).get(20, TimeUnit.SECONDS);
                         assertEquals(normalized(store.all()), normalized(snapshot.rows()));
                         assertEquals(2, signals.size(), "One event must emit exactly one invalidation");
+                        // Repeat with committed state: a rejected delivery cannot erase that state.
+                        assertRollbackInvisible(application, store, gateway, signals);
+                        appendDefault(application);
+                        assertEquals(2, store.writes.get(), "Redelivery must apply once, including idempotent set mappings");
+                        assertEquals(3, signals.size(), "Each committed redelivery must invalidate exactly once");
+                        assertTrue(signals.getLast().invalidated());
+                        assertEquals(2, writesAtInvalidation.get(), "Committed redelivery must write before invalidation");
+                        var retried = gateway.query(new __LIVE_QUERY__(), __LIVE_QUERY__.Result.class).get(20, TimeUnit.SECONDS);
+                        assertEquals(normalized(store.all()), normalized(retried.rows()));
+                        assertNull(failure.get());
                     } finally { if (active.get() != null) active.get().cancel(); }
                 }
             }

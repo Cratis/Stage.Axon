@@ -53,7 +53,8 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             .Line($"private final {code.Reference("java.util.Set")}<{code.Reference("java.lang.Object")}> keys = new {code.Reference("java.util.LinkedHashSet")}<>();")
             .Line($"private final {code.Reference("java.util.List")}<{code.Reference("java.util.function.BooleanSupplier")}> pending = new {code.Reference("java.util.ArrayList")}<>();")
             .Line($"private record {ChangeType(_root)}<T>(T value, boolean touched, boolean ancestors) {{}}")
-            .DiffersFromScreenplay("projection join indexes are replay-built; restore them by replaying events after restarting a persistent store.");
+            .DiffersFromScreenplay("projection join indexes are replay-built; restore them by replaying events after restarting a persistent store.")
+            .DiffersFromScreenplay("default-profile writes are not yet rolled back with a failed unit of work.");
         foreach (var node in _root.All)
         {
             for (var index = 0; index < node.Scope.Joins.Length; index++)

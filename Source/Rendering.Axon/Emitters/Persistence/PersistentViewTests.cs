@@ -64,7 +64,15 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         Add("EnvelopeTest", PersistentViewEnvelopeTests.Source);
         var live = LiveQuery(owner, model);
         if (live is not null && target.Observed.Count(contract => contract == spec.GivenEvents[0].EventContract) == 1)
-            Add("DefaultDispatchTest", DefaultViewDispatchProof.Source.Replace("__LIVE_QUERY__", package + "." + JavaNames.Type(live.Name), StringComparison.Ordinal));
+        {
+            var transition = owner.Slice.Projections.Where(projection => projection.ReadModel == model.Id).SelectMany(ProjectionTransitions.From)
+                .Single(from => from.EventContract == spec.GivenEvents[0].EventContract);
+            var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(contract => contract.Id == transition.EventContract);
+            Add("DefaultDispatchTest", DefaultViewDispatchProof.Source
+                .Replace("__ROLLBACK_PROOF__", DefaultViewRollbackProof.Source, StringComparison.Ordinal)
+                .Replace("__KEY__", new ProjectionValues(context, types).Key(transition.Key, @event), StringComparison.Ordinal)
+                .Replace("__LIVE_QUERY__", package + "." + JavaNames.Type(live.Name), StringComparison.Ordinal));
+        }
     }
 
     (string Projector, string Arguments, string ReducerArgument, string ReducerImports, SemanticId[] Observed) ProjectorInputs(LocatedSemanticSlice owner, SemanticReadModel model)
