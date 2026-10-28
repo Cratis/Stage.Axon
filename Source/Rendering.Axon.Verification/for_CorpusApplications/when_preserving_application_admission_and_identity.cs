@@ -49,10 +49,10 @@ public class when_preserving_application_admission_and_identity : Specification
     void Destroy() => _inputs?.Dispose();
 
     [Fact]
-    void should_keep_all_thirty_application_names() => _applications.Select(application => application.Name).SequenceEqual<string>(
+    void should_keep_all_thirty_one_application_names() => _applications.Select(application => application.Name).SequenceEqual<string>(
     [
         "administration", "approvals", "bookings", "catalog", "contracts", "crm", "customer-portal", "hr", "inventory", "invoicing", "orders", "projects", "ticketing", "vendors", "work-orders",
-        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views", "ingress-invariants", "ingress-persistent", "inline-java-policies", "inline-java-policy-performers", "client-proof", "inline-java-bodies", "constrained-java-bodies"
+        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views", "ingress-invariants", "ingress-persistent", "inline-java-policies", "inline-java-policy-performers", "client-proof", "inline-java-bodies", "constrained-java-bodies", "reaction-constraints"
     ]).ShouldBeTrue();
 
     [Fact] void should_keep_native_report_application_names() => CorpusApplications.Find(given.the_repository.Root()).Select(application => application.Name).SequenceEqual(_applications.Select(application => application.Name)).ShouldBeTrue();

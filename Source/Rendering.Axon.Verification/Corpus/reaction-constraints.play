@@ -1,0 +1,42 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+domain Stage.ReactionConstraints
+
+concept OwnerId : String
+
+module Accounts
+  feature Aliases
+    slice StateChange RequestAssignment
+      command RequestAlias
+        id OwnerId identifier
+        alias String
+        produces AliasRequested
+          for id
+          alias = alias
+      event AliasRequested
+        alias String
+
+    slice StateChange RequestRelease
+      command RequestRelease
+        id OwnerId identifier
+        produces ReleaseRequested
+          for id
+      event ReleaseRequested
+
+    slice Automation Assign
+      reaction AssignAlias
+        when AliasRequested
+          produces AliasAssigned
+            alias = alias
+      event AliasAssigned
+        alias String
+      constraint UniqueAlias
+        unique alias on AliasAssigned
+        released by AliasReleased
+
+    slice Automation Release
+      reaction ReleaseAlias
+        when ReleaseRequested
+          produces AliasReleased
+      event AliasReleased
