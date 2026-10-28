@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text.RegularExpressions;
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
@@ -10,9 +11,15 @@ using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
 
-internal static class QueryPerformer
+internal static partial class QueryPerformer
 {
-    const string LegacyStoreReason = "The inline performer body references ReadModelStore, which no longer exists; the body will not compile until it reads the typed Spring Data repository passed as 'repository'.";
+    const string LegacyStoreReason = "The inline performer body reads the removed ReadModelStore ('store'), so it is kept only as a comment and the performer throws until the body is rewritten against the typed Spring Data repository passed as 'repository' (for example repository.findAll()).";
+
+    [GeneratedRegex(@"\bstore\s*\.", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex StoreUse { get; }
+
+    [GeneratedRegex(@"\bstore\s*[=:;,)]", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex StoreDeclaration { get; }
 
     internal static SemanticImplementationRequirement? Requirement(AxonEmissionContext context, SemanticKeyedQuery query) =>
         (context.Request.ImplementationRequirements.IsDefault ? [] : context.Request.ImplementationRequirements).FirstOrDefault(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer && requirement.Source.SemanticId == query.Id);
@@ -37,7 +44,7 @@ internal static class QueryPerformer
         var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Performer");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Performer");
         var repository = QueryModelReference.Claim(code, package, repositoryType, name, name + "Performer");
-        var legacy = native && content.Contains("ReadModelStore", StringComparison.Ordinal);
+        var legacy = native && ReadsLegacyStore(content);
         if (legacy)
         {
             context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, LegacyStoreReason, "answer the query with its modeled performer", query.Id.ToString());
@@ -46,8 +53,13 @@ internal static class QueryPerformer
         code.Block($"public interface {name}Performer", body => body
                 .Block($"default {code.Reference("java.util.List")}<{modelName}> perform({name} query, {repository} repository)", method =>
                 {
-                    if (legacy) method.UnsupportedIntent("answer the query with its modeled performer: " + LegacyStoreReason, query.Id.ToString(), AxonRefusalCodes.QueryPerformer);
-                    if (native)
+                    if (legacy)
+                    {
+                        method.UnsupportedIntent("answer the query with its modeled performer: " + LegacyStoreReason, query.Id.ToString(), AxonRefusalCodes.QueryPerformer);
+                        foreach (var line in content.ReplaceLineEndings("\n").Split('\n')) method.Line("// " + line);
+                        method.Line($"throw new {method.Reference("java.lang.UnsupportedOperationException")}({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.QueryPerformer + ": " + LegacyStoreReason)});");
+                    }
+                    else if (native)
                     {
                         method.RawBody(content);
                     }
@@ -67,4 +79,8 @@ internal static class QueryPerformer
                 .Block($"public {name}Performer {JavaNames.Member(name)}Performer()", method => method.Line($"return new {name}Performer() {{}};")));
         context.AddJava(package, name + "PerformerConfiguration", configuration.Build(), sources: query.Id);
     }
+
+    // The old signature passed the store as an undeclared 'store' parameter; a body that declares its own 'store' is not legacy.
+    static bool ReadsLegacyStore(string content) =>
+        content.Contains("ReadModelStore", StringComparison.Ordinal) || (StoreUse.IsMatch(content) && !StoreDeclaration.IsMatch(content));
 }
