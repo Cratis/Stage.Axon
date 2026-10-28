@@ -54,14 +54,16 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
         var message = body.Reference("org.axonframework.messaging.core.Message");
         var completionException = body.Reference("java.util.concurrent.CompletionException");
         var descriptor = body.Reference("org.axonframework.common.infra.ComponentDescriptor");
+        var throwable = body.Reference("java.lang.Throwable");
+        var overrideAnnotation = body.Reference("java.lang.Override");
         body.Block($"public static {appender} enforcing({store} store, {appender} appender, {processing} context)", method => method.RawBody($$"""
                     return new {{appender}}() {
-                        @Override
+                        @{{overrideAnnotation}}
                         public void append({{list}}<?> events) {
                             append(events, {{metadata}}.emptyInstance());
                         }
 
-                        @Override
+                        @{{overrideAnnotation}}
                         public void append({{list}}<?> events, {{metadata}} metadata) {
                             try {
                                 for (var event : events) {
@@ -69,13 +71,13 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
                                     apply(store, payload, context);
                                 }
                                 appender.append(events, metadata);
-                            } catch (Throwable failure) {
+                            } catch ({{throwable}} failure) {
                                 context.runOnPrepareCommit(ignored -> { throw new {{completionException}}(failure); });
                                 throw failure;
                             }
                         }
 
-                        @Override
+                        @{{overrideAnnotation}}
                         public void describeTo({{descriptor}} descriptor) {
                             appender.describeTo(descriptor);
                         }
