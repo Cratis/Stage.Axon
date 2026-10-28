@@ -28,7 +28,7 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_refuse_scoped_projections() => PersistentViewAdmission.Supports(_context, ReadModelId("Board")).ShouldBeFalse();
     [Fact] void should_refuse_unplaced_reducers() => PersistentViewAdmission.Supports(_context, ReadModelId("RebuiltTotal")).ShouldBeFalse();
     [Fact] void should_preserve_early_scoped_refusal() => Code("BoardStoreConfiguration").ShouldContain("public static PersistentReadModelSafety persistentReadModelSafety()");
-    [Fact] void should_preserve_early_unplaced_reducer_refusal() => Code("RebuiltTotalStoreConfiguration").ShouldContain("public static PersistentReadModelSafety persistentReadModelSafety()");
+    [Fact] void should_refuse_unavailable_reducer_store_access_in_every_profile() => Code("RebuiltTotalStoreConfiguration").ShouldContain("public List<RebuiltTotal> all() { throw new IllegalStateException(\"STAGE-AXON-0306: Read model unavailable.\"); }");
     [Fact] void should_remove_only_the_flat_guard() => Code("TotalStoreConfiguration").ShouldNotContain("persistentReadModelSafety");
     [Fact] void should_keep_the_direct_call_signature() => Code("TotalProjectionProjector").ShouldContain("public void on(Increased event, QueryUpdateEmitter updates)");
     [Fact] void should_bind_the_actual_handler_context() => Code("TotalProjectionProjector").ShouldContain("JpaReadModelStore.bind(store, context)");

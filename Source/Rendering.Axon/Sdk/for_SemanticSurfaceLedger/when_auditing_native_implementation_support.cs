@@ -70,6 +70,9 @@ public class when_auditing_native_implementation_support : Specification
         var entry = SemanticSurfaceLedger.Entries[member];
         entry.Kind.ShouldEqual(SemanticSurfaceDispositionKind.Warned);
         entry.Detail.ShouldContain("STAGE-AXON-0306");
-        entry.Detail.ShouldContain("disabled");
+        entry.Detail.ShouldContain("quarantine");
+        entry.Detail.ShouldContain("ALL opaque Java query performers refuse");
+        entry.Detail.ShouldNotContain("return current");
+        entry.Detail.ShouldNotContain("remain disabled");
     }
 }

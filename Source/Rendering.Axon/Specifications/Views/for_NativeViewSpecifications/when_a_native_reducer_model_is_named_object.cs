@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Security.Cryptography;
+using System.Text;
 using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Rendering.Axon.Emitters;
@@ -30,8 +32,15 @@ public class when_a_native_reducer_model_is_named_object : a_view_request
         };
         var application = _request.Model.Application;
         var esm = ExecutableSemanticModel.Create(_request.Model.LanguageVersion, _request.Model.SemanticVersion, application with { Modules = [.. application.Modules.Select(module => module with { Features = [.. module.Features.Select(Feature)] })] });
-        var unused = located.Slice.Reducers.Single().Transitions.Single(transition => transition.EventContract != spec.GivenEvents[0].EventContract);
-        var request = _request with { Model = esm, ImplementationContents = _request.ImplementationContents.Remove(unused.RequirementId) };
+        var transition = located.Slice.Reducers.Single().Transitions.Single(transition => transition.EventContract != spec.GivenEvents[0].EventContract);
+        var content = _request.ImplementationContents[transition.RequirementId].Replace("new RebuiltTotal(", "new Object(", StringComparison.Ordinal);
+        var request = _request with
+        {
+            Model = esm,
+            ImplementationContents = _request.ImplementationContents.SetItem(transition.RequirementId, content),
+            ImplementationRequirements = [.. _request.ImplementationRequirements.Select(requirement => requirement.RequirementId == transition.RequirementId
+                ? requirement with { ContentHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content))) } : requirement)]
+        };
         var context = new AxonEmissionContext(request, new(request.Profile));
         new AxonProjectionsEmitter().Emit(context);
         _java = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ObjectViewSpecificationsTest.java", StringComparison.Ordinal)));

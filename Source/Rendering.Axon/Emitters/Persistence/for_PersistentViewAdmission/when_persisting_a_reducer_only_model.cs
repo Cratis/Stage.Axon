@@ -39,7 +39,7 @@ public class when_persisting_a_reducer_only_model : given.a_flat_view
     [Fact] void should_report_the_warning() => _placed.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == ReadModelId("RebuiltTotal") && diagnostic.Code == "STAGE-AXON-0308").ShouldBeTrue();
     [Fact] void should_keep_the_memory_store() => Code(_placed, "RebuiltTotalStoreConfiguration").ShouldContain("InMemoryReadModelStore");
     [Fact] void should_refuse_unplaced_transitions() => PersistentViewAdmission.Supports(_unplaced, ReadModelId("RebuiltTotal")).ShouldBeFalse();
-    [Fact] void should_warn_for_unplaced_persistence() => Code(_unplaced, "RebuiltTotalStoreConfiguration").ShouldContain("STAGE-AXON-0308");
+    [Fact] void should_warn_for_unavailable_reduction() => Code(_unplaced, "RebuiltTotalStoreConfiguration").ShouldContain("STAGE-AXON-0306");
     [Fact] void should_keep_unplaced_transition_diagnostics() => _unplaced.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0306").ShouldBeTrue();
     [Fact] void should_refuse_mixed_writers() => PersistentViewAdmission.Supports(_mixed, ReadModelId("RebuiltTotal")).ShouldBeFalse();
     [Fact] void should_guard_mixed_writers_without_crashing() => Code(_mixed, "RebuiltTotalStoreConfiguration").ShouldContain("STAGE-AXON-0308");
@@ -54,7 +54,7 @@ public class when_persisting_a_reducer_only_model : given.a_flat_view
     [Fact] void should_emit_persistent_proofs_for_placed_reducers() => _placed.Artifacts.Exists(artifact => artifact.RelativePath.Contains("/RebuiltTotalPersistent", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_not_emit_a_proof_for_unplaced_reducers() => _unplaced.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("RebuiltTotalPersistentTest.java", StringComparison.Ordinal)).ShouldBeFalse();
 
-    [Fact] void should_explain_unplaced_reducer_refusal() => Code(_unplaced, "RebuiltTotalStoreConfiguration").ShouldContain("reducer is not fully placed");
+    [Fact] void should_explain_model_wide_quarantine() => Code(_unplaced, "RebuiltTotalStoreConfiguration").ShouldContain("No projector is registered and no stored row is readable in any profile.");
     [Fact] void should_explain_mixed_writer_refusal() => Code(_mixed, "RebuiltTotalStoreConfiguration").ShouldContain("both a projection and a reducer");
 
     string Projector => Code(_placed, "RebuiltTotalReducerProjector");
