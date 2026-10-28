@@ -95,10 +95,10 @@ public class when_models_claim_java_lang_names : Projections.for_AxonProjections
         foreach (var plan in _plans)
         {
             string Code(string suffix) => Text(plan.Artifacts.Single(artifact => artifact.RelativePath.EndsWith(suffix, StringComparison.Ordinal)));
-            Code("/persistence/PersistentViewBootstrap.java").ShouldContain("String application, String fingerprint");
-            Code("/persistence/PersistentViewBootstrap.java").ShouldContain("new IllegalStateException(");
-            Code("/persistence/JpaReadModelStore.java").ShouldContain("Object");
-            Code("/persistence/JpaReadModelStore.java").ShouldContain("Exception");
+            foreach (var name in new[] { "ViewRow", "ViewGeneration", "JpaReadModelStore", "PersistentViewBootstrap", "PersistentViewProcessorGuard" })
+            {
+                plan.Artifacts.Any(artifact => artifact.RelativePath.EndsWith("/persistence/" + name + ".java", StringComparison.Ordinal)).ShouldBeFalse();
+            }
             Code("/runtime/RuntimeTest.java").ShouldContain("private final Integer value;");
         }
     }

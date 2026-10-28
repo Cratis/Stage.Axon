@@ -128,7 +128,7 @@ internal sealed class PersistentViewRemovalProof(AxonEmissionContext context, Vi
         internal const string Source = """
         package __PACKAGE__;
 
-        import __PERSISTENCE__.JpaReadModelStore;
+        import __RUNTIME_MODULE__.views.JpaReadModelStore;
         import java.nio.file.Path;
         import java.util.Base64;
         import java.util.HashMap;

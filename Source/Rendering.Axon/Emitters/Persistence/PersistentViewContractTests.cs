@@ -8,8 +8,8 @@ internal static class PersistentViewContractTests
     internal const string Source = """
         package __PACKAGE__;
 
-        import __PERSISTENCE__.JpaReadModelStore;
-        import __PERSISTENCE__.PersistentViewBootstrap;
+        import __RUNTIME_MODULE__.views.JpaReadModelStore;
+        import __RUNTIME_MODULE__.views.PersistentViewBootstrap;
         import __RUNTIME_MODULE__.ReadModelStore;
         import jakarta.persistence.EntityManagerFactory;
         import java.util.ArrayList;

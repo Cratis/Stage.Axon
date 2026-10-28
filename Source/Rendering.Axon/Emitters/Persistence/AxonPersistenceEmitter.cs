@@ -33,11 +33,6 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
             name,
             PersistentJavaTemplate.Render(source.Replace("__PACKAGE__", package, StringComparison.Ordinal).Replace("__RUNTIME_MODULE__", AxonRuntimePackage.ModulePackage, StringComparison.Ordinal)),
             ids);
-        Add("ViewRow", PersistentViewEntities.Row);
-        Add("ViewGeneration", PersistentViewEntities.Generation);
-        Add("JpaReadModelStore", PersistentViewStore.Source);
-        Add("PersistentViewBootstrap", PersistentViewBootstrap.Source);
-        Add("PersistentViewProcessorGuard", PersistentViewProcessorGuard.Source);
         var namespaces = ScopeSelection.Select(context.Request)
             .Where(owner => owner.Slice.ReadModels.Any(model => PersistentViewAdmission.Supports(context, model.Id)))
             .Select(types.Package).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
@@ -70,6 +65,10 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
     static string Configuration(string package, string application, string fingerprint, string processors) => $$"""
         package {{package}};
 
+        import {{AxonRuntimePackage.Type(application, "views.ViewRow")}};
+        import {{AxonRuntimePackage.Type(application, "views.ViewGeneration")}};
+        import {{AxonRuntimePackage.Type(application, "views.PersistentViewBootstrap")}};
+        import {{AxonRuntimePackage.Type(application, "views.PersistentViewProcessorGuard")}};
         import jakarta.persistence.EntityManagerFactory;
         import java.util.Set;
         import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;

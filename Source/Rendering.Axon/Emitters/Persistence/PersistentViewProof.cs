@@ -8,7 +8,7 @@ internal static class PersistentViewProof
     internal const string Source = """
         package __PACKAGE__;
 
-        import __PERSISTENCE__.JpaReadModelStore;
+        import __RUNTIME_MODULE__.views.JpaReadModelStore;
         import java.net.URI;
         import java.net.http.HttpClient;
         import java.net.http.HttpRequest;
@@ -140,6 +140,7 @@ internal static class PersistentViewProof
     internal const string MultiSegmentSource = """
         package __PACKAGE__;
 
+        import __RUNTIME_MODULE__.views.JpaReadModelStore;
         import jakarta.persistence.EntityManagerFactory;
         import java.net.URI;
         import java.net.http.HttpClient;
@@ -189,7 +190,7 @@ internal static class PersistentViewProof
                 observedOwners.clear();
                 try {
                     try (var application = startMultiSegment(path)) {
-                        assertInstanceOf(__PERSISTENCE__.JpaReadModelStore.class, store(application));
+                        assertInstanceOf(JpaReadModelStore.class, store(application));
                         var before = tokens(application);
         __APPENDS__
                         assertFixture(application, before);

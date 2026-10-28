@@ -3,6 +3,7 @@ package io.cratis.stage.axon.fixture;
 import io.cratis.stage.axon.runtime.InMemoryUniqueValueStore;
 import io.cratis.stage.axon.runtime.UniqueValueStore;
 import io.cratis.stage.axon.runtime.persistent.UniqueClaim;
+import io.cratis.stage.axon.runtime.views.ViewRow;
 import jakarta.persistence.EntityManagerFactory;
 import io.cratis.stage.axon.runtime.persistent.PersistentConfiguration;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,11 @@ class DefaultProfileFixtureTest {
     void hasNoEventStorageEngineEnhancer() {
         assertFalse(context.containsBean("eventStorageEngine"));
         assertTrue(context.getBeansOfType(PersistentConfiguration.class).isEmpty());
+    }
+
+    @Test
+    void doesNotRegisterViewRowsWithoutAScan() {
+        assertFalse(factory.getMetamodel().getEntities().stream().anyMatch(entity -> entity.getJavaType() == ViewRow.class));
     }
 
     @Test

@@ -3,6 +3,7 @@ package io.cratis.stage.axon.fixture;
 import io.cratis.stage.axon.runtime.UniqueValueStore;
 import io.cratis.stage.axon.runtime.persistent.JpaUniqueValueStore;
 import io.cratis.stage.axon.runtime.persistent.UniqueClaim;
+import io.cratis.stage.axon.runtime.views.ViewRow;
 import jakarta.persistence.EntityManagerFactory;
 import org.axonframework.common.configuration.ConfigurationEnhancer;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.ActiveProfiles;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +32,11 @@ class PersistentProfileFixtureTest {
     @Test
     void providesTheEventStorageEngineEnhancer() {
         assertInstanceOf(ConfigurationEnhancer.class, context.getBean("eventStorageEngine"));
+    }
+
+    @Test
+    void doesNotRegisterViewRowsWithoutAScan() {
+        assertFalse(factory.getMetamodel().getEntities().stream().anyMatch(entity -> entity.getJavaType() == ViewRow.class));
     }
 
     @Test

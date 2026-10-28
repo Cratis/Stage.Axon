@@ -35,6 +35,7 @@
     <dependency><groupId>org.springframework</groupId><artifactId>spring-webmvc</artifactId><scope>provided</scope></dependency>
     <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-core</artifactId><scope>provided</scope></dependency>
     <dependency><groupId>org.axonframework</groupId><artifactId>axon-messaging</artifactId><scope>provided</scope></dependency>
+    <dependency><groupId>tools.jackson.core</groupId><artifactId>jackson-databind</artifactId><scope>provided</scope></dependency>
     <dependency><groupId>org.reactivestreams</groupId><artifactId>reactive-streams</artifactId><scope>provided</scope></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId><scope>test</scope></dependency>
