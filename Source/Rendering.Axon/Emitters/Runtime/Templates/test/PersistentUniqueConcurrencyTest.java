@@ -3,7 +3,7 @@ package __RUNTIME__;
 import io.cratis.stage.axon.runtime.UniqueValueConflict;
 import io.cratis.stage.axon.runtime.UniqueValueStore;
 import io.cratis.stage.axon.runtime.UniqueValues;
-import __RUNTIME__.persistent.JpaUniqueValueStore;
+import io.cratis.stage.axon.runtime.persistent.JpaUniqueValueStore;
 import jakarta.persistence.EntityManagerFactory;
 import java.util.ArrayList;
 import java.util.List;

@@ -1,7 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Text;
 using Cratis.Specifications;
 using Xunit;
 
@@ -14,10 +13,10 @@ public class when_emitting_the_read_model_transaction_template : for_AxonArtifac
 
     void Because()
     {
-        var context = new AxonEmissionContext(request, new(request.Profile));
-        new AxonRuntimeEmitter().Emit(context);
-        _source = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ReadModelTransaction.java", StringComparison.Ordinal)).Bytes.AsSpan());
-        _test = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ReadModelTransactionTest.java", StringComparison.Ordinal)).Bytes.AsSpan());
+        var module = Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Source", "Runtime", "src");
+        var package = Path.Combine("io", "cratis", "stage", "axon", "runtime");
+        _source = File.ReadAllText(Path.Combine(module, "main", "java", package, "ReadModelTransaction.java"));
+        _test = File.ReadAllText(Path.Combine(module, "test", "java", package, "ReadModelTransactionTest.java"));
     }
 
     [Fact] void should_apply_after_commit_before_after_commit() => _source.ShouldContain("DefaultPhases.AFTER_COMMIT.order() - 1");

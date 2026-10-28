@@ -8,8 +8,8 @@ internal static class DefaultViewDispatchProof
     internal const string Source = """
         package __PACKAGE__;
 
-        import __RUNTIME__.ReadModelStore;
-        import __RUNTIME__.ReadModelTransaction;
+        import __RUNTIME_MODULE__.ReadModelStore;
+        import __RUNTIME_MODULE__.ReadModelTransaction;
         import java.util.concurrent.atomic.AtomicBoolean;
         import org.axonframework.messaging.core.annotation.Namespace;
         import org.axonframework.messaging.core.unitofwork.ProcessingContext;

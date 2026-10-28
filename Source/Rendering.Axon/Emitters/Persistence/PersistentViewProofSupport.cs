@@ -9,8 +9,8 @@ internal static class PersistentViewProofSupport
         package __PACKAGE__;
 
         import __PERSISTENCE__.JpaReadModelStore;
-        import __RUNTIME__.ReadModelStore;
-        import __RUNTIME__.InMemoryReadModelStore;
+        import __RUNTIME_MODULE__.ReadModelStore;
+        import __RUNTIME_MODULE__.InMemoryReadModelStore;
         import jakarta.persistence.EntityManagerFactory;
         import java.nio.file.Files;
         import java.nio.file.Path;

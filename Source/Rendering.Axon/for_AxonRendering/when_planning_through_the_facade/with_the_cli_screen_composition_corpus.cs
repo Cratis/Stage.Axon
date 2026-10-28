@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
+using Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.for_AxonRendering.when_planning_through_the_facade;
@@ -21,6 +22,18 @@ public class with_the_cli_screen_composition_corpus : given.a_screen_composition
     [Fact] void should_succeed() => _plan.Success.ShouldBeTrue();
 
     [Fact]
-    void should_have_only_the_three_known_warnings() => _plan.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Severity))
+    void should_have_only_the_three_known_warnings() => _plan.Diagnostics.Where(diagnostic => diagnostic.Code != "STAGE-AXON-LOCAL-RUNTIME").Select(diagnostic => (diagnostic.Code, diagnostic.Severity))
         .ShouldEqual(Enumerable.Repeat(("STAGE-AXON-0308", ArtifactRenderDiagnosticSeverity.Warning), 3));
+
+    [Fact]
+    void should_surface_the_local_runtime_warning_in_the_plan()
+    {
+        var warnings = _plan.Diagnostics.Where(diagnostic => diagnostic.Code == "STAGE-AXON-LOCAL-RUNTIME").ToArray();
+        warnings.Length.ShouldEqual(AxonMavenProject.IsLocalVersion(AxonRendering.Version) ? 1 : 0);
+        foreach (var warning in warnings)
+        {
+            warning.Severity.ShouldEqual(ArtifactRenderDiagnosticSeverity.Warning);
+            warning.Message.ShouldEqual(AxonMavenProject.LocalBuildWarning(AxonRendering.Version));
+        }
+    }
 }

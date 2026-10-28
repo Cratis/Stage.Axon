@@ -1,8 +1,9 @@
 package __RUNTIME__;
 
-import __RUNTIME__.persistent.PersistentConfiguration;
-import __RUNTIME__.persistent.PersistentReadModelSafety;
-import __RUNTIME__.persistent.UniqueClaim;
+import io.cratis.stage.axon.runtime.ReadModelStore;
+import io.cratis.stage.axon.runtime.persistent.PersistentConfiguration;
+import io.cratis.stage.axon.runtime.persistent.PersistentReadModelSafety;
+import io.cratis.stage.axon.runtime.persistent.UniqueClaim;
 import jakarta.persistence.EntityManagerFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;

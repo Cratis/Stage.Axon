@@ -16,15 +16,11 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 
@@ -205,19 +201,5 @@ class RuntimeTest {
         assertEquals(json, mapper.writeValueAsString(new Elapsed(value)));
         assertEquals(new Elapsed(value), mapper.readValue(json, Elapsed.class));
         assertEquals("\"00:00:01\"", mapper.writeValueAsString(Duration.ofSeconds(1)));
-    }
-
-    @Test
-    void storeUpdatesAreAtomicAndListsAreSnapshots() throws Exception {
-        var store = new InMemoryReadModelStore<String, Integer>();
-        try (var executor = Executors.newFixedThreadPool(4)) {
-            var updates = IntStream.range(0, 100).mapToObj(ignored -> CompletableFuture.runAsync(() -> store.update("count", current -> current == null ? 1 : current + 1), executor)).toArray(CompletableFuture<?>[]::new);
-            CompletableFuture.allOf(updates).get();
-        }
-        var snapshot = store.all();
-        assertEquals(100, store.get("count").orElseThrow());
-        store.clear();
-        assertEquals(1, snapshot.size());
-        assertTrue(store.all().isEmpty());
     }
 }

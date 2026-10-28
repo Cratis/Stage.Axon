@@ -1,6 +1,6 @@
-package __RUNTIME__;
+package io.cratis.stage.axon.runtime;
 
-import __RUNTIME__.persistent.PersistentReadModelSafety;
+import io.cratis.stage.axon.runtime.persistent.PersistentReadModelSafety;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.BeanDefinitionStoreException;

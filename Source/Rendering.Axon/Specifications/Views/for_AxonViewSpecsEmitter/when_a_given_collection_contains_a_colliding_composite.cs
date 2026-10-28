@@ -18,6 +18,6 @@ public class when_a_given_collection_contains_a_colliding_composite : given.a_po
     [Fact] void should_import_the_application_composite() => _java.ShouldContain("import nativeviews.types.ReadModelStore;");
     [Fact] void should_import_the_nested_concept() => _java.ShouldContain("import nativeviews.concepts.StatusValue;");
     [Fact] void should_construct_the_populated_collection() => _java.ShouldContain("List.of(new ReadModelStore(new StatusValue(\"visible\")))");
-    [Fact] void should_qualify_the_runtime_store() => _java.ShouldContain("nativeviews.runtime.ReadModelStore<Object, Categories> store");
-    [Fact] void should_not_import_the_runtime_store() => _java.ShouldNotContain("import nativeviews.runtime.ReadModelStore;");
+    [Fact] void should_qualify_the_runtime_store() => _java.ShouldContain("io.cratis.stage.axon.runtime.ReadModelStore<Object, Categories> store");
+    [Fact] void should_not_import_the_runtime_store() => _java.ShouldNotContain("import io.cratis.stage.axon.runtime.ReadModelStore;");
 }

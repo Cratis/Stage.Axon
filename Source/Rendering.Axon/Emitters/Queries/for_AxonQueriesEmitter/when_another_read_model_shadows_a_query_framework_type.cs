@@ -22,7 +22,7 @@ public class when_another_read_model_shadows_a_query_framework_type : given.a_qu
     [InlineData("List", "FindTotal", "java.util.List<Total>")]
     [InlineData("QueryGateway", "FindTotalEndpoint", "org.axonframework.messaging.queryhandling.gateway.QueryGateway gateway")]
     [InlineData("ResponseEntity", "FindTotalEndpoint", "org.springframework.http.ResponseEntity<Total>")]
-    [InlineData("ReadModelStore", "RankedTotalsPerformer", "axonviews.runtime.ReadModelStore<Object, Total>")]
+    [InlineData("ReadModelStore", "RankedTotalsPerformer", "io.cratis.stage.axon.runtime.ReadModelStore<Object, Total>")]
     [InlineData("Component", "FindTotalHandler", "@org.springframework.stereotype.Component(")]
     [InlineData("RequestParam", "FindTotalEndpoint", "@org.springframework.web.bind.annotation.RequestParam(")]
     [InlineData("Bean", "RankedTotalsPerformerConfiguration", "@org.springframework.context.annotation.Bean(")]

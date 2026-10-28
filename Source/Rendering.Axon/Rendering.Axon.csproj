@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <IsPackable>true</IsPackable>
+        <!-- Override the inherited source default; a command-line -p:Version still takes precedence. -->
+        <Version>0.0.0-local</Version>
         <AssemblyName>Cratis.Stage.Rendering.Axon</AssemblyName>
         <RootNamespace>Cratis.Stage.Rendering.Axon</RootNamespace>
         <Description>Axon Framework JVM artifact planning from Screenplay executable semantic models</Description>

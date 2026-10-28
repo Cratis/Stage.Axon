@@ -1,9 +1,10 @@
 package __RUNTIME__;
 
+import io.cratis.stage.axon.runtime.ReadModelStore;
 import io.cratis.stage.axon.runtime.UniqueValueConflict;
 import io.cratis.stage.axon.runtime.UniqueValueStore;
-import __RUNTIME__.persistent.JpaUniqueValueStore;
-import __RUNTIME__.persistent.PersistentReadModelSafety;
+import io.cratis.stage.axon.runtime.persistent.JpaUniqueValueStore;
+import io.cratis.stage.axon.runtime.persistent.PersistentReadModelSafety;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;

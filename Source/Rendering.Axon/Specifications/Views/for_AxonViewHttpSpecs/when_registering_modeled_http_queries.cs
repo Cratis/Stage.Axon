@@ -40,7 +40,7 @@ public class when_registering_modeled_http_queries : Emitters.Projections.for_Ax
     [Fact] void should_resolve_the_assertions_in_the_destination_class() => code.ShouldContain("Assertions.assertTrue(rows.stream()");
 
     [Theory]
-    [InlineData("axonviews.runtime.ReadModelStore")]
+    [InlineData("io.cratis.stage.axon.runtime.ReadModelStore")]
     [InlineData("axonviews.views.counters.totals.TotalProjectionProjector")]
     [InlineData("org.junit.jupiter.api.Assertions")]
     [InlineData("tools.jackson.databind.json.JsonMapper")]

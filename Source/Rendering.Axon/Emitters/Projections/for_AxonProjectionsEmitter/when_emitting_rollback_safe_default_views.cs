@@ -36,7 +36,7 @@ public class when_emitting_rollback_safe_default_views : Persistence.for_Persist
     [Fact] void should_pass_the_bound_emitter_in_the_persistent_branch() => Code(_admitted, "TotalProjectionProjector").ShouldContain("if (store instanceof JpaReadModelStore<?>) {\n            apply(event, updates, JpaReadModelStore.bind(store, context));\n        }");
     [Fact] void should_not_register_after_commit_handlers_in_the_persistent_branch() => Code(_admitted, "TotalProjectionProjector").ShouldNotContain("runOnAfterCommit");
     [Fact] void should_let_the_bound_emitter_defer_non_admitted_invalidations() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldNotContain("context.runOnAfterCommit");
-    [Fact] void should_import_the_transaction() => Code(_admitted, "TotalProjectionProjector").ShouldContain("import axonviews.runtime.ReadModelTransaction;");
+    [Fact] void should_import_the_transaction() => Code(_admitted, "TotalProjectionProjector").ShouldContain("import io.cratis.stage.axon.runtime.ReadModelTransaction;");
     [Fact] void should_not_dispatch_through_the_unbound_method() => Code(_admitted, "TotalProjectionProjector").ShouldNotContain("on(event");
     [Fact] void should_keep_the_direct_call_unannotated() => Code(_admitted, "TotalProjectionProjector").ShouldContain("}\n    public void on(Increased event, QueryUpdateEmitter updates)");
     [Fact] void should_exercise_a_non_admitted_flat_view() => PersistentViewAdmission.Supports(_nonAdmitted, ReadModelId("Total")).ShouldBeFalse();

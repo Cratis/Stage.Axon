@@ -8,7 +8,7 @@ internal static class PersistentViewStore
     internal const string Source = """
         package __PACKAGE__;
 
-        import __RUNTIME__.ReadModelStore;
+        import __RUNTIME_MODULE__.ReadModelStore;
         import jakarta.persistence.EntityManager;
         import jakarta.persistence.EntityManagerFactory;
         import jakarta.persistence.LockModeType;

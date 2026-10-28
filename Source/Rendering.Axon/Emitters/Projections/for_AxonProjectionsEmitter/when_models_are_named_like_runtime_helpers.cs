@@ -43,14 +43,14 @@ public class when_models_are_named_like_runtime_helpers : given.a_view_request
         }
     }
 
-    [Fact] void should_qualify_the_colliding_store_interface() => _configurations["ReadModelStore"].ShouldContain("public axonviews.runtime.ReadModelStore<Object, ReadModelStore> store()");
-    [Fact] void should_qualify_the_colliding_store_implementation() => _configurations["InMemoryReadModelStore"].ShouldContain("return new axonviews.runtime.InMemoryReadModelStore<>();");
-    [Fact] void should_qualify_the_colliding_guard_return_type() => _guardConfigurations["PersistentReadModelSafety"].ShouldContain("public static axonviews.runtime.persistent.PersistentReadModelSafety persistentReadModelSafety()");
-    [Fact] void should_qualify_the_colliding_guard_constructor() => _guardConfigurations["PersistentReadModelSafety"].ShouldContain("return new axonviews.runtime.persistent.PersistentReadModelSafety(");
-    [Fact] void should_keep_the_application_model_short_in_the_projector() => _projector.ShouldContain("private final axonviews.runtime.ReadModelStore<Object, ReadModelStore> store;");
-    [Fact] void should_qualify_the_projector_constructor_parameter() => _projector.ShouldContain("axonviews.runtime.ReadModelStore<Object, ReadModelStore> store)");
-    [Fact] void should_qualify_the_scoped_projector_store() => _scopedProjector.ShouldContain("private final axonviews.runtime.ReadModelStore<Object, ReadModelStore> store;");
-    [Fact] void should_qualify_the_scoped_projector_constructor() => _scopedProjector.ShouldContain("public BoardProjectionProjector(axonviews.runtime.ReadModelStore<Object, ReadModelStore> store)");
-    [Fact] void should_qualify_the_reducer_projector_store() => _reducerProjector.ShouldContain("private final axonviews.runtime.ReadModelStore<Object, ReadModelStore> store;");
-    [Fact] void should_qualify_the_reducer_projector_constructor() => _reducerProjector.ShouldContain("axonviews.runtime.ReadModelStore<Object, ReadModelStore> store, ReadModelStoreReducer reducer)");
+    [Fact] void should_qualify_the_colliding_store_interface() => _configurations["ReadModelStore"].ShouldContain("public io.cratis.stage.axon.runtime.ReadModelStore<Object, ReadModelStore> store()");
+    [Fact] void should_qualify_the_colliding_store_implementation() => _configurations["InMemoryReadModelStore"].ShouldContain("return new io.cratis.stage.axon.runtime.InMemoryReadModelStore<>();");
+    [Fact] void should_qualify_the_colliding_guard_return_type() => _guardConfigurations["PersistentReadModelSafety"].ShouldContain("public static io.cratis.stage.axon.runtime.persistent.PersistentReadModelSafety persistentReadModelSafety()");
+    [Fact] void should_qualify_the_colliding_guard_constructor() => _guardConfigurations["PersistentReadModelSafety"].ShouldContain("return new io.cratis.stage.axon.runtime.persistent.PersistentReadModelSafety(");
+    [Fact] void should_keep_the_application_model_short_in_the_projector() => _projector.ShouldContain("private final io.cratis.stage.axon.runtime.ReadModelStore<Object, ReadModelStore> store;");
+    [Fact] void should_qualify_the_projector_constructor_parameter() => _projector.ShouldContain("io.cratis.stage.axon.runtime.ReadModelStore<Object, ReadModelStore> store)");
+    [Fact] void should_qualify_the_scoped_projector_store() => _scopedProjector.ShouldContain("private final io.cratis.stage.axon.runtime.ReadModelStore<Object, ReadModelStore> store;");
+    [Fact] void should_qualify_the_scoped_projector_constructor() => _scopedProjector.ShouldContain("public BoardProjectionProjector(io.cratis.stage.axon.runtime.ReadModelStore<Object, ReadModelStore> store)");
+    [Fact] void should_qualify_the_reducer_projector_store() => _reducerProjector.ShouldContain("private final io.cratis.stage.axon.runtime.ReadModelStore<Object, ReadModelStore> store;");
+    [Fact] void should_qualify_the_reducer_projector_constructor() => _reducerProjector.ShouldContain("io.cratis.stage.axon.runtime.ReadModelStore<Object, ReadModelStore> store, ReadModelStoreReducer reducer)");
 }

@@ -10,7 +10,7 @@ internal static class PersistentViewContractTests
 
         import __PERSISTENCE__.JpaReadModelStore;
         import __PERSISTENCE__.PersistentViewBootstrap;
-        import __RUNTIME__.ReadModelStore;
+        import __RUNTIME_MODULE__.ReadModelStore;
         import jakarta.persistence.EntityManagerFactory;
         import java.util.ArrayList;
         import java.util.List;

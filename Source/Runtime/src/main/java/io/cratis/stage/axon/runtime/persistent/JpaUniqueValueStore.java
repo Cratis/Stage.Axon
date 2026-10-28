@@ -1,4 +1,4 @@
-package __RUNTIME__.persistent;
+package io.cratis.stage.axon.runtime.persistent;
 
 import io.cratis.stage.axon.runtime.UniqueValueConflict;
 import io.cratis.stage.axon.runtime.UniqueValueStore;
