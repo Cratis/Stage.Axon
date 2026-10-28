@@ -32,6 +32,9 @@ public partial class when_writing_the_constraint_proof : Specification
     [Fact] void should_prove_swallowed_delegate_failures() => source.ShouldContain("void swallowedDelegateFailureKeepsTheOriginalClaim()");
     [Fact] void should_not_disable_native_tests() => source.ShouldNotContain("@Disabled");
     [Fact] void should_race_occurrences() => source.ShouldContain("exactlyOneConcurrentOpeningWins");
+    [Fact] void should_convert_stored_payloads() => source.ShouldContain("event.payloadAs(type, configuration.getComponent(EventConverter.class))");
+    [Fact] void should_report_contender_failures() => source.ShouldContain("\"Contender failures: \" + failures");
+    [Fact] void should_not_inspect_raw_stored_payloads() => source.ShouldNotContain(".payload()");
     [Fact] void should_share_native_and_modeled_occurrence_enforcement() => source.ShouldContain("new OpenAccountModeled(owner)");
     [Fact] void should_reuse_the_suite_in_the_persistent_profile() => ConstraintProofArtifacts.JavaSources(ConstraintProofArtifacts.PersistentApplication)["GeneratedPersistentNativeUniqueTest.java"].ShouldContain("extends GeneratedNativeUniqueTest");
     [Fact] void should_make_the_persistent_base_abstract() => ConstraintProofArtifacts.JavaSources(ConstraintProofArtifacts.PersistentApplication)["GeneratedNativeUniqueTest.java"].ShouldContain("abstract class GeneratedNativeUniqueTest");

@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
+using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Constraints;
@@ -37,7 +38,8 @@ internal static class ConstraintCoverage
         try
         {
             var primary = AxonEventSources.PrimaryTag(context, contract);
-            return !string.IsNullOrEmpty(primary.ComponentName) && !string.IsNullOrEmpty(primary.JavaType);
+            return !string.IsNullOrEmpty(primary.ComponentName) && !string.IsNullOrEmpty(primary.JavaType) &&
+                OccurrenceIdentitySupported(context, contract, primary.ComponentName, primary.JavaType);
         }
         catch (InvalidOperationException)
         {
@@ -48,6 +50,21 @@ internal static class ConstraintCoverage
             return false;
         }
     }
+
+    static bool OccurrenceIdentitySupported(AxonEmissionContext context, SemanticEventContract contract, string component, string javaType)
+    {
+        var property = contract.Properties.FirstOrDefault(property => JavaNames.Member(property.Name) == component);
+        if (property is not null && NonIntegral(context, property.Type)) return false;
+        return !context.Request.Model.Application.Concepts.Any(concept => concept.Primitive == SemanticPrimitiveType.DecimalNumber &&
+            javaType == context.BasePackage + ".concepts." + JavaNames.Type(concept.Name));
+    }
+
+    static bool NonIntegral(AxonEmissionContext context, SemanticTypeReference type) => type.Kind switch
+    {
+        SemanticTypeReferenceKind.Primitive => type.Primitive == SemanticPrimitiveType.DecimalNumber,
+        SemanticTypeReferenceKind.Concept => context.Request.Model.Application.Concepts.Any(concept => concept.Id == type.Target && concept.Primitive == SemanticPrimitiveType.DecimalNumber),
+        _ => false
+    };
 
     static bool TargetSupported(AxonEmissionContext context, SemanticConstraintTarget target)
     {

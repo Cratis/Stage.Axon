@@ -6,7 +6,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 internal static class AxonPersistentScaffold
 {
     internal const string Properties = """
-        spring.datasource.url=jdbc:h2:file:./data/stage
+        spring.datasource.url=jdbc:h2:file:./data/stage;LOCK_TIMEOUT=5000
         spring.datasource.username=sa
         spring.datasource.password=
         spring.jpa.hibernate.ddl-auto=update

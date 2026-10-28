@@ -1,10 +1,12 @@
 package io.cratis.stage.axon.runtime;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.axonframework.messaging.core.ApplicationContext;
@@ -12,6 +14,8 @@ import org.axonframework.messaging.core.unitofwork.ProcessingContext;
 import org.axonframework.messaging.core.unitofwork.SimpleUnitOfWorkFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -79,28 +83,29 @@ abstract class UniqueValueStoreContractTest {
         conflict(() -> run(context -> store().occurOnce(context, constraint, "owner", "once")));
     }
 
-    @Test
-    void aContenderCannotPassAnUncommittedReservation() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void aContenderCannotPassAnUncommittedReservation(boolean property) throws Exception {
         var constraint = unique();
         var reserved = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var contending = new CountDownLatch(1);
         try (var workers = Executors.newFixedThreadPool(2)) {
             var holder = workers.submit(() -> run(context -> {
-                store().occurOnce(context, constraint, "owner", "once");
+                reserve(context, constraint, property, "owner");
                 reserved.countDown();
                 await(release);
             }));
             try {
                 assertTrue(reserved.await(5, TimeUnit.SECONDS));
-                var contender = workers.submit(() -> {
+                var contender = workers.submit(() -> conflict(() -> run(context -> {
                     contending.countDown();
-                    conflict(() -> run(context -> store().occurOnce(context, constraint, "owner", "once")));
-                });
+                    reserve(context, constraint, property, property ? "other" : "owner");
+                })));
                 assertTrue(contending.await(5, TimeUnit.SECONDS));
+                awaitContender(contender);
                 release.countDown();
                 holder.get(10, TimeUnit.SECONDS);
-                contender.get(10, TimeUnit.SECONDS);
             } finally { release.countDown(); }
         }
     }
@@ -131,6 +136,15 @@ abstract class UniqueValueStoreContractTest {
             for (var call : calls) if (call.get(10, TimeUnit.SECONDS)) winners++;
             assertEquals(1, winners);
         } finally { start.countDown(); }
+    }
+
+    protected void awaitContender(Future<?> contender) throws Exception {
+        contender.get(3, TimeUnit.SECONDS);
+    }
+
+    private void reserve(ProcessingContext context, String constraint, boolean property, String owner) {
+        if (property) store().assign(context, constraint, List.of("value"), owner, false, "once");
+        else store().occurOnce(context, constraint, owner, "once");
     }
 
     protected void run(Consumer<ProcessingContext> action) {
