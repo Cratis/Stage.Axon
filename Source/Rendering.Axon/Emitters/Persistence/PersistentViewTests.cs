@@ -62,7 +62,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         Add("StoreTest", PersistentViewContractTests.Source);
         Add("LegacyTest", PersistentViewLegacyProof.Source);
         Add("EnvelopeTest", PersistentViewEnvelopeTests.Source);
-        var live = LiveQuery(owner, model);
+        var live = owner.Slice.Projections.Any(projection => projection.ReadModel == model.Id) ? LiveQuery(owner, model) : null;
         if (live is not null && target.Observed.Count(contract => contract == spec.GivenEvents[0].EventContract) == 1)
         {
             var transition = owner.Slice.Projections.Where(projection => projection.ReadModel == model.Id).SelectMany(ProjectionTransitions.From)
