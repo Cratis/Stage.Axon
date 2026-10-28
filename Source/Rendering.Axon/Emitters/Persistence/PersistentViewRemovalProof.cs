@@ -64,6 +64,7 @@ internal sealed class PersistentViewRemovalProof(AxonEmissionContext context, Vi
         var modelName = JavaNames.Type(model.Name);
         var name = modelName + "PersistentRemoval";
         var projector = package + "." + JavaNames.Type(projection.Name) + "Projector";
+        var policies = ProjectionPolicyNames.ForProjector(context.Request.Model.Application, projection);
         var create = AxonViewEvents.Expression(context, types, created, source: name + "Test.createSource");
         var secondary = AxonViewEvents.Expression(context, types, other, source: name + "Test.otherSource");
         var remove = AxonViewEvents.Expression(context, types, removed, source: name + "Test.removeSource");
@@ -88,8 +89,8 @@ internal sealed class PersistentViewRemovalProof(AxonEmissionContext context, Vi
             ["NAME"] = name,
             ["QUALIFIER"] = package + "." + modelName,
             ["PROJECTOR"] = projector,
-            ["SEQUENCE"] = types.EventType(removed.EventContract).Split('.')[^1] + "Sequence",
-            ["CREATE_SEQUENCE"] = types.EventType(created.EventContract).Split('.')[^1] + "Sequence",
+            ["SEQUENCE"] = policies.For(removed.EventContract),
+            ["CREATE_SEQUENCE"] = policies.For(created.EventContract),
             ["EVENT_TYPE"] = types.EventType(removed.EventContract),
             ["CREATE_TYPE"] = types.EventType(created.EventContract),
             ["EVENT"] = remove,
