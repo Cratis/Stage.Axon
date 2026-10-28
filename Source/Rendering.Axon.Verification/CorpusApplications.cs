@@ -29,7 +29,8 @@ internal static class CorpusApplications
             (IngressProofModel.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/ingress-invariants.play")),
             (IngressProofModel.PersistentApplication, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/ingress-invariants.play")),
             (ClientProofArtifacts.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/client-proof.play")),
-            ("inline-java-bodies", Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/inline-java-bodies.play"))
+            ("inline-java-bodies", Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/inline-java-bodies.play")),
+            (ReactionConstraintProofArtifacts.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/reaction-constraints.play"))
         ];
     }
 }

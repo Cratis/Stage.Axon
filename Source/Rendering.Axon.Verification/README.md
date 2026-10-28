@@ -55,6 +55,14 @@ An in-memory uniqueness reservation may reject a contender even when its owner l
 
 These are native CI proofs, not evidence from .NET rendering alone. Local verification renders their sources and runs emitter/harness specs; Java/Maven execution and the actual concurrency outcomes must be checked in CI.
 
+## Reaction constraint proofs
+
+`reaction-constraints.play` renders assignment and released-by reactions with a unique alias constraint. `GeneratedMemoryReactionConstraintTest` and `GeneratedPersistentReactionConstraintTest` run under default Surefire discovery; the latter uses H2 in memory, without containers. Native report verification requires both suites.
+
+Both suites drive live reactions, reject another owner's conflicting generated append, and force rollback after the generated assignment/release handlers append. They assert produced-event counts and subsequent ownership, distinguishing produced events from initiating events in the aggregate JPA stream. Reflection pins Spring's selection of the `@Autowired UniqueValueStore` constructor and shared configured store rather than the no-argument constructor's private in-memory fallback.
+
+Generated reactions are `@DisallowReplay`. The probes deliver through Axon's annotated handler with a real replay token and verify that assignment and release production are skipped, not reapplied. Regular delivery is the positive control. These checks do not establish that replay rebuilds lost uniqueness state; restart/rebuild policy remains separate from live assignment, rollback, and release.
+
 ## React and Scene proof host
 
 `ClientProof/scene` is a proof-local React and Scene host over the transport-neutral interface in `Source/Rendering.Axon/Emitters/Client/Templates/transport.ts`. It is not generated and not published, and its files are not embedded in the harness. `sceneDispatcher.ts` implements Scene's `executeCommand` over `Transport.execute`: `validation` maps to `validationErrors`, every other outcome, including `cancelled`, maps to `exceptionMessages`, and duplicate or unknown command names throw. `useLiveQueryResults.ts` watches a live query as Scene `queryResults`, closes on unmount and on a key change, and clears and ignores older values on an identity change.

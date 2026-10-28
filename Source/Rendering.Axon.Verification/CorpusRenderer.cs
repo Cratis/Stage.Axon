@@ -59,9 +59,15 @@ internal static class CorpusRenderer
         }
 
         await WriteArtifacts(destination, plan);
+        await WriteProofArtifacts(name, destination);
+        Console.WriteLine($"{name}: rendered {plan.Artifacts.Length} artifacts; {plan.Diagnostics.Length} diagnostics; no refusals");
+    }
+
+    static async Task WriteProofArtifacts(string name, string destination)
+    {
         if (name == IngressProofModel.Application || name == IngressProofModel.PersistentApplication) await IngressProofArtifacts.Write(destination, name);
         if (name == ClientProofArtifacts.Application) await ClientProofArtifacts.Write(destination);
-        Console.WriteLine($"{name}: rendered {plan.Artifacts.Length} artifacts; {plan.Diagnostics.Length} diagnostics; no refusals");
+        if (name == ReactionConstraintProofArtifacts.Application) await ReactionConstraintProofArtifacts.Write(destination);
     }
 
     static ArtifactRenderPlan Plan(string name, LoadedSemanticModel loaded) => name switch
