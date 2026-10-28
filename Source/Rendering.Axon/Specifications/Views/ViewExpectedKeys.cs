@@ -30,6 +30,7 @@ internal static class ViewExpectedKeys
             var property = model.Properties.First(candidate => candidate.Id == entry.TargetProperty);
             return $"{map}.entry({JavaCodeBuilder.StringLiteral(property.Id.ToString())}, String.valueOf({types.Unwrap(property.Type, code is null ? types.Literal(entry.Value, property.Type) : types.Literal(entry.Value, property.Type, code))}))";
         });
-        return $"{map}.ofEntries({string.Join(", ", entries)})";
+        var tree = code?.Reference("java.util.TreeMap") ?? "java.util.TreeMap";
+        return $"String.valueOf(new {tree}<>({map}.ofEntries({string.Join(", ", entries)})))";
     }
 }

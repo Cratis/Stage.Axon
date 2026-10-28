@@ -13,7 +13,8 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections.for_AxonProjectionsEm
 public class when_emitting_a_view_named_profile : Specification
 {
     AxonEmissionContext context;
-    string configuration;
+    string repository;
+    string entity;
 
     async Task Establish()
     {
@@ -28,13 +29,14 @@ public class when_emitting_a_view_named_profile : Specification
     void Because()
     {
         new AxonProjectionsEmitter().Emit(context);
-        configuration = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ProfileStoreConfiguration.java", StringComparison.Ordinal)).Bytes.AsSpan());
+        repository = Text("/ProfileRepository.java");
+        entity = Text("/ProfileEntity.java");
     }
 
-    [Fact] void should_type_the_store_with_the_model_rather_than_the_spring_annotation() => configuration.ShouldContain("ReadModelStore<Object, Profile>");
-    [Fact] void should_not_import_the_spring_annotation_over_the_model() => configuration.ShouldNotContain("import org.springframework.context.annotation.Profile;");
-    [Fact] void should_qualify_the_persistent_guard_annotation() => configuration.ShouldContain("@org.springframework.context.annotation.Profile(\"persistent\")");
-    [Fact] void should_admit_the_flat_view_without_a_refusal_guard() => configuration.ShouldNotContain("persistentReadModelSafety()");
-    [Fact] void should_preserve_the_model_type_in_the_durable_store() => configuration.ShouldContain("\"templates.customers.profile.managerprofile.Profile\", Profile.class)");
-    [Fact] void should_preserve_the_qualified_store_name() => configuration.ShouldContain("@Bean(\"templates.customers.profile.managerprofile.Profile\")");
+    string Text(string suffix) => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith(suffix, StringComparison.Ordinal)).Bytes.AsSpan());
+
+    [Fact] void should_type_the_repository_with_the_entity_of_the_model() => repository.ShouldContain("JpaRepository<ProfileEntity, String>");
+    [Fact] void should_not_import_the_spring_annotation_over_the_model() => entity.ShouldNotContain("import org.springframework.context.annotation.Profile;");
+    [Fact] void should_map_the_entity_back_to_the_model() => entity.ShouldContain("public Profile toModel()");
+    [Fact] void should_keep_the_qualified_repository_bean_name() => repository.ShouldContain("@Repository(\"templates.customers.profile.managerprofile.ProfileRepository\")");
 }

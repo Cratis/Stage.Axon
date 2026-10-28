@@ -36,7 +36,7 @@ public class when_a_body_contains_carriage_returns : a_view_request
         resolved.ShouldEqual(string.Empty);
         reason.ShouldContain("LF-only");
         var located = ScopeSelection.Select(request).First(slice => slice.Slice.ReadModels.Any(model => model.Id == requirement.QueryShape.ReadModel));
-        QueryPerformer.Emit(context, "sample.queries", QueryPerformer.Queries(context, located).Single(), "sample.queries.Item");
+        QueryPerformer.Emit(context, "sample.queries", QueryPerformer.Queries(context, located).Single(), "sample.queries.Item", "sample.queries.ItemRepository");
         InlineImplementationDiagnostics.Emit(context);
         var diagnostic = context.Degradation.UnsupportedConstructs.Single(candidate => candidate.Message.Contains("LF-only", StringComparison.Ordinal));
         diagnostic.Artifact.ShouldEqual(requirement.Source.SemanticId);

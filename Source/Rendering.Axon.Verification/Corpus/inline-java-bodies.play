@@ -50,7 +50,7 @@ module Bodies
         performer
           ```java
           // inline-java-bodies: query performer
-          return store.all().stream().map(total -> new RebuiltTotal(total.id(), total.amount() * 2)).toList();
+          return repository.findAll().stream().map(RebuiltTotalEntity::toModel).map(total -> new RebuiltTotal(total.id(), total.amount() * 2)).toList();
           ```
       specification RebuildFromEvents
         given CountRecorded

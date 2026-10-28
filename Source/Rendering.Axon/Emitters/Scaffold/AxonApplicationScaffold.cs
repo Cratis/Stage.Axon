@@ -18,7 +18,6 @@ internal static class AxonApplicationScaffold
         .Import("java.time.Clock")
         .Import("org.springframework.context.annotation.Bean")
         .Import("org.springframework.context.annotation.Configuration")
-        .Import("org.springframework.context.annotation.Profile")
         .Import("org.axonframework.eventsourcing.eventstore.EventStorageEngine")
         .Import("org.axonframework.eventsourcing.eventstore.inmemory.InMemoryEventStorageEngine")
         .Import("org.axonframework.messaging.eventhandling.processing.streaming.token.store.TokenStore")
@@ -31,10 +30,8 @@ internal static class AxonApplicationScaffold
         .Line("@Configuration")
         .Block("public class AxonConfiguration", body => body
             .Line("@Bean")
-            .Line("@Profile(\"!persistent\")")
             .Line("EventStorageEngine eventStorageEngine() { return new InMemoryEventStorageEngine(); }")
             .Line("@Bean")
-            .Line("@Profile(\"!persistent\")")
             .Line("TokenStore tokenStore() { return new InMemoryTokenStore(); }")
             .Line("@Bean")
             .Line("Clock clock() { return Clock.systemUTC(); }")

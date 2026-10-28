@@ -29,14 +29,14 @@ module Accounts
         authorize PerformedFinance
         performer
           ```java
-          return store.all();
+          return repository.findAll().stream().map(ActiveAccountsEntity::toModel).toList();
           ```
 
       query LivePerformedAccounts => observable ActiveAccounts[]
         authorize PerformedFinance
         performer
           ```java
-          return store.all();
+          return repository.findAll().stream().map(ActiveAccountsEntity::toModel).toList();
           ```
 
       projection ActiveProjection => ActiveAccounts

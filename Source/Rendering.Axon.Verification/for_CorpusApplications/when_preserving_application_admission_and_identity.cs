@@ -69,7 +69,7 @@ public class when_preserving_application_admission_and_identity : Specification
     [Fact] void should_refuse_the_unsupported_cross_stream_proof() => ProofSource("CloseOtherAccountHandler").ShouldContain("throw new UnsupportedOperationException(\"STAGE-AXON-0106:");
     [Fact] void should_not_append_in_the_unsupported_proof() => ProofSource("CloseOtherAccountHandler").ShouldNotContain("appender.append(");
     [Fact] void should_emit_the_persistent_gateway_race_base() => ProofSource("PersistentUniqueConcurrencyTest").ShouldContain("abstract CompletableFuture<Void> register(UUID owner, String value)");
-    [Fact] void should_preserve_the_scoped_memory_proof_view() => ProofSource("ActiveAccountsStoreConfiguration").ShouldContain("new PersistentReadModelSafety(");
+    [Fact] void should_render_the_proof_view_over_a_typed_repository() => ProofSource("ActiveAccountsRepository").ShouldContain("extends JpaRepository<ActiveAccountsEntity, String>");
     [Fact] void should_not_render_views_for_the_persistent_proofs() => _plans[IngressProofModel.PersistentApplication].Artifacts.Any(artifact => artifact.RelativePath.Contains("/accounts/registry/active/", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_not_warn_about_persistent_proof_views() => _plans[IngressProofModel.PersistentApplication].Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0308").ShouldBeFalse();
     [Fact] void should_enforce_persistent_protected_reads() => PersistentProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new CommandValidationException");

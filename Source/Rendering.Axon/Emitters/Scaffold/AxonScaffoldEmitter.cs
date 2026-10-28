@@ -28,7 +28,6 @@ internal sealed class AxonScaffoldEmitter : IAxonEmitter
         context.AddJava(context.BasePackage, "Application", AxonApplicationScaffold.Application(context.BasePackage));
         context.AddJava(context.BasePackage + ".infrastructure", "AxonConfiguration", AxonApplicationScaffold.Infrastructure(context.BasePackage));
         context.Artifacts.Add(PlannedArtifact.CreateText(".gitignore", "target/\ndata/\n.idea/\n*.iml\n"));
-        context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/application-persistent.properties", AxonPersistentScaffold.Properties));
         context.Artifacts.Add(PlannedArtifact.CreateText(
             "src/test/resources/spring.properties",
             "# Axon entity registration cannot be repeated when Spring restarts a paused test context.\nspring.test.context.cache.pause=NEVER\n"));

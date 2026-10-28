@@ -31,12 +31,12 @@ public class when_emitting_reducer_delegates : a_view_request
     [Fact] void should_expose_a_nullable_current() => _contract.ShouldContain("reduce(CountRecorded event, @Nullable RebuiltTotal current, EventMessage message)");
     [Fact] void should_copy_the_native_body() => _contract.ShouldContain("return new RebuiltTotal(event.id(), (current == null ? 0L : current.amount()) + event.amount());");
     [Fact] void should_copy_the_delete_body() => _contract.ShouldContain("return null;");
-    [Fact] void should_delegate_from_an_event_handler() => _projector.ShouldContain("var next = reducer.reduce(event, store.get(key).orElse(null), message);");
-    [Fact] void should_delete_only_when_the_body_returns_null() => _projector.ShouldContain("if (next == null) store.remove(key); else store.put(key, next);");
+    [Fact] void should_delegate_from_an_event_handler() => _projector.ShouldContain("var next = reducer.reduce(event, repository.findById(key).map(RebuiltTotalEntity::toModel).orElse(null), message);");
+    [Fact] void should_delete_only_when_the_body_returns_null() => _projector.ShouldContain("if (next == null) repository.deleteById(key); else repository.save(new RebuiltTotalEntity(key, next));");
     [Fact] void should_enable_dependent_specs() => _specs.ShouldNotContain("@Disabled");
     [Fact] void should_exercise_initialization() => _specs.ShouldContain("initializeFromFirstEvent");
     [Fact] void should_exercise_accumulation() => _specs.ShouldContain("accumulateThroughCurrent");
-    [Fact] void should_assert_keyed_absence() => _specs.ShouldContain("assertTrue(store.get(\"deleted\").isEmpty()");
+    [Fact] void should_assert_keyed_absence() => _specs.ShouldContain("repository.findById(\"deleted\").map(RebuiltTotalEntity::toModel).stream().findAny().isEmpty()");
     [Fact] void should_use_the_axon_message_resolver() => _specs.ShouldContain("new AnnotationMessageTypeResolver().resolve(event.getClass()).orElseThrow()");
     [Fact] void should_use_the_runtime_test_message_constructor() => _specs.ShouldContain("new GenericEventMessage(type, event)");
     [Fact] void should_confirm_the_actual_event_record_accessors() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/CountRecorded.java", StringComparison.Ordinal))).ShouldContain("CounterId id, Long amount");

@@ -24,8 +24,8 @@ public class when_materializing_a_literal_projection_key : given.a_native_view_r
     }
 
     [Fact] void should_enable_the_authored_specification() => _context.Specifications[_spec.Id].DisabledCode.ShouldBeNull();
-    [Fact] void should_use_the_real_projector() => _java.ShouldContain("var projector = new InventoryFiguresProjectionProjector(store);");
-    [Fact] void should_assert_the_literal_projection_key() => _java.ShouldContain("store.get(\"global\").stream().anyMatch(row ->");
+    [Fact] void should_use_the_real_projector() => _java.ShouldContain("var projector = new InventoryFiguresProjectionProjector(repository);");
+    [Fact] void should_assert_the_literal_projection_key() => _java.ShouldContain("repository.findById(\"global\").map(InventoryFiguresEntity::toModel).stream().anyMatch(row ->");
     [Fact] void should_assert_the_computed_quantity() => _java.ShouldContain("Objects.equals(row.unitsOnHand(), 6L)");
     [Fact] void should_assert_the_computed_count() => _java.ShouldContain("Objects.equals(row.itemCount(), 1L)");
     [Fact] void should_not_disable_the_test() => _java.ShouldNotContain("@Disabled");

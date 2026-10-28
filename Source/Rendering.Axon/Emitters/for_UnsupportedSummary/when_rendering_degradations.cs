@@ -24,8 +24,8 @@ public class when_rendering_degradations : for_AxonArtifactRenderPlanner.given.a
         location = string.Join(" / ", located.Path.Where((part, index) => index == 0 || !part.Equals(located.Path[index - 1], StringComparison.OrdinalIgnoreCase))) + " / " + model.Name + " read model";
         context.AddJava("sample", "XProjectorTest", "", true, model.Id);
         context.AddJava("sample", "XProjector", "", false, model.Id);
-        context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Rows are volatile.");
-        context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, other.Id, "Rows are volatile.");
+        context.Degradation.Unsupported(AxonRefusalCodes.ObservableQuery, model.Id, "Rows are volatile.");
+        context.Degradation.Unsupported(AxonRefusalCodes.ObservableQuery, other.Id, "Rows are volatile.");
         context.Degradation.Unsupported("STAGE-AXON-TYPE", model.Id, "No member type.", "represent the requested member", model.Id + "/members/x");
         context.Degradation.Unsupported("STAGE-AXON-UNKNOWN", unknown, "An unknown construct.");
         context.Degradation.Note("Review the model with its authors.");
@@ -36,8 +36,8 @@ public class when_rendering_degradations : for_AxonArtifactRenderPlanner.given.a
     [Fact]
     void should_summarize_distinct_rows_before_the_details()
     {
-        var description = Degradations.Find(AxonRefusalCodes.ReadModelPersistence);
-        Assert.Contains($"- `STAGE-AXON-0308` (2): {description.Construct}. See {description.AxonDocs}", summary, StringComparison.Ordinal);
+        var description = Degradations.Find(AxonRefusalCodes.ObservableQuery);
+        Assert.Contains($"- `STAGE-AXON-0401` (2): {description.Construct}. See {description.AxonDocs}", summary, StringComparison.Ordinal);
         Assert.True(summary.IndexOf("## Summary", StringComparison.Ordinal) < summary.IndexOf("| Code |", StringComparison.Ordinal));
         Assert.DoesNotContain("Rows are volatile.", summary[..summary.IndexOf("## Details", StringComparison.Ordinal)], StringComparison.Ordinal);
     }
@@ -56,7 +56,7 @@ public class when_rendering_degradations : for_AxonArtifactRenderPlanner.given.a
             var cells = row.Split('|');
             Assert.NotEqual(cells[4].Trim(), cells[5].Trim());
         }
-        Assert.Contains($"| {Degradations.Find(AxonRefusalCodes.ReadModelPersistence).Construct} | Rows are volatile. |", summary, StringComparison.Ordinal);
+        Assert.Contains($"| {Degradations.Find(AxonRefusalCodes.ObservableQuery).Construct} | Rows are volatile. |", summary, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -45,8 +45,8 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
         if (mapping.Operation is not (SemanticProjectionOperation.Add or SemanticProjectionOperation.Subtract or SemanticProjectionOperation.Increment or SemanticProjectionOperation.Decrement)) return null;
         var primitive = types.PrimitiveOf(target.Type);
         if (primitive is not (SemanticPrimitiveType.WholeNumber or SemanticPrimitiveType.DecimalNumber)) return null;
-        var left = $"({old} == null ? {types.Default(target.Type)} : {old})";
-        left = types.Unwrap(target.Type, left);
+        var zero = primitive == SemanticPrimitiveType.DecimalNumber ? $"{Reference("java.math.BigDecimal")}.ZERO" : "0L";
+        var left = $"({old} == null ? {zero} : {types.Unwrap(target.Type, old)})";
         var increment = mapping.Operation is SemanticProjectionOperation.Increment or SemanticProjectionOperation.Decrement;
         var operandValue = source is null ? null : types.Unwrap(target.Type, source);
         var right = increment ? One(primitive) : operandValue;
@@ -103,7 +103,7 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
         if (entries.Any(entry => entry.Value is null)) return null;
         var map = Reference("java.util.Map");
         var arguments = entries.Select(entry => $"{map}.entry({JavaCodeBuilder.StringLiteral(entry.Property.ToString())}, {Reference("java.lang.String", "String")}.valueOf({types.Unwrap(entry.Type, entry.Value!)}))");
-        return $"{map}.ofEntries({string.Join(", ", arguments)})";
+        return $"{Reference("java.lang.String", "String")}.valueOf(new {Reference("java.util.TreeMap")}<>({map}.ofEntries({string.Join(", ", arguments)})))";
     }
 
     string? EventProperty(SemanticProjectionEventProperty property, SemanticTypeReference target, SemanticEventContract @event)

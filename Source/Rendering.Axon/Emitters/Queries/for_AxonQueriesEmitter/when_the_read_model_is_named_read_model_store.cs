@@ -20,10 +20,7 @@ public class when_the_read_model_is_named_read_model_store : given.a_query_colli
     }
 
     [Fact] void should_keep_the_application_model_short() => Code("FindTotal").ShouldContain("public record Result(List<ReadModelStore> rows)");
-    [Fact] void should_qualify_the_runtime_store() => Code("FindTotalHandler").ShouldContain("io.cratis.stage.axon.runtime.ReadModelStore<Object, ReadModelStore> store;");
-    [Fact] void should_not_import_the_conflicting_runtime_store() => Code("FindTotalHandler").ShouldNotContain("import io.cratis.stage.axon.runtime.ReadModelStore;");
-    [Fact] void should_keep_the_subscription_model_short() => _subscription.ShouldContain("private io.cratis.stage.axon.runtime.ReadModelStore<Object, ReadModelStore> store;");
-    [Fact] void should_not_import_the_subscription_runtime_store() => _subscription.ShouldNotContain("import io.cratis.stage.axon.runtime.ReadModelStore;");
-    [Fact] void should_qualify_the_sse_runtime_store() => _sse.ShouldContain(", io.cratis.stage.axon.runtime.ReadModelStore.class);");
-    [Fact] void should_not_import_the_sse_runtime_store() => _sse.ShouldNotContain("import io.cratis.stage.axon.runtime.ReadModelStore;");
+    [Fact] void should_type_the_handler_with_the_repository_of_the_model() => Code("FindTotalHandler").ShouldContain("private final ReadModelStoreRepository repository;");
+    [Fact] void should_read_the_repository_in_the_subscription_spec() => _subscription.ShouldContain("ReadModelStoreRepository");
+    [Fact] void should_read_the_repository_in_the_sse_spec() => _sse.ShouldContain("application.getBean(ReadModelStoreRepository.class)");
 }

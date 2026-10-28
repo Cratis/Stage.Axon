@@ -23,7 +23,6 @@ public class when_visiting_families : for_AxonArtifactRenderPlanner.given.an_axo
             "AxonProjectionsEmitter",
             "AxonQueriesEmitter",
             "AxonAutomationsEmitter",
-            "AxonPersistenceEmitter",
             "AxonSecurityEmitter",
             "AxonSpecificationsEmitter",
             "AxonClientEmitter",

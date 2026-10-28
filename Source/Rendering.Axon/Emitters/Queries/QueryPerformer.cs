@@ -12,6 +12,8 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
 
 internal static class QueryPerformer
 {
+    const string LegacyStoreReason = "The inline performer body references ReadModelStore, which no longer exists; the body will not compile until it reads the typed Spring Data repository passed as 'repository'.";
+
     internal static SemanticImplementationRequirement? Requirement(AxonEmissionContext context, SemanticKeyedQuery query) =>
         (context.Request.ImplementationRequirements.IsDefault ? [] : context.Request.ImplementationRequirements).FirstOrDefault(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer && requirement.Source.SemanticId == query.Id);
 
@@ -25,7 +27,7 @@ internal static class QueryPerformer
                 Authorization = requirement.QueryShape.Authorization
             });
 
-    internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query, string modelType)
+    internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query, string modelType, string repositoryType)
     {
         var name = JavaNames.Type(query.Name);
         const string reason = "Query performer bodies are not translated; implement the generated performer interface as a Spring bean.";
@@ -34,11 +36,17 @@ internal static class QueryPerformer
         if (!native) context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, reason, "answer the query with its modeled performer", query.Id.ToString());
         var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Performer");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Performer");
-        var store = code.Reference(AxonRuntimePackage.Type(context.BasePackage, "ReadModelStore"));
+        var repository = QueryModelReference.Claim(code, package, repositoryType, name, name + "Performer");
+        var legacy = native && content.Contains("ReadModelStore", StringComparison.Ordinal);
+        if (legacy)
+        {
+            context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, LegacyStoreReason, "answer the query with its modeled performer", query.Id.ToString());
+        }
         if (!native) code.DiffersFromScreenplay("the modeled performer is a typed Spring extension point; implementation bodies are not translated.");
         code.Block($"public interface {name}Performer", body => body
-                .Block($"default {code.Reference("java.util.List")}<{modelName}> perform({name} query, {store}<{code.Reference("java.lang.Object")}, {modelName}> store)", method =>
+                .Block($"default {code.Reference("java.util.List")}<{modelName}> perform({name} query, {repository} repository)", method =>
                 {
+                    if (legacy) method.UnsupportedIntent("answer the query with its modeled performer: " + LegacyStoreReason, query.Id.ToString(), AxonRefusalCodes.QueryPerformer);
                     if (native)
                     {
                         method.RawBody(content);

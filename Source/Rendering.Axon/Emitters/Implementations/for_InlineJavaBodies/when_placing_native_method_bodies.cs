@@ -43,13 +43,28 @@ public class when_placing_native_method_bodies : a_view_request
         var context = Context(seed.Role, seed.Source.SemanticId, body);
         var located = ScopeSelection.Select(_request).First(slice => slice.Slice.ReadModels.Any(model => model.Id == seed.QueryShape.ReadModel));
         var query = QueryPerformer.Queries(context, located).Single();
-        QueryPerformer.Emit(context, "sample.queries", query, "sample.queries.Item");
+        QueryPerformer.Emit(context, "sample.queries", query, "sample.queries.Item", "sample.queries.ItemRepository");
         var code = Text(context.Artifacts[0]);
         code.ShouldContain(body);
         code.ShouldContain("perform(");
-        code.ShouldContain("ReadModelStore<Object, Item> store)");
+        code.ShouldContain("ItemRepository repository)");
         code.ShouldNotContain("UnsupportedOperationException");
         context.ConsumedImplementations.ShouldContain(seed.RequirementId);
+    }
+
+    [Fact]
+    void should_warn_when_a_query_performer_body_still_references_the_removed_read_model_store()
+    {
+        const string body = "ReadModelStore<Object, Item> store = null; return java.util.List.of();";
+        var seed = _request.ImplementationRequirements.Single(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer);
+        var context = Context(seed.Role, seed.Source.SemanticId, body);
+        var located = ScopeSelection.Select(_request).First(slice => slice.Slice.ReadModels.Any(model => model.Id == seed.QueryShape.ReadModel));
+        var query = QueryPerformer.Queries(context, located).Single();
+        QueryPerformer.Emit(context, "sample.queries", query, "sample.queries.Item", "sample.queries.ItemRepository");
+        var code = Text(context.Artifacts[0]);
+        code.ShouldContain("which no longer exists; the body will not compile");
+        code.ShouldContain(body);
+        context.Degradation.UnsupportedConstructs.Count(diagnostic => diagnostic.Code == "STAGE-AXON-0401" && diagnostic.Message.Contains("ReadModelStore", StringComparison.Ordinal)).ShouldEqual(1);
     }
 
     [Theory]

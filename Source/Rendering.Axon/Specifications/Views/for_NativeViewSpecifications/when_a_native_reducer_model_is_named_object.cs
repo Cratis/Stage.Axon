@@ -41,7 +41,7 @@ public class when_a_native_reducer_model_is_named_object : a_view_request
 
     [Fact] void should_emit_an_executable_native_scenario() => _java.ShouldNotContain("@Disabled");
     [Fact] void should_keep_the_application_record_as_the_store_value() => _model.ShouldContain("public record Object(CounterId id, Long amount)");
-    [Fact] void should_qualify_only_the_store_key_in_the_native_specification() => _java.ShouldContain("ReadModelStore<java.lang.Object, Object> store = new InMemoryReadModelStore<>();");
-    [Fact] void should_use_the_same_qualified_key_in_the_projector() => _projector.ShouldContain("ReadModelStore<java.lang.Object, Object> store, ObjectReducer reducer)");
-    [Fact] void should_not_bind_the_key_to_the_application_record() => _java.ShouldNotContain("ReadModelStore<Object, Object>");
+    [Fact] void should_type_the_repository_of_the_application_record_in_the_native_specification() => _java.ShouldContain("ObjectRepository repository;");
+    [Fact] void should_inject_the_repository_in_the_projector() => _projector.ShouldContain("ObjectRepository repository, ObjectReducer reducer)");
+    [Fact] void should_not_reference_the_removed_runtime_store() => _java.ShouldNotContain("ReadModelStore");
 }

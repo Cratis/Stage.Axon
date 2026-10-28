@@ -12,9 +12,6 @@ public class with_a_java_package : given.a_facade_model
     ArtifactRenderPlan _actual;
     ArtifactRenderPlan _default;
 
-    static string Fingerprint(ArtifactRenderPlan plan) => Text(plan.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentViewConfiguration.java", StringComparison.Ordinal)))
-        .Split('\n').Single(line => line.Contains("public static final String FINGERPRINT = ", StringComparison.Ordinal)).Split('"')[1];
-
     void Establish() => _default = AxonRendering.Plan(Request(new()));
     void Because() => _actual = AxonRendering.Plan(Request(new() { JavaPackage = "Acme.Orders" }));
 
@@ -32,13 +29,10 @@ public class with_a_java_package : given.a_facade_model
         foreach (var artifact in _default.Artifacts.Where(artifact => artifact.RelativePath.EndsWith(".java", StringComparison.Ordinal)))
         {
             var renamed = _actual.Artifacts.Single(candidate => candidate.RelativePath == artifact.RelativePath.Replace("/facadeproof/", "/acme/orders/", StringComparison.Ordinal));
-            Text(renamed).Replace(Fingerprint(_actual), "<fingerprint>", StringComparison.Ordinal).Split('\n').Order(StringComparer.Ordinal)
-                .ShouldEqual(Text(artifact).Replace("facadeproof", "acme.orders", StringComparison.Ordinal).Replace(Fingerprint(_default), "<fingerprint>", StringComparison.Ordinal).Split('\n').Order(StringComparer.Ordinal));
+            Text(renamed).Split('\n').Order(StringComparer.Ordinal)
+                .ShouldEqual(Text(artifact).Replace("facadeproof", "acme.orders", StringComparison.Ordinal).Replace("rm_acme.orders_", "rm_acme_orders_", StringComparison.Ordinal).Split('\n').Order(StringComparer.Ordinal));
         }
     }
-
-    [Fact]
-    void should_recompute_the_persistence_fingerprint() => Assert.NotEqual(Fingerprint(_default), Fingerprint(_actual));
 
     [Fact]
     void should_remove_the_old_package_in_every_form() => _actual.Artifacts
@@ -47,10 +41,6 @@ public class with_a_java_package : given.a_facade_model
     [Fact]
     void should_declare_the_new_package_in_every_java_file() => _actual.Artifacts.Where(artifact => artifact.RelativePath.EndsWith(".java", StringComparison.Ordinal))
         .All(artifact => Text(artifact).Contains("package acme.orders;", StringComparison.Ordinal) || Text(artifact).Contains("package acme.orders.", StringComparison.Ordinal)).ShouldBeTrue();
-
-    [Fact]
-    void should_keep_the_renamed_bare_package_identity() => Text(_actual.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentViewConfiguration.java", StringComparison.Ordinal)))
-        .ShouldContain("PersistentViewBootstrap.verify(factory, \"acme.orders\", FINGERPRINT)");
 
     [Fact]
     void should_set_the_spring_application_name() => Text(_actual.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("application.yml", StringComparison.Ordinal))).ShouldContain("acme.orders");
