@@ -28,20 +28,32 @@ public partial class when_preparing_native_proofs : Specification
     [Fact]
     void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
     [
-        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
+        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedJwtAudienceTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
         "GeneratedPersistentUniqueConcurrencyTest.java", "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
     [Fact]
     void should_include_the_inline_policy_failure_and_composition_proofs()
     {
         var sources = IngressProofArtifacts.Sources("inline-java-policies");
-        sources.Count.ShouldEqual(2);
+        sources.Count.ShouldEqual(3);
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("nativePolicyBeanReadsOnlyJwtAttributes");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("compositionsDenyTheWholeRealCommand");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("handlerClaimsAndUnprovenSubscriptionUpdatesFailClosed");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("\"Finance Operations\", \"Other\", \"throw\", \"error\"");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("\"and-snapshot\", \"or-snapshot\", \"escape-and-snapshot\", \"escape-or-snapshot\"");
         sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain("stage.axon.demo.claims.department=Finance Operations");
+    }
+
+    [Fact]
+    void should_prove_native_decoder_audiences_without_mocking()
+    {
+        var source = IngressProofArtifacts.Sources("inline-java-policies")["GeneratedJwtAudienceTest.java"];
+        source.ShouldContain("wrongAudienceIsRejectedByTheRealDecoderAndApplication");
+        source.ShouldContain("rightAudienceIsAuthenticatedBeforeTheNativePolicyDenial");
+        source.ShouldContain("noConfiguredAudienceRejectsAnOtherwiseValidToken");
+        source.ShouldContain("assertInstanceOf(NimbusJwtDecoder.class, decoder)");
+        source.ShouldContain("new RSASSASigner(KEY.getPrivate())");
+        source.ShouldNotContain("@Mock");
     }
 
     [Fact]
@@ -57,8 +69,9 @@ public partial class when_preparing_native_proofs : Specification
     void should_send_the_generated_inline_policy_command_field()
     {
         var sources = IngressProofArtifacts.Sources("inline-java-policies");
-        foreach (var source in sources.Values)
+        foreach (var name in new[] { "GeneratedInlinePolicyTest.java", "GeneratedInlinePolicyDemoTest.java" })
         {
+            var source = sources[name];
             source.ShouldContain("\\\"id\\\":\\\"");
             source.ShouldNotContain("\\\"accountId\\\":");
         }
