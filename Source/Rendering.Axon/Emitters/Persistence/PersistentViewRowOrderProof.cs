@@ -30,13 +30,14 @@ internal static class PersistentViewRowOrderProof
         /** Hold only the old source segment; row routing must not depend on that source. */
         class __NAME__RowOrderTest {
             @Test void differentSourcesWriteOneRowInStreamOrder() throws Exception {
-                var segments = Segment.splitBalanced(Segment.ROOT_SEGMENT, 4);
+                var segments = Segment.splitBalanced(Segment.ROOT_SEGMENT, 3);
                 var rowSegment = segments.stream().filter(segment -> segment.matches(__ROW_KEY__)).findFirst().orElseThrow();
                 var held = segments.stream().filter(segment -> !segment.equals(rowSegment)).findFirst().orElseThrow();
                 var firstSource = sourceFor(held);
                 var competingSource = sourceFor(rowSegment);
                 var first = __ROW_FIRST__;
                 var competing = __ROW_COMPETING__;
+                __ROW_LATER__
                 assertTrue(held.matches(AggregateBasedEventStorageEngineUtils.resolveAggregateIdentifier(Set.of(tag(first)))));
                 assertTrue(rowSegment.matches(AggregateBasedEventStorageEngineUtils.resolveAggregateIdentifier(Set.of(tag(competing)))));
                 assertNotEquals(held, rowSegment, "FIXTURE: default routing must separate the competing deliveries");
@@ -45,10 +46,12 @@ internal static class PersistentViewRowOrderProof
                 projector.on(first__ARGUMENT__);
                 projector.on(first__ARGUMENT__);
                 projector.on(competing__ARGUMENT__);
+                __ROW_REFERENCE_LATER__
                 var inverted = new InMemoryReadModelStore<Object, __MODEL__>();
                 var reversed = projector(inverted);
                 reversed.on(first__ARGUMENT__);
                 reversed.on(competing__ARGUMENT__);
+                __ROW_INVERTED_LATER__
                 reversed.on(first__ARGUMENT__);
                 assertNotEquals(normalized(reference.all()), normalized(inverted.all()),
                         "FIXTURE: the last writer must expose inversion, with no later masking event");
@@ -64,6 +67,7 @@ internal static class PersistentViewRowOrderProof
                     await(() -> !processor.processingStatus().containsKey(held.getSegmentId()));
                     append(application, first);
                     append(application, competing);
+                    __ROW_APPEND_LATER__
                     var terminalHead = head(application);
                     // This reads persisted tokens in a fresh EntityManager, never an in-flight handler signal.
                     await(() -> coversHead(application, terminalHead, rowSegment.getSegmentId()));

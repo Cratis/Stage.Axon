@@ -8,7 +8,7 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false, IReadOnlyList<string>? keys = null)
+internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false, IReadOnlyList<string>? keys = null, ProjectionHandlerBinding.ProjectionSequence? sequence = null)
 {
     readonly ProjectionUpdates _updates = new(context, types, model.Id);
 
@@ -23,7 +23,10 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
     internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false)
     {
         EmitContextual(body, eventType, transitions, message);
+        if (PersistentViewAdmission.Supports(context, model.Id)) EmitSequencing(body, sequence ?? new(eventType, null));
     }
+
+    static string SequenceName(string eventType) => eventType.Split('.')[^1] + "Sequence";
 
     void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message)
     {
@@ -35,6 +38,10 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var messageParameter = message ? $", {eventMessage} message" : string.Empty;
         var messageArgument = message ? ", message" : string.Empty;
         var arguments = messageArgument + (_updates.Enabled ? ", updates" : string.Empty);
+        if (PersistentViewAdmission.Supports(context, model.Id))
+        {
+            body.Line($"@{body.Reference("org.axonframework.messaging.core.annotation.SequencingPolicy")}({SequenceName(eventType)}.class)");
+        }
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
             .Block($"public void handle({eventType} event{updateParameter}, {processing} context)", method =>
             {
@@ -44,6 +51,27 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
             })
             .Block($"public {modifier}void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store);"))
             .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
+    }
+
+    void EmitSequencing(JavaCodeBuilder body, ProjectionSequence sequence)
+    {
+        var policy = body.Reference("org.axonframework.messaging.core.sequencing.SequencingPolicy");
+        var message = body.Reference("org.axonframework.messaging.eventhandling.EventMessage");
+        var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
+        var optional = body.Reference("java.util.Optional");
+        var identifier = sequence.Key ?? JavaCodeBuilder.StringLiteral(package + "." + JavaNames.Type(model.Name));
+        body.Block($"public static final class {SequenceName(sequence.EventType)} implements {policy}<{message}>", nested =>
+        {
+            nested.Line("@Override")
+                .Block($"public {optional}<{nested.Reference("java.lang.Object")}> sequenceIdentifierFor({message} message, {processing} context)", method =>
+                {
+                    if (sequence.Key is not null)
+                    {
+                        method.Line($"var event = message.payloadAs({sequence.EventType}.class, context.component({method.Reference("org.axonframework.messaging.eventhandling.conversion.EventConverter")}.class));");
+                    }
+                    method.Line($"return {optional}.of({identifier});");
+                });
+        });
     }
 
     void BindStore(JavaCodeBuilder method, string messageArgument)
@@ -82,4 +110,6 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         transitions(method);
         _updates.Notify(method, package);
     }
+
+    internal sealed record ProjectionSequence(string EventType, string? Key);
 }

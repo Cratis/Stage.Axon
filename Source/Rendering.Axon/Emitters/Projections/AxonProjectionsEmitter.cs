@@ -134,10 +134,13 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
                 var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == group.Key);
                 var values = new ProjectionValues(context, types, body);
                 var keys = group.Count() < 2 ? [] : ProjectionHandlerBinding.PreReserved([.. group.Select(from => values.Key(from.Key, @event))]);
-                new ProjectionHandlerBinding(context, types, model, package, keys: keys).Emit(body, types.EventType(group.Key, body), method =>
-                {
-                    foreach (var from in group) EmitFrom(context, types, method, projection, model, @event, from);
-                });
+                new ProjectionHandlerBinding(context, types, model, package, keys: keys, sequence: new(types.EventType(group.Key, body), group.Count() == 1 ? values.Key(group.Single().Key, @event) : null)).Emit(
+                    body,
+                    types.EventType(group.Key, body),
+                    method =>
+                    {
+                        foreach (var from in group) EmitFrom(context, types, method, projection, model, @event, from);
+                    });
             }
         });
         ViewJavaTypes.Add(context, package, name, code.Build(), projection.Id);
