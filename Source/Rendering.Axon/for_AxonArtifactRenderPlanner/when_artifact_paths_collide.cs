@@ -18,12 +18,25 @@ public class when_artifact_paths_collide : given.an_axon_request
     {
         var plan = new AxonArtifactRenderPlanner([new Colliding(later)]).Plan(request);
         plan.Success.ShouldBeTrue();
+        plan.Refusals.ShouldBeEmpty();
         plan.Artifacts.Count(artifact => artifact.RelativePath.EndsWith(".java", StringComparison.Ordinal)).ShouldEqual(1);
         var first = plan.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/Item.java", StringComparison.Ordinal));
         Encoding.UTF8.GetString(first.Bytes.AsSpan()).ShouldContain("first");
         plan.Diagnostics.Single(diagnostic => diagnostic.Code == "STAGE-AXON-GENERATION").Severity.ShouldEqual(ArtifactRenderDiagnosticSeverity.Warning);
         var summary = plan.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md");
         Encoding.UTF8.GetString(summary.Bytes.AsSpan()).ShouldContain("References may not compile");
+    }
+
+    [Theory]
+    [InlineData("Item")]
+    [InlineData("item")]
+    void should_refuse_dropped_artifacts_in_strict_mode(string later)
+    {
+        var plan = new AxonArtifactRenderPlanner([new Colliding(later)]).Plan(request with { Profile = AxonRendering.CreateProfile(strict: true) });
+        plan.Success.ShouldBeFalse();
+        plan.Artifacts.ShouldBeEmpty();
+        plan.Diagnostics.Single(diagnostic => diagnostic.Code == "STAGE-AXON-GENERATION").Severity.ShouldEqual(ArtifactRenderDiagnosticSeverity.Error);
+        plan.Refusals.Any(refusal => refusal.Codes.Contains("STAGE-AXON-GENERATION")).ShouldBeTrue();
     }
 
     sealed class Colliding(string later) : IAxonEmitter

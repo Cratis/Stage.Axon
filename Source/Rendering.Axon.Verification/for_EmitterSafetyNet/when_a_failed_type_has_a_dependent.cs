@@ -12,7 +12,7 @@ namespace Cratis.Stage.Rendering.Axon.Verification.for_EmitterSafetyNet;
 public class when_a_failed_type_has_a_dependent
 {
     [Fact]
-    public async Task should_compile_the_stub_and_its_dependent_module()
+    public async Task should_compile_completed_concept_and_enum_apis_and_the_incomplete_stub_with_their_dependent()
     {
         var root = the_repository.Root();
         var loaded = await blueprint_models.Load("orders");
@@ -45,6 +45,9 @@ public class when_a_failed_type_has_a_dependent
             throw;
         }
         Assert.True(process.ExitCode == 0, await output + await errors);
+        Assert.True(File.Exists(Path.Combine(directory, "classes", "proof", "Allocated.class")));
+        Assert.True(File.Exists(Path.Combine(directory, "classes", "proof", "Status.class")));
+        Assert.True(File.Exists(Path.Combine(directory, "classes", "proof", "Unfinished$Value.class")));
         Assert.True(File.Exists(Path.Combine(directory, "classes", "proof", "Dependent.class")));
         Assert.True(File.Exists(Path.Combine(directory, "classes", "module-info.class")));
     }

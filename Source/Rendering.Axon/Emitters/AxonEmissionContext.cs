@@ -32,11 +32,12 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
 
     internal Dictionary<string, JavaAllocation> AllocatedTypes { get; } = new(StringComparer.Ordinal);
 
-    internal void AllocateJava(string package, string name, string? stub = null) =>
-        AllocateJava(new(package, name, stub ?? TypeStub(package, name), false, []));
+    // Incomplete allocations must supply their downstream API; it cannot be reconstructed from a type name.
+    internal void AllocateJava(string package, string name, string stub) =>
+        AllocateJava(new(package, name, stub, false, []));
 
     internal void AddJava(string package, string name, string code, bool test = false, params SemanticId[] sources) =>
-        AddJava(new(package, name, TypeStub(package, name), test, sources), code);
+        AddJava(new(package, name, code, test, sources), code);
 
     internal string UnsupportedBody(string code, SemanticId owner, string reason)
     {
@@ -44,17 +45,9 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
         return JavaStubs.ThrowingBody(code, reason);
     }
 
-    static string TypeStub(string package, string name) => new JavaCodeBuilder(package).Declare(name)
-        .DiffersFromScreenplay("Generation failed; this type is an unsupported stub.")
-        .Block($"public class {name}", body => body.Block($"public {name}()", method =>
-            method.Line($"throw new {method.Reference("java.lang.UnsupportedOperationException")}(\"Generation failed\");"))).Build();
-
     void AddJava(JavaAllocation allocation, string code)
     {
-        var record = code.IndexOf($"public record {allocation.Name}(", StringComparison.Ordinal);
-        var body = record < 0 ? -1 : code.IndexOf('{', record);
-        var stub = body < 0 ? allocation.Stub : code[..body] + $"{{ public {allocation.Name} {{ throw new java.lang.UnsupportedOperationException(\"Generation failed\"); }} }}\n";
-        AllocateJava(allocation with { Stub = stub });
+        AllocateJava(allocation);
         Artifacts.Add(PlannedArtifact.CreateText($"src/{(allocation.Test ? "test" : "main")}/java/{allocation.Package.Replace('.', '/')}/{allocation.Name}.java", code, [.. allocation.Sources]));
     }
 

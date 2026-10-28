@@ -30,11 +30,13 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
                 if (model is null)
                 {
                     const string reason = "read model outside slice";
-                    context.Degradation.Unsupported(AxonRefusalCodes.ProjectionMapping, projection.Id, reason);
+                    const string intent = "project events";
+                    var path = projection.Id.ToString();
+                    context.Degradation.Unsupported(AxonRefusalCodes.ProjectionMapping, projection.Id, reason, intent, path);
                     var stub = new JavaCodeBuilder(package).DiffersFromScreenplay(reason)
-                        .UnsupportedIntent("project events", projection.Id.ToString(), AxonRefusalCodes.ProjectionMapping)
+                        .UnsupportedIntent(intent, path, AxonRefusalCodes.ProjectionMapping)
                         .Block($"public class {JavaNames.Type(projection.Name)}Projector", _ => { });
-                    context.AddJava(package, JavaNames.Type(projection.Name) + "Projector", stub.Build());
+                    context.AddJava(package, JavaNames.Type(projection.Name) + "Projector", stub.Build(), sources: [projection.Id]);
                     continue;
                 }
                 EmitProjector(context, types, package, projection, model);
