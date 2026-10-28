@@ -1,6 +1,3 @@
-// Copyright (c) Cratis. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
 package __APPLICATION__.runtime;
 
 import __APPLICATION__.accounts.aliases.assign.AssignAliasOn0Append;

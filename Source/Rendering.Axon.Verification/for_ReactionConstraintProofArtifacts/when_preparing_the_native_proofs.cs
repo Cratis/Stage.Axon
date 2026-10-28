@@ -19,6 +19,7 @@ public class when_preparing_the_native_proofs : Specification
         "GeneratedReactionConstraintTest.java", "GeneratedReactionProofSupport.java"
     ]).ShouldBeTrue();
     [Fact] void should_resolve_the_application_package() => _sources.Values.Any(source => source.Contains("__APPLICATION__", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_not_add_license_headers_to_java() => _sources.Values.Any(source => source.Contains("Copyright (c) Cratis", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_not_mix_with_the_ingress_templates() => IngressProofArtifacts.Sources().ContainsKey("GeneratedReactionConstraintTest.java").ShouldBeFalse();
     [Fact] void should_use_container_free_jpa() => _sources["GeneratedPersistentReactionConstraintTest.java"].ShouldContain("jdbc:h2:mem:reaction-constraints");
     [Fact]
