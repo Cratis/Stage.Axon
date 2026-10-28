@@ -51,6 +51,8 @@ Default Surefire discovery runs generated gateway uniqueness races against the a
 
 The authorization tests deny anonymous and wrong-role commands before claims or appends, deny snapshot queries on both ingress paths, and accept authorized calls. Recorded facts must identify the authenticated caller rather than a forged body/header principal. Live-query authorization remains covered by emitter specs; the optional live-stream ownership probe is not added.
 
+The `inline-java-policies` bearer fixture adds one application with verbatim Java policy bodies. Its native proofs cover Finance/Writer allow and deny, anonymous and unauthenticated denial, JWT-over-details precedence, and opt-in demo claims (missing claims deny). The pinned Screenplay contract refuses inline policies beneath NOT; a renderer spec pins that upstream refusal instead of constructing an invalid fixture. Native tests cover body exceptions and FAILED operands denying through AND and OR without short-circuiting. Without failures, AND requires both operands to grant; OR allows a granting role even when its policy legitimately denies. These new native proofs require CI Maven execution; no local native result is implied.
+
 An in-memory uniqueness reservation may reject a contender even when its owner later rolls back; the JPA rollback proof does not promise that the in-memory store retries that contender. Authorization proofs record observed HTTP denial statuses without defining the transport's error-status or envelope policy.
 
 These are native CI proofs, not evidence from .NET rendering alone. Local verification renders their sources and runs emitter/harness specs; Java/Maven execution and the actual concurrency outcomes must be checked in CI.

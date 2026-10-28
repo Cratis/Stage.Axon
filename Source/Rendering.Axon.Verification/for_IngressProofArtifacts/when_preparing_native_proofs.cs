@@ -28,9 +28,20 @@ public partial class when_preparing_native_proofs : Specification
     [Fact]
     void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
     [
-        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
+        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
         "GeneratedPersistentUniqueConcurrencyTest.java", "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
+    [Fact]
+    void should_include_the_inline_policy_failure_and_composition_proofs()
+    {
+        var sources = IngressProofArtifacts.Sources("inline-java-policies");
+        sources.Count.ShouldEqual(2);
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("inlineFailureAndAnonymousNeverGrant");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("roleGrantOrLegitimatePolicyDenyGrants");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("failedOperandDeniesAndAndOr");
+        sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain("stage.axon.demo.claims.department=Finance Operations");
+    }
+
     [Fact] void should_resolve_all_template_packages() => _all.ShouldNotContain("__APPLICATION__");
     [Fact] void should_resolve_the_runtime_package() => _all.ShouldNotContain("__RUNTIME__");
     [Fact] void should_not_add_license_headers_to_java() => _all.ShouldNotContain("Copyright (c) Cratis");

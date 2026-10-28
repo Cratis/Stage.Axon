@@ -28,6 +28,7 @@ internal static class CorpusApplications
             .. files.Select(path => ("view-" + Path.GetFileNameWithoutExtension(path), path)),
             (IngressProofModel.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/ingress-invariants.play")),
             (IngressProofModel.PersistentApplication, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/ingress-invariants.play")),
+            ("inline-java-policies", Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/inline-java-policies.play")),
             (ClientProofArtifacts.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/client-proof.play"))
         ];
     }

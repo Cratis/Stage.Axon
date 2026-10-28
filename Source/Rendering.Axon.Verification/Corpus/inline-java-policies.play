@@ -10,6 +10,12 @@ policy IsFinanceStaff
     return claims.get("department") instanceof String department && department.startsWith("Finance");
     ```
 
+policy FinanceCheck
+  ```java
+    if ("throw".equals(claims.get("department"))) throw new IllegalStateException("policy failure");
+    return claims.get("department") instanceof String department && department.startsWith("Finance");
+    ```
+
 module Accounts
   feature Registry
     slice StateChange Register
@@ -33,6 +39,18 @@ module Accounts
       query AccountSnapshot => ActiveAccounts optional
         by id AccountId
         authorize IsFinanceStaff
+
+      query CheckedSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize FinanceCheck
+
+      query AndSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsWriter and FinanceCheck
+
+      query OrSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsWriter or FinanceCheck
 
       projection ActiveAccountsProjection => ActiveAccounts
         from AccountRegistered

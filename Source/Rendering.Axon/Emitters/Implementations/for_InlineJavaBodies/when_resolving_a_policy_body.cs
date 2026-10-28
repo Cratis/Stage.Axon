@@ -26,7 +26,7 @@ public class when_resolving_a_policy_body : Specification
             ImplementationContents = loaded.ImplementationContents
         };
         context = new(request, new(request.Profile));
-        requirement = loaded.ImplementationRequirements.Single();
+        requirement = loaded.ImplementationRequirements.Single(item => item.Member == "IsFinanceStaff");
     }
 
     [Fact] void should_have_the_policy_role() => requirement.Role.ShouldEqual(SemanticImplementationRole.PolicyPredicate);

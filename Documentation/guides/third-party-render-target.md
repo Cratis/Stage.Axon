@@ -208,6 +208,8 @@ Live queries use Axon subscription queries. Projector invalidations cause the pu
 
 Endpoints and handlers share the renderer's Spring Security mapping. Unsupported authorization policies fail closed with a warning and intent comment; a query is not made public to accommodate an unsupported policy.
 
+Resolvable inline Java policy bodies run natively in the generated policies bean with `authentication` and `claims` parameters. They return boolean and must not redeclare those names. Each authorization site involving an inline policy calls one eager, three-valued Java evaluator: failed evaluation denies regardless of AND, OR or NOT. AND requires both ALLOW and OR requires either ALLOW only after all operands evaluate successfully; any FAILED denies, even when the other OR operand grants. Screenplay 4.250.0 refuses inline policies under NOT; defensive FAILED propagation remains in the evaluator. Foreign-language or unresolved bodies still deny and report degradation; declarative claim conditions remain unsupported. JWT attributes precede details-map claims. Demo details claims (`stage.axon.demo.claims.*`) exist only with the explicitly enabled `demo` profile.
+
 ### Performed queries and reducers
 
 A query performer becomes a `<Query>Performer` interface taking the typed query and store and returning rows. Handlers delegate to that interface rather than substituting an ordinary store listing. An admitted inline Java body fills the existing default method; a Spring bean can still replace it through `@ConditionalOnMissingBean`. Without an admitted body the default throws `UnsupportedOperationException`, emits `STAGE-AXON-0401` and preserves the modeled intent. Non-Java bodies are not translated.
