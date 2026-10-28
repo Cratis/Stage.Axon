@@ -8,6 +8,8 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
 internal static class ReactionScheduling
 {
+    static readonly string[] _weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
     // These generated annotations contain only framework type references and literal schedule parameters.
     internal static string? Annotation(SemanticReactionTrigger trigger) => trigger.Kind switch
     {
@@ -15,15 +17,6 @@ internal static class ReactionScheduling
         SemanticReactionTriggerKind.Schedule => Schedule(trigger),
         _ => EventAnnotation(trigger.Kind)
     };
-
-    internal static void CalendarGuard(JavaCodeBuilder body, SemanticReactionTrigger trigger)
-    {
-        if (trigger.Kind != SemanticReactionTriggerKind.Schedule) return;
-        if (trigger.OnDayOfMonth is null && trigger.OnDayOfWeek is null) return;
-        body.Line($"var date = {body.Reference("java.time.LocalDate")}.now(clock.withZone({body.Reference("java.time.ZoneOffset")}.UTC));");
-        if (trigger.OnDayOfMonth is { } day) body.Line($"if (date.getDayOfMonth() != {day}) return;");
-        if (trigger.OnDayOfWeek is { } weekday) body.Line($"if (date.getDayOfWeek().getValue() % 7 != {weekday}) return;");
-    }
 
     static string? EventAnnotation(SemanticReactionTriggerKind kind) => kind switch
     {
@@ -37,15 +30,17 @@ internal static class ReactionScheduling
     static string? Interval(long? seconds) => seconds is > 0
         ? "@org.springframework.scheduling.annotation.Scheduled(fixedRateString = " + JavaCodeBuilder.StringLiteral("PT" + seconds + "S") + ")" : null;
 
-    static string? Schedule(SemanticReactionTrigger trigger) => trigger.At is >= 0 and < 86400 && ValidDays(trigger) ? Cron(trigger.At.Value) : null;
+    static string? Schedule(SemanticReactionTrigger trigger) => trigger.At is >= 0 and < 86400 && ValidDays(trigger) ? Cron(trigger.At.Value, trigger) : null;
 
     static bool ValidDays(SemanticReactionTrigger trigger) =>
         (trigger.OnDayOfMonth is null or (>= 1 and <= 31)) && (trigger.OnDayOfWeek is null or (>= 0 and <= 6));
 
-    static string Cron(int seconds)
+    static string Cron(int seconds, SemanticReactionTrigger trigger)
     {
         var minutes = seconds / 60;
+        var day = trigger.OnDayOfMonth?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "*";
+        var weekday = trigger.OnDayOfWeek is { } value ? _weekdays[value] : "*";
         return "@org.springframework.scheduling.annotation.Scheduled(cron = " +
-            JavaCodeBuilder.StringLiteral($"{seconds % 60} {minutes % 60} {seconds / 3600} * * *") + ", zone = \"UTC\")";
+            JavaCodeBuilder.StringLiteral($"{seconds % 60} {minutes % 60} {seconds / 3600} {day} * {weekday}") + ", zone = \"UTC\")";
     }
 }

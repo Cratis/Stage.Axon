@@ -24,6 +24,8 @@ public class when_planning_the_inline_java_bodies_application : Specification
     [Fact] void should_plan_without_refusals() => (_plan.Success && _plan.Refusals.IsEmpty).ShouldBeTrue();
     [Fact] void should_place_the_command_handler_body() => Source("RecordCountHandler").ShouldContain("// inline-java-bodies: command handler");
     [Fact] void should_place_the_reaction_body() => Source("GuardRecordedCountReaction").ShouldContain("// inline-java-bodies: reaction effect");
+    [Fact] void should_place_the_acknowledgement_handler_body() => Source("AcknowledgeCountHandler").ShouldContain("// inline-java-bodies: acknowledgement handler");
+    [Fact] void should_send_the_invoked_command_from_the_event_handler() => Source("AcknowledgeRecordedCountReaction").ShouldContain("commands.sendAndWait(new AcknowledgeCount(input.id(), input.amount()), context);");
     [Fact] void should_place_the_performer_body() => Source("DoubledTotalsPerformer").ShouldContain("// inline-java-bodies: query performer");
     [Fact] void should_place_the_reducer_body() => Source("RebuiltTotalReducer").ShouldContain("// inline-java-bodies: reducer transition");
     [Fact] void should_import_the_produced_event_for_the_handler_body() => Source("RecordCountHandler").ShouldContain("import corpusinlinejavabodies.bodies.events.CountRecorded;");

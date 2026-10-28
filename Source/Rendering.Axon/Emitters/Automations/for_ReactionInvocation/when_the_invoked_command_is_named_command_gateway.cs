@@ -15,7 +15,7 @@ public class when_the_invoked_command_is_named_command_gateway : for_AxonAutomat
     void Because()
     {
         Render();
-        _code = Code("SubmitOrderReaction");
+        _code = Code("SubmitOrderEndpoint");
     }
 
     [Fact] void should_keep_the_model_command_short() => _code.ShouldContain("commands.sendAndWait(new CommandGateway(");
