@@ -150,7 +150,7 @@ internal static class PersistentViewProofSupport
             public static class RollbackWitness {
                 private final ConfigurableApplicationContext application;
                 RollbackWitness(ConfigurableApplicationContext application) { this.application = application; }
-                @org.axonframework.messaging.core.annotation.SequencingPolicy(__PROJECTOR__.__SEQUENCE__.class)
+                @org.axonframework.messaging.core.annotation.SequencingPolicy(type = __PROJECTOR__.__SEQUENCE__.class)
                 @EventHandler
                 public void handle(__EVENT_TYPE__ event, ProcessingContext context) {
                     var owner = Segment.fromContext(context).map(Segment::getSegmentId)

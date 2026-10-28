@@ -14,7 +14,7 @@ internal static class DefaultViewRollbackProof
                 final AtomicBoolean reject = new AtomicBoolean();
                 final AtomicInteger stagedFailures = new AtomicInteger();
                 RejectingDelivery(@Qualifier("__QUALIFIER__") ReadModelStore<Object, __MODEL__> store) { this.store = store; }
-                @org.axonframework.messaging.core.annotation.SequencingPolicy(__PROJECTOR__.__SEQUENCE__.class)
+                @org.axonframework.messaging.core.annotation.SequencingPolicy(type = __PROJECTOR__.__SEQUENCE__.class)
                 @EventHandler
                 public void handle(__EVENT_TYPE__ event, ProcessingContext context) {
                     if (!reject.getAndSet(false)) return;

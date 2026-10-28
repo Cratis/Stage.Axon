@@ -40,7 +40,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var arguments = messageArgument + (_updates.Enabled ? ", updates" : string.Empty);
         if (PersistentViewAdmission.Supports(context, model.Id))
         {
-            body.Line($"@{body.Reference("org.axonframework.messaging.core.annotation.SequencingPolicy")}({SequenceName(eventType)}.class)");
+            body.Line($"@{body.Reference("org.axonframework.messaging.core.annotation.SequencingPolicy")}(type = {SequenceName(eventType)}.class)");
         }
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
             .Block($"public void handle({eventType} event{updateParameter}, {processing} context)", method =>
@@ -59,13 +59,15 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var message = body.Reference("org.axonframework.messaging.eventhandling.EventMessage");
         var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
         var optional = body.Reference("java.util.Optional");
-        var identifier = sequence.Key ?? JavaCodeBuilder.StringLiteral(package + "." + JavaNames.Type(model.Name));
+        var routing = new ProjectionSequencing(context, types, model);
+        var key = routing.UsesModelSequence ? null : sequence.Key;
+        var identifier = key ?? JavaCodeBuilder.StringLiteral(routing.Namespace);
         body.Block($"public static final class {SequenceName(sequence.EventType)} implements {policy}<{message}>", nested =>
         {
             nested.Line("@Override")
                 .Block($"public {optional}<{nested.Reference("java.lang.Object")}> sequenceIdentifierFor({message} message, {processing} context)", method =>
                 {
-                    if (sequence.Key is not null)
+                    if (key is not null)
                     {
                         method.Line($"var event = message.payloadAs({sequence.EventType}.class, context.component({method.Reference("org.axonframework.messaging.eventhandling.conversion.EventConverter")}.class));");
                     }

@@ -42,7 +42,7 @@ public class when_emitting_multi_key_flat_handlers : Persistence.for_PersistentV
     void should_sequence_multi_key_handlers_by_the_model_namespace(bool root)
     {
         var code = Projector(root);
-        code.ShouldContain("return Optional.of(\"axonviews.features.totals.views.Total\");");
+        code.ShouldContain("return Optional.of(\"axonviews.views.counters.totals.Total\");");
         code.ShouldNotContain("return Optional.of(String.valueOf(event.eventSourceId()");
     }
 
