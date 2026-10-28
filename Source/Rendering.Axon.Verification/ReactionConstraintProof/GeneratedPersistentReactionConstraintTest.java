@@ -3,7 +3,7 @@
 
 package __APPLICATION__.runtime;
 
-import __APPLICATION__.runtime.persistent.JpaUniqueValueStore;
+import io.cratis.stage.axon.runtime.persistent.JpaUniqueValueStore;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
