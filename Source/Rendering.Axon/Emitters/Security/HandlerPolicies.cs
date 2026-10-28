@@ -2,9 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
-using Cratis.Stage.Rendering.Axon.Emitters.Queries;
 using Cratis.Stage.Rendering.Axon.Java;
-using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Security;
 
@@ -15,15 +13,13 @@ internal static class HandlerPolicies
         if (authorization is null) return string.Empty;
         var roles = Roles(context, authorization);
         if (roles is { Length: 0 }) return string.Empty;
-        var live = ScopeSelection.Select(context.Request).SelectMany(slice => slice.Slice.Queries.Concat(QueryPerformer.Queries(context, slice)))
-            .Any(query => query.Id == owner && query.Delivery == SemanticQueryDelivery.Live);
         var annotation = "@" + code.Reference("org.springframework.security.access.annotation.Secured");
-        if (roles is not null && !live) return annotation + "({" + string.Join(", ", roles.Select(role => JavaCodeBuilder.StringLiteral("ROLE_" + role))) + "})";
+
+        // Axon authorizes subscriptions at opening; a denied initial result terminates before any updates.
+        if (roles is not null) return annotation + "({" + string.Join(", ", roles.Select(role => JavaCodeBuilder.StringLiteral("ROLE_" + role))) + "})";
         const string intent = "authorize access with the modeled policy";
         var path = owner + "/authorization";
-        var reason = live
-            ? "Subscription updates have no proven native authorization boundary; the protected live handler denies before initial data access or stream setup."
-            : "This handler policy requires claims, custom Authentication fields, or conditions not expressible by native metadata role checks; access is denied.";
+        const string reason = "This handler policy requires claims, custom Authentication fields, or conditions not expressible by native metadata role checks; access is denied.";
         context.Degradation.Unsupported("STAGE-AXON-AUTHORIZATION", owner, reason, intent, path);
         return "// Differs from Screenplay: " + reason + "\n" + JavaCodeBuilder.UnsupportedComment(intent, path, "STAGE-AXON-AUTHORIZATION") + "\n" + annotation + "({})";
     }

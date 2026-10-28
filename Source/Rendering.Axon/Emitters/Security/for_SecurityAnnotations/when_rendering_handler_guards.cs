@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
+using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Security.for_SecurityAnnotations;
@@ -21,6 +22,14 @@ public class when_rendering_handler_guards : for_AxonArtifactRenderPlanner.given
 
     [Fact] void should_preserve_public_handlers() => Guard(null).ShouldEqual(string.Empty);
     [Fact] void should_use_native_metadata_roles() => Guard(new SemanticPolicyReference("IsSales")).ShouldEqual("@Secured({\"ROLE_Sales\"})");
+    [Fact]
+    void should_authorize_subscriptions_at_opening_without_degradation()
+    {
+        var live = ScopeSelection.Select(request).SelectMany(slice => slice.Slice.Queries).First(query => query.Delivery == SemanticQueryDelivery.Live);
+        SecurityAnnotations.ForHandler(context, new SemanticPolicyReference("IsSales"), live.Id, code).ShouldEqual("@Secured({\"ROLE_Sales\"})");
+        context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
+    }
+
     [Fact]
     void should_import_the_native_annotation()
     {
