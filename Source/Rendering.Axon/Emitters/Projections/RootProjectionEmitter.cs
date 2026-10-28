@@ -70,18 +70,35 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
         code.Line("{")
             .Line($"    var key = {key};")
             .Line($"    var state = repository.findById(key).map({entity}::toModel).orElseGet(() -> {records.Empty(modelName, model.Properties)});");
-        foreach (var mapping in from.Mappings)
+        if (from.Key is SemanticProjectionCompositeKey composite && model.Properties.Where(property => property.IsIdentifier).ToArray() is [var identifier] && values.CompositeValue(composite, @event) is { } value)
         {
-            var target = mapping.Target.Length == 0 ? null : records.Property(model.Properties, mapping.Target);
-            var expression = target is null ? null : values.Mapping(mapping, target, @event, records.Access(model.Properties, mapping.Target, "state"));
-            if (expression is null)
-            {
-                context.Degradation.Unsupported(AxonRefusalCodes.ProjectionMapping, projection.Id, "The projection mapping is not available in the Axon target.");
-                code.UnsupportedIntent("map the projected property", projection.Id.ToString(), AxonRefusalCodes.ProjectionMapping);
-                continue;
-            }
-            code.Line($"    state = {records.Set(modelName, model.Properties, mapping.Target, "state", expression)};");
+            code.Line($"    state = {records.Set(modelName, model.Properties, [identifier.Id], "state", value)};");
         }
+
+        foreach (var mapping in Identity(from)) Apply(code, values, records, modelName, @event, mapping);
+        foreach (var mapping in from.Mappings) Apply(code, values, records, modelName, @event, mapping);
         code.Line($"    repository.save(new {entity}(key, state));").Line("}");
+    }
+
+    IEnumerable<SemanticProjectionMapping> Identity(SemanticProjectionFrom from)
+    {
+        if (from.Key is SemanticProjectionPartsKey parts) return parts.Parts.Select(part => new SemanticProjectionMapping([part.Property], SemanticProjectionOperation.Set, part.Value));
+        var identifiers = model.Properties.Where(property => property.IsIdentifier).ToArray();
+        if (identifiers.Length != 1) return [];
+        return from.Key is SemanticProjectionValueKey key ? [new SemanticProjectionMapping([identifiers[0].Id], SemanticProjectionOperation.Set, key.Value)] : [];
+    }
+
+    void Apply(JavaCodeBuilder code, ProjectionValues values, ProjectionRecords records, string modelName, SemanticEventContract @event, SemanticProjectionMapping mapping)
+    {
+        var target = mapping.Target.Length == 0 ? null : records.Property(model.Properties, mapping.Target);
+        var expression = target is null ? null : values.Mapping(mapping, target, @event, records.Access(model.Properties, mapping.Target, "state"));
+        if (expression is null)
+        {
+            context.Degradation.Unsupported(AxonRefusalCodes.ProjectionMapping, projection.Id, "The projection mapping is not available in the Axon target.");
+            code.UnsupportedIntent("map the projected property", projection.Id.ToString(), AxonRefusalCodes.ProjectionMapping);
+            return;
+        }
+
+        code.Line($"    state = {records.Set(modelName, model.Properties, mapping.Target, "state", expression)};");
     }
 }

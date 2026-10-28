@@ -14,6 +14,9 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 /// </summary>
 internal static class ReadModelEntities
 {
+    /// <summary>The longest VARCHAR H2 supports. A modeled key is never truncated or rejected by an implicit limit, and a CLOB cannot be a primary key, so the column is spelled out.</summary>
+    internal const int KeyLength = 1_000_000_000;
+
     internal static string EntityName(SemanticReadModel model) => JavaNames.Type(model.Name) + "Entity";
 
     internal static string RepositoryName(SemanticReadModel model) => JavaNames.Type(model.Name) + "Repository";
@@ -32,7 +35,7 @@ internal static class ReadModelEntities
             .Block($"public class {entity}", body =>
             {
                 body.Line($"@{body.Reference("jakarta.persistence.Id")}")
-                    .Line($"@{body.Reference("jakarta.persistence.Column")}(name = \"row_key\")")
+                    .Line($"@{body.Reference("jakarta.persistence.Column")}(name = \"row_key\", columnDefinition = \"VARCHAR({KeyLength})\")")
                     .Line($"private {body.Reference("java.lang.String")} rowKey;");
                 foreach (var (_, member, column) in columns)
                 {
@@ -85,7 +88,7 @@ internal static class ReadModelEntities
 
     static string Basic(string column, SemanticPrimitiveType primitive) => primitive switch
     {
-        SemanticPrimitiveType.DecimalNumber => column + ", precision = 38, scale = 10)",
+        SemanticPrimitiveType.DecimalNumber => column + ", columnDefinition = \"DECFLOAT\")",
         SemanticPrimitiveType.Uuid or SemanticPrimitiveType.WholeNumber or SemanticPrimitiveType.Boolean or SemanticPrimitiveType.Date or SemanticPrimitiveType.DateTime => column + ")",
         _ => column + ", length = 4096)"
     };

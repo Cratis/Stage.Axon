@@ -39,3 +39,11 @@ module Pricing
         then readmodel BasketTotal
           name = "global"
           total = 15
+
+      specification KeepingEveryFractionalDigit
+        given LineAdded
+          unitPrice = 0.1234567890123
+          quantity = 1
+        then readmodel BasketTotal
+          name = "global"
+          total = 0.1234567890123

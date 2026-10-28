@@ -37,7 +37,7 @@ public class when_models_are_named_like_runtime_helpers : given.a_view_request
     [Fact] void should_qualify_the_colliding_entity_annotation() => _entities["Entity"].ShouldContain("@jakarta.persistence.Entity(name = \"axonviews.views.counters.totals.EntityEntity\")");
     [Fact] void should_not_import_the_colliding_entity_annotation() => _entities["Entity"].ShouldNotContain("import jakarta.persistence.Entity;");
     [Fact] void should_qualify_the_colliding_id_annotation() => _entities["Id"].ShouldContain("@jakarta.persistence.Id");
-    [Fact] void should_qualify_the_colliding_column_annotation() => _entities["Column"].ShouldContain("@jakarta.persistence.Column(name = \"row_key\")");
+    [Fact] void should_qualify_the_colliding_column_annotation() => _entities["Column"].ShouldContain("@jakarta.persistence.Column(name = \"row_key\", columnDefinition = \"VARCHAR(1000000000)\")");
     [Fact] void should_keep_the_stereotype_on_a_model_named_repository() => _repositories["Repository"].ShouldContain("@Repository(\"axonviews.views.counters.totals.RepositoryRepository\")");
     [Fact] void should_type_the_repository_with_the_entity_of_a_model_named_repository() => _repositories["Repository"].ShouldContain("JpaRepository<RepositoryEntity, String>");
     [Fact] void should_keep_the_jpa_interface_for_a_model_named_jpa_repository() => _repositories["JpaRepository"].ShouldContain("JpaRepository<JpaRepositoryEntity, String>");
