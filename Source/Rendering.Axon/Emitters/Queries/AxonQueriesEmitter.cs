@@ -88,7 +88,7 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                     constructor.Line("this.store = store;");
                     if (performed) constructor.Line("this.performer = performer;");
                 });
-                var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
+                var authorization = SecurityAnnotations.ForHandler(context, query.Authorization, query.Id, body);
                 if (authorization.Length > 0) body.Line(authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal));
                 body.Line("@" + body.Reference("org.axonframework.messaging.queryhandling.annotation.QueryHandler")).Block($"public {name}.Result handle({name} query)", method =>
                 {

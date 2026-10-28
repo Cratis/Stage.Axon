@@ -18,7 +18,7 @@ public class when_emitting_basic_security_by_default : for_AxonArtifactRenderPla
         code = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/SecurityConfiguration.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 
-    [Fact] void should_keep_basic() => code.ShouldContain(".httpBasic(basic -> basic.authenticationEntryPoint(entryPoint())).build();");
+    [Fact] void should_keep_basic() => code.ShouldContain(".httpBasic(Customizer.withDefaults()).build();");
     [Theory]
     [InlineData("oauth2")]
     [InlineData("Jwt")]

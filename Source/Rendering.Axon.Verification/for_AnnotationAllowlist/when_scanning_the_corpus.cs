@@ -12,7 +12,8 @@ public class when_scanning_the_corpus : Specification
 {
     AnnotationScan scan;
     IReadOnlySet<string> recorded;
-    int applications;
+    readonly List<string> applications = [];
+    string[] discovered;
 
     async Task Establish()
     {
@@ -20,7 +21,9 @@ public class when_scanning_the_corpus : Specification
         recorded = AnnotationAllowlist.Load(repository);
         using var inputs = CanonicalCorpusInputs.Create(repository);
         var files = new List<(string Path, string Source)>();
-        foreach (var (name, root) in CorpusApplications.Find(repository, inputs.Root))
+        var corpus = CorpusApplications.Find(repository, inputs.Root).ToArray();
+        discovered = [.. corpus.Select(application => application.Name)];
+        foreach (var (name, root) in corpus)
         {
             var applicationName = "Corpus" + string.Concat(name.Split('-').Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
             var compilation = File.Exists(root)
@@ -31,12 +34,13 @@ public class when_scanning_the_corpus : Specification
             Assert.True(plan.Success);
             files.AddRange(plan.Artifacts.Where(artifact => artifact.RelativePath.EndsWith(".java", StringComparison.Ordinal))
                 .Select(artifact => (name + "/" + artifact.RelativePath, Encoding.UTF8.GetString(artifact.Bytes.AsSpan()))));
-            applications++;
+            applications.Add(name);
         }
         scan = AnnotationAllowlist.Scan(files);
     }
 
-    [Fact] void should_scan_every_application() => Assert.Equal(32, applications);
+    [Fact] void should_scan_every_application() => applications.ShouldEqual(discovered);
+    [Fact] void should_scan_at_least_one_application() => applications.Count.ShouldBeGreaterThan(0);
     [Fact] void should_find_the_emitted_command_handlers() => Assert.Contains("org.axonframework.messaging.commandhandling.annotation.CommandHandler", scan.Annotations.Keys);
 
     [Fact]

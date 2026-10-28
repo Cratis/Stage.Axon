@@ -55,7 +55,7 @@ public class when_enlisting_property_uniqueness : for_AxonArtifactRenderPlanner.
     [Fact] void should_emit_a_persistent_store() => PersistentModuleSource("JpaUniqueValueStore").ShouldContain("findTransactionalExecutor(context)");
     [Fact] void should_use_the_axon_transaction_callback() => PersistentModuleSource("JpaUniqueValueStore").ShouldContain("ThrowingConsumer<EntityManager, Exception> action");
     [Fact] void should_release_in_memory_reservations_after_errors_too() => ModuleSource("InMemoryUniqueValueStore").ShouldContain("context.doFinally(completed -> complete(changes, completed.isCommitted()))");
-    [Fact] void should_share_the_runtime_http_test_context() => Source("UniqueAppendTransactionTest.java").ShouldContain("@Import(RuntimeHttpRoundTripTest.EchoEndpoint.class)");
+    [Fact] void should_not_depend_on_an_echo_endpoint() => Source("UniqueAppendTransactionTest.java").ShouldNotContain("RuntimeHttpRoundTripTest");
     [Fact] void should_make_the_restart_proof_opt_in() => Source("PersistentRestartProbe.java").ShouldContain("@EnabledIfSystemProperty(named = \"stage.restart\", matches = \"true\")");
     [Fact] void should_exclude_the_restart_probe_from_default_surefire_discovery() => plan.Artifacts.Any(artifact => artifact.RelativePath.EndsWith("/PersistentRestartTest.java", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_boot_viewless_persistence_twice_on_the_same_database() => Source("PersistentRestartProbe.java").ShouldContain("try (var second = boot(database, main))");

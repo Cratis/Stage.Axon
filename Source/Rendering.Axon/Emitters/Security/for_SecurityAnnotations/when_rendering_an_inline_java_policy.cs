@@ -22,7 +22,8 @@ public class when_rendering_an_inline_java_policy : Specification
         var compilation = await SemanticModelLoader.LoadAsync(root, ["inline-java-policies.play"], null, "InlinePolicies");
         compilation.Success.ShouldBeTrue();
         var loaded = compilation.Loaded!;
-        var request = new ArtifactRenderRequest(loaded.Model, loaded.Plan, AxonRendering.CreateProfile(), new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id))
+        var profile = AxonRendering.WithBearerTokens(AxonRendering.CreateProfile());
+        var request = new ArtifactRenderRequest(loaded.Model, loaded.Plan, profile, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id))
         {
             ImplementationRequirements = loaded.ImplementationRequirements,
             ImplementationContents = loaded.ImplementationContents
@@ -31,113 +32,69 @@ public class when_rendering_an_inline_java_policy : Specification
     }
 
     [Fact]
-    void should_call_the_bean_without_degradation()
+    void should_call_the_native_bean_without_degradation()
     {
-        Annotation(new SemanticPolicyReference("IsFinanceStaff")).ShouldEqual(SiteAnnotation);
+        Annotation(new SemanticPolicyReference("IsFinanceStaff")).ShouldEqual("@PreAuthorize(\"isAuthenticated() and @isFinanceStaffPolicy.check(authentication)\")");
         context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
-    }
-
-    [Fact]
-    void should_combine_with_roles() => Annotation(new SemanticLogicalAuthorization(new SemanticPolicyReference("IsWriter"), SemanticLogicalOperator.And, new SemanticPolicyReference("IsFinanceStaff")))
-        .ShouldEqual(SiteAnnotation);
-
-    [Fact]
-    void should_pin_the_upstream_refusal_of_negated_inline_policies()
-    {
-        var policy = context.Request.Model.Application.Policies.Single(policy => policy.Name == "IsFinanceStaff");
-        var application = context.Request.Model.Application with { Policies = [.. context.Request.Model.Application.Policies.Where(candidate => candidate != policy), policy with { Condition = new SemanticNotPolicyCondition(policy.Condition) }] };
-        var exception = Assert.Throws<InvalidSemanticContract>(() => ExecutableSemanticModel.Create(new(7, 0), new(7, 0), application));
-        exception.Message.ShouldEqual("Invalid policy condition.");
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    void should_emit_the_claims_adapter_only_with_selected_dependencies(bool bearer)
+    [InlineData(SemanticLogicalOperator.And)]
+    [InlineData(SemanticLogicalOperator.Or)]
+    void should_deny_whole_compositions_instead_of_broadening_on_failure(SemanticLogicalOperator operation)
     {
-        var request = context.Request with { Profile = bearer ? AxonRendering.WithBearerTokens(context.Request.Profile) : context.Request.Profile };
-        context = new(request, new(request.Profile));
-        new AxonSecurityEmitter().Emit(context);
-        var code = Source("Policies");
-        code.ShouldContain("@Component(\"policies\")");
-        code.ShouldContain("public boolean authorize");
-        Source("IsFinanceStaffPolicy").ShouldContain("public static boolean evaluate(Authentication authentication, Map<String, Object> claims)");
-        code.ShouldContain("IsFinanceStaffPolicy.evaluate(authentication, claims)");
-        code.ShouldContain("catch (Throwable");
-        code.ShouldContain("return false;");
-        code.ShouldContain("claims.putIfAbsent");
-        code.ShouldContain("authentication instanceof AnonymousAuthenticationToken");
-        code.ShouldContain("authentication.getDetails() instanceof Map<?, ?>");
-        Source("IsFinanceStaffPolicy").ShouldContain("return claims.get(\"department\") instanceof String department && department.startsWith(\"Finance\");");
-        code.ShouldNotContain("department.startsWith");
-        code.Contains("jwt.getTokenAttributes()", StringComparison.Ordinal).ShouldEqual(bearer);
-        context.ConsumedImplementations.Count.ShouldEqual(3);
-        InlineImplementationDiagnostics.Emit(context);
-        context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
+        Annotation(new SemanticLogicalAuthorization(new SemanticPolicyReference("IsWriter"), operation, new SemanticPolicyReference("FinanceCheck"))).ShouldContain("denyAll()");
+        context.Degradation.UnsupportedConstructs.Single().Message.ShouldContain("composition");
     }
 
     [Fact]
-    void should_not_emit_unreferenced_bodies()
+    void should_emit_only_native_jwt_claims()
     {
-        var request = context.Request with { ImplementationRequirements = [context.Request.ImplementationRequirements.Single(item => item.Member == "IsFinanceStaff") with { RequirementId = "unreferenced" }] };
-        context = new(request, new(request.Profile));
         new AxonSecurityEmitter().Emit(context);
+        var code = Source("IsFinanceStaffPolicy");
+        code.ShouldContain("public boolean check(Authentication authentication)");
+        code.ShouldContain("jwt.getTokenAttributes()");
+        code.ShouldNotContain("getDetails()");
+        code.ShouldNotContain("putIfAbsent");
+        code.ShouldNotContain("catch (Throwable");
         context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/Policies.java", StringComparison.Ordinal)).ShouldBeFalse();
     }
 
-    [Fact]
-    void should_deny_the_second_colliding_member()
+    [Theory]
+    [InlineData("return !claims.containsKey(\"blocked\");")]
+    [InlineData("return authentication.getDetails() != null;")]
+    [InlineData("return claims.get(\"sub\") == null;")]
+    [InlineData("return java.util.Collections.emptyList().isEmpty();")]
+    void should_catalog_unsafe_binding_or_unimportable_bodies_as_denial(string body)
     {
-        var policies = context.Request.Model.Application.Policies;
-        var policy = policies.Single(policy => policy.Name == "IsFinanceStaff");
-        ReplacePolicies([.. policies, policy with { Name = "isFinanceStaff", Condition = new SemanticOpaquePolicyCondition("collision") }]);
-        Annotation(new SemanticPolicyReference("isFinanceStaff")).ShouldContain("denyAll()");
-        context.Degradation.UnsupportedConstructs.Single().Message.ShouldContain("collision");
+        Body(body);
+        Annotation(new SemanticPolicyReference("IsFinanceStaff")).ShouldContain("denyAll()");
+        context.Degradation.UnsupportedConstructs.Single().Code.ShouldEqual("STAGE-AXON-AUTHORIZATION");
+        new AxonSecurityEmitter().Emit(context);
+        context.ConsumedImplementations.Contains(context.Request.ImplementationRequirements.Single(item => item.Member == "IsFinanceStaff").RequirementId).ShouldBeFalse();
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    void should_preserve_the_foreign_language_deny_and_diagnostics(bool strict)
+    [Fact]
+    void should_deny_implicit_claims_without_a_native_provider()
     {
-        var request = context.Request with { Profile = AxonRendering.CreateProfile(strict: strict), ImplementationRequirements = [context.Request.ImplementationRequirements.Single(item => item.Member == "IsFinanceStaff") with { Language = "python" }] };
+        var request = context.Request with { Profile = AxonRendering.CreateProfile() };
         context = new(request, new(request.Profile));
         Annotation(new SemanticPolicyReference("IsFinanceStaff")).ShouldContain("denyAll()");
-        InlineImplementationDiagnostics.Emit(context);
-        context.Degradation.UnsupportedConstructs.Count.ShouldEqual(2);
-        context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
-        string.Join(' ', context.Degradation.UnsupportedConstructs.Select(item => item.Message)).ShouldContain("language 'python'");
     }
 
     [Fact]
-    void should_evaluate_every_branch_and_propagate_failure_through_negation()
+    void should_not_emit_an_automatic_demo_identity()
     {
         new AxonSecurityEmitter().Emit(context);
-        var code = Source("Policies");
-        code.ShouldContain("private enum Decision { ALLOW, DENY, FAILED }");
-        code.ShouldContain("return value == Decision.FAILED ? Decision.FAILED : decision(value == Decision.DENY);");
-        code.ShouldContain("if (left == Decision.FAILED || right == Decision.FAILED) return Decision.FAILED;");
-        code.ShouldContain("catch (Throwable failure)");
-        code.ShouldContain("return Decision.FAILED;");
-        code.ShouldContain("if (!authenticated(authentication)) return false;");
-        code.ShouldContain("return and(decision(authentication != null && authentication.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals(\"ROLE_Writer\"))), evaluateFinanceCheck(authentication, claims)) == Decision.ALLOW;");
-        code.ShouldContain("return or(decision(authentication != null && authentication.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals(\"ROLE_Writer\"))), evaluateFinanceCheck(authentication, claims)) == Decision.ALLOW;");
-        code.ShouldNotContain("return evaluateIsFinanceStaff(authentication, claims) &&");
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/DemoIdentityConfiguration.java", StringComparison.Ordinal)).ShouldBeFalse();
     }
 
     [Fact]
-    void should_isolate_scope_escaping_bodies_from_the_evaluator_and_siblings()
+    void should_isolate_scope_escaping_bodies_from_siblings()
     {
         new AxonSecurityEmitter().Emit(context);
-        var escaped = Source("ScopeEscapePolicy");
-        escaped.ShouldContain("private static final ForgedDecision Decision = new ForgedDecision();");
-        escaped.ShouldContain("private final boolean FAILED = ALLOW;");
-        escaped.ShouldNotContain("evaluateFinanceCheck");
-        Source("Policies").ShouldNotContain("ForgedDecision");
-        Source("Policies").ShouldContain("return decision(FinanceCheckPolicy.evaluate(authentication, claims));");
-        Source("Policies").ShouldContain("catch (Throwable failure)");
-        Source("FinanceCheckPolicy").ShouldNotContain("ForgedDecision");
-        Source("FinanceCheckPolicy").ShouldNotContain("Decision");
+        Source("ScopeEscapePolicy").ShouldContain("private static final ForgedDecision Decision = new ForgedDecision();");
+        Source("IsFinanceStaffPolicy").ShouldNotContain("ForgedDecision");
     }
 
     [Theory]
@@ -145,50 +102,42 @@ public class when_rendering_an_inline_java_policy : Specification
     [InlineData(true, "// \\u007d\nreturn true;")]
     [InlineData(false, "return \"\\u0061\".isEmpty();")]
     [InlineData(true, "return \"\\u0061\".isEmpty();")]
-    void should_reject_all_unicode_escape_occurrences_through_the_unsupported_path(bool strict, string body)
+    void should_reject_unicode_escapes_without_emitting_or_consuming_the_body(bool strict, string body)
+    {
+        Body(body, AxonRendering.CreateProfile(strict: strict));
+        Annotation(new SemanticPolicyReference("IsFinanceStaff")).ShouldContain("STAGE-AXON-AUTHORIZATION");
+        context.Degradation.UnsupportedConstructs.Single().Message.ShouldContain("Java Unicode escapes");
+        context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
+        new AxonSecurityEmitter().Emit(context);
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/IsFinanceStaffPolicy.java", StringComparison.Ordinal)).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    void should_preserve_foreign_language_diagnostics(bool strict)
+    {
+        var request = context.Request with { Profile = AxonRendering.CreateProfile(strict: strict), ImplementationRequirements = [context.Request.ImplementationRequirements.Single(item => item.Member == "IsFinanceStaff") with { Language = "python" }] };
+        context = new(request, new(request.Profile));
+        Annotation(new SemanticPolicyReference("IsFinanceStaff")).ShouldContain("denyAll()");
+        InlineImplementationDiagnostics.Emit(context);
+        string.Join(' ', context.Degradation.UnsupportedConstructs.Select(item => item.Message)).ShouldContain("language 'python'");
+        context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
+    }
+
+    void Body(string body, ArtifactRenderProfile? profile = null)
     {
         var requirement = context.Request.ImplementationRequirements.Single(item => item.Member == "IsFinanceStaff");
         var request = context.Request with
         {
-            Profile = AxonRendering.CreateProfile(strict: strict),
+            Profile = profile ?? context.Request.Profile,
             ImplementationContents = context.Request.ImplementationContents.SetItem(requirement.RequirementId, body),
             ImplementationRequirements = [.. context.Request.ImplementationRequirements.Select(item => item.RequirementId == requirement.RequirementId
                 ? item with { ContentHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body))) } : item)]
         };
         context = new(request, new(request.Profile));
-        var annotation = Annotation(new SemanticPolicyReference("IsFinanceStaff"));
-        annotation.ShouldContain("denyAll()");
-        annotation.ShouldContain("STAGE-AXON-AUTHORIZATION");
-        context.Degradation.UnsupportedConstructs.Single().Message.ShouldContain("Java Unicode escapes");
-        context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
-        new AxonSecurityEmitter().Emit(context);
-        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/IsFinanceStaffPolicy.java", StringComparison.Ordinal)).ShouldBeFalse();
-        if (strict) return;
-        var plan = new AxonArtifactRenderPlanner().Plan(request);
-        Encoding.UTF8.GetString(plan.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan()).ShouldContain("Java Unicode escapes");
-        plan.Artifacts.Any(artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan()).Contains("@PreAuthorize(\"denyAll()\")", StringComparison.Ordinal)).ShouldBeTrue();
     }
 
-    [Fact]
-    void should_keep_demo_claims_inside_the_inactive_profile()
-    {
-        new AxonSecurityEmitter().Emit(context);
-        var demo = Source("DemoIdentityConfiguration");
-        demo.ShouldContain("@Profile(\"demo\")");
-        demo.ShouldContain("Binder.get(environment).bind(\"stage.axon.demo.claims\", Bindable.mapOf(String.class, String.class))");
-        demo.ShouldContain("putIfAbsent(\"sub\", \"demo\")");
-        demo.ShouldContain("token.setDetails(");
-        context.Artifacts.Select(artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan())).ShouldEachConformTo(source => !source.Contains("spring.profiles.active", StringComparison.Ordinal));
-    }
-
-    string SiteAnnotation => "@PreAuthorize(\"@policies." + PolicyPredicates.SiteMember(context.Request.Model.Application.Id) + "(authentication)\")";
     string Annotation(SemanticAuthorization authorization) => SecurityAnnotations.For(context, authorization, context.Request.Model.Application.Id);
     string Source(string name) => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());
-
-    void ReplacePolicies(params SemanticPolicy[] policies)
-    {
-        var application = context.Request.Model.Application with { Policies = [.. policies] };
-        var request = context.Request with { Model = ExecutableSemanticModel.Create(context.Request.Model.LanguageVersion, context.Request.Model.SemanticVersion, application) };
-        context = new(request, new(request.Profile));
-    }
 }

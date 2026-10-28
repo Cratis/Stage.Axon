@@ -29,11 +29,11 @@ public class when_a_policy_body_declares_authentication_and_claims : Specificati
 
     void Because() => new AxonSecurityEmitter().Emit(_context);
 
-    [Fact] void should_rename_the_authentication_parameter() => Policy().ShouldContain("evaluate(Authentication authenticationInput, ");
-    [Fact] void should_rename_the_claims_parameter() => Policy().ShouldContain("Map<String, Object> claimsInput)");
-    [Fact] void should_keep_the_body_as_written() => Policy().ShouldContain("var authentication = org.springframework");
-    [Fact] void should_keep_the_pattern_variable_as_written() => Policy().ShouldContain("principal instanceof java.util.Map<?, ?> claims ? claims.get(\"department\")");
-    [Fact] void should_still_call_the_policy_positionally() => Source("Policies").ShouldContain("IsFinanceStaffPolicy.evaluate(authentication, claims)");
+    [Fact] void should_rename_the_authentication_parameter() => Policy().ShouldContain("check(Authentication authenticationInput)");
+    [Fact] void should_not_introduce_an_implicit_claims_binding() => Policy().ShouldNotContain("claimsInput");
+    [Fact] void should_keep_the_body_with_imported_type_spelling() => Policy().ShouldContain("var authentication = SecurityContextHolder");
+    [Fact] void should_keep_the_pattern_variable_as_written() => Policy().ShouldContain("principal instanceof Map<?, ?> claims ? claims.get(\"department\")");
+    [Fact] void should_emit_a_spring_policy_bean() => Policy().ShouldContain("@Component(\"isFinanceStaffPolicy\")");
 
     string Policy() => Source("IsFinanceStaffPolicy");
     string Source(string name) => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());

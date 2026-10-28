@@ -20,7 +20,8 @@ internal enum DegradationStub
     NoOpHandler,
     EmptyResult,
     Omitted,
-    NoOpValidator
+    NoOpValidator,
+    DenyAccess
 }
 
 internal sealed record Degradation(string Code, DegradationKind Kind, string Construct, string Reason,
@@ -82,7 +83,8 @@ internal static class Degradations
         Unsupported("STAGE-AXON-0505", "invoke commands from the modeled trigger", "The trigger cannot be represented by the generated handler.", Omitted),
         Unsupported("STAGE-AXON-SPEC-CLAIMS", "preserve all modeled caller claims", "The security fixture cannot represent every modeled caller claim.", Comment),
         Unsupported("STAGE-AXON-EVENT-TAGS", "tag events with every modeled event source", "Axon events use one primary event-source tag.", Comment),
-        Unsupported("STAGE-AXON-AUTHORIZATION", "enforce the modeled authorization policy", "The policy has no admitted executable implementation.", ThrowingBody),
+        Unsupported("STAGE-AXON-AUTHORIZATION", "enforce the modeled authorization policy", "The policy cannot be enforced natively at this boundary; access is denied.", DenyAccess),
+        Unsupported("STAGE-AXON-JWT-PROVIDER", "validate tokens for the configured audience", "Credentials are rejected without a native JWT provider and explicit audience configuration.", DenyAccess),
         Unsupported("STAGE-AXON-HTTP-SPEC", "verify the modeled HTTP behavior", "The HTTP fixture cannot establish this expectation.", Comment),
         Unsupported("STAGE-AXON-SPEC", "verify the modeled specification", "No specification renderer establishes this expectation.", Comment)
     ]);
