@@ -42,7 +42,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__MODEL__", package + "." + modelName, StringComparison.Ordinal).Replace("__NAME__", name, StringComparison.Ordinal)
             .Replace("__QUALIFIER__", package + "." + modelName, StringComparison.Ordinal)
             .Replace("__PROJECTOR__", package + "." + target.Projector, StringComparison.Ordinal)
-            .Replace("__SEQUENCE__", types.EventType(spec.GivenEvents[0].EventContract).Split('.')[^1] + "Sequence", StringComparison.Ordinal)
+            .Replace("__SEQUENCE__", new ProjectionPolicyNames(context.Request.Model.Application, target.Observed).For(spec.GivenEvents[0].EventContract), StringComparison.Ordinal)
             .Replace("__REDUCER_ARGUMENT__", target.ReducerArgument, StringComparison.Ordinal)
             .Replace("__REDUCER_IMPORTS__", target.ReducerImports, StringComparison.Ordinal)
             .Replace("__IMPORTS__", Imports(package, query), StringComparison.Ordinal)

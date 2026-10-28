@@ -23,10 +23,8 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
     internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message = false)
     {
         EmitContextual(body, eventType, transitions, message);
-        if (PersistentViewAdmission.Supports(context, model.Id)) EmitSequencing(body, sequence ?? new(eventType, null));
+        if (PersistentViewAdmission.Supports(context, model.Id)) EmitSequencing(body, sequence!);
     }
-
-    static string SequenceName(string eventType) => eventType.Split('.')[^1] + "Sequence";
 
     void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message)
     {
@@ -41,7 +39,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var (scopeParameter, scopeArgument) = ScopeSignature(body, store);
         if (PersistentViewAdmission.Supports(context, model.Id))
         {
-            body.Line($"@{body.Reference("org.axonframework.messaging.core.annotation.SequencingPolicy")}(type = {SequenceName(eventType)}.class)");
+            body.Line($"@{body.Reference("org.axonframework.messaging.core.annotation.SequencingPolicy")}(type = {sequence!.Name}.class)");
         }
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
             .Block($"public void handle({eventType} event{updateParameter}, {processing} context)", method =>
@@ -66,7 +64,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var routing = new ProjectionSequencing(context, types, model);
         var key = routing.UsesModelSequence ? null : sequence.Key;
         var identifier = key ?? JavaCodeBuilder.StringLiteral(routing.Namespace);
-        body.Block($"public static final class {SequenceName(sequence.EventType)} implements {policy}<{message}>", nested =>
+        body.Block($"public static final class {sequence.Name} implements {policy}<{message}>", nested =>
         {
             nested.Line("@Override")
                 .Block($"public {optional}<{nested.Reference("java.lang.Object")}> sequenceIdentifierFor({message} message, {processing} context)", method =>
@@ -129,5 +127,5 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         if (scopeState is null) _updates.Notify(method, package);
     }
 
-    internal sealed record ProjectionSequence(string EventType, string? Key);
+    internal sealed record ProjectionSequence(string Name, string EventType, string? Key);
 }
