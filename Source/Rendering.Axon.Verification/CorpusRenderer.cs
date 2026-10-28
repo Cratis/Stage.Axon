@@ -83,6 +83,10 @@ internal static class CorpusRenderer
             case ReactionConstraintProofArtifacts.Application:
                 await ReactionConstraintProofArtifacts.Write(destination);
                 break;
+            case ReducerFailureProofArtifacts.Application:
+            case ReducerFailureProofArtifacts.PersistentApplication:
+                await ReducerFailureProofArtifacts.Write(destination, name);
+                break;
         }
     }
 

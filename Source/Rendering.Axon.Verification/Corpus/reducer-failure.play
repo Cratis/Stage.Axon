@@ -1,0 +1,91 @@
+domain Stage.ReducerQuarantine
+
+concept CounterId : String
+
+policy Admin
+  require role "Admin"
+
+module Accounts
+  feature Totals
+    slice StateChange Record
+      command RecordCount
+        id CounterId identifier
+        amount Int
+        produces CountRecorded for id
+          id = id
+          amount = amount
+      event CountRecorded
+        id CounterId
+        amount Int
+
+    slice StateChange Delete
+      command DeleteCounter
+        id CounterId identifier
+        produces CounterDeleted for id
+          id = id
+      event CounterDeleted
+        id CounterId
+
+    slice StateView Quarantined
+      readmodel QuarantinedTotal
+        id CounterId key
+        amount Int
+      reducer RebuildTotal => QuarantinedTotal
+        on CountRecorded
+          ```java
+          return new QuarantinedTotal(event.id(), (current == null ? 0L : current.amount()) + event.amount());
+          ```
+        on CounterDeleted
+          ```csharp
+          return null;
+          ```
+      query QuarantinedTotals => QuarantinedTotal[]
+      query LiveQuarantinedTotals => observable QuarantinedTotal[]
+      query ProtectedQuarantinedTotals => QuarantinedTotal[]
+        authorize Admin
+      query OpaqueQuarantinedTotals => QuarantinedTotal[]
+        performer
+          ```java
+          throw new AssertionError("Opaque quarantined body must not execute");
+          ```
+      specification InitializationCannotSucceedWhileDeleteIsUnavailable
+        given CountRecorded
+          for "retained"
+          id = "retained"
+          amount = 7
+        then readmodel QuarantinedTotal
+          id = "retained"
+          amount = 7
+      specification DeletionCannotSucceedWhileUnavailable
+        given CountRecorded
+          for "retained"
+          id = "retained"
+          amount = 7
+        given CounterDeleted
+          for "retained"
+          id = "retained"
+        then no readmodel QuarantinedTotal for "retained"
+
+    slice StateView Healthy
+      readmodel HealthyTotal
+        id CounterId key
+        amount Int
+      projection HealthyProjection => HealthyTotal
+        from CountRecorded
+          key $eventSourceId
+          id = id
+          amount = amount
+      query HealthyTotals => HealthyTotal[]
+      query UnrelatedOpaqueTotals => HealthyTotal[]
+        performer
+          ```java
+          throw new AssertionError("Unrelated opaque body must not execute during quarantine");
+          ```
+      specification HealthyProjectionStillWorks
+        given CountRecorded
+          for "healthy"
+          id = "healthy"
+          amount = 4
+        then readmodel HealthyTotal
+          id = "healthy"
+          amount = 4

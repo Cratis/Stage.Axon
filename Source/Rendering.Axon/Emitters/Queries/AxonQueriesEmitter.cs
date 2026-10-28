@@ -38,13 +38,17 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                 var package = types.Package(located);
                 var name = JavaNames.Type(query.Name);
                 EmitRecord(context, package, query, name, modelType, shape);
-                if (QueryPerformer.Required(context, query)) QueryPerformer.Emit(context, package, query, modelType);
+                if (QueryPerformer.Required(context, query))
+                {
+                    if (QueryAvailability.Reason(context, query) is { } reason) QueryAvailability.EmitPerformer(context, package, query, modelType, reason);
+                    else QueryPerformer.Emit(context, package, query, modelType);
+                }
                 EmitHandler(context, types, package, query, name, modelType, shape);
                 new QueryEndpoint(context, types, located, query, modelType, shape).Emit();
                 if (query.Delivery != SemanticQueryDelivery.Live) continue;
                 LiveQuerySubscription.Emit(context, package, query, modelType);
                 LiveQueryStreams.Emit(context, package, query, modelType);
-                AxonViewLiveSpecs.Emit(context, types, located, query, owner, model);
+                if (QueryAvailability.Reason(context, query) is null) AxonViewLiveSpecs.Emit(context, types, located, query, owner, model);
             }
         }
     }
@@ -92,6 +96,13 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                 if (authorization.Length > 0) body.Line(authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal));
                 body.Line("@" + body.Reference("org.axonframework.messaging.queryhandling.annotation.QueryHandler")).Block($"public {name}.Result handle({name} query)", method =>
                 {
+                    if (QueryAvailability.Reason(context, query) is { } reason)
+                    {
+                        context.Degradation.Unsupported(AxonRefusalCodes.Reduction, query.Id, reason, "answer the query", query.Id.ToString());
+                        method.UnsupportedIntent(reason, query.Id.ToString(), AxonRefusalCodes.Reduction)
+                            .Line($"throw new {method.Reference("java.lang.IllegalStateException")}({JavaCodeBuilder.StringLiteral(UnavailableReadModelStore.Message)});");
+                        return;
+                    }
                     var predicate = QueryPerformer.Required(context, query) ? string.Empty : shape.Predicate(method);
                     method.Line(performed
                         ? $"var rows = {method.Reference("java.util.List")}.copyOf(performer.perform(query, store));"

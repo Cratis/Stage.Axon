@@ -15,8 +15,12 @@ namespace Cratis.Stage.Rendering.Axon.Specifications.Views;
 
 internal sealed class ReducerViewSpecifications(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticReadModel model)
 {
-    internal static void Emit(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticReadModel model, SemanticSpecification[] specs) =>
-        new ReducerViewSpecifications(context, types, located, model).Emit(specs);
+    internal static void Emit(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticReadModel model, SemanticSpecification[] specs)
+    {
+        if (ReducerModelAvailability.For(context).Reason(model.Id) is not null)
+            UnavailableReadModelStore.EmitSpecifications(context, types, located, model, specs);
+        else new ReducerViewSpecifications(context, types, located, model).Emit(specs);
+    }
 
     static string? SourceKey(List<SemanticSpecificationEvent> events)
     {
@@ -95,7 +99,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
     {
         var reducer = located.Slice.Reducers.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
         if (reducer is null) return "The reducer is unavailable.";
-        var admission = ReducerBodies.Admission(context, located, reducer);
+        var admission = ReducerModelAvailability.For(context).Admission(reducer);
         if (admission.Blocked is { } blocked) return blocked;
         return events.Exists(given => !reducer.Transitions.Any(transition => transition.EventContract == given.EventContract && admission.Transitions[transition.RequirementId].Placed))
             ? "An observed event has no placed reducer transition." : null;

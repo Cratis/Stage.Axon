@@ -18,29 +18,31 @@ public class when_reducer_admission_degrades : given.a_view_request
     [InlineData("stale")]
     [InlineData("revision")]
     [InlineData("capability")]
-    void should_emit_one_warning_and_a_safe_default_for_each_unplaced_transition(string cause)
+    void should_quarantine_the_whole_model_for_each_unplaced_transition(string cause)
     {
         var request = _request with
         {
             ImplementationRequirements = [.. _request.ImplementationRequirements.Select(requirement => UnplacedRequirement(requirement, cause))]
         };
         var located = ScopeSelection.Select(request).Single(slice => !slice.Slice.Reducers.IsEmpty);
-        var reducer = located.Slice.Reducers.Single();
         var context = new AxonEmissionContext(request, new(request.Profile));
-        new ReducerProjection(context, new(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name))).Emit(located, located.Slice.ReadModels.Single(), reducer);
-        var java = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalReducer.java", StringComparison.Ordinal)));
-        java.ShouldContain("return current;");
-        java.ShouldContain("events are ignored until a supported body is authored");
-        java.ShouldNotContain("throw new");
-        java.ShouldNotContain("return new RebuiltTotal(event.id()");
+        new AxonProjectionsEmitter().Emit(context);
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalReducerProjector.java", StringComparison.Ordinal)).ShouldBeFalse();
+        var java = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalStoreConfiguration.java", StringComparison.Ordinal)));
+        java.ShouldContain("throw new IllegalStateException");
+        java.ShouldNotContain("return current;");
+        java.ShouldNotContain("InMemoryReadModelStore");
         context.ConsumedImplementations.Count.ShouldEqual(0);
         var diagnostics = context.Degradation.UnsupportedConstructs.Where(diagnostic => diagnostic.Code == "STAGE-AXON-0306").ToArray();
-        diagnostics.Length.ShouldEqual(reducer.Transitions.Length);
+        diagnostics.Length.ShouldEqual(1);
         diagnostics.All(diagnostic => diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Warning).ShouldBeTrue();
         var specs = new AxonEmissionContext(request, new(request.Profile));
         new AxonViewSpecsEmitter().Emit(specs);
-        foreach (var spec in located.Slice.Specifications) specs.Specifications[spec.Id].DisabledCode.ShouldEqual("STAGE-AXON-0306");
-        Text(specs.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalViewSpecificationsTest.java", StringComparison.Ordinal))).ShouldNotContain("throw new");
+        foreach (var spec in located.Slice.Specifications) specs.Specifications[spec.Id].DisabledCode.ShouldBeNull();
+        var proof = Text(specs.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalQuarantineSpecificationsTest.java", StringComparison.Ordinal)));
+        proof.ShouldContain("assertThrows");
+        proof.ShouldNotContain("@Disabled");
+        proof.ShouldNotContain("new RebuiltTotalReducerProjector(");
     }
 
     static SemanticImplementationRequirement UnplacedRequirement(SemanticImplementationRequirement requirement, string cause)
@@ -66,10 +68,8 @@ public class when_reducer_admission_degrades : given.a_view_request
         admission.Blocked.ShouldBeNull();
         admission.Transitions.Values.All(transition => !transition.Placed && transition.Reason.Contains("filter", StringComparison.Ordinal)).ShouldBeTrue();
         new ReducerProjection(context, new(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name))).Emit(located, located.Slice.ReadModels.Single(), reducer);
-        var java = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalReducer.java", StringComparison.Ordinal)));
-        java.ShouldContain("return current;");
-        java.ShouldContain("STAGE-AXON-0306");
-        java.ShouldNotContain("return new RebuiltTotal(event.id()");
+        context.Artifacts.ShouldBeEmpty();
+        context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0306").ShouldBeTrue();
         context.ConsumedImplementations.Count.ShouldEqual(0);
     }
 

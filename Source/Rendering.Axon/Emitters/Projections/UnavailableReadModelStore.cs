@@ -13,6 +13,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 internal static class UnavailableReadModelStore
 {
     internal const string Message = "STAGE-AXON-0306: Read model unavailable.";
+    static readonly string[] _operations = ["all()", "get(\"retained\")", "put(\"retained\", null)", "remove(\"retained\")", "clear()", "update(\"retained\", current -> { throw new AssertionError(\"Callback must not see rows\"); })"];
 
     internal static void Emit(AxonEmissionContext context, string package, SemanticReadModel model, string reason)
     {
@@ -56,7 +57,7 @@ internal static class UnavailableReadModelStore
                             .Line($"var store = new {JavaNames.Type(model.Name)}StoreConfiguration().store();");
                         var assertions = test.Reference("org.junit.jupiter.api.Assertions");
                         var exception = test.Reference("java.lang.IllegalStateException");
-                        foreach (var operation in new[] { "all()", "get(\"retained\")", "put(\"retained\", null)", "remove(\"retained\")", "clear()", "update(\"retained\", current -> { throw new AssertionError(\"Callback must not see rows\"); })" })
+                        foreach (var operation in _operations)
                             test.Line($"{assertions}.assertThrows({exception}.class, () -> store.{operation});");
                     });
                 AxonSpecificationsEmitter.Register(context, spec.Id, package + "." + name, method, null);

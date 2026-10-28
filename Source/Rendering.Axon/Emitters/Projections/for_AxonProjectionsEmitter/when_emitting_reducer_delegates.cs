@@ -49,18 +49,17 @@ public class when_emitting_reducer_delegates : a_view_request
     }
 
     [Fact]
-    void should_ignore_events_for_an_unimplemented_transition_without_creating_or_deleting_state()
+    void should_refuse_access_when_any_transition_is_unimplemented()
     {
         var request = _request with { ImplementationContents = _request.ImplementationContents.Clear() };
         var context = new AxonEmissionContext(request, new(request.Profile));
         new AxonProjectionsEmitter().Emit(context);
-        var contract = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalReducer.java", StringComparison.Ordinal)));
-        contract.ShouldContain("return current;");
-        contract.ShouldContain("events are ignored until a supported body is authored");
-        contract.ShouldNotContain("throw new");
-        var placeholder = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalReducerPlaceholderTest.java", StringComparison.Ordinal)));
-        placeholder.ShouldContain("assertNull(reducer.reduce((CountRecorded) null, null, null)");
-        placeholder.ShouldContain("assertSame(current, reducer.reduce((CountRecorded) null, current, null)");
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalReducerProjector.java", StringComparison.Ordinal)).ShouldBeFalse();
+        var store = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RebuiltTotalStoreConfiguration.java", StringComparison.Ordinal)));
+        store.ShouldContain("throw new IllegalStateException");
+        store.ShouldNotContain("return current;");
+        store.ShouldNotContain("InMemoryReadModelStore");
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("ReducerPlaceholderTest.java", StringComparison.Ordinal)).ShouldBeFalse();
         context.ConsumedImplementations.Count.ShouldEqual(0);
     }
 

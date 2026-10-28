@@ -69,6 +69,7 @@ internal static class NativeTestResults
     static string[] RequiredReports(string application) => application switch
     {
         ClientProofArtifacts.Application => ["ClientContractTest"],
+        ReducerFailureProofArtifacts.Application or ReducerFailureProofArtifacts.PersistentApplication => ["GeneratedReducerFailureTest"],
         ReactionConstraintProofArtifacts.Application => ["GeneratedMemoryReactionConstraintTest", "GeneratedPersistentReactionConstraintTest"],
         ConstraintProofArtifacts.Application => ["GeneratedNativeUniqueTest"],
         ConstraintProofArtifacts.PersistentApplication => ["GeneratedPersistentNativeUniqueTest"],

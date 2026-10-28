@@ -25,6 +25,13 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
             foreach (var model in located.Slice.ReadModels)
             {
                 var specs = located.Slice.Specifications.Where(specification => !context.Specifications.ContainsKey(specification.Id) && (specification.ThenReadModels.Any(expected => expected.ReadModel == model.Id) || specification.ThenAbsentReadModels.Any(expected => expected.ReadModel == model.Id))).ToArray();
+                if (ReducerModelAvailability.For(context).Reason(model.Id) is not null)
+                {
+                    var queries = located.Slice.Queries.Where(query => query.ReadModel == model.Id).Select(query => query.Id).ToHashSet();
+                    specs = [.. specs.Concat(located.Slice.Specifications.Where(spec => !context.Specifications.ContainsKey(spec.Id) && spec.ThenQueries.Any(expected => queries.Contains(expected.Query)))).DistinctBy(spec => spec.Id)];
+                    if (specs.Length > 0) UnavailableReadModelStore.EmitSpecifications(context, types, located, model, specs);
+                    continue;
+                }
                 if (specs.Length == 0) continue;
                 if (located.Slice.Reducers.Any(reducer => reducer.ReadModel == model.Id))
                 {

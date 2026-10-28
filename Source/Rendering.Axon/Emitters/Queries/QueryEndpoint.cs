@@ -63,6 +63,7 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
         var result = query.Cardinality == SemanticQueryCardinality.Many ? $"{code.Reference("java.util.List")}<{modelName}>" : modelName;
         code.Block($"public {code.Reference("java.util.concurrent.CompletableFuture")}<{response}<{result}>> get({shape.Parameters(code)})", method =>
         {
+            if (RefuseUnavailable(method)) return;
             var mapped = query.Cardinality switch
             {
                 SemanticQueryCardinality.Many => $"{response}.ok(result.rows())",
@@ -78,9 +79,18 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}(value = {JavaCodeBuilder.StringLiteral(route)}, produces = {code.Reference("org.springframework.http.MediaType")}.TEXT_EVENT_STREAM_VALUE)")
             .Block($"public {code.Reference("org.springframework.web.servlet.mvc.method.annotation.SseEmitter")} stream({shape.Parameters(code)})", method =>
             {
+                if (RefuseUnavailable(method)) return;
                 method.Line($"var query = new {name}({shape.Parsed(method)});")
                     .Line($"return streams.open({name}Subscription.values(gateway, query));");
             });
+    }
+
+    bool RefuseUnavailable(JavaCodeBuilder code)
+    {
+        if (QueryAvailability.Reason(context, query) is not { } reason) return false;
+        code.UnsupportedIntent(reason, query.Id.ToString(), Admission.AxonRefusalCodes.Reduction)
+            .Line($"throw new {code.Reference("org.springframework.web.server.ResponseStatusException")}({code.Reference("org.springframework.http.HttpStatus")}.SERVICE_UNAVAILABLE);");
+        return true;
     }
 
     void Register(string? expression, string route)

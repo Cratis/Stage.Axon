@@ -9,7 +9,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
 internal sealed class ReducerModelAvailability
 {
-    static readonly ConditionalWeakTable<AxonEmissionContext, ReducerModelAvailability> _cache = new();
+    static readonly ConditionalWeakTable<AxonEmissionContext, ReducerModelAvailability> _cache = [];
     readonly Dictionary<SemanticId, string> _unavailable = [];
     readonly Dictionary<SemanticReducer, ReducerBodies.Result> _admissions = [];
 
@@ -26,13 +26,9 @@ internal sealed class ReducerModelAvailability
         }
     }
 
-    internal static ReducerModelAvailability For(AxonEmissionContext context) => _cache.GetValue(context, key => new(key));
-
     internal bool Any => _unavailable.Count > 0;
 
-    internal string? Reason(SemanticId model) => _unavailable.GetValueOrDefault(model);
-
-    internal ReducerBodies.Result Admission(SemanticReducer reducer) => _admissions[reducer];
+    internal static ReducerModelAvailability For(AxonEmissionContext context) => _cache.GetValue(context, key => new(key));
 
     internal static string? Reason(SemanticReducer reducer, ReducerBodies.Result admission)
     {
@@ -40,4 +36,8 @@ internal sealed class ReducerModelAvailability
         if (reducer.Transitions.IsEmpty) return "The reducer declares no transition body or observed event.";
         return admission.Transitions.Values.FirstOrDefault(transition => !transition.Placed)?.Reason;
     }
+
+    internal string? Reason(SemanticId model) => _unavailable.GetValueOrDefault(model);
+
+    internal ReducerBodies.Result Admission(SemanticReducer reducer) => _admissions[reducer];
 }
