@@ -80,7 +80,7 @@ internal static class CommandValidationInfrastructure
                     .Block($"private static {body.Reference("java.lang.reflect.Field")} field({body.Reference("java.lang.reflect.Type")} type, {body.Reference("java.lang.String")} name)", method => method
                         .Line($"var raw = type instanceof {method.Reference("java.lang.Class")}<?> plain ? plain : type instanceof {method.Reference("java.lang.reflect.ParameterizedType")} parameterized ? ({method.Reference("java.lang.Class")}<?>) parameterized.getRawType() : null;")
                         .Line("if (raw == null) return null;")
-                        .Block($"try", attempt => attempt.Line("return raw.getDeclaredField(name);"))
+                        .Block("try", attempt => attempt.Line("return raw.getDeclaredField(name);"))
                         .Block($"catch ({method.Reference("java.lang.NoSuchFieldException")} missing)", none => none.Line("return null;"))).Line()
                     .Block($"private static {body.Reference("java.lang.reflect.Type")} content({body.Reference("java.lang.reflect.Type")} type)", method => method
                         .Line($"if (type instanceof {method.Reference("java.lang.Class")}<?> array && array.isArray()) return array.getComponentType();")
