@@ -34,8 +34,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var messageParameter = message ? $", {eventMessage} message" : string.Empty;
         var messageArgument = message ? ", message" : string.Empty;
         var arguments = messageArgument + (_updates.Enabled ? ", updates" : string.Empty);
-        var scopeParameter = scopeState is null ? string.Empty : $", {store}<{body.Reference("java.lang.Object")}, {scopeState}> scope";
-        var scopeArgument = scopeState is null ? string.Empty : ", scope";
+        var (scopeParameter, scopeArgument) = ScopeSignature(body, store);
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
             .Block($"public void handle({eventType} event{updateParameter}, {processing} context)", method =>
             {
@@ -46,6 +45,9 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
             .Block($"public {modifier}void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store{scopeArgument});"))
             .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store{scopeParameter})", method => Apply(method, transitions));
     }
+
+    (string Parameter, string Argument) ScopeSignature(JavaCodeBuilder body, string store) =>
+        scopeState is null ? (string.Empty, string.Empty) : ($", {store}<{body.Reference("java.lang.Object")}, {scopeState}> scope", ", scope");
 
     void BindStore(JavaCodeBuilder method, string messageArgument)
     {
