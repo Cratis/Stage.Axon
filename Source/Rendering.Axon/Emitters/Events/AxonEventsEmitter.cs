@@ -15,7 +15,9 @@ internal sealed class AxonEventsEmitter : IAxonEmitter
 
     public void Emit(AxonEmissionContext context)
     {
-        foreach (var (module, contract) in Contracts(context)) Emit(context, module, contract);
+        var contracts = Contracts(context).ToList();
+        foreach (var (module, contract) in contracts) Emit(context, module, contract);
+        if (contracts.Exists(pair => AxonEventSources.PrimaryTag(context, pair.Event).JavaType == AxonEventSources.FallbackType(context.BasePackage))) EmitFallbackIdentity(context);
     }
 
     internal static IEnumerable<(SemanticModule Module, SemanticEventContract Event)> Contracts(AxonEmissionContext context)
@@ -42,6 +44,20 @@ internal sealed class AxonEventsEmitter : IAxonEmitter
         if (type[..separator] == package) code.Declare(name);
         else return code.Reference(type);
         return name;
+    }
+
+    static void EmitFallbackIdentity(AxonEmissionContext context)
+    {
+        var package = context.BasePackage + ".events";
+        var code = new JavaCodeBuilder(package).Declare("EventSourceId");
+        var value = "@" + code.Reference("com.fasterxml.jackson.annotation.JsonValue");
+        var creator = "@" + code.Reference("com.fasterxml.jackson.annotation.JsonCreator") + "(mode = JsonCreator.Mode.DELEGATING)";
+        code.Block($"public record EventSourceId({value} {code.Reference("java.lang.String")} value)", body =>
+        {
+            body.Line(creator).Block("public EventSourceId", constructor => constructor.Line($"{body.Reference("java.util.Objects")}.requireNonNull(value, \"value\");"))
+                .Line("@" + body.Reference("java.lang.Override")).Block($"public {body.Reference("java.lang.String")} toString()", method => method.Line("return value;"));
+        });
+        context.AddJava(package, "EventSourceId", code.Build(), sources: [context.Request.Model.Application.Id]);
     }
 
     static void Emit(AxonEmissionContext context, SemanticModule module, SemanticEventContract contract)

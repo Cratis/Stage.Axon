@@ -6,6 +6,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
+using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
@@ -14,15 +15,17 @@ namespace Cratis.Stage.Rendering.Axon.for_AxonCommandsEmitter;
 public class when_an_allocating_command_is_named_event_source_id : for_AxonArtifactRenderPlanner.given.an_axon_request
 {
     string _code;
+    string _identity;
 
     void Because()
     {
         var located = ScopeSelection.Select(request).First(slice => !slice.Slice.Commands.IsEmpty);
         var command = located.Slice.Commands[0] with { Name = "EventSourceId", Properties = [] };
         var context = new AxonEmissionContext(request, new(request.Profile));
+        _identity = AxonEventSources.FallbackType(context.BasePackage);
         var source = new CommandSource
         {
-            Primary = ("eventSourceId", "io.cratis.stage.axon.runtime.EventSourceId", "eventSourceId"),
+            Primary = ("eventSourceId", _identity, "eventSourceId"),
             Type = SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text),
             TagReference = "EventTags.EVENT_SOURCE_ID"
         };
@@ -31,8 +34,8 @@ public class when_an_allocating_command_is_named_event_source_id : for_AxonArtif
     }
 
     [Fact] void should_keep_the_command_constructor_short() => _code.ShouldContain("return new EventSourceId(");
-    [Fact] void should_qualify_the_allocated_runtime_identity() => _code.ShouldContain("new io.cratis.stage.axon.runtime.EventSourceId(GenerateValue.uuid().toString())");
-    [Fact] void should_qualify_the_identity_component_type() => _code.ShouldContain("io.cratis.stage.axon.runtime.EventSourceId eventSourceId");
-    [Fact] void should_not_import_the_runtime_type_over_the_command() => _code.ShouldNotContain("import io.cratis.stage.axon.runtime.EventSourceId;");
+    [Fact] void should_qualify_the_allocated_application_identity() => _code.ShouldContain("new " + _identity + "(GenerateValue.uuid().toString())");
+    [Fact] void should_qualify_the_identity_component_type() => _code.ShouldContain(_identity + " eventSourceId");
+    [Fact] void should_not_import_the_application_identity_over_the_command() => _code.ShouldNotContain("import " + _identity + ";");
     [Fact] void should_not_allocate_the_command_as_its_identity() => _code.ShouldNotContain("new EventSourceId(GenerateValue.uuid().toString())");
 }

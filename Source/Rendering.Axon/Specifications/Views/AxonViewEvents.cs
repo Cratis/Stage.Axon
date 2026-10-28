@@ -5,7 +5,6 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
-using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -34,9 +33,9 @@ internal static class AxonViewEvents
             ? Literal(types, code, value.Value, property.Type) : Default(types, code, property.Type)).ToList();
         if (!@event.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName))
         {
-            if (source is not null && primary.JavaType == AxonRuntimePackage.Type(types.BasePackage, "EventSourceId")) identitySource = source;
+            if (source is not null && primary.JavaType == AxonEventSources.FallbackType(types.BasePackage)) identitySource = source;
             var identity = $"new {(code is null ? primary.JavaType : code.Reference(primary.JavaType))}({identitySource})";
-            if (primary.JavaType != AxonRuntimePackage.Type(types.BasePackage, "EventSourceId") && given.EventSource is { } eventSource)
+            if (primary.JavaType != AxonEventSources.FallbackType(types.BasePackage) && given.EventSource is { } eventSource)
                 identity = Literal(types, code, eventSource.Value, eventSource.Type);
             arguments.Insert(0, identity);
         }

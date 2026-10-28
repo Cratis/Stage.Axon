@@ -39,7 +39,7 @@ internal sealed class ViewSpecificationClaims(AxonEmissionContext context, ViewJ
         foreach (var property in contract.Properties) Literal(Value(given, property, primary.ComponentName, normalized), property.Type, code);
         if (contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName)) return;
         if (!AxonRuntimePackage.IsRuntimeType(types.BasePackage, primary.JavaType)) code.Reference(primary.JavaType);
-        if (given.EventSource is { } source && primary.JavaType != AxonRuntimePackage.Type(types.BasePackage, "EventSourceId")) Literal(source.Value, source.Type, code);
+        if (given.EventSource is { } source && primary.JavaType != AxonEventSources.FallbackType(types.BasePackage)) Literal(source.Value, source.Type, code);
     }
 
     static SemanticValue? Value(SemanticSpecificationEvent given, SemanticProperty property, string primary, bool normalized)

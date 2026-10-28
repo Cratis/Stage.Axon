@@ -65,13 +65,13 @@ public class when_selecting_the_primary_tag : for_AxonArtifactRenderPlanner.give
     }
 
     [Fact]
-    void should_fall_back_to_the_runtime_identity_when_no_concept_is_modeled()
+    void should_fall_back_to_the_application_identity_when_no_concept_is_modeled()
     {
         var unknown = new SemanticEventContract(loaded.Model.Application.Id, contract.ContractId, contract.Revision, "Unrouted", []);
         var primary = AxonEventSources.PrimaryTag(context, unknown);
         primary.ComponentName.ShouldEqual("eventSourceId");
         primary.TagKey.ShouldEqual("eventSourceId");
-        primary.JavaType.ShouldEqual("io.cratis.stage.axon.runtime.EventSourceId");
+        primary.JavaType.ShouldEqual(context.BasePackage + ".events.EventSourceId");
     }
 
     static int TagCount(string code) => code.Split("@EventTag", StringSplitOptions.None).Length - 1;

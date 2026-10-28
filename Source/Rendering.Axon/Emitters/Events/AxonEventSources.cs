@@ -3,7 +3,6 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Concepts;
-using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -17,8 +16,10 @@ internal static class AxonEventSources
             .SelectMany(command => command.Produces.Where(produced => produced.EventContract == contract.Id).Select(produced => (Command: command, Produced: produced)));
         var identifier = producers.Select(pair => FromProducer(context, pair.Command, pair.Produced)).FirstOrDefault(concept => concept is not null)
             ?? Identifier(context, contract.Properties);
-        return identifier is not null ? Tag(context, identifier) : ("eventSourceId", AxonRuntimePackage.Type(context.BasePackage, "EventSourceId"), "eventSourceId");
+        return identifier is not null ? Tag(context, identifier) : ("eventSourceId", FallbackType(context.BasePackage), "eventSourceId");
     }
+
+    internal static string FallbackType(string basePackage) => basePackage + ".events.EventSourceId";
 
     internal static string Record(AxonEmissionContext context, string package, SemanticEventContract contract, string annotation) =>
         Record(context, package, contract, _ => annotation);

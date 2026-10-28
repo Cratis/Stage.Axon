@@ -6,6 +6,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
+using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
@@ -17,6 +18,7 @@ public class when_preparing_generated_commands : for_AxonArtifactRenderPlanner.g
     string supported;
     string unsupported;
     string allocated;
+    string allocatedPackage;
     AxonEmissionContext unsupportedContext;
 
     void Because()
@@ -27,17 +29,18 @@ public class when_preparing_generated_commands : for_AxonArtifactRenderPlanner.g
         var seed = ScopeSelection.Select(request).First(slice => !slice.Slice.Commands.IsEmpty).Slice.Commands[0];
         var source = new CommandSource
         {
-            Primary = ("eventSourceId", "io.cratis.stage.axon.runtime.EventSourceId", "eventSourceId"),
+            Primary = ("eventSourceId", AxonEventSources.FallbackType(context.BasePackage), "eventSourceId"),
             Type = SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text),
             TagReference = "EventTags.EVENT_SOURCE_ID"
         };
+        allocatedPackage = context.BasePackage;
         var body = new JavaCodeBuilder(context.BasePackage);
         new CommandPreparation(context, seed with { Properties = [] }, source).Emit(body);
         allocated = body.Build();
     }
 
     [Fact] void should_allocate_identities_using_fundamentals() => allocated.ShouldContain("new EventSourceId(GenerateValue.uuid().toString())");
-    [Fact] void should_import_allocated_runtime_identities() => allocated.ShouldContain("import io.cratis.stage.axon.runtime.EventSourceId;");
+    [Fact] void should_import_allocated_application_identities() => allocated.ShouldContain("import " + AxonEventSources.FallbackType(allocatedPackage) + ";");
     [Fact] void should_import_fundamentals_generation() => allocated.ShouldContain("import io.cratis.fundamentals.concepts.GenerateValue;");
     [Fact] void should_import_the_preparation_clock() => allocated.ShouldContain("import java.time.Clock;");
     [Fact] void should_exclude_generated_values_from_the_http_body() => supported.ShouldContain("@JsonIgnore UUID requestId");
@@ -69,7 +72,7 @@ public class when_preparing_generated_commands : for_AxonArtifactRenderPlanner.g
         var body = new JavaCodeBuilder(context.BasePackage + ".commands");
         var source = new CommandSource
         {
-            Primary = ("identity", "io.cratis.stage.axon.runtime.EventSourceId", "identity"),
+            Primary = ("identity", AxonEventSources.FallbackType(context.BasePackage), "identity"),
             Type = SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text),
             TagReference = "EventTags.EVENT_SOURCE_ID"
         };
