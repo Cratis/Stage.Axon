@@ -31,7 +31,8 @@ internal static class PolicyPredicates
         ScopeSelection.Select(context.Request).SelectMany(located =>
             located.Slice.Commands.Select(command => (command.Id, command.Authorization))
                 .Concat(located.Slice.Queries.Concat(QueryPerformer.Queries(context, located))
-                    .DistinctBy(query => query.Id).Select(query => (query.Id, query.Authorization))))
+                    .Select(query => (query.Id, query.Authorization))))
+            .DistinctBy(site => site.Id)
             .Where(site => site.Authorization is not null && HasInline(context, site.Authorization))
             .Select(site => (site.Id, site.Authorization!));
 
