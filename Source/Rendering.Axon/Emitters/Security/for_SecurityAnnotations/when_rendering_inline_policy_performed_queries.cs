@@ -1,0 +1,82 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System.Text;
+using System.Text.RegularExpressions;
+using Cratis.Screenplay.Semantics;
+using Cratis.Specifications;
+using Cratis.Stage.Contracts.Rendering;
+using Cratis.Stage.Contracts.Semantics;
+using Xunit;
+
+namespace Cratis.Stage.Rendering.Axon.Emitters.Security.for_SecurityAnnotations;
+
+public partial class when_rendering_inline_policy_performed_queries : Specification
+{
+    ArtifactRenderRequest _request;
+    IReadOnlyDictionary<string, string> _sources;
+
+    [GeneratedRegex(@"@policies\.(?<site>[A-Za-z0-9_]+)\(", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture, 1000)]
+    private static partial Regex PolicyReference { get; }
+
+    async Task Establish()
+    {
+        var root = Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Source/Rendering.Axon.Verification/Corpus");
+        var compilation = await SemanticModelLoader.LoadAsync(root, ["inline-java-policy-performers.play"], null, "InlinePolicies");
+        compilation.Success.ShouldBeTrue();
+        var loaded = compilation.Loaded!;
+        _request = new(loaded.Model, loaded.Plan, AxonRendering.CreateProfile(), new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id))
+        {
+            ImplementationRequirements = loaded.ImplementationRequirements,
+            ImplementationContents = loaded.ImplementationContents
+        };
+    }
+
+    void Because()
+    {
+        var plan = new AxonArtifactRenderPlanner().Plan(_request);
+        plan.Refusals.ShouldBeEmpty();
+        _sources = plan.Artifacts.Where(artifact => artifact.RelativePath.EndsWith(".java", StringComparison.Ordinal))
+            .ToDictionary(artifact => artifact.RelativePath, artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan()), StringComparer.Ordinal);
+    }
+
+    [Fact]
+    void should_generate_a_method_for_every_policy_reference_in_every_rendered_java_source()
+    {
+        var policies = Source("Policies");
+        var references = _sources.Values.SelectMany(source => PolicyReference.Matches(source).Select(match => match.Groups["site"].Value)).ToArray();
+        references.ShouldNotBeEmpty();
+        foreach (var reference in references.Distinct(StringComparer.Ordinal))
+        {
+            policies.ShouldContain("public boolean " + reference + "(Authentication authentication)");
+        }
+    }
+
+    [Fact]
+    void should_use_the_performed_query_id_for_both_handler_and_endpoint_sites()
+    {
+        var requirements = _request.ImplementationRequirements.Where(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer).ToArray();
+        requirements.Length.ShouldEqual(2);
+        foreach (var requirement in requirements)
+        {
+            var reference = "@policies." + PolicyPredicates.SiteMember(requirement.Source.SemanticId) + "(authentication)";
+            Source(requirement.Owner.Name + "Handler").ShouldContain(reference);
+            Source(requirement.Owner.Name + "Endpoint").ShouldContain(reference);
+        }
+    }
+
+    [Fact]
+    void should_discover_policies_referenced_only_by_performed_queries() => Source("PerformedFinancePolicy")
+        .ShouldContain("department.startsWith(\"Finance\")");
+
+    [Fact]
+    void should_deduplicate_performed_query_sites_by_query_id()
+    {
+        var requirement = _request.ImplementationRequirements.First(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer);
+        var request = _request with { ImplementationRequirements = [.. _request.ImplementationRequirements, requirement] };
+        var context = new AxonEmissionContext(request, new(request.Profile));
+        PolicyPredicates.Sites(context).Count(site => site.Owner == requirement.Source.SemanticId).ShouldEqual(1);
+    }
+
+    string Source(string name) => _sources.Single(source => source.Key.EndsWith("/" + name + ".java", StringComparison.Ordinal)).Value;
+}
