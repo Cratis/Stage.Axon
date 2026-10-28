@@ -66,7 +66,13 @@ internal static class NativeTestResults
         RequireWithinBudget(totals, budget);
     }
 
-    static string[] RequiredReports(string application) => application == ClientProofArtifacts.Application ? ["ClientContractTest"] : [];
+    static string[] RequiredReports(string application) => application switch
+    {
+        ClientProofArtifacts.Application => ["ClientContractTest"],
+        ConstraintProofArtifacts.Application => ["GeneratedNativeUniqueTest"],
+        ConstraintProofArtifacts.PersistentApplication => ["GeneratedPersistentNativeUniqueTest"],
+        _ => []
+    };
 
     static bool Failed(XElement test) => test.Element("failure") is not null || test.Element("error") is not null;
 }
