@@ -8,13 +8,20 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 
 internal static class AxonMavenProject
 {
-    internal static string Pom(string groupId, string artifactId, bool bearer = false) => $$"""
+    internal static bool IsLocalVersion(string version) => version.EndsWith("-local", StringComparison.Ordinal);
+
+    internal static string LocalBuildWarning(string version) =>
+        $"This renderer was built from source; generated applications depend on {AxonRuntimePackage.GroupId}:{AxonRuntimePackage.ArtifactId} {version}, which is not published. Run `sh ./mvnw -Drevision={version} install` in Stage.Axon's Source/Runtime, or use a released renderer.";
+
+    internal static string Pom(string groupId, string artifactId, bool bearer = false) => Pom(groupId, artifactId, bearer, AxonRuntimePackage.Version);
+
+    internal static string Pom(string groupId, string artifactId, bool bearer, string runtimeVersion) => $$"""
         <?xml version="1.0" encoding="UTF-8"?>
         <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <modelVersion>4.0.0</modelVersion>
           <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.1.2</version><relativePath/></parent>
           <groupId>{{groupId}}</groupId><artifactId>{{artifactId}}</artifactId><version>1.0.0-SNAPSHOT</version>
-          <properties><java.version>25</java.version><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding><stage-axon-runtime.version>{{AxonRuntimePackage.Version}}</stage-axon-runtime.version></properties>
+          <properties><java.version>25</java.version><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>{{(IsLocalVersion(runtimeVersion) ? "<!-- " + LocalBuildWarning(runtimeVersion) + " -->" : string.Empty)}}<stage-axon-runtime.version>{{runtimeVersion}}</stage-axon-runtime.version></properties>
           <dependencyManagement><dependencies>
             <dependency><groupId>org.axonframework</groupId><artifactId>axon-framework-bom</artifactId><version>5.4.1</version><type>pom</type><scope>import</scope></dependency>
           </dependencies></dependencyManagement>

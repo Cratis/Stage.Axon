@@ -34,14 +34,14 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     void should_replace_every_package_placeholder() =>
         context.Artifacts.Exists(artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan()).Contains("__RUNTIME__", StringComparison.Ordinal)).ShouldBeFalse();
 
-    [Fact] void should_emit_the_inert_persistent_safety_helper() => context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/persistent/PersistentReadModelSafety.java", StringComparison.Ordinal)).RelativePath.ShouldContain("src/main/java/");
-    [Fact] void should_emit_ordinary_native_safety_tests() => context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentReadModelSafetyTest.java", StringComparison.Ordinal)).RelativePath.ShouldContain("src/test/java/");
+    [Fact] void should_not_emit_the_persistent_safety_helper() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/persistent/PersistentReadModelSafety.java", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_not_emit_the_persistent_safety_test() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/PersistentReadModelSafetyTest.java", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact]
     void should_register_installed_axon_entities_in_the_test_fixture()
     {
         var fixture = Template("PersistentProbeSupport.java");
         fixture.ShouldContain("@EntityScan(basePackageClasses = { UniqueClaim.class,\n            AggregateEventEntry.class,\n            TokenEntry.class })");
-        fixture.ShouldContain($"import {context.BasePackage}.runtime.persistent.UniqueClaim;");
+        fixture.ShouldContain("import io.cratis.stage.axon.runtime.persistent.UniqueClaim;");
         fixture.ShouldContain("import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;");
         fixture.ShouldContain("import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;");
     }
@@ -71,13 +71,18 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     }
 
     [Fact]
-    void should_keep_application_specific_runtime_helpers()
+    void should_not_emit_the_read_model_helpers()
     {
         foreach (var name in new[] { "ReadModelStore", "InMemoryReadModelStore", "ReadModelTransaction" })
         {
-            context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith($"/runtime/{name}.java", StringComparison.Ordinal)).ShouldBeTrue();
+            context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith($"/runtime/{name}.java", StringComparison.Ordinal)).ShouldBeFalse();
         }
+
+        context.Artifacts.Exists(artifact => artifact.RelativePath.Contains("/runtime/persistent/", StringComparison.Ordinal)).ShouldBeFalse();
     }
+
+    [Fact]
+    void should_not_pin_the_moved_store_test_in_the_runtime_test() => Template("RuntimeTest.java").ShouldNotContain("storeUpdatesAreAtomicAndListsAreSnapshots");
 
     [Fact]
     void should_pin_exact_wire_tests()

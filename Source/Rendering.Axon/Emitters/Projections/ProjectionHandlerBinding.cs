@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
@@ -27,7 +28,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
     void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions, bool message)
     {
         var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
-        var store = body.Reference(types.BasePackage + ".runtime.ReadModelStore");
+        var store = body.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
         var modifier = synchronized ? "synchronized " : string.Empty;
         var updateParameter = _updates.ParameterFor(body);
         var eventMessage = message ? body.Reference("org.axonframework.messaging.eventhandling.EventMessage") : string.Empty;
@@ -54,7 +55,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         if (scopeState is not null && PersistentViewAdmission.Supports(context, model.Id))
             throw new InvalidOperationException($"Scoped projector state is not staged for persistent-admitted model {model.Id}.");
         var adapter = PersistentViewAdmission.Supports(context, model.Id) ? method.Reference(types.BasePackage + ".persistence.JpaReadModelStore") : null;
-        var transaction = method.Reference(types.BasePackage + ".runtime.ReadModelTransaction");
+        var transaction = method.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelTransaction"));
 
         // The context-bound emitter already defers in-memory invalidations to AFTER_COMMIT, after the staged writes apply.
         var staged = $"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {transaction}.bind(store, context));";

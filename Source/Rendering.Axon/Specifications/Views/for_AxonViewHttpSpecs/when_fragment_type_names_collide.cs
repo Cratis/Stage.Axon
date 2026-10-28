@@ -13,7 +13,7 @@ public class when_fragment_type_names_collide : given.a_modeled_http_query
     [InlineData("Assertions", "org.junit.jupiter.api.Assertions")]
     [InlineData("JsonMapper", "tools.jackson.databind.json.JsonMapper")]
     [InlineData("TypeReference", "tools.jackson.core.type.TypeReference")]
-    [InlineData("ReadModelStore", "axonviews.runtime.ReadModelStore")]
+    [InlineData("ReadModelStore", "io.cratis.stage.axon.runtime.ReadModelStore")]
     public void should_give_the_modeled_type_the_short_name(string name, string framework)
     {
         var code = Render(slice => slice with { ReadModels = [.. slice.ReadModels.Select(model => model.Name == "Total" ? model with { Name = name } : model)] });

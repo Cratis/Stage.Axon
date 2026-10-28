@@ -8,8 +8,8 @@ internal static class ProjectorRollbackProof
     internal const string Source = """
         package __PACKAGE__;
 
-        import __RUNTIME__.InMemoryReadModelStore;
-        import __RUNTIME__.ReadModelStore;
+        import __IN_MEMORY_STORE__;
+        import __STORE__;
         import java.util.List;
         import java.util.Optional;
         import java.util.Set;

@@ -99,9 +99,7 @@ public class when_models_claim_java_lang_names : Projections.for_AxonProjections
             Code("/persistence/PersistentViewBootstrap.java").ShouldContain("new IllegalStateException(");
             Code("/persistence/JpaReadModelStore.java").ShouldContain("Object");
             Code("/persistence/JpaReadModelStore.java").ShouldContain("Exception");
-            Code("/runtime/InMemoryReadModelStore.java").ShouldContain("Object");
             Code("/runtime/RuntimeTest.java").ShouldContain("private final Integer value;");
-            Code("/runtime/persistent/PersistentReadModelSafety.java").ShouldContain("private final String model;");
         }
     }
 }

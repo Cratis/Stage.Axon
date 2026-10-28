@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 using Cratis.Stage.Rendering.Axon.Emitters.Queries;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Cratis.Stage.Rendering.Axon.Specifications.Views;
@@ -47,7 +48,8 @@ internal sealed class ProjectorRollbackTests(AxonEmissionContext context, ViewJa
         var source = ProjectorRollbackProof.Source
             .Replace("__TESTS__", tests.ToString().TrimEnd('\n'), StringComparison.Ordinal)
             .Replace("__PACKAGE__", package, StringComparison.Ordinal)
-            .Replace("__RUNTIME__", types.BasePackage + ".runtime", StringComparison.Ordinal)
+            .Replace("__IN_MEMORY_STORE__", AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"), StringComparison.Ordinal)
+            .Replace("__STORE__", AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"), StringComparison.Ordinal)
             .Replace("__NAME__", name, StringComparison.Ordinal)
             .Replace("__PROJECTOR__", projector, StringComparison.Ordinal)
             .Replace("__CONSTRUCTION__", construction, StringComparison.Ordinal)

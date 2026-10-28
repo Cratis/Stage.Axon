@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -53,8 +54,8 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
     void Fields(JavaCodeBuilder code, string name)
     {
         var state = StateType(_root);
-        var predicate = $"{code.Reference("java.util.function.Predicate")}<{code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}>>";
-        code.Line($"private final {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store;")
+        var predicate = $"{code.Reference("java.util.function.Predicate")}<{code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}>>";
+        code.Line($"private final {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}> store;")
             .Line($"private final {code.Reference("java.time.Clock")} clock;")
             .Line($"private final {code.Reference("java.util.Set")}<{code.Reference("java.lang.Object")}> keys = new {code.Reference("java.util.LinkedHashSet")}<>();")
             .Line($"private final {code.Reference("java.util.List")}<{predicate}> pending = new {code.Reference("java.util.ArrayList")}<>();")
@@ -72,8 +73,8 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
         }
         StateMembers(code, state, predicate, caches);
         code.Line($"@{code.Reference("org.springframework.beans.factory.annotation.Autowired")}")
-            .Block($"public {name}(@{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store, {code.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.store = store;").Line("this.clock = clock;"))
-            .Block($"public {name}({code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store)", constructor => constructor.Line($"this(store, {constructor.Reference("java.time.Clock")}.systemUTC());"));
+            .Block($"public {name}(@{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}> store, {code.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.store = store;").Line("this.clock = clock;"))
+            .Block($"public {name}({code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}> store)", constructor => constructor.Line($"this(store, {constructor.Reference("java.time.Clock")}.systemUTC());"));
     }
 
     void StateMembers(JavaCodeBuilder code, string state, string predicate, List<(string Name, string Type)> caches)
@@ -82,7 +83,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
         var components = string.Join(", ", new[] { $"{list}<{code.Reference("java.lang.Object")}> keys", $"{list}<{predicate}> pending" }.Concat(caches.Select(cache => $"{cache.Type} {cache.Name}")));
 
         // The scope state is one immutable snapshot, staged through its own store so a rolled back unit of work leaves none of it behind.
-        code.Line($"private final {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {state}> scope = new {code.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
+        code.Line($"private final {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {state}> scope = new {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
             .Line($"private {state} applied;")
             .Line("private boolean clean;")
             .Line($"private record {state}({components}) {{}}")
@@ -104,7 +105,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
         var eventType = types.EventType(@event.Id, code);
         var method = "project" + JavaNames.Type(@event.Name);
         var messageType = code.Reference("org.axonframework.messaging.eventhandling.EventMessage");
-        var storeType = $"{code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}>";
+        var storeType = $"{code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}>";
         new ProjectionHandlerBinding(context, types, model, package, synchronized: true, scopeState: StateType(_root)).Emit(
             code,
             eventType,
