@@ -2,13 +2,14 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
-using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandFixtureAssertions(AxonEmissionContext context, SemanticCommand command, SemanticSpecification specification)
 {
+    const string ViolationException = "org.axonframework.messaging.core.interception.JSR303ViolationException";
+
     readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
     JavaCodeBuilder? _code;
 
@@ -26,10 +27,27 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
         if (specification.ThenDenied) return;
         if (!specification.ThenErrors.IsEmpty)
         {
-            code.Reference(AxonRuntimePackage.Type(context.BasePackage, "CommandValidationException"));
+            code.Reference(ViolationException);
             return;
         }
         ClaimResponse(code);
+    }
+
+    /// <summary>
+    /// Constructs the command inside the rejection boundary: invalid concepts reject with <see cref="IllegalArgumentException"/> before dispatch,
+    /// which is the modeled rejection. Any other construction failure, such as an unsupported compliance concept, still fails the test.
+    /// </summary>
+    internal void EmitConstruction(JavaCodeBuilder method, string input)
+    {
+        _code = method;
+        method.Line("Object command;");
+        method.Block("try", attempt => attempt.Line($"command = {input};"));
+        method.Block("catch (IllegalArgumentException error)", rejection =>
+        {
+            foreach (var error in specification.ThenErrors.Where(error => error.Message is not null))
+                rejection.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(String.valueOf(error.getMessage())).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
+            rejection.Line("return;");
+        });
     }
 
     internal void EmitReferences(JavaCodeBuilder method, IReadOnlyList<string> expected) => new CommandFixtureAssertions(context, command, specification) { _code = method }.Emit(method, expected);
@@ -66,13 +84,14 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
 
     void Errors(JavaCodeBuilder method)
     {
-        var exceptionType = Reference(AxonRuntimePackage.Type(context.BasePackage, "CommandValidationException"));
+        var violation = Reference(ViolationException);
+        var assertions = Reference("org.assertj.core.api.Assertions");
         method.Block("result.exceptionSatisfies(error ->", assertion =>
         {
-            assertion.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(error).isInstanceOf({exceptionType}.class);")
-                .Line($"var failure = ({exceptionType}) error;");
+            assertion.Line($"{assertions}.assertThat(error).isInstanceOfAny({violation}.class, IllegalArgumentException.class);")
+                .Line($"var messages = error instanceof {violation} violations ? violations.getViolations().stream().map(violation -> violation.getMessage()).toList() : {Reference("java.util.List")}.of(String.valueOf(error.getMessage()));");
             foreach (var error in specification.ThenErrors.Where(error => error.Message is not null))
-                assertion.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(failure.errors()).extracting(validationError -> validationError.message()).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
+                assertion.Line($"{assertions}.assertThat(String.join(\"; \", messages)).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
         }).Line(");").Line("result.noEvents();");
     }
 

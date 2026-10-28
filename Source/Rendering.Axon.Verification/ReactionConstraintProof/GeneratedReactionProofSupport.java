@@ -9,7 +9,7 @@ import __APPLICATION__.accounts.aliases.release.ReleaseAliasReaction;
 import __APPLICATION__.accounts.events.AliasAssigned;
 import __APPLICATION__.accounts.events.AliasReleased;
 import __APPLICATION__.accounts.events.EventTags;
-import io.cratis.stage.axon.runtime.EventSourceId;
+import __APPLICATION__.events.EventSourceId;
 import io.cratis.stage.axon.runtime.UniqueValueStore;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;

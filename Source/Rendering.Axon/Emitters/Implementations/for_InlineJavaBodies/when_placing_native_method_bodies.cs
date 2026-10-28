@@ -18,7 +18,7 @@ public class when_placing_native_method_bodies : a_view_request
     const string Body = "// java.time and \\\\ must stay literal\nvar block = \"\"\"\n  authored indentation\n    java.time\n  \"\"\";\nreturn;";
 
     [Fact]
-    void should_replace_synthetic_command_effects_after_validation()
+    void should_replace_synthetic_command_effects()
     {
         var located = ScopeSelection.Select(_request).First(slice => slice.Slice.Commands.Any(command => !command.Produces.IsEmpty));
         var command = located.Slice.Commands.First(command => !command.Produces.IsEmpty) with { Response = null };
@@ -28,8 +28,7 @@ public class when_placing_native_method_bodies : a_view_request
         new CommandHandlerEmitter(context, located, command, source).Emit();
         var code = Text(context.Artifacts.Single());
         code.ShouldContain(Body);
-        code.ShouldContain("rules.validate(command);");
-        Assert.True(code.IndexOf("rules.validate(command);", StringComparison.Ordinal) < code.IndexOf(Body, StringComparison.Ordinal));
+        code.ShouldNotContain("rules.");
         code.ShouldNotContain("appender.append(");
         code.ShouldNotContain("UnsupportedOperationException");
         context.ConsumedImplementations.ShouldContain(command.Handler.RequirementId);

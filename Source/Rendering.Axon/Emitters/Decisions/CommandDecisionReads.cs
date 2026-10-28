@@ -26,8 +26,7 @@ internal sealed class CommandDecisionReads(AxonEmissionContext context, Semantic
         foreach (var read in Prepare() ?? throw new InvalidOperationException("Cannot emit unsupported decision reads."))
         {
             var message = JavaCodeBuilder.StringLiteral($"Required decision read '{read.Name}' was not found.");
-            var exception = body.Reference(AxonRuntimePackage.Type(context.BasePackage, "CommandValidationException"));
-            body.Line($"if (state == null || !state.{read.Member}()) throw new {exception}({message});");
+            body.Line($"if (state == null || !state.{read.Member}()) throw new IllegalArgumentException({message});");
         }
     }
 

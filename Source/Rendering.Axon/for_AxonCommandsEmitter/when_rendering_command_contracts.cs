@@ -39,6 +39,6 @@ public class when_rendering_command_contracts : for_AxonArtifactRenderPlanner.gi
     [Fact] void should_validate_nested_concepts() => contract.ShouldContain("@Valid ");
     [Fact] void should_validate_required_components() => contract.ShouldContain("@NotNull ");
     [Fact] void should_map_the_java_uuid_concept() => contract.ShouldContain("OrderId orderId");
-    [Fact] void should_emit_only_selected_commands() => context.Artifacts.Count.ShouldEqual(ScopeSelection.Select(request)[0].Slice.Commands.Length * 2);
+    [Fact] void should_emit_only_selected_commands() => context.Artifacts.Count.ShouldEqual(ScopeSelection.Select(request)[0].Slice.Commands.Length);
     [Fact] void should_trace_the_command_sources() => context.Artifacts.TrueForAll(artifact => artifact.Sources.Any(id => ScopeSelection.Select(request)[0].Slice.Commands.Any(command => command.Id == id))).ShouldBeTrue();
 }

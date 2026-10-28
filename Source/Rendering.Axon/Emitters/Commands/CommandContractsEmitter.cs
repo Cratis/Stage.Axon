@@ -15,7 +15,6 @@ internal static class CommandContractsEmitter
         var package = Package(types, located);
         var name = JavaNames.Type(command.Name);
         context.AddJava(package, name, Code(context, command, package, source), sources: [command.Id, .. command.Properties.Select(property => property.Id)]);
-        context.AddJava(package, name + "Rules", new CommandRulesEmitter(context, command, types).Render(package), sources: [command.Id]);
     }
 
     internal static string Package(CommandJavaTypes types, LocatedSemanticSlice located) =>

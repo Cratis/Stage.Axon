@@ -39,7 +39,7 @@ public class when_rendering_state_changes : for_AxonArtifactRenderPlanner.given.
     [Fact] void should_return_a_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("CompletableFuture<Void>");
     [Fact] void should_dispatch_with_the_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("send(command, Void.class)");
     [Fact] void should_not_return_an_untyped_result() => Code("PlaceOrderEndpoint").ShouldNotContain("<Object>");
-    [Fact] void should_validate_requests_before_dispatch() => Code("PlaceOrderEndpoint").ShouldContain("rules.validateInput(command);");
+    [Fact] void should_leave_request_validation_to_the_dispatch_interceptor() => Code("PlaceOrderEndpoint").ShouldNotContain("rules");
     [Fact] void should_emit_real_axon_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("AxonTestFixture.with(configuration)");
     [Fact] void should_enforce_method_security_in_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("AuthorizationManagerBeforeMethodInterceptor.preAuthorize()");
     [Fact] void should_compare_the_expected_events() => Code("PlaceOrderSpecificationsTest").ShouldContain("result.events(new OrderPlaced(");

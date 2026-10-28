@@ -65,16 +65,16 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
     void Setup(JavaCodeBuilder body)
     {
         var name = JavaNames.Type(command.Name);
-        body.Line($"private final {body.Reference("jakarta.validation.ValidatorFactory")} validators = {body.Reference("jakarta.validation.Validation")}.buildDefaultValidatorFactory();")
-            .Line($"private {body.Reference("org.axonframework.test.fixture.AxonTestFixture")} fixture;").Line($"@{body.Reference("org.junit.jupiter.api.AfterEach")}").Block("void stop()", method => method.Line("if (fixture != null) fixture.stop();")
-                .Line("validators.close();").Line($"{method.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
+        body.Line($"private {body.Reference("org.axonframework.test.fixture.AxonTestFixture")} fixture;").Line($"@{body.Reference("org.junit.jupiter.api.AfterEach")}").Block("void stop()", method => method.Line("if (fixture != null) fixture.stop();")
+                .Line($"{method.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
         CommandFixtureSecurity.ProxyReferences(body, name, usesClock);
         body.Block($"private {body.Reference("org.axonframework.test.fixture.AxonTestFixture")} fixture({body.Reference("java.lang.String")} instant)", method =>
         {
             FixtureClock(method);
             method.Line($"var configuration = {method.Reference("org.axonframework.eventsourcing.configuration.EventSourcingConfigurer")}.create();");
             if (source is not null) method.Line($"configuration.registerEntity({method.Reference("org.axonframework.eventsourcing.configuration.EventSourcedEntityModule")}.autodetected({new CommandJavaTypes(context.Request.Model.Application, context.BasePackage).Reference(source.JavaType, method)}.class, {name}Stream.class));");
-            method.Line($"configuration.messaging(messaging -> messaging.registerCommandHandlingModule({method.Reference("org.axonframework.messaging.commandhandling.configuration.CommandHandlingModule")}.named({JavaCodeBuilder.StringLiteral(name)})")
+            method.Line($"configuration.messaging(messaging -> messaging.registerCommandDispatchInterceptor(c -> new {method.Reference("org.axonframework.messaging.core.interception.BeanValidationInterceptor")}<>())")
+                .Line($"    .registerCommandHandlingModule({method.Reference("org.axonframework.messaging.commandhandling.configuration.CommandHandlingModule")}.named({JavaCodeBuilder.StringLiteral(name)})")
                 .Line($"    .commandHandlers().autodetectedCommandHandlingComponent(components -> handler({(usesClock ? "clock" : string.Empty)})).build()));")
                 .Line($"fixture = {method.Reference("org.axonframework.test.fixture.AxonTestFixture")}.with(configuration);").Line("return fixture;");
         });
@@ -109,9 +109,21 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         {
             CommandFixtureSecurity.CallerReferences(test, specification.GivenCaller);
             var activity = given.Length == 0 ? ".noPriorActivity()" : $".events({string.Join(", ", given.Select(value => test.ReferenceExpression(value!)))})";
-            test.Line($"var scenario = fixture({JavaCodeBuilder.StringLiteral(specification.GivenClock ?? "1970-01-01T00:00:00Z")}).given(){activity};")
-                .Line($"var result = scenario.when().command({test.ReferenceExpression(input!)}).then();");
-            new CommandFixtureAssertions(context, command, specification).EmitReferences(test, [.. expected.Select(value => test.ReferenceExpression(value!))]);
+            test.Line($"var scenario = fixture({JavaCodeBuilder.StringLiteral(specification.GivenClock ?? "1970-01-01T00:00:00Z")}).given(){activity};");
+            var assertions = new CommandFixtureAssertions(context, command, specification);
+            var payload = test.ReferenceExpression(input!);
+            var metadata = CommandFixtureSecurity.Subject(specification.GivenCaller) is { } subject ? $", {test.Reference("java.util.Map")}.of(\"username\", {JavaCodeBuilder.StringLiteral(subject)})" : string.Empty;
+            if (specification.ThenErrors.IsEmpty)
+            {
+                test.Line($"var result = scenario.when().command({payload}{metadata}).then();");
+            }
+            else
+            {
+                // Invalid concepts reject while the command is constructed, so construction sits inside the rejection boundary.
+                assertions.EmitConstruction(test, payload);
+                test.Line($"var result = scenario.when().command(command{metadata}).then();");
+            }
+            assertions.EmitReferences(test, [.. expected.Select(value => test.ReferenceExpression(value!))]);
         });
     }
 

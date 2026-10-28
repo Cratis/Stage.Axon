@@ -29,13 +29,19 @@ public class when_rendering_portable_validation : for_AxonArtifactRenderPlanner.
         context = new(request, new(request.Profile));
     }
 
-    void Because() => rules = new CommandRulesEmitter(context, command, new(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name))).Render("sample.commands");
+    void Because()
+    {
+        var builder = new Java.JavaCodeBuilder("sample.commands");
+        new CommandDomainChecks(context, command, new(request.Model.Application, Java.JavaNames.PackageSegment(request.Model.Application.Name))).Emit(builder);
+        rules = builder.Build();
+    }
 
-    [Fact] void should_use_jakarta_validation() => rules.ShouldContain("import jakarta.validation.Validator;");
+    [Fact] void should_not_emit_a_rules_class_or_validator() => rules.ShouldNotContain("Validator");
     [Fact] void should_preserve_optional_rule_null_semantics() => rules.ShouldContain("command.label() == null || (command.label().length() >= 3)");
     [Fact] void should_escape_text_operands() => rules.ShouldContain("command.label().contains(\"\\\"quoted\\\"\")");
     [Fact] void should_preserve_requirement_messages() => rules.ShouldContain("Label is blocked.");
     [Fact] void should_check_requirements() => rules.ShouldContain("!(Objects.equals(command.label(), \"blocked\"))");
-    [Fact] void should_throw_after_collecting_rejections() => rules.ShouldContain("validation.throwIfInvalid();");
+    [Fact] void should_throw_after_collecting_rejections() => rules.ShouldContain("if (!failures.isEmpty()) throw new IllegalArgumentException(String.join(\"; \", failures));");
+    [Fact] void should_not_depend_on_the_runtime_module() => rules.ShouldNotContain("io.cratis");
     [Fact] void should_not_degrade_supported_rules() => context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
 }

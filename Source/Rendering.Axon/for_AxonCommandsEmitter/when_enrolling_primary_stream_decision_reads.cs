@@ -46,9 +46,9 @@ public class when_enrolling_primary_stream_decision_reads : given.a_protected_de
     [Fact] void should_reject_absent_state() => handler.ShouldContain("if (state == null || !state.decisionRead0()) throw new ");
     [Fact] void should_not_wrap_the_snapshot() => handler.ShouldNotContain("Optional<");
     [Fact] void should_fail_before_appending_if_the_read_is_absent() => (handler.IndexOf("Required decision read 'order'", StringComparison.Ordinal) < handler.IndexOf("appender.append", StringComparison.Ordinal)).ShouldBeTrue();
-    [Fact] void should_fail_before_generated_values_or_rules() => (handler.IndexOf("Required decision read 'order'", StringComparison.Ordinal) < handler.IndexOf("rules.validate", StringComparison.Ordinal)).ShouldBeTrue();
-    [Fact] void should_reject_with_a_command_validation_error() => handler.ShouldContain("throw new CommandValidationException");
-    [Fact] void should_import_the_validation_exception() => handler.ShouldContain("import io.cratis.stage.axon.runtime.CommandValidationException;");
+    [Fact] void should_not_depend_on_a_rules_class() => handler.ShouldNotContain("rules");
+    [Fact] void should_reject_with_the_invalid_argument_exception() => handler.ShouldContain("throw new IllegalArgumentException(\"Required decision read");
+    [Fact] void should_not_use_the_runtime_validation_exception() => handler.ShouldNotContain("CommandValidationException");
     [Fact] void should_not_degrade_supported_presence_reads() => context.Degradation.UnsupportedConstructs.Count.ShouldEqual(0);
     [Fact] void should_refuse_cross_stream_decisions() => (otherKey.Prepare() is null).ShouldBeTrue();
     [Fact] void should_refuse_a_generated_read_key() => (generatedKey.Prepare() is null).ShouldBeTrue();

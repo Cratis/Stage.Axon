@@ -53,7 +53,7 @@ public class when_rendering_handler_clocks : for_AxonArtifactRenderPlanner.given
 
     [Fact] void should_omit_an_unused_occurrence_local() => ordinary.ShouldNotContain("var occurred =");
     [Fact] void should_omit_an_unused_clock_dependency() => ordinary.ShouldNotContain("java.time.Clock");
-    [Fact] void should_construct_clock_free_handlers_in_fixtures() => fixture.ShouldContain("new PlaceOrderHandler(new PlaceOrderRules(validators.getValidator()))");
+    [Fact] void should_construct_clock_free_handlers_in_fixtures() => fixture.ShouldContain("new PlaceOrderHandler()");
     [Fact] void should_omit_unused_fixture_clocks() => fixture.ShouldNotContain("java.time.Clock");
     [Fact] void should_keep_the_clock_for_generation() => generated.ShouldContain("command = command.withGenerated(clock);");
     [Fact] void should_load_the_allocated_identity_through_the_state_manager() => generated.ShouldContain("loadManagedEntity(PlaceOrderStream.class, command.orderId(), context).join();");

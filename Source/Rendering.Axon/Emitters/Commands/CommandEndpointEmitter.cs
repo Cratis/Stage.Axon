@@ -26,19 +26,19 @@ internal static partial class CommandEndpointEmitter
     {
         var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located);
         var name = JavaNames.Type(command.Name);
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Rules").Declare(name + "Endpoint");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Endpoint");
         var returnType = ReturnType(command, new(context.Request.Model.Application, context.BasePackage), code);
         var gateway = code.Reference("org.axonframework.messaging.commandhandling.gateway.CommandGateway");
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.RestController")}").Block($"public class {name}Endpoint", body =>
         {
-            body.Line($"private final {gateway} commandGateway;").Line($"private final {name}Rules rules;")
-                .Block($"public {name}Endpoint({gateway} commandGateway, {name}Rules rules)", constructor => constructor.Line("this.commandGateway = commandGateway;").Line("this.rules = rules;"))
+            body.Line($"private final {gateway} commandGateway;")
+                .Block($"public {name}Endpoint({gateway} commandGateway)", constructor => constructor.Line("this.commandGateway = commandGateway;"))
                 .Line("@" + body.Reference("org.springframework.web.bind.annotation.PostMapping") + "(" + JavaCodeBuilder.StringLiteral(Route(located, command)) + ")");
             var expression = AxonHttpTestsEndpoints.Expression(Authorize(context, command, body));
             AxonHttpTestsEndpoints.Register(context, new("command", "POST", Route(located, command), null, expression, [], null, command.Id));
             body.Block($"public {body.Reference("java.util.concurrent.CompletableFuture")}<{returnType}> execute(@{body.Reference("org.springframework.web.bind.annotation.RequestBody")} {name} request)", method =>
                 method.Line("var command = " + (command.Properties.Any(property => property.IsGenerated) || source?.Allocated == true ? "request.forRequest();" : "request;"))
-                    .Line("rules.validateInput(command);").Line($"return commandGateway.send(command, {returnType}.class);"));
+                    .Line($"return commandGateway.send(command, {returnType}.class);"));
         });
         context.AddJava(package, name + "Endpoint", code.Build(), sources: [command.Id]);
     }

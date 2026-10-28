@@ -28,6 +28,10 @@ internal static class CommandFixtureSecurity
 
     internal static void ProxyReferences(JavaCodeBuilder body, string name, bool usesClock) => ProxyCore(body, name, usesClock, body);
 
+    /// <summary>The authenticated caller subject forwarded as the native <c>username</c> command metadata, or null for anonymous callers.</summary>
+    internal static string? Subject(SemanticCaller? caller) => caller?.Authenticated != true ? null
+        : caller.Claims.FirstOrDefault(claim => claim.Type == "sub" || claim.Type.EndsWith("/nameidentifier", StringComparison.Ordinal))?.Value ?? "stage-spec-caller";
+
     static string Reference(JavaCodeBuilder? code, string type) => code?.Reference(type) ?? type;
 
     static bool HasOnlySubjectClaim(SemanticCaller caller)
@@ -46,7 +50,7 @@ internal static class CommandFixtureSecurity
             method.Line($"{holder}.getContext().setAuthentication(new {Reference(code, "org.springframework.security.authentication.AnonymousAuthenticationToken")}(\"stage-spec\", \"anonymous\", {Reference(code, "java.util.List")}.of(new {Reference(code, "org.springframework.security.core.authority.SimpleGrantedAuthority")}(\"ROLE_ANONYMOUS\"))));");
             return;
         }
-        var identity = caller.Claims.FirstOrDefault(claim => claim.Type == "sub" || claim.Type.EndsWith("/nameidentifier", StringComparison.Ordinal))?.Value ?? "stage-spec-caller";
+        var identity = Subject(caller)!;
         var roles = caller.Roles.Select(role => $"new {Reference(code, "org.springframework.security.core.authority.SimpleGrantedAuthority")}({JavaCodeBuilder.StringLiteral("ROLE_" + role)})");
         method.Line($"{holder}.getContext().setAuthentication({Reference(code, "org.springframework.security.authentication.UsernamePasswordAuthenticationToken")}.authenticated({JavaCodeBuilder.StringLiteral(identity)}, null, {Reference(code, "java.util.List")}.of({string.Join(", ", roles)})));");
     }
@@ -54,9 +58,9 @@ internal static class CommandFixtureSecurity
     static void ProxyCore(JavaCodeBuilder body, string name, bool usesClock, JavaCodeBuilder? code)
     {
         var parameter = usesClock ? $"{Reference(code, "java.time.Clock")} clock" : string.Empty;
-        var argument = usesClock ? ", clock" : string.Empty;
+        var argument = usesClock ? "clock" : string.Empty;
         body.Block($"private {name}Handler handler({parameter})", method => method
-            .Line($"var factory = new {Reference(code, "org.springframework.aop.framework.ProxyFactory")}(new {name}Handler(new {name}Rules(validators.getValidator()){argument}));")
+            .Line($"var factory = new {Reference(code, "org.springframework.aop.framework.ProxyFactory")}(new {name}Handler({argument}));")
             .Line("factory.setProxyTargetClass(true);")
             .Line($"factory.addAdvisor({Reference(code, "org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor")}.preAuthorize());")
             .Line($"return ({name}Handler) factory.getProxy();"));
