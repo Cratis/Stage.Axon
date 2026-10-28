@@ -42,5 +42,7 @@ public class when_mapping_event_context : given.a_flat_view
     [Fact] void should_not_emit_persistent_proofs_for_unsupported_context() => _contexts.Where(pair => pair.Key == "sequenceNumber").ShouldEachConformTo(pair => !pair.Value.Artifacts.Exists(artifact => artifact.RelativePath.Contains("/TotalPersistent", StringComparison.Ordinal)));
     [Fact] void should_not_guard_an_admitted_persistent_view() => Code(_contexts["occurred"], "TotalStoreConfiguration").ShouldNotContain("persistentReadModelSafety");
 
+    [Fact] void should_explain_unsupported_event_context() => Code(_contexts["sequenceNumber"], "TotalStoreConfiguration").ShouldContain("event-context value");
+
     string Projector => Code(_contexts["occurred"], "TotalProjectionProjector");
 }

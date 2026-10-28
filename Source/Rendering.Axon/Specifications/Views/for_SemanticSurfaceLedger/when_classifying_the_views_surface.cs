@@ -11,6 +11,13 @@ public class when_classifying_the_views_surface : Specification
 {
     [Fact] void should_classify_live_queries_as_rendered() => SemanticSurfaceLedger.Entries["SemanticQueryDelivery.Live"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Rendered);
     [Fact] void should_account_for_conditional_persistent_read_model_storage() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Warned);
+    [Fact]
+    void should_register_the_writerless_code()
+    {
+        SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Codes.ShouldContain("STAGE-AXON-0309");
+        SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Detail.ShouldContain("STAGE-AXON-0309");
+    }
+
     [Fact] void should_register_the_persistence_warning_code() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Detail.ShouldContain("STAGE-AXON-0308");
     [Fact] void should_explain_retained_generation_refusal() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Detail.ShouldContain("Retained data without compatible generation metadata is refused");
     [Fact] void should_not_promise_automatic_recovery() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Detail.ShouldContain("automatic replay and legacy adoption are not performed");
