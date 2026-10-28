@@ -1,1 +1,2 @@
 io.cratis.stage.axon.runtime.StageAxonRuntimeAutoConfiguration
+io.cratis.stage.axon.runtime.persistent.StageAxonPersistenceAutoConfiguration

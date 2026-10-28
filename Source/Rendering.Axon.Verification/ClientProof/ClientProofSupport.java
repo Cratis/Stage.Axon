@@ -3,6 +3,7 @@ package __RUNTIME__;
 import __APPLICATION__.work.items.overview.WorkItemById;
 import __APPLICATION__.work.items.overview.WorkItems;
 import __RUNTIME_MODULE__.LiveStreams;
+import __RUNTIME_MODULE__.ReadModelStore;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

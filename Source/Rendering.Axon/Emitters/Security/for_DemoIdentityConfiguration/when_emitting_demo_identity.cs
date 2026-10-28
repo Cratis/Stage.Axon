@@ -29,7 +29,7 @@ public class when_emitting_demo_identity : for_AxonArtifactRenderPlanner.given.a
         demo.ShouldContain("UsernamePasswordAuthenticationToken.authenticated(\"demo\", null, authorities)");
         demo.ShouldContain("SecurityContextHolder.createEmptyContext()");
         demo.ShouldContain("finally { SecurityContextHolder.clearContext(); }");
-        demo.ShouldContain(".addFilterAfter(identity(authorities), SecurityContextHolderFilter.class)");
+        demo.ShouldContain(".addFilterAfter(identity(authorities, claims), SecurityContextHolderFilter.class)");
         demo.ShouldContain(".warn(\"DEMO IDENTITY ENABLED:");
         demo.ShouldContain("Never activate the demo profile in production.");
         demo.ShouldContain("SessionCreationPolicy.STATELESS");
