@@ -61,6 +61,7 @@ internal static class CorpusRenderer
         await WriteArtifacts(destination, plan);
         if (name == IngressProofModel.Application || name == IngressProofModel.PersistentApplication) await IngressProofArtifacts.Write(destination, name);
         if (name == ClientProofArtifacts.Application) await ClientProofArtifacts.Write(destination);
+        if (name == ConstraintProofArtifacts.Application) await ConstraintProofArtifacts.Write(destination);
         Console.WriteLine($"{name}: rendered {plan.Artifacts.Length} artifacts; {plan.Diagnostics.Length} diagnostics; no refusals");
     }
 

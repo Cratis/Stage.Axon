@@ -1,0 +1,77 @@
+domain Stage.ConstrainedJavaBodies
+
+concept AccountId : String
+
+module Accounts
+  feature Aliases
+    slice StateChange Claim
+      command ClaimAlias
+        id AccountId identifier
+        alias String
+        produces AliasClaimed
+          for id
+          id = id
+          alias = alias
+        handler
+          ```java
+          appender.append(new AliasClaimed(command.id(), command.id(), command.alias()));
+          ```
+      event AliasClaimed
+        id AccountId
+        alias String
+      constraint UniqueAlias
+        unique alias on AliasClaimed
+        released by AliasReleased
+        message "The alias is taken."
+      specification ClaimingAnAlias
+        when ClaimAlias
+          id = "first"
+          alias = "available"
+        then AliasClaimed
+          for "first"
+          id = "first"
+          alias = "available"
+
+    slice StateChange Release
+      command ReleaseAlias
+        id AccountId identifier
+        produces AliasReleased
+          for id
+          id = id
+        handler
+          ```java
+          appender.append(new AliasReleased(command.id(), command.id()));
+          ```
+      event AliasReleased
+        id AccountId
+
+    slice StateChange QuietClaim
+      command ClaimAliasQuietly
+        id AccountId identifier
+        alias String
+        produces AliasClaimed
+          for id
+          id = id
+          alias = alias
+        handler
+          ```java
+          try {
+              appender.append(new AliasClaimed(command.id(), command.id(), command.alias()));
+          } catch (RuntimeException conflict) {
+              return;
+          }
+          ```
+
+    slice StateChange FailingClaim
+      command ClaimAliasThenFail
+        id AccountId identifier
+        alias String
+        produces AliasClaimed
+          for id
+          id = id
+          alias = alias
+        handler
+          ```java
+          appender.append(new AliasClaimed(command.id(), command.id(), command.alias()));
+          throw new IllegalStateException("forced rollback");
+          ```

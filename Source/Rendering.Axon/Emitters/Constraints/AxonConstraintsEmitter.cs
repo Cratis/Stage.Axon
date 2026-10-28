@@ -40,8 +40,47 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
             {
                 foreach (var (slice, constraint) in constraints.Where(item => ConstraintCoverage.Supported(context, item.Constraint))) EmitRule(context, method, slice, constraint);
             });
+            if (constraints.Any(item => ConstraintCoverage.Supported(context, item.Constraint))) EmitEnforcing(context, body, store);
         });
         context.AddJava(package, "ModeledConstraints", code.Build(), sources: [.. constraints.Select(item => item.Slice)]);
+    }
+
+    static void EmitEnforcing(AxonEmissionContext context, JavaCodeBuilder body, string store)
+    {
+        var appender = body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender");
+        var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
+        var list = body.Reference("java.util.List");
+        var metadata = body.Reference("org.axonframework.messaging.core.Metadata");
+        var message = body.Reference("org.axonframework.messaging.core.Message");
+        var conflict = body.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueConflict"));
+        var descriptor = body.Reference("org.axonframework.common.infra.ComponentDescriptor");
+        body.Block($"public static {appender} enforcing({store} store, {appender} appender, {processing} context)", method => method.RawBody($$"""
+            return new {{appender}}() {
+                @Override
+                public void append({{list}}<?> events) {
+                    append(events, {{metadata}}.emptyInstance());
+                }
+
+                @Override
+                public void append({{list}}<?> events, {{metadata}} metadata) {
+                    try {
+                        for (var event : events) {
+                            var payload = event instanceof {{message}} message ? message.payload() : event;
+                            apply(store, payload, context);
+                        }
+                    } catch ({{conflict}} conflict) {
+                        context.runOnPrepareCommit(ignored -> { throw conflict; });
+                        throw conflict;
+                    }
+                    appender.append(events, metadata);
+                }
+
+                @Override
+                public void describeTo({{descriptor}} descriptor) {
+                    appender.describeTo(descriptor);
+                }
+            };
+            """));
     }
 
     static void EmitRule(AxonEmissionContext context, JavaCodeBuilder body, SemanticId slice, SemanticConstraint constraint)

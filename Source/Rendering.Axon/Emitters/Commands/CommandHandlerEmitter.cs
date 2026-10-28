@@ -16,9 +16,11 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandHandlerEmitter(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource? source)
 {
+    static readonly string[] ForbiddenAppenderTokens = ["EventAppender", "EventSink", "EventGateway", "EventStore", "forContext"];
     readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
 
     bool _usesClock;
+    string? _nativeBody;
 
     bool Constrained => ConstraintCoverage.All(context).Any(item => command.Produces.Any(produced => ConstraintCoverage.Applies(item.Constraint, produced.EventContract)));
 
@@ -38,6 +40,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             var authorization = SecurityAnnotations.For(context, command.Authorization, command.Id);
             if (authorization.Length > 0) body.Line(authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal));
             body.Block($"public {response.ReturnTypeFor(body)} handle({Parameters(name, body, package)})", method => Handle(method, response, package));
+            if (_nativeBody is not null) NativeBody(body, response, name);
             Dependencies(body, name);
         });
         context.AddJava(package, name + "Handler", code.Build(), sources: [command.Id]);
@@ -79,7 +82,8 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
 
     string Parameters(string name, JavaCodeBuilder code, string package)
     {
-        var parameters = name + $" command, {code.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender";
+        var appender = command.Handler is not null && Constrained ? "unconstrainedAppender" : "appender";
+        var parameters = name + $" command, {code.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} {appender}";
         if (Constrained && source?.Generated != true) parameters += $", {code.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
         if (source is null) return parameters;
         if (source.Generated) return parameters + $", {code.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
@@ -92,7 +96,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         if (!Supported(body, response)) return;
         if (command.Handler is { } handler)
         {
-            HandleNative(body, handler, package);
+            HandleNative(body, handler, package, response);
             return;
         }
         var appends = new List<(string Event, string? Condition)>();
@@ -112,7 +116,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         if (response.ReturnType != "void") body.Line("return " + body.ReferenceExpression(response.Value!) + ";");
     }
 
-    void HandleNative(JavaCodeBuilder body, SemanticCommandHandler handler, string package)
+    void HandleNative(JavaCodeBuilder body, SemanticCommandHandler handler, string package, CommandResponses response)
     {
         var slot = new InlineBodySlot(handler.RequirementId, SemanticImplementationRole.CommandHandler, command.Id);
         if (handler.ResultVersion != 1)
@@ -125,16 +129,39 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation: " + reason);
             return;
         }
+        if (Constrained && ForbiddenAppenderTokens.Any(token => content.Contains(token, StringComparison.Ordinal)))
+        {
+            Unsupported(body, AxonRefusalCodes.Constraint, "enforce modeled uniqueness for every event a native command body appends");
+            return;
+        }
         Validate(body);
         foreach (var produced in command.Produces) AxonEventsEmitter.TypeFor(context, CommandAppends.Contract(context, produced.EventContract).Id, body, package);
-        body.RawBody(content);
+        if (Constrained)
+        {
+            var arguments = "command, " + body.Reference(context.BasePackage + ".infrastructure.ModeledConstraints") + ".enforcing(uniqueValues, unconstrainedAppender, context)";
+            if (source?.Generated == true) arguments += ", context";
+            else if (source is not null) arguments += ", state";
+            body.Line((response.ReturnType == "void" ? string.Empty : "return ") + "handleBody(" + arguments + ");");
+            _nativeBody = content;
+        }
+        else
+        {
+            body.RawBody(content);
+        }
         context.ConsumedImplementations.Add(handler.RequirementId);
+    }
+
+    void NativeBody(JavaCodeBuilder body, CommandResponses response, string name)
+    {
+        var parameters = name + $" command, {body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender";
+        if (source?.Generated == true) parameters += $", {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
+        else if (source is not null) parameters += $", {body.Reference("org.jspecify.annotations.Nullable")} {name}Stream state";
+        body.Block($"private {response.ReturnTypeFor(body)} handleBody({parameters})", method => method.RawBody(_nativeBody!));
     }
 
     bool Supported(JavaCodeBuilder body, CommandResponses response)
     {
         if (ConstraintCoverage.CommandRequiresUnsupportedConstraint(context, command)) return Unsupported(body, AxonRefusalCodes.Constraint, "enforce or release modeled uniqueness in the append unit of work");
-        if (command.Handler is not null && Constrained) return Unsupported(body, AxonRefusalCodes.Constraint, "enforce or release modeled uniqueness for a native command body in the append unit of work");
         if (new CommandDecisionReads(context, command, source).Prepare() is null) return Unsupported(body, AxonRefusalCodes.ProtectedReads, "check modeled decision reads before changing state");
         if (MissingSource) return Unsupported(body, AxonRefusalCodes.CommandMapping, "resolve the command's primary event-source identity");
         return command.Handler is not null || response.Value is not null || Unsupported(body, AxonRefusalCodes.CommandMapping, "compute the complete modeled command response");

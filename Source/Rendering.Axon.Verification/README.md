@@ -25,6 +25,8 @@ Every application must execute passing native tests. Missing, failed, empty, or 
 
 The existing four-file views corpus includes native reducer initialization, accumulation and deletion scenarios.
 
+`constrained-java-bodies` adds native command handlers with supported property uniqueness and release-only events, without `given` specifications or disabled tests. `GeneratedNativeUniqueTest` dispatches through the generated gateway in the default in-memory profile: eight concurrent claimants over 25 repetitions (exactly one winner), owner value changes, release/reuse, body-failure rollback, and swallowed-conflict prepare-commit poisoning. All waits are bounded. These Java proofs run in CI; native-handler JPA coverage is deferred to Deliverable B. `UniqueEventOccurrence` remains unsupported.
+
 Persistent startup supports admitted flat projections with durable view rows and generation metadata; scoped projections, reducers and other unsupported shapes remain guarded by `STAGE-AXON-0308`. Supported views require pooled processors with propagating error handling. Missing or incompatible generation metadata on retained data is refused: no automatic replay, reset or legacy adoption is performed.
 
 Generated default Surefire proofs cover recovery before new appends, retained checkpoints, subsequent updates, handler/token-store failure rollback and retry, and rejection of off-thread or non-joined writes. Additional cases cover generation refusal, processor customization guards and default-profile handler dispatch/query invalidation. These tests are included in the generated Maven `verify` run used by CI.
