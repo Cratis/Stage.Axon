@@ -76,9 +76,8 @@ internal sealed class PersistentViewRemovalProof(AxonEmissionContext context, Vi
         var imports = new[]
         {
             types.BasePackage + ".infrastructure.AxonConfiguration.class", types.BasePackage + ".infrastructure.SecurityConfiguration.class",
-            AxonRuntimePackage.Type(types.BasePackage, "persistent.PersistentConfiguration") + ".class", persistence + ".PersistentViewConfiguration.class",
-            package + "." + modelName + "StoreConfiguration.class", projector + ".class"
-        };
+            AxonRuntimePackage.Type(types.BasePackage, "persistent.PersistentConfiguration") + ".class", persistence + ".PersistentViewConfiguration.class"
+        }.Concat(new PersistentViewTests(context, types, persistence).PersistentProjectorImports()).Distinct(StringComparer.Ordinal);
         var replacements = new Dictionary<string, string>
         {
             ["PACKAGE"] = package,
@@ -453,9 +452,9 @@ internal sealed class PersistentViewRemovalProof(AxonEmissionContext context, Vi
             private static Map<Integer, String> claims(ConfigurableApplicationContext application) {
                 try (var manager = application.getBean(jakarta.persistence.EntityManagerFactory.class).createEntityManager()) {
                     var result = new HashMap<Integer, String>();
-                    for (var row : manager.createQuery("select e.segment, e.owner from TokenEntry e where e.processorName = :name", Object[].class)
+                    for (var entry : manager.createQuery("select e from TokenEntry e where e.processorName = :name", TokenEntry.class)
                             .setParameter("name", "__PACKAGE__").getResultList()) {
-                        if (row[1] != null) result.put(((Segment) row[0]).getSegmentId(), (String) row[1]);
+                        if (entry.getOwner() != null) result.put(entry.getSegment().getSegmentId(), entry.getOwner());
                     }
                     return result;
                 }

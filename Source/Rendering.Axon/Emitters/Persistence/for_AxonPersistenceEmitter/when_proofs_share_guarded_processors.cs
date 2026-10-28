@@ -29,8 +29,11 @@ public class when_proofs_share_guarded_processors : Projections.for_AxonProjecti
             .Select(model => (Owner: owner, Model: model))).ToArray();
         models.Length.ShouldBeGreaterThan(0);
         var types = new ViewJavaTypes(_request.Model.Application, Java.JavaNames.PackageSegment(_request.Model.Application.Name));
-        var supports = _context.Artifacts.Where(artifact => artifact.RelativePath.EndsWith("PersistentSupport.java", StringComparison.Ordinal)).ToArray();
+        var supports = _context.Artifacts.Where(artifact =>
+            artifact.RelativePath.EndsWith("PersistentSupport.java", StringComparison.Ordinal) ||
+            artifact.RelativePath.EndsWith("PersistentRemovalSupport.java", StringComparison.Ordinal)).ToArray();
         supports.Length.ShouldBeGreaterThan(0);
+        supports.Any(artifact => artifact.RelativePath.EndsWith("PersistentRemovalSupport.java", StringComparison.Ordinal)).ShouldBeTrue();
         foreach (var support in supports)
         {
             var fixture = Text(support).Split("@Import({", StringSplitOptions.None)[1];

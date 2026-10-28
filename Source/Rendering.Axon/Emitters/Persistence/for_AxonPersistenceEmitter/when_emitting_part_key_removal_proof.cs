@@ -29,6 +29,8 @@ public class when_emitting_part_key_removal_proof : for_PersistentViewAdmission.
     [Fact] void should_flush_the_actual_delete_before_injection() => _proof.ShouldContain("projector(bound).on(event, null)");
     [Fact] void should_hold_the_earlier_create() => _proof.ShouldContain("entered.await(10, TimeUnit.SECONDS)");
     [Fact] void should_compare_claimed_owners() => _proof.ShouldContain("claims(application)");
+    [Fact] void should_read_claims_from_typed_token_entries() => _proof.ShouldContain("result.put(entry.getSegment().getSegmentId(), entry.getOwner())");
+    [Fact] void should_not_cast_the_persisted_segment_id_to_a_segment() => _proof.ShouldNotContain("((Segment) row[0])");
     [Fact] void should_check_the_owning_checkpoint() => _proof.ShouldContain("decoded(checkpoint.get(owner))");
     [Fact] void should_prove_the_other_row_survives() => _proof.ShouldContain("Other row must survive rollback and reclaim");
     [Fact] void should_prove_recreation() => _proof.ShouldContain("Recreation is a create, not a removal replay");
