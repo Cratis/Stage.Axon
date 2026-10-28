@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 @SpringBootTest(properties = "stage.axon.demo.claims.department=Finance Operations")
 @AutoConfigureMockMvc
@@ -20,8 +21,8 @@ class GeneratedInlinePolicyDemoTest {
     @Test
     void explicitDemoClaimsReachTheInlinePolicy() throws Exception {
         var accepted = http.perform(post("/api/accounts/registry/register-account").contentType("application/json")
-                .content("{\"accountId\":\"" + UUID.randomUUID() + "\",\"alias\":\"demo\"}"))
-                .andReturn();
+                .content("{\"id\":\"" + UUID.randomUUID() + "\",\"alias\":\"demo\"}"))
+                .andExpect(request().asyncStarted()).andReturn();
         http.perform(asyncDispatch(accepted)).andExpect(status().is2xxSuccessful());
     }
 }
@@ -35,7 +36,7 @@ class GeneratedInlinePolicyMissingClaimsDemoTest {
     @Test
     void demoWithoutDepartmentDoesNotGrant() throws Exception {
         http.perform(post("/api/accounts/registry/register-account").contentType("application/json")
-                .content("{\"accountId\":\"" + UUID.randomUUID() + "\",\"alias\":\"demo\"}"))
+                .content("{\"id\":\"" + UUID.randomUUID() + "\",\"alias\":\"demo\"}"))
                 .andExpect(status().is4xxClientError());
     }
 }

@@ -45,6 +45,34 @@ public partial class when_preparing_native_proofs : Specification
         sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain("stage.axon.demo.claims.department=Finance Operations");
     }
 
+    [Fact]
+    void should_send_the_generated_inline_policy_command_field()
+    {
+        var sources = IngressProofArtifacts.Sources("inline-java-policies");
+        foreach (var source in sources.Values)
+        {
+            source.ShouldContain("\\\"id\\\":\\\"");
+            source.ShouldNotContain("\\\"accountId\\\":");
+        }
+    }
+
+    [Fact]
+    void should_require_async_start_for_allowed_inline_policy_commands()
+    {
+        var sources = IngressProofArtifacts.Sources("inline-java-policies");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("http.perform(command().with(authentication(caller(\"Finance Operations\"))))\n                .andExpect(request().asyncStarted()).andReturn();");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("http.perform(command().with(authentication(caller)))\n                .andExpect(request().asyncStarted()).andReturn();");
+        sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain(".andExpect(request().asyncStarted()).andReturn();");
+    }
+
+    [Fact]
+    void should_assert_synchronous_inline_policy_query_denials_directly()
+    {
+        var source = IngressProofArtifacts.Sources("inline-java-policies")["GeneratedInlinePolicyTest.java"];
+        source.ShouldContain("if (result.andReturn().getRequest().isAsyncStarted())");
+        source.ShouldContain("var response = result.andExpect(request().asyncStarted()).andReturn();\n            return http.perform(asyncDispatch(response));\n        }\n        return result;");
+    }
+
     [Fact] void should_resolve_all_template_packages() => _all.ShouldNotContain("__APPLICATION__");
     [Fact] void should_resolve_the_runtime_package() => _all.ShouldNotContain("__RUNTIME__");
     [Fact] void should_not_add_license_headers_to_java() => _all.ShouldNotContain("Copyright (c) Cratis");

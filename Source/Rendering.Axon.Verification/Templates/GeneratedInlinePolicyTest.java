@@ -52,7 +52,8 @@ class GeneratedInlinePolicyTest {
 
     @Test
     void financeWriterAllowsWhileOtherDepartmentsAndAnonymousDeny() throws Exception {
-        var accepted = http.perform(command().with(authentication(caller("Finance Operations")))).andReturn();
+        var accepted = http.perform(command().with(authentication(caller("Finance Operations"))))
+                .andExpect(request().asyncStarted()).andReturn();
         http.perform(asyncDispatch(accepted)).andExpect(status().is2xxSuccessful());
         http.perform(command().with(authentication(caller("Other")))).andExpect(status().is4xxClientError());
         http.perform(command()).andExpect(status().is4xxClientError());
@@ -138,7 +139,8 @@ class GeneratedInlinePolicyTest {
         var jwt = Jwt.withTokenValue("proof").header("alg", "none").claim("sub", "alice").claim("department", "Finance Operations").build();
         var caller = new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_Writer")));
         caller.setDetails(Map.of("department", "Other"));
-        var accepted = http.perform(command().with(authentication(caller))).andReturn();
+        var accepted = http.perform(command().with(authentication(caller)))
+                .andExpect(request().asyncStarted()).andReturn();
         http.perform(asyncDispatch(accepted)).andExpect(status().is2xxSuccessful());
     }
 
@@ -156,7 +158,7 @@ class GeneratedInlinePolicyTest {
 
     private static MockHttpServletRequestBuilder command() {
         return post(ROOT + "register-account").contentType("application/json")
-                .content("{\"accountId\":\"" + UUID.randomUUID() + "\",\"alias\":\"proof\"}");
+                .content("{\"id\":\"" + UUID.randomUUID() + "\",\"alias\":\"proof\"}");
     }
 
     private MockHttpServletRequestBuilder query(String name) {
@@ -167,6 +169,10 @@ class GeneratedInlinePolicyTest {
 
     private ResultActions queryResult(String name, Authentication caller) throws Exception {
         var result = http.perform(query(name).with(authentication(caller)).accept("application/json"));
-        return result.andReturn().getRequest().isAsyncStarted() ? http.perform(asyncDispatch(result.andReturn())) : result;
+        if (result.andReturn().getRequest().isAsyncStarted()) {
+            var response = result.andExpect(request().asyncStarted()).andReturn();
+            return http.perform(asyncDispatch(response));
+        }
+        return result;
     }
 }
