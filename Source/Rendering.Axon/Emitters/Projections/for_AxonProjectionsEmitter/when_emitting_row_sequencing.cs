@@ -17,10 +17,22 @@ public class when_emitting_row_sequencing : Persistence.for_PersistentViewAdmiss
     void Because() => _context = Render(slice => slice);
 
     [Fact] void should_attach_the_policy_to_the_discovered_handler() => Code(_context, "TotalProjectionProjector").ShouldContain("@SequencingPolicy(type = IncreasedSequence.class)\n    @EventHandler\n    public void handle(");
-    [Fact] void should_return_the_literal_row_key() => Code(_context, "TotalProjectionProjector").ShouldContain("return Optional.of(\"global\");");
+    [Fact]
+    void should_return_the_literal_row_key()
+    {
+        var code = Code(_context, "TotalProjectionProjector");
+        code.ShouldContain("store.update(\"global\", current -> {");
+        code.ShouldContain("return Optional.of(\"global\");");
+    }
     [Fact] void should_convert_payloads_through_the_event_converter() => Code(_context, "TotalProjectionProjector").ShouldContain("message.payloadAs(Increased.class, context.component(EventConverter.class))");
     [Fact] void should_keep_the_on_method_context_free() => Code(_context, "TotalProjectionProjector").ShouldContain("public void on(Increased event, QueryUpdateEmitter updates)");
-    [Fact] void should_sequence_placed_reducers_by_their_existing_source_key() => Code(_context, "RebuiltTotalReducerProjector").ShouldContain("return Optional.of(String.valueOf(event.counterId().value()));");
+    [Fact]
+    void should_sequence_placed_reducers_by_their_existing_source_key()
+    {
+        var code = Code(_context, "RebuiltTotalReducerProjector");
+        code.ShouldContain("var key = String.valueOf(event.counterId().value());");
+        code.ShouldContain("return Optional.of(String.valueOf(event.counterId().value()));");
+    }
     [Fact] void should_leave_stateful_projectors_without_a_policy() => Code(_context, "BoardProjectionProjector").ShouldNotContain("@SequencingPolicy");
     [Fact] void should_route_admitted_part_key_removals() => Code(_context, "MetricProjectionProjector").ShouldContain("@SequencingPolicy(type = MetricRemovedSequence.class)");
     [Fact] void should_route_the_rollback_witness_like_the_projector() => Code(_context, "TotalPersistentSupport").ShouldContain("@SequencingPolicy(type = TotalProjectionProjector.IncreasedSequence.class)");
@@ -57,7 +69,7 @@ public class when_emitting_row_sequencing : Persistence.for_PersistentViewAdmiss
         var types = new ViewJavaTypes(_request.Model.Application, "axonviews");
         var body = new JavaCodeBuilder(types.Package(owner));
         var values = new ProjectionValues(_context, types, body);
-        new ProjectionHandlerBinding(_context, types, model, types.Package(owner), sequence: new(types.EventType(contract.Id, body), key is null ? null : values.Key(key, contract))).Emit(body, types.EventType(contract.Id, body), _ => { });
+        new ProjectionHandlerBinding(_context, types, model, types.Package(owner), sequence: new(new ProjectionPolicyNames(_context.Request.Model.Application, [contract.Id]).For(contract.Id), types.EventType(contract.Id, body), key is null ? null : values.Key(key, contract))).Emit(body, types.EventType(contract.Id, body), _ => { });
         return body.Build();
     }
 
@@ -74,6 +86,7 @@ public class when_emitting_row_sequencing : Persistence.for_PersistentViewAdmiss
                 }
             })]
         });
+        Code(context, "TotalProjectionProjector").ShouldContain("store.update(String.valueOf(event.eventSourceId().value()), current -> {");
         Code(context, "TotalProjectionProjector").ShouldContain("return Optional.of(String.valueOf(event.eventSourceId().value()));");
         context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/TotalPersistentRowOrderTest.java", StringComparison.Ordinal)).ShouldBeFalse();
     }

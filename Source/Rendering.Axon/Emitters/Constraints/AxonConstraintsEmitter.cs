@@ -40,8 +40,49 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
             {
                 foreach (var (slice, constraint) in constraints.Where(item => ConstraintCoverage.Supported(context, item.Constraint))) EmitRule(context, method, slice, constraint);
             });
+            if (constraints.Any(item => ConstraintCoverage.Supported(context, item.Constraint))) EmitEnforcing(context, body, store);
         });
         context.AddJava(package, "ModeledConstraints", code.Build(), sources: [.. constraints.Select(item => item.Slice)]);
+    }
+
+    static void EmitEnforcing(AxonEmissionContext context, JavaCodeBuilder body, string store)
+    {
+        var appender = body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender");
+        var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
+        var list = body.Reference("java.util.List");
+        var metadata = body.Reference("org.axonframework.messaging.core.Metadata");
+        var message = body.Reference("org.axonframework.messaging.core.Message");
+        var completionException = body.Reference("java.util.concurrent.CompletionException");
+        var descriptor = body.Reference("org.axonframework.common.infra.ComponentDescriptor");
+        var throwable = body.Reference("java.lang.Throwable");
+        var overrideAnnotation = body.Reference("java.lang.Override");
+        body.Block($"public static {appender} enforcing({store} store, {appender} appender, {processing} context)", method => method.RawBody($$"""
+                    return new {{appender}}() {
+                        @{{overrideAnnotation}}
+                        public void append({{list}}<?> events) {
+                            append(events, {{metadata}}.emptyInstance());
+                        }
+
+                        @{{overrideAnnotation}}
+                        public void append({{list}}<?> events, {{metadata}} metadata) {
+                            try {
+                                for (var event : events) {
+                                    var payload = event instanceof {{message}} message ? message.payload() : event;
+                                    apply(store, payload, context);
+                                }
+                                appender.append(events, metadata);
+                            } catch ({{throwable}} failure) {
+                                context.runOnPrepareCommit(ignored -> { throw new {{completionException}}(failure); });
+                                throw failure;
+                            }
+                        }
+
+                        @{{overrideAnnotation}}
+                        public void describeTo({{descriptor}} descriptor) {
+                            appender.describeTo(descriptor);
+                        }
+                    };
+            """));
     }
 
     static void EmitRule(AxonEmissionContext context, JavaCodeBuilder body, SemanticId slice, SemanticConstraint constraint)
@@ -53,8 +94,16 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
         {
             var contract = CommandAppends.Contract(context, target.EventContract);
             var owner = AxonEventSources.PrimaryTag(context, contract).ComponentName;
-            var values = target.Properties.Select(id => "fact." + JavaNames.Member(contract.Properties.Single(property => property.Id == id).Name) + "()");
-            body.Line($"if (event instanceof {AxonEventsEmitter.TypeFor(context, contract.Id, body, package)} fact) store.assign(context, {key}, {body.Reference("java.util.Arrays")}.asList({string.Join(", ", values)}), fact.{owner}(), {constraint.IgnoreCasing.ToString().ToLowerInvariant()}, {message});");
+            var type = AxonEventsEmitter.TypeFor(context, contract.Id, body, package);
+            if (constraint.Kind == SemanticConstraintKind.UniqueEventOccurrence)
+            {
+                body.Line($"if (event instanceof {type} fact) store.occurOnce(context, {key}, fact.{owner}(), {message});");
+            }
+            else
+            {
+                var values = target.Properties.Select(id => "fact." + JavaNames.Member(contract.Properties.Single(property => property.Id == id).Name) + "()");
+                body.Line($"if (event instanceof {type} fact) store.assign(context, {key}, {body.Reference("java.util.Arrays")}.asList({string.Join(", ", values)}), fact.{owner}(), {constraint.IgnoreCasing.ToString().ToLowerInvariant()}, {message});");
+            }
         }
         foreach (var id in constraint.ReleasedBy)
         {

@@ -76,6 +76,13 @@ internal static class CorpusRenderer
             case ClientProofArtifacts.Application:
                 await ClientProofArtifacts.Write(destination);
                 break;
+            case ConstraintProofArtifacts.Application:
+            case ConstraintProofArtifacts.PersistentApplication:
+                await ConstraintProofArtifacts.Write(destination, name);
+                break;
+            case ReactionConstraintProofArtifacts.Application:
+                await ReactionConstraintProofArtifacts.Write(destination);
+                break;
         }
     }
 
@@ -84,6 +91,7 @@ internal static class CorpusRenderer
         "inline-java-policies" or "inline-java-policy-performers" => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: BearerProfile),
         IngressProofModel.Application => IngressProofModel.Plan(loaded, BearerProfile),
         IngressProofModel.PersistentApplication => IngressProofModel.PersistentPlan(loaded, Profile),
+        ConstraintProofArtifacts.PersistentApplication => ConstraintProofArtifacts.PersistentPlan(loaded, Profile),
         _ => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: Profile)
     };
 

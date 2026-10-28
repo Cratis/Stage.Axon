@@ -1,0 +1,147 @@
+domain Stage.ConstrainedJavaBodies
+
+concept AccountId : String
+
+module Accounts
+  feature Aliases
+    slice StateChange Claim
+      command ClaimAlias
+        id AccountId identifier
+        alias String
+        produces AliasClaimed
+          for id
+          id = id
+          alias = alias
+        handler
+          ```java
+          appender.append(new AliasClaimed(command.id(), command.id(), command.alias()));
+          ```
+      event AliasClaimed
+        id AccountId
+        alias String
+      constraint UniqueAlias
+        unique alias on AliasClaimed
+        released by AliasReleased
+        message "The alias is taken."
+      specification ClaimingAnAlias
+        when ClaimAlias
+          id = "first"
+          alias = "available"
+        then AliasClaimed
+          for "first"
+          id = "first"
+          alias = "available"
+
+    slice StateChange Release
+      command ReleaseAlias
+        id AccountId identifier
+        produces AliasReleased
+          for id
+          id = id
+        handler
+          ```java
+          appender.append(new AliasReleased(command.id(), command.id()));
+          ```
+      event AliasReleased
+        id AccountId
+
+    slice StateChange QuietRelease
+      command ReleaseAliasQuietly
+        id AccountId identifier
+        produces AliasReleased
+          for id
+          id = id
+        handler
+          ```java
+          try {
+              appender.append(new AliasReleased(command.id(), command.id()), null);
+          } catch (RuntimeException failure) {
+              return;
+          }
+          ```
+
+    slice StateChange QuietClaim
+      command ClaimAliasQuietly
+        id AccountId identifier
+        alias String
+        produces AliasClaimed
+          for id
+          id = id
+          alias = alias
+        handler
+          ```java
+          try {
+              appender.append(new AliasClaimed(command.id(), command.id(), command.alias()));
+          } catch (RuntimeException conflict) {
+              return;
+          }
+          ```
+
+    slice StateChange FailingClaim
+      command ClaimAliasThenFail
+        id AccountId identifier
+        alias String
+        produces AliasClaimed
+          for id
+          id = id
+          alias = alias
+        handler
+          ```java
+          appender.append(new AliasClaimed(command.id(), command.id(), command.alias()));
+          throw new IllegalStateException("forced rollback");
+          ```
+
+  feature Openings
+    slice StateChange Open
+      command OpenAccount
+        id AccountId identifier
+        produces AccountOpened
+          for id
+          id = id
+        handler
+          ```java
+          appender.append(new AccountOpened(command.id(), command.id()));
+          ```
+      event AccountOpened
+        id AccountId
+      constraint OneOpening
+        unique event AccountOpened
+        released by AccountClosed
+      specification OpeningAnAccount
+        when OpenAccount
+          id = "opening"
+        then AccountOpened
+          for "opening"
+          id = "opening"
+
+    slice StateChange ModeledOpen
+      command OpenAccountModeled
+        id AccountId identifier
+        produces AccountOpened
+          for id
+          id = id
+
+    slice StateChange Close
+      command CloseAccount
+        id AccountId identifier
+        produces AccountClosed
+          for id
+          id = id
+        handler
+          ```java
+          appender.append(new AccountClosed(command.id(), command.id()));
+          ```
+      event AccountClosed
+        id AccountId
+
+    slice StateChange FailingOpen
+      command OpenAccountThenFail
+        id AccountId identifier
+        produces AccountOpened
+          for id
+          id = id
+        handler
+          ```java
+          appender.append(new AccountOpened(command.id(), command.id()));
+          throw new IllegalStateException("forced rollback");
+          ```

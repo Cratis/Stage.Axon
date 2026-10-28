@@ -16,17 +16,17 @@ internal sealed class ProjectionSequencing(AxonEmissionContext context, ViewJava
     internal string Namespace => types.Package(ScopeSelection.Locate(context.Request.Model.Application)
         .Single(owner => owner.Slice.ReadModels.Any(candidate => candidate.Id == model.Id))) + "." + JavaNames.Type(model.Name);
 
-    internal ProjectionHandlerBinding.ProjectionSequence Projection(IGrouping<SemanticId, SemanticProjectionFrom> group, JavaCodeBuilder code)
+    internal ProjectionHandlerBinding.ProjectionSequence Projection(IGrouping<SemanticId, SemanticProjectionFrom> group, JavaCodeBuilder code, ProjectionPolicyNames names)
     {
-        return ForKeys(group.Key, [.. group.Select(from => from.Key)], code);
+        return ForKeys(group.Key, [.. group.Select(from => from.Key)], code, names);
     }
 
-    internal ProjectionHandlerBinding.ProjectionSequence ForKeys(SemanticId contract, SemanticProjectionKey[] keys, JavaCodeBuilder code) =>
-        new(types.EventType(contract, code), UsesModelSequence || keys.Length != 1 ? null : new ProjectionValues(context, types, code).Key(keys[0], Contract(contract)));
+    internal ProjectionHandlerBinding.ProjectionSequence ForKeys(SemanticId contract, SemanticProjectionKey[] keys, JavaCodeBuilder code, ProjectionPolicyNames names) =>
+        new(names.For(contract), types.EventType(contract, code), UsesModelSequence || keys.Length != 1 ? null : new ProjectionValues(context, types, code).Key(keys[0], Contract(contract)));
 
     // Reducers write one source-keyed row, but inherit any other writer's model-wide fallback.
-    internal ProjectionHandlerBinding.ProjectionSequence Reducer(SemanticEventContract contract, JavaCodeBuilder code) =>
-        new(types.EventType(contract.Id, code), UsesModelSequence ? null : new ProjectionValues(context, types, code).Source(contract));
+    internal ProjectionHandlerBinding.ProjectionSequence Reducer(SemanticEventContract contract, JavaCodeBuilder code, ProjectionPolicyNames names) =>
+        new(names.For(contract.Id), types.EventType(contract.Id, code), UsesModelSequence ? null : new ProjectionValues(context, types, code).Source(contract));
 
     internal bool NeedsFallback(SemanticProjection projection) => ProjectionTransitions.From(projection)
         .Select(from => (from.EventContract, from.Key))

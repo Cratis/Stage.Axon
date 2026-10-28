@@ -18,6 +18,27 @@ public class when_sequencing_removal_writers : Persistence.for_PersistentViewAdm
         code.ShouldContain($"store.remove({key});");
         code.Split($"return Optional.of({key});", StringSplitOptions.None).Length.ShouldEqual(3);
         code.ShouldNotContain("return Optional.of(\"axonviews.metrics.monthly.metrics.Metric\");");
+        foreach (var policy in new[] { "MetricCountedSequence", "MetricRemovedSequence" })
+        {
+            code.ShouldContain($"@SequencingPolicy(type = {policy}.class)");
+            code.Split($"public static final class {policy} ", StringSplitOptions.None)[1].Split("public static final class ", StringSplitOptions.None)[0].ShouldContain($"return Optional.of({key});");
+        }
+    }
+
+    [Fact]
+    void should_allocate_a_collision_safe_policy_for_a_removal_only_contract()
+    {
+        var context = Render(slice => slice with
+        {
+            ReadModels = [.. slice.ReadModels.Select(model => model.Name == "Metric" ? model with { Name = "MetricRemovedSequence" } : model)]
+        });
+        var projection = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Projections).Single(projection => projection.Name == "MetricProjection");
+        var removal = projection.Scope!.Removals.Single();
+        ProjectionTransitions.From(projection).Any(from => from.EventContract == removal.EventContract).ShouldBeFalse();
+        var code = Code(context, "MetricProjectionProjector");
+        code.ShouldContain("@SequencingPolicy(type = MetricRemovedSequence2.class)");
+        code.ShouldContain("public static final class MetricRemovedSequence2 implements org.axonframework.messaging.core.sequencing.SequencingPolicy<EventMessage>");
+        code.ShouldContain("store.remove(Map.ofEntries(");
     }
 
     [Theory]

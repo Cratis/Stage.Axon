@@ -45,6 +45,17 @@ public final class InMemoryUniqueValueStore implements UniqueValueStore {
     }
 
     @Override
+    public synchronized void occurOnce(ProcessingContext context, String constraint, Object owner, String message) {
+        var changes = changes(context);
+        var identity = UniqueValues.owner(owner);
+        var key = new Key(constraint, identity);
+        var current = changes.writes.containsKey(key) ? changes.writes.get(key) : owners.get(key);
+        if (reservedElsewhere(key, changes) || current != null) throw new UniqueValueConflict(message);
+        reservations.put(key, changes);
+        changes.writes.put(key, identity);
+    }
+
+    @Override
     public synchronized void releaseOwner(ProcessingContext context, String constraint, Object owner) {
         var changes = changes(context);
         var identity = UniqueValues.owner(owner);

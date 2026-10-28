@@ -16,10 +16,12 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
     {
         var name = JavaNames.Type(projection.Name) + "Projector";
         var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type);
-        foreach (var property in model.Properties) types.ClaimProjectionType(property.Type, code);
-        new ProjectionUpdates(context, types, model.Id).Claim(code, package);
         var removals = projection.Scope?.Removals ?? [];
         var contracts = ProjectionTransitions.From(projection).Select(from => from.EventContract).Concat(removals.Select(removal => removal.EventContract)).Distinct().ToArray();
+        var policies = new ProjectionPolicyNames(context.Request.Model.Application, contracts);
+        policies.Declare(code);
+        foreach (var property in model.Properties) types.ClaimProjectionType(property.Type, code);
+        new ProjectionUpdates(context, types, model.Id).Claim(code, package);
         foreach (var contract in contracts) types.EventType(contract, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
             .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
@@ -34,7 +36,7 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
                     var values = new ProjectionValues(context, types, body);
                     var rowKeys = from.Select(transition => transition.Key).Concat(removed.Select(removal => removal.Key)).ToArray();
                     var keys = rowKeys.Length < 2 ? [] : ProjectionHandlerBinding.PreReserved([.. rowKeys.Select(key => values.Key(key, @event))]);
-                    new ProjectionHandlerBinding(context, types, model, package, keys: keys, sequence: new ProjectionSequencing(context, types, model).ForKeys(contract, rowKeys, body)).Emit(
+                    new ProjectionHandlerBinding(context, types, model, package, keys: keys, sequence: new ProjectionSequencing(context, types, model).ForKeys(contract, rowKeys, body, policies)).Emit(
                     body,
                     types.EventType(contract, body),
                     method =>

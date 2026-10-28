@@ -4,12 +4,13 @@ import io.cratis.stage.axon.runtime.InMemoryUniqueValueStore;
 import io.cratis.stage.axon.runtime.UniqueValueStore;
 import io.cratis.stage.axon.runtime.persistent.UniqueClaim;
 import jakarta.persistence.EntityManagerFactory;
-import org.axonframework.common.configuration.ConfigurationEnhancer;
+import io.cratis.stage.axon.runtime.persistent.PersistentConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,7 +28,8 @@ class DefaultProfileFixtureTest {
 
     @Test
     void hasNoEventStorageEngineEnhancer() {
-        assertTrue(context.getBeansOfType(ConfigurationEnhancer.class).isEmpty());
+        assertFalse(context.containsBean("eventStorageEngine"));
+        assertTrue(context.getBeansOfType(PersistentConfiguration.class).isEmpty());
     }
 
     @Test
