@@ -68,7 +68,9 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-          cache-dependency-path: Source/Rendering.Axon/Emitters/Scaffold/AxonMavenProject.cs
+          cache-dependency-path: |
+            Source/Rendering.Axon/Emitters/Scaffold/AxonMavenProject.cs
+            Source/Runtime/pom.xml
       - uses: actions/setup-node@v4
         with:
           node-version: '24.20.0'
@@ -78,6 +80,14 @@ jobs:
         run: >-
           dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj
           -c Debug --no-build -- render "${{ runner.temp }}/axon-corpus"
+      - name: Test and install the Stage Axon runtime the rendered apps pin
+        working-directory: Source/Runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's:.*<stage-axon-runtime.version>\([^<]*\)</stage-axon-runtime.version>.*:\1:p' "$RUNNER_TEMP"/axon-corpus/*/pom.xml | sort -u)
+          [ -n "$version" ] && [ "$(printf '%s\n' "$version" | wc -l)" -eq 1 ] || { echo "::error::Rendered apps must pin exactly one runtime version: $version"; exit 1; }
+          sh ./mvnw -B -Drevision="$version" install
       - name: Run the generated HTTP transport proofs
         run: node --test "Source/Rendering.Axon/Emitters/Client/Tests/*.test.mjs"
       - name: Type-check every generated TypeScript client and the client-proof scenarios

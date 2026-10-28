@@ -27,7 +27,7 @@ public class when_preparing_generated_commands : for_AxonArtifactRenderPlanner.g
         var seed = ScopeSelection.Select(request).First(slice => !slice.Slice.Commands.IsEmpty).Slice.Commands[0];
         var source = new CommandSource
         {
-            Primary = ("eventSourceId", context.BasePackage + ".runtime.EventSourceId", "eventSourceId"),
+            Primary = ("eventSourceId", "io.cratis.stage.axon.runtime.EventSourceId", "eventSourceId"),
             Type = SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text),
             TagReference = "EventTags.EVENT_SOURCE_ID"
         };
@@ -37,7 +37,7 @@ public class when_preparing_generated_commands : for_AxonArtifactRenderPlanner.g
     }
 
     [Fact] void should_allocate_identities_using_fundamentals() => allocated.ShouldContain("new EventSourceId(GenerateValue.uuid().toString())");
-    [Fact] void should_import_allocated_runtime_identities() => allocated.ShouldContain("import " + JavaNames.PackageSegment(request.Model.Application.Name) + ".runtime.EventSourceId;");
+    [Fact] void should_import_allocated_runtime_identities() => allocated.ShouldContain("import io.cratis.stage.axon.runtime.EventSourceId;");
     [Fact] void should_import_fundamentals_generation() => allocated.ShouldContain("import io.cratis.fundamentals.concepts.GenerateValue;");
     [Fact] void should_import_the_preparation_clock() => allocated.ShouldContain("import java.time.Clock;");
     [Fact] void should_exclude_generated_values_from_the_http_body() => supported.ShouldContain("@JsonIgnore UUID requestId");
@@ -69,7 +69,7 @@ public class when_preparing_generated_commands : for_AxonArtifactRenderPlanner.g
         var body = new JavaCodeBuilder(context.BasePackage + ".commands");
         var source = new CommandSource
         {
-            Primary = ("identity", context.BasePackage + ".runtime.EventSourceId", "identity"),
+            Primary = ("identity", "io.cratis.stage.axon.runtime.EventSourceId", "identity"),
             Type = SemanticTypeReference.ForPrimitive(SemanticPrimitiveType.Text),
             TagReference = "EventTags.EVENT_SOURCE_ID"
         };

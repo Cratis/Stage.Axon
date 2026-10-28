@@ -36,7 +36,7 @@ public partial class when_emitting_query_types_with_short_names : given.a_query_
     [InlineData("Throwable", "LiveTotalsSubscription", "onError(java.lang.Throwable failure)")]
     [InlineData("Flow", "LiveTotalsStreams", "java.util.concurrent.Flow.Publisher<Object>")]
     [InlineData("Flow", "LiveTotalsSubscription", "java.util.concurrent.Flow.Publisher<LiveTotals.Result>")]
-    [InlineData("QueryResults", "FindTotalHandler", "axonviews.runtime.QueryResults.atMostOne(rows);")]
+    [InlineData("QueryResults", "FindTotalHandler", "io.cratis.stage.axon.runtime.QueryResults.atMostOne(rows);")]
     void should_reserve_the_model_before_framework_names(string model, string file, string expected)
     {
         _model = _model with { Name = model };

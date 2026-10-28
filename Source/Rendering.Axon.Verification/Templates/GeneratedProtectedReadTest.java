@@ -4,6 +4,7 @@ import __APPLICATION__.accounts.registry.consume.ConsumeAccount;
 import __APPLICATION__.accounts.registry.consume.ConsumeAccountRules;
 import __APPLICATION__.accounts.registry.crossstream.CloseOtherAccount;
 import __APPLICATION__.concepts.AccountId;
+import __RUNTIME_MODULE__.CommandValidationException;
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.ArrayList;
 import java.util.UUID;

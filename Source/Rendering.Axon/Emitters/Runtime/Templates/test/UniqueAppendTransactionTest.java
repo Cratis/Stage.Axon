@@ -1,5 +1,8 @@
 package __RUNTIME__;
 
+import io.cratis.stage.axon.runtime.ProblemDetailsAdvice;
+import io.cratis.stage.axon.runtime.UniqueValueConflict;
+import io.cratis.stage.axon.runtime.UniqueValueStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
