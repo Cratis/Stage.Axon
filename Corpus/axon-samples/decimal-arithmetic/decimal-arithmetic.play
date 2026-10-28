@@ -1,0 +1,41 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+concept Money : Decimal
+concept Quantity : Int
+
+module Pricing
+  feature Basket
+    slice StateChange AddLine
+      command AddLine
+        unitPrice Money
+        quantity Quantity
+        produces LineAdded
+          unitPrice = unitPrice
+          quantity = quantity
+      event LineAdded
+        unitPrice Money
+        quantity Quantity
+
+    slice StateView Totals
+      readmodel BasketTotal
+        name String
+        total Money
+
+      query AllTotals => BasketTotal[]
+      query FindTotal => BasketTotal optional
+        by name String
+
+      projection BasketTotalProjection => BasketTotal
+        from LineAdded
+          key "global"
+          name = "global"
+          add total by unitPrice * quantity
+
+      specification AddingALine
+        given LineAdded
+          unitPrice = 5
+          quantity = 3
+        then readmodel BasketTotal
+          name = "global"
+          total = 15
