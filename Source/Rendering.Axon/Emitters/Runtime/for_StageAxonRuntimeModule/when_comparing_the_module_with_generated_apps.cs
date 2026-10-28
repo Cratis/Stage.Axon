@@ -24,9 +24,12 @@ public class when_comparing_the_module_with_generated_apps : Specification
     [Fact] void should_use_the_axon_bom_of_the_generated_apps() => Version(_module, "axon-framework-bom").ShouldEqual(Version(_app, "axon-framework-bom"));
     [Fact] void should_use_the_fundamentals_version_of_the_generated_apps() => Version(_module, CratisFundamentals.ArtifactId).ShouldEqual(CratisFundamentals.Version);
     [Fact] void should_use_the_runtime_group() => _module.ShouldContain($"<groupId>{AxonRuntimePackage.GroupId}</groupId>\n  <artifactId>{AxonRuntimePackage.ArtifactId}</artifactId>");
+    [Fact] void should_publish_the_package_the_verification_proofs_import() => AxonRuntimePackage.ModulePackage.ShouldEqual("io.cratis.stage.axon.runtime");
     [Fact] void should_compile_for_the_generated_java_release() => Property(_module, "maven.compiler.release").ShouldEqual(Property(_app, "java.version"));
 
-    static string Version(string pom, string artifact) => Regex.Match(pom, $"<artifactId>{Regex.Escape(artifact)}</artifactId>\\s*<version>([^<]+)</version>").Groups[1].Value;
+    static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
-    static string Property(string pom, string name) => Regex.Match(pom, $"<{Regex.Escape(name)}>([^<]+)</{Regex.Escape(name)}>").Groups[1].Value;
+    static string Version(string pom, string artifact) => Regex.Match(pom, $"<artifactId>{Regex.Escape(artifact)}</artifactId>\\s*<version>([^<]+)</version>", RegexOptions.None, Timeout).Groups[1].Value;
+
+    static string Property(string pom, string name) => Regex.Match(pom, $"<{Regex.Escape(name)}>([^<]+)</{Regex.Escape(name)}>", RegexOptions.None, Timeout).Groups[1].Value;
 }

@@ -1,12 +1,13 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
-
 namespace Cratis.Stage.Rendering.Axon.Verification;
 
 internal static class IngressProofArtifacts
 {
+    /// <summary>The Java package of the published runtime module; a Rendering.Axon spec asserts the renderer emits the same package.</summary>
+    internal const string RuntimeModulePackage = "io.cratis.stage.axon.runtime";
+
     const string ApplicationPackage = "corpusingressinvariants";
     const string RuntimePackage = ApplicationPackage + ".runtime";
 
@@ -20,7 +21,7 @@ internal static class IngressProofArtifacts
                 name =>
                 {
                     using var reader = new StreamReader(assembly.GetManifestResourceStream(name)!);
-                    return reader.ReadToEnd().Replace("__APPLICATION__", ApplicationPackage, StringComparison.Ordinal).Replace("__RUNTIME_MODULE__", AxonRuntimePackage.ModulePackage, StringComparison.Ordinal).Replace("__RUNTIME__", RuntimePackage, StringComparison.Ordinal);
+                    return reader.ReadToEnd().Replace("__APPLICATION__", ApplicationPackage, StringComparison.Ordinal).Replace("__RUNTIME_MODULE__", IngressProofArtifacts.RuntimeModulePackage, StringComparison.Ordinal).Replace("__RUNTIME__", RuntimePackage, StringComparison.Ordinal);
                 },
                 StringComparer.Ordinal);
     }
@@ -39,7 +40,7 @@ internal static class IngressProofArtifacts
 
     internal static async Task Write(string destination, string application)
     {
-        var directory = Path.Combine(destination, "src/test/java", AxonRuntimePackage.InlinePackage(Package(application)).Replace('.', '/'));
+        var directory = Path.Combine(destination, "src/test/java", (Package(application) + ".runtime").Replace('.', '/'));
         Directory.CreateDirectory(directory);
         foreach (var (name, source) in Sources(application)) await File.WriteAllTextAsync(Path.Combine(directory, name), source);
     }
