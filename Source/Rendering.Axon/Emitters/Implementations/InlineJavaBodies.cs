@@ -7,7 +7,11 @@ using Cratis.Screenplay.Semantics;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 
-internal sealed record InlineBodySlot(string? RequirementId, SemanticImplementationRole Role, SemanticId Owner);
+/// <summary>
+/// Identifies a body slot. <paramref name="Slice"/> and <paramref name="MemberPrefix"/> additionally accept the shape the Screenplay compiler
+/// produces for reaction triggers: a slice-owned requirement whose member begins with the owning reaction's name.
+/// </summary>
+internal sealed record InlineBodySlot(string? RequirementId, SemanticImplementationRole Role, SemanticId Owner, SemanticId? Slice = null, string? MemberPrefix = null);
 
 internal static class InlineJavaBodies
 {
@@ -19,7 +23,8 @@ internal static class InlineJavaBodies
         reason = "The implementation requirement is unavailable or ambiguous.";
         if (string.IsNullOrEmpty(requirementId) || candidates.Length != 1) return false;
         var requirement = candidates[0];
-        reason = ContractReason(requirement, slot.Role, slot.Owner);
+        var sliceOwned = SliceOwned(requirement, slot);
+        reason = ContractReason(requirement, slot.Role, sliceOwned ? requirement.Source.SemanticId : slot.Owner, sliceOwned ? SemanticKind.Slice : OwnerKind(slot.Role));
         if (reason.Length > 0) return false;
         if (!context.Request.ImplementationContents.TryGetValue(requirementId, out var content) || string.IsNullOrWhiteSpace(content))
         {
@@ -52,15 +57,19 @@ internal static class InlineJavaBodies
         _ => SemanticKind.Unknown
     };
 
+    static bool SliceOwned(SemanticImplementationRequirement requirement, InlineBodySlot slot) =>
+        slot.Slice is { } slice && slot.MemberPrefix is { } prefix && requirement.Role == slot.Role && requirement.Source.SemanticId == slice &&
+        requirement.Owner.Kind == SemanticKind.Slice && requirement.Member?.StartsWith(prefix, StringComparison.Ordinal) == true;
+
     static string ForeignLanguage(string language) =>
         $"The Axon target only realizes Java bodies; language '{language}' is not supported. Supply the body in Java (or render it with a target that realizes this language) and render again.";
 
-    static string ContractReason(SemanticImplementationRequirement requirement, SemanticImplementationRole role, SemanticId owner)
+    static string ContractReason(SemanticImplementationRequirement requirement, SemanticImplementationRole role, SemanticId owner, SemanticKind ownerKind)
     {
         (bool Invalid, string Reason)[] checks =
         [
             (requirement.Role != role || requirement.Source.SemanticId != owner, "The implementation role or semantic owner does not match the slot."),
-            (requirement.Owner.Kind != OwnerKind(role), "The implementation address does not identify the slot's owner kind."),
+            (requirement.Owner.Kind != ownerKind, "The implementation address does not identify the slot's owner kind."),
             (requirement.Language is null, "The implementation language is unknown. Supply the body in Java and render again."),
             (requirement.Language != "java", ForeignLanguage(requirement.Language!)),
             (requirement.File is not null, "File-backed implementations have no supported native body slot."),
