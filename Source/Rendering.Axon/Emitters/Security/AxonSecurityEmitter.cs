@@ -21,6 +21,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
         var bearer = HttpAuthenticationInput.Bearer(context.Request.Profile);
         EmitConfiguration(context, bearer);
         DemoIdentityConfiguration.Emit(context);
+        PoliciesConfiguration.Emit(context);
         if (bearer) EmitAudienceGuard(context);
     }
 

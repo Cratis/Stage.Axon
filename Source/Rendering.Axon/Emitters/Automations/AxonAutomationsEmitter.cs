@@ -62,20 +62,16 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
                 {
                     if (triggers[index] is not { } trigger || (unregistered && trigger.Production is not null))
                     {
-                        var cause = emitter.Rejections.TryGetValue(index, out var rejected) ? ": " + rejected : string.Empty;
-                        body.UnsupportedIntent($"execute reaction {reaction.Name} trigger {index + 1} with its original guards, identity, mappings and effects{cause}", reaction.Id.ToString(), "STAGE-AXON-0504");
+                        body.UnsupportedIntent($"execute reaction {reaction.Name} trigger {index + 1} with its original guards, identity, mappings and effects", reaction.Id.ToString(), "STAGE-AXON-0504");
                         continue;
                     }
                     emitter.Emit(reaction.Triggers[index], trigger, index, body);
                 }
             });
-        if (triggers.Any(trigger => trigger is null)) context.Degradation.Unsupported("STAGE-AXON-0504", reaction.Id, $"Reaction '{reaction.Name}' is not registered: a trigger's effects, routing, guards or identity cannot be preserved." + Causes(emitter));
+        if (triggers.Any(trigger => trigger is null)) context.Degradation.Unsupported("STAGE-AXON-0504", reaction.Id, $"Reaction '{reaction.Name}' is not registered: a trigger's effects, routing, guards or identity cannot be preserved.");
         context.AddJava(package, name, code.Build(), sources: [reaction.Id, .. reaction.Triggers.Where(trigger => trigger.Source != default).Select(trigger => trigger.Source)]);
         return triggers.All(trigger => trigger is not null);
     }
-
-    static string Causes(ReactionTriggerEmitter emitter) =>
-        string.Concat(emitter.Rejections.Select(rejection => $" Trigger {rejection.Key + 1} implementation body: {rejection.Value}"));
 
     static void EmitProductions(AxonEmissionContext context, string package, SemanticId reaction, PreparedReactionTrigger?[] triggers)
     {

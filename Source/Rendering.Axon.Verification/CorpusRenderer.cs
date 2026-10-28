@@ -59,19 +59,32 @@ internal static class CorpusRenderer
         }
 
         await WriteArtifacts(destination, plan);
-        await WriteProofArtifacts(name, destination);
+        await WriteProofs(destination, name);
         Console.WriteLine($"{name}: rendered {plan.Artifacts.Length} artifacts; {plan.Diagnostics.Length} diagnostics; no refusals");
     }
 
-    static async Task WriteProofArtifacts(string name, string destination)
+    static async Task WriteProofs(string destination, string name)
     {
-        if (name == IngressProofModel.Application || name == IngressProofModel.PersistentApplication) await IngressProofArtifacts.Write(destination, name);
-        if (name == ClientProofArtifacts.Application) await ClientProofArtifacts.Write(destination);
-        if (name == ReactionConstraintProofArtifacts.Application) await ReactionConstraintProofArtifacts.Write(destination);
+        switch (name)
+        {
+            case IngressProofModel.Application:
+            case IngressProofModel.PersistentApplication:
+            case "inline-java-policies":
+            case "inline-java-policy-performers":
+                await IngressProofArtifacts.Write(destination, name);
+                break;
+            case ClientProofArtifacts.Application:
+                await ClientProofArtifacts.Write(destination);
+                break;
+            case ReactionConstraintProofArtifacts.Application:
+                await ReactionConstraintProofArtifacts.Write(destination);
+                break;
+        }
     }
 
     static ArtifactRenderPlan Plan(string name, LoadedSemanticModel loaded) => name switch
     {
+        "inline-java-policies" or "inline-java-policy-performers" => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: BearerProfile),
         IngressProofModel.Application => IngressProofModel.Plan(loaded, BearerProfile),
         IngressProofModel.PersistentApplication => IngressProofModel.PersistentPlan(loaded, Profile),
         _ => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: Profile)

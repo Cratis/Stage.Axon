@@ -13,11 +13,16 @@ internal static class SecurityAnnotations
     internal static string For(AxonEmissionContext context, SemanticAuthorization? authorization, SemanticId owner)
     {
         if (authorization is null) return string.Empty;
+        var inline = PolicyPredicates.HasInline(context, authorization);
         var expression = Expression(context, authorization, new(StringComparer.Ordinal));
+        if (inline && PolicyPredicates.Expression(context, authorization) is not null)
+            expression = "@policies." + PolicyPredicates.SiteMember(owner) + "(authentication)";
         if (expression is not null) return "@PreAuthorize(" + JavaCodeBuilder.StringLiteral(expression) + ")";
         var path = owner + "/authorization";
         const string intent = "authorize access with the modeled policy";
-        context.Degradation.Unsupported(Code, owner, "The policy requires an unconfigured identity claim or an unsupported condition; access is denied.", intent, path);
+        var reason = "The policy requires an unconfigured identity claim or an unsupported condition; access is denied.";
+        if (inline && PolicyPredicates.Failure(context, authorization) is { } detail) reason += " " + detail;
+        context.Degradation.Unsupported(Code, owner, reason, intent, path);
         return JavaCodeBuilder.UnsupportedComment(intent, path, Code) + "\n@PreAuthorize(\"denyAll()\")";
     }
 
@@ -32,18 +37,18 @@ internal static class SecurityAnnotations
     {
         if (!visiting.Add(name)) return null;
         var policy = context.Request.Model.Application.Policies.FirstOrDefault(policy => policy.Name == name);
-        var result = policy is null ? null : Condition(policy.Condition);
+        var result = policy is null ? null : Condition(context, policy, policy.Condition);
         visiting.Remove(name);
         return result;
     }
 
-    static string? Condition(SemanticPolicyCondition condition) => condition switch
+    static string? Condition(AxonEmissionContext context, SemanticPolicy policy, SemanticPolicyCondition condition) => condition switch
     {
         SemanticAnonymousCondition => "permitAll()",
         SemanticAuthenticatedCondition => "isAuthenticated()",
         SemanticRoleCondition role => "hasRole('" + role.Role.Replace("'", "''", StringComparison.Ordinal) + "')",
-        SemanticNotPolicyCondition not => Condition(not.Operand) is { } operand ? "!(" + operand + ")" : null,
-        SemanticLogicalPolicyCondition logical => Combine(Condition(logical.Left), logical.Operator, Condition(logical.Right)),
+        SemanticNotPolicyCondition not => Condition(context, policy, not.Operand) is { } operand ? "!(" + operand + ")" : null,
+        SemanticLogicalPolicyCondition logical => Combine(Condition(context, policy, logical.Left), logical.Operator, Condition(context, policy, logical.Right)),
         _ => null
     };
 

@@ -24,10 +24,10 @@ public class when_a_populated_given_concept_is_named_read_model_store : for_Axon
 
     [Fact] void should_import_the_subscription_concept() => _subscription.ShouldContain("import nativeviews.concepts.ReadModelStore;");
     [Fact] void should_construct_the_populated_subscription_concept() => _subscription.ShouldContain("new ReadModelStore(\"visible\")");
-    [Fact] void should_qualify_the_subscription_store() => _subscription.ShouldContain("nativeviews.runtime.ReadModelStore<Object, Categories> store");
-    [Fact] void should_not_import_the_subscription_store() => _subscription.ShouldNotContain("import nativeviews.runtime.ReadModelStore;");
+    [Fact] void should_qualify_the_subscription_store() => _subscription.ShouldContain("io.cratis.stage.axon.runtime.ReadModelStore<Object, Categories> store");
+    [Fact] void should_not_import_the_subscription_store() => _subscription.ShouldNotContain("import io.cratis.stage.axon.runtime.ReadModelStore;");
     [Fact] void should_import_the_sse_concept() => _sse.ShouldContain("import nativeviews.concepts.ReadModelStore;");
     [Fact] void should_construct_the_populated_sse_concept() => _sse.ShouldContain("new ReadModelStore(\"visible\")");
-    [Fact] void should_qualify_the_sse_store() => _sse.ShouldContain(", nativeviews.runtime.ReadModelStore.class);");
-    [Fact] void should_not_import_the_sse_store() => _sse.ShouldNotContain("import nativeviews.runtime.ReadModelStore;");
+    [Fact] void should_qualify_the_sse_store() => _sse.ShouldContain(", io.cratis.stage.axon.runtime.ReadModelStore.class);");
+    [Fact] void should_not_import_the_sse_store() => _sse.ShouldNotContain("import io.cratis.stage.axon.runtime.ReadModelStore;");
 }

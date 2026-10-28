@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -94,7 +95,7 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
         var name = JavaNames.Type(model.Name);
         var updates = new ProjectionUpdates(context, types, model.Id);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Reducer").Declare(name + "ReducerProjector");
-        var storeType = code.Reference(context.BasePackage + ".runtime.ReadModelStore");
+        var storeType = code.Reference(AxonRuntimePackage.Type(context, "ReadModelStore"));
         updates.Claim(code, package);
         foreach (var transition in reducer.Transitions) types.EventType(transition.EventContract, code);
         var values = new ProjectionValues(context, types, code);

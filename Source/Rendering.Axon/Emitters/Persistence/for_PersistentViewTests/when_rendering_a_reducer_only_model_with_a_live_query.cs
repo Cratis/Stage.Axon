@@ -60,6 +60,8 @@ public class when_rendering_a_reducer_only_model_with_a_live_query : Projections
     [Fact] void should_emit_the_live_query() => Has("LiveRebuiltTotalsHandler").ShouldBeTrue();
     [Fact] void should_not_emit_the_reducer_default_dispatch_proof() => Has("RebuiltTotalPersistentDefaultDispatchTest").ShouldBeFalse();
     [Fact] void should_keep_the_projection_default_dispatch_proof() => Has("TotalPersistentDefaultDispatchTest").ShouldBeTrue();
+    [Fact] void should_not_emit_the_reducer_subscription_proof() => Has("RebuiltTotalPersistentSubscriptionTest").ShouldBeFalse();
+    [Fact] void should_keep_the_projection_subscription_proof() => Has("TotalPersistentSubscriptionTest").ShouldBeTrue();
     [Fact] void should_have_no_projection_for_the_reducer_model() => ScopeSelection.Select(_request).SelectMany(owner => owner.Slice.Projections).Any(projection => projection.ReadModel == ReadModelId("RebuiltTotal")).ShouldBeFalse();
 
     bool Has(string name) => _plan.Artifacts.Any(artifact => artifact.RelativePath.EndsWith('/' + name + ".java", StringComparison.Ordinal));

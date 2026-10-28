@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -48,7 +49,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
 
     void Fields(JavaCodeBuilder code, string name)
     {
-        code.Line($"private final {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store;")
+        code.Line($"private final {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}> store;")
             .Line($"private final {code.Reference("java.time.Clock")} clock;")
             .Line($"private final {code.Reference("java.util.Set")}<{code.Reference("java.lang.Object")}> keys = new {code.Reference("java.util.LinkedHashSet")}<>();")
             .Line($"private final {code.Reference("java.util.List")}<{code.Reference("java.util.function.BooleanSupplier")}> pending = new {code.Reference("java.util.ArrayList")}<>();")
@@ -61,8 +62,8 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
                 code.Line($"private final {code.Reference("java.util.Map")}<{code.Reference("java.lang.String")}, {code.Reference("java.util.function.UnaryOperator")}<{code.Reference(node.Type)}>> {Cache(node, index)} = new {code.Reference("java.util.HashMap")}<>();");
         }
         code.Line($"@{code.Reference("org.springframework.beans.factory.annotation.Autowired")}")
-            .Block($"public {name}(@{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store, {code.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.store = store;").Line("this.clock = clock;"))
-            .Block($"public {name}({code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store)", constructor => constructor.Line($"this(store, {constructor.Reference("java.time.Clock")}.systemUTC());"));
+            .Block($"public {name}(@{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}> store, {code.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.store = store;").Line("this.clock = clock;"))
+            .Block($"public {name}({code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}> store)", constructor => constructor.Line($"this(store, {constructor.Reference("java.time.Clock")}.systemUTC());"));
     }
 
     void Handler(JavaCodeBuilder code, SemanticEventContract @event, ProjectionScopeMethods methods)

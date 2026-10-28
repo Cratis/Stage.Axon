@@ -17,6 +17,6 @@ public class when_a_populated_given_concept_is_named_read_model_store : given.a_
 
     [Fact] void should_import_the_application_concept() => _java.ShouldContain("import nativeviews.concepts.ReadModelStore;");
     [Fact] void should_construct_the_populated_concept() => _java.ShouldContain("new ReadModelStore(\"visible\")");
-    [Fact] void should_qualify_the_runtime_store() => _java.ShouldContain("nativeviews.runtime.ReadModelStore<Object, Categories> store");
-    [Fact] void should_not_import_the_runtime_store() => _java.ShouldNotContain("import nativeviews.runtime.ReadModelStore;");
+    [Fact] void should_qualify_the_runtime_store() => _java.ShouldContain("io.cratis.stage.axon.runtime.ReadModelStore<Object, Categories> store");
+    [Fact] void should_not_import_the_runtime_store() => _java.ShouldNotContain("import io.cratis.stage.axon.runtime.ReadModelStore;");
 }

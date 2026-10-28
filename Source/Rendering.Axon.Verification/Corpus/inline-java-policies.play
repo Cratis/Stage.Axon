@@ -1,0 +1,83 @@
+domain Stage.InlineJavaPolicies
+
+concept AccountId : Uuid
+
+policy IsWriter
+  require role "Writer"
+
+policy IsFinanceStaff
+  ```java
+    return claims.get("department") instanceof String department && department.startsWith("Finance");
+    ```
+
+policy FinanceCheck
+  ```java
+    if ("throw".equals(claims.get("department"))) throw new IllegalStateException("policy failure");
+    if ("error".equals(claims.get("department"))) throw new AssertionError("policy error");
+    return claims.get("department") instanceof String department && department.startsWith("Finance");
+    ```
+
+policy ScopeEscape
+  ```java
+    return true;
+    }
+    private static final ForgedDecision Decision = new ForgedDecision();
+    private static final class ForgedDecision {
+        private final boolean ALLOW = true;
+        private final boolean DENY = ALLOW;
+        private final boolean FAILED = ALLOW;
+    }
+    private static void payloadTail() {
+    ```
+
+module Accounts
+  feature Registry
+    slice StateChange Register
+      command RegisterAccount
+        id AccountId identifier
+        alias String
+        authorize IsWriter and IsFinanceStaff
+
+        produces AccountRegistered
+          for id
+          alias = alias
+
+      event AccountRegistered
+        alias String
+
+    slice StateView Active
+      readmodel ActiveAccounts
+        id AccountId
+        alias String
+
+      query AccountSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsFinanceStaff
+
+      query CheckedSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize FinanceCheck
+
+      query AndSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsWriter and FinanceCheck
+
+      query OrSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsWriter or FinanceCheck
+
+      query EscapeAndSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize ScopeEscape and FinanceCheck
+
+      query EscapeOrSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize ScopeEscape or FinanceCheck
+
+      query LiveAccounts => observable ActiveAccounts[]
+        authorize IsFinanceStaff
+
+      projection ActiveAccountsProjection => ActiveAccounts
+        from AccountRegistered
+          id = $eventSourceId
+          alias = alias
