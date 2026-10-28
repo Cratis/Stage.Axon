@@ -17,6 +17,8 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
 
     internal static string ChangeType(ProjectionScopeNode root) => root.Type == "ScopeChange" ? "ScopeChangeResult" : "ScopeChange";
 
+    internal static string StateType(ProjectionScopeNode root) => root.Type == "ScopeState" ? "ScopeStateSnapshot" : "ScopeState";
+
     internal void Emit()
     {
         if (ProjectionHandlerShape.RootOnly(projection) && PersistentViewAdmission.Supports(context, model.Id))
@@ -25,7 +27,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             return;
         }
         var name = JavaNames.Type(projection.Name) + "Projector";
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare(ChangeType(_root));
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare(ChangeType(_root)).Declare(StateType(_root));
         foreach (var property in _root.All.SelectMany(node => node.Properties)) types.ClaimProjectionType(property.Type, code);
         _updates.Claim(code, package);
         foreach (var @event in Events()) types.EventType(@event.Id, code);
@@ -42,45 +44,84 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             }
         });
         ViewJavaTypes.Add(context, package, name, code.Build(), projection.Id);
+        var owner = ScopeSelection.Select(context.Request).First(candidate => candidate.Slice.Projections.Any(candidateProjection => candidateProjection.Id == projection.Id));
+        new ProjectorRollbackTests(context, types).Emit(owner, model, name, $"new {name}(store)", [.. Events().Select(@event => @event.Id)]);
     }
 
     static IEnumerable<ProjectionScopeNode> RootAndNested(ProjectionScopeNode node) => new[] { node }.Concat(node.Nested.SelectMany(RootAndNested));
 
     void Fields(JavaCodeBuilder code, string name)
     {
+        var state = StateType(_root);
+        var predicate = $"{code.Reference("java.util.function.Predicate")}<{code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}>>";
         code.Line($"private final {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store;")
             .Line($"private final {code.Reference("java.time.Clock")} clock;")
             .Line($"private final {code.Reference("java.util.Set")}<{code.Reference("java.lang.Object")}> keys = new {code.Reference("java.util.LinkedHashSet")}<>();")
-            .Line($"private final {code.Reference("java.util.List")}<{code.Reference("java.util.function.BooleanSupplier")}> pending = new {code.Reference("java.util.ArrayList")}<>();")
+            .Line($"private final {code.Reference("java.util.List")}<{predicate}> pending = new {code.Reference("java.util.ArrayList")}<>();")
             .Line($"private record {ChangeType(_root)}<T>(T value, boolean touched, boolean ancestors) {{}}")
-            .DiffersFromScreenplay("projection join indexes are replay-built; restore them by replaying events after restarting a persistent store.")
-            .DiffersFromScreenplay("default-profile writes are not yet rolled back with a failed unit of work.");
+            .DiffersFromScreenplay("projection join indexes are replay-built; restore them by replaying events after restarting a persistent store.");
+        var caches = new List<(string Name, string Type)>();
         foreach (var node in _root.All)
         {
             for (var index = 0; index < node.Scope.Joins.Length; index++)
-                code.Line($"private final {code.Reference("java.util.Map")}<{code.Reference("java.lang.String")}, {code.Reference("java.util.function.UnaryOperator")}<{code.Reference(node.Type)}>> {Cache(node, index)} = new {code.Reference("java.util.HashMap")}<>();");
+            {
+                var type = $"{code.Reference("java.util.Map")}<{code.Reference("java.lang.String")}, {code.Reference("java.util.function.UnaryOperator")}<{code.Reference(node.Type)}>>";
+                caches.Add((Cache(node, index), type));
+                code.Line($"private final {type} {Cache(node, index)} = new {code.Reference("java.util.HashMap")}<>();");
+            }
         }
+        StateMembers(code, state, predicate, caches);
         code.Line($"@{code.Reference("org.springframework.beans.factory.annotation.Autowired")}")
             .Block($"public {name}(@{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store, {code.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.store = store;").Line("this.clock = clock;"))
             .Block($"public {name}({code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}> store)", constructor => constructor.Line($"this(store, {constructor.Reference("java.time.Clock")}.systemUTC());"));
+    }
+
+    void StateMembers(JavaCodeBuilder code, string state, string predicate, List<(string Name, string Type)> caches)
+    {
+        var list = code.Reference("java.util.List");
+        var components = string.Join(", ", new[] { $"{list}<{code.Reference("java.lang.Object")}> keys", $"{list}<{predicate}> pending" }.Concat(caches.Select(cache => $"{cache.Type} {cache.Name}")));
+
+        // The scope state is one immutable snapshot, staged through its own store so a rolled back unit of work leaves none of it behind.
+        code.Line($"private final {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {state}> scope = new {code.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
+            .Line($"private {state} applied;")
+            .Line($"private record {state}({components}) {{}}")
+            .Block($"private void restore({state} state)", method =>
+            {
+                method.Line("if (state == applied) return;").Line("keys.clear();").Line("pending.clear();");
+                foreach (var cache in caches) method.Line($"{cache.Name}.clear();");
+                method.Block("if (state != null)", restored =>
+                {
+                    restored.Line("keys.addAll(state.keys());").Line("pending.addAll(state.pending());");
+                    foreach (var cache in caches) restored.Line($"{cache.Name}.putAll(state.{cache.Name}());");
+                }).Line("applied = state;");
+            })
+            .Block($"private {state} snapshot()", method => method.Line($"return applied = new {state}({string.Join(", ", new[] { $"{list}.copyOf(keys)", $"{list}.copyOf(pending)" }.Concat(caches.Select(cache => $"{code.Reference("java.util.Map")}.copyOf({cache.Name})")))});"));
     }
 
     void Handler(JavaCodeBuilder code, SemanticEventContract @event, ProjectionScopeMethods methods)
     {
         var eventType = types.EventType(@event.Id, code);
         var method = "project" + JavaNames.Type(@event.Name);
-        code.Line($"@{code.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}").Block($"public synchronized void on({eventType} event, {code.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message{_updates.ParameterFor(code)})", body =>
+        var messageType = code.Reference("org.axonframework.messaging.eventhandling.EventMessage");
+        var storeType = $"{code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {_root.Type}>";
+        new ProjectionHandlerBinding(context, types, model, package, synchronized: true, scopeState: StateType(_root)).Emit(
+            code,
+            eventType,
+            body =>
             {
+                body.Line("restore(scope.get(\"scope\").orElse(null));");
                 foreach (var node in _root.All) methods.Caches(body, node, @event);
                 var deferred = _root.All.Any(node => node.Identity is not null && (node.Scope.From.Any(from => from.EventContract == @event.Id) || node.Scope.Removals.Any(removal => removal.EventContract == @event.Id)));
-                body.Line($"boolean modified = {method}(event, message);");
-                if (deferred) body.Line($"if (!modified) pending.add(() -> {method}(event, message));");
+                body.Line($"boolean modified = {method}(event, message, store);");
+                if (deferred) body.Line($"if (!modified) pending.add(writes -> {method}(event, message, writes));");
                 body.Line("boolean progressed;").Block("do", loop => loop
                     .Line("progressed = false;").Line("var iterator = pending.iterator();")
-                    .Block("while (iterator.hasNext())", iteration => iteration.Block("if (iterator.next().getAsBoolean())", found => found.Line("iterator.remove();").Line("progressed = true;").Line("modified = true;"))))
-                    .Line("while (progressed);");
+                    .Block("while (iterator.hasNext())", iteration => iteration.Block("if (iterator.next().test(store))", found => found.Line("iterator.remove();").Line("progressed = true;").Line("modified = true;"))))
+                    .Line("while (progressed);").Line("scope.put(\"scope\", snapshot());");
                 if (_updates.Enabled) body.Block("if (modified)", updates => _updates.Notify(updates, package));
-            }).Block($"private boolean {method}({eventType} event, {code.Reference("org.axonframework.messaging.eventhandling.EventMessage")} message)", body =>
+            },
+            message: true);
+        code.Block($"private boolean {method}({eventType} event, {messageType} message, {storeType} store)", body =>
         {
             var values = new ProjectionValues(context, types, body);
             body.Line($"var candidates = new {body.Reference("java.util.LinkedHashSet")}<>(keys);");

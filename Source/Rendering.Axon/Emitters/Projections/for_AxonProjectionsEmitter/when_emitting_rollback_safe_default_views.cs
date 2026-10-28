@@ -44,6 +44,8 @@ public class when_emitting_rollback_safe_default_views : Persistence.for_Persist
     [Fact] void should_bind_non_admitted_default_writes() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldContain("apply(event, updates, ReadModelTransaction.bind(store, context));");
     [Fact] void should_not_reference_absent_persistence() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldNotContain("JpaReadModelStore");
     [Fact] void should_not_add_an_event_message_handler_parameter() => Code(_nonAdmitted, "TotalProjectionProjector").ShouldNotContain("EventMessage");
-    [Fact] void should_document_scoped_rollback_divergence() => Code(_admitted, "BoardProjectionProjector").ShouldContain("default-profile writes are not yet rolled back with a failed unit of work");
-    [Fact] void should_document_reducer_rollback_divergence() => Code(_admitted, "RebuiltTotalReducerProjector").ShouldContain("default-profile writes are not yet rolled back with a failed unit of work");
+    [Fact] void should_stage_scoped_state() => Code(_admitted, "BoardProjectionProjector").ShouldContain("ReadModelTransaction.reserve(state, List.of(\"scope\"));");
+    [Fact] void should_not_document_scoped_rollback_divergence() => Code(_admitted, "BoardProjectionProjector").ShouldNotContain("not yet rolled back");
+    [Fact] void should_bind_reducer_writes() => Code(_admitted, "RebuiltTotalReducerProjector").ShouldContain("ReadModelTransaction.bind(store, context)");
+    [Fact] void should_not_document_reducer_rollback_divergence() => Code(_admitted, "RebuiltTotalReducerProjector").ShouldNotContain("not yet rolled back");
 }

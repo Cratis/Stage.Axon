@@ -7,7 +7,7 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
-internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false, IReadOnlyList<string>? keys = null)
+internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package, bool synchronized = false, IReadOnlyList<string>? keys = null, string? scopeState = null)
 {
     readonly ProjectionUpdates _updates = new(context, types, model.Id);
 
@@ -34,6 +34,8 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
         var messageParameter = message ? $", {eventMessage} message" : string.Empty;
         var messageArgument = message ? ", message" : string.Empty;
         var arguments = messageArgument + (_updates.Enabled ? ", updates" : string.Empty);
+        var scopeParameter = scopeState is null ? string.Empty : $", {store}<{body.Reference("java.lang.Object")}, {scopeState}> scope";
+        var scopeArgument = scopeState is null ? string.Empty : ", scope";
         body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
             .Block($"public void handle({eventType} event{updateParameter}, {processing} context)", method =>
             {
@@ -41,12 +43,14 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
                 if (message) method.Line($"var message = ({eventMessage}) {body.Reference("org.axonframework.messaging.core.Message")}.fromContext(context);");
                 BindStore(method, messageArgument);
             })
-            .Block($"public {modifier}void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store);"))
-            .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
+            .Block($"public {modifier}void on({eventType} event{messageParameter}{updateParameter})", method => method.Line($"apply(event{arguments}, store{scopeArgument});"))
+            .Block($"private void apply({eventType} event{messageParameter}{updateParameter}, {store}<{body.Reference("java.lang.Object")}, {JavaNames.Type(model.Name)}> store{scopeParameter})", method => Apply(method, transitions));
     }
 
     void BindStore(JavaCodeBuilder method, string messageArgument)
     {
+        if (scopeState is not null && PersistentViewAdmission.Supports(context, model.Id))
+            throw new InvalidOperationException($"Scoped projector state is not staged for persistent-admitted model {model.Id}.");
         var adapter = PersistentViewAdmission.Supports(context, model.Id) ? method.Reference(types.BasePackage + ".persistence.JpaReadModelStore") : null;
         var transaction = method.Reference(types.BasePackage + ".runtime.ReadModelTransaction");
 
@@ -66,6 +70,14 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
 
     void BindMemory(JavaCodeBuilder method, string messageArgument, string transaction, string staged)
     {
+        if (scopeState is not null)
+        {
+            // The scope state is staged beside the rows and reserved first, so units of work on one projector serialize without a monitor.
+            method.Line($"var state = {transaction}.bind(scope, context);")
+                .Line($"{transaction}.reserve(state, {method.Reference("java.util.List")}.of(\"scope\"));")
+                .Line($"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {transaction}.bind(store, context), state);");
+            return;
+        }
         if (keys is not { Count: >= 2 })
         {
             method.Line(staged);
@@ -79,6 +91,8 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
     void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)
     {
         transitions(method);
-        _updates.Notify(method, package);
+
+        // A scoped body notifies only when it modified a row.
+        if (scopeState is null) _updates.Notify(method, package);
     }
 }
