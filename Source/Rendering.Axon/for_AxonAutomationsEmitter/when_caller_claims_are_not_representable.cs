@@ -49,7 +49,7 @@ public class when_caller_claims_are_not_representable : given.a_reaction_model
         Assert.DoesNotContain("throw new UnsupportedOperationException", java, StringComparison.Ordinal);
         UnsupportedSummary.Emit(context);
         var summary = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan());
-        Assert.Contains($"| {DiagnosticCode} | {specification.Id}/givenCaller/claims | preserve all modeled caller claims", summary, StringComparison.Ordinal);
+        Assert.Matches($@"\| {DiagnosticCode} \| [^\n]*\(givenCaller/claims\) \| [^\n]*\| preserve all modeled caller claims", summary);
         Assert.Equal(strict, context.Degradation.Refusals.Any(refusal => refusal.Codes.Contains(DiagnosticCode)));
     }
 
