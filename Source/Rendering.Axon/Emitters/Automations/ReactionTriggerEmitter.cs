@@ -5,6 +5,7 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 using Cratis.Stage.Rendering.Axon.Java;
+using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
@@ -62,7 +63,8 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
 
     PreparedReactionTrigger? PrepareNative(SemanticReactionTrigger trigger, int index, string annotation, ReactionInput input)
     {
-        var slot = new InlineBodySlot(trigger.RequirementId, SemanticImplementationRole.ReactionEffect, reaction.Id);
+        var slice = ScopeSelection.Locate(context.Request.Model.Application).FirstOrDefault(located => located.Slice.Reactions.Any(candidate => candidate.Id == reaction.Id))?.Slice.Id;
+        var slot = new InlineBodySlot(trigger.RequirementId, SemanticImplementationRole.ReactionEffect, reaction.Id, slice, reaction.Name + "/");
         if (!InlineJavaBodies.TryResolve(context, slot, out var content, out var reason))
         {
             _rejections[index] = reason;
