@@ -26,6 +26,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
 
     void EmitModel(LocatedSemanticSlice owner, SemanticReadModel model)
     {
+        new PersistentViewRemovalProof(context, types, persistence).Emit(owner, model);
         var target = ProjectorInputs(owner, model);
         var spec = Specification(owner, model, target.Observed);
         var query = Query(owner, model);
