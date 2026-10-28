@@ -37,6 +37,8 @@ public class when_enlisting_property_uniqueness : for_AxonArtifactRenderPlanner.
 
     string Source(string name) => Encoding.UTF8.GetString(plan.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name, StringComparison.Ordinal)).Bytes.AsSpan());
 
+    static string ModuleSource(string name) => File.ReadAllText(Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Source", "Runtime", "src", "main", "java", "io", "cratis", "stage", "axon", "runtime", name + ".java"));
+
     [Fact] void should_enlist_before_appending() => (handler.IndexOf("ModeledConstraints.apply", StringComparison.Ordinal) < handler.IndexOf("appender.append", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_collect_constrained_events() => handler.ShouldContain("for (var event : events)");
     [Fact] void should_append_constrained_events_as_a_batch() => handler.ShouldContain("if (!events.isEmpty()) appender.append(events);");
@@ -50,7 +52,7 @@ public class when_enlisting_property_uniqueness : for_AxonArtifactRenderPlanner.
     [Fact] void should_release_by_owner_on_the_modeled_event() => constraints.ShouldContain("OrderMoved fact) store.releaseOwner");
     [Fact] void should_emit_a_persistent_store() => Source("JpaUniqueValueStore.java").ShouldContain("findTransactionalExecutor(context)");
     [Fact] void should_use_the_axon_transaction_callback() => Source("JpaUniqueValueStore.java").ShouldContain("ThrowingConsumer<EntityManager, Exception> action");
-    [Fact] void should_release_in_memory_reservations_after_errors_too() => Source("InMemoryUniqueValueStore.java").ShouldContain("context.doFinally(completed -> complete(changes, completed.isCommitted()))");
+    [Fact] void should_release_in_memory_reservations_after_errors_too() => ModuleSource("InMemoryUniqueValueStore").ShouldContain("context.doFinally(completed -> complete(changes, completed.isCommitted()))");
     [Fact] void should_share_the_runtime_http_test_context() => Source("UniqueAppendTransactionTest.java").ShouldContain("@Import(RuntimeHttpRoundTripTest.EchoEndpoint.class)");
     [Fact] void should_make_the_restart_proof_opt_in() => Source("PersistentRestartProbe.java").ShouldContain("@EnabledIfSystemProperty(named = \"stage.restart\", matches = \"true\")");
     [Fact] void should_exclude_the_restart_probe_from_default_surefire_discovery() => plan.Artifacts.Any(artifact => artifact.RelativePath.EndsWith("/PersistentRestartTest.java", StringComparison.Ordinal)).ShouldBeFalse();
@@ -61,6 +63,6 @@ public class when_enlisting_property_uniqueness : for_AxonArtifactRenderPlanner.
     [Fact] void should_construct_the_aggregate_jpa_engine() => Source("PersistentConfiguration.java").ShouldContain("new AggregateBasedJpaEventStorageEngine(");
     [Fact] void should_use_the_configured_event_converter() => Source("PersistentConfiguration.java").ShouldContain("configuration.getComponent(EventConverter.class)");
     [Fact] void should_tag_the_native_proof_event_with_the_owner() => Source("UniqueAppendTransactionTest.java").ShouldContain("@EventTag(key = \"owner\")");
-    [Fact] void should_map_conflicts_to_http_409() => Source("ProblemDetailsAdvice.java").ShouldContain("HttpStatus.CONFLICT");
+    [Fact] void should_map_conflicts_to_http_409() => ModuleSource("ProblemDetailsAdvice").ShouldContain("HttpStatus.CONFLICT");
     [Fact] void should_not_refuse_supported_uniqueness() => plan.Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0801").ShouldBeFalse();
 }

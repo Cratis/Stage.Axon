@@ -46,6 +46,6 @@ internal static class CommandContractsEmitter
         var generated = property.IsGenerated ? $"@{code.Reference("com.fasterxml.jackson.annotation.JsonIgnore")} " : string.Empty;
         var identifier = source?.Member == JavaNames.Member(property.Name) ? $"@{code.Reference("org.axonframework.modelling.annotation.TargetEntityId")} " : string.Empty;
         var cascaded = types.Cascades(property.Type) ? $"@{code.Reference("jakarta.validation.Valid")} " : string.Empty;
-        return $"{identifier}{required}{cascaded}{generated}{types.Type(property.Type, code)} {JavaNames.Member(property.Name)}";
+        return $"{identifier}{required}{cascaded}{generated}{JavaJsonNames.Annotation(property.Name, code)}{types.Type(property.Type, code)} {JavaNames.Member(property.Name)}";
     }
 }

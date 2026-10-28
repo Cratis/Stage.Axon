@@ -21,7 +21,7 @@ internal static class ApplicationTriggersEmitter
             var name = JavaNames.Type(trigger.Name);
             var code = new JavaCodeBuilder(package).Declare(name);
             ReactionJavaReferences.Claim(code, trigger.Properties.Select(property => types.Type(property.Type)));
-            var properties = trigger.Properties.Select(property => (property.Type.IsOptional ? string.Empty : $"@{code.Reference("jakarta.validation.constraints.NotNull")} ") + $"@{code.Reference("jakarta.validation.Valid")} " + ReactionJavaReferences.Expression(code, types.Type(property.Type)) + " " + JavaNames.Member(property.Name));
+            var properties = trigger.Properties.Select(property => (property.Type.IsOptional ? string.Empty : $"@{code.Reference("jakarta.validation.constraints.NotNull")} ") + $"@{code.Reference("jakarta.validation.Valid")} " + JavaJsonNames.Annotation(property.Name, code) + ReactionJavaReferences.Expression(code, types.Type(property.Type)) + " " + JavaNames.Member(property.Name));
             context.AddJava(package, name, code.Line($"public record {name}({string.Join(", ", properties)}) {{}}").Build(), sources: [trigger.Id]);
             context.AddJava(package, name + "Endpoint", Endpoint(package, trigger.Name, handlers), sources: [trigger.Id]);
         }

@@ -1,0 +1,62 @@
+domain Stage.InlineJavaBodies
+
+concept CounterId : String
+
+module Bodies
+  feature Counters
+    slice StateChange Record
+      command RecordCount
+        id CounterId identifier
+        amount Int
+        produces CountRecorded
+          id = id
+          amount = amount
+        handler
+          ```java
+          // inline-java-bodies: command handler
+          appender.append(new CountRecorded(command.id(), command.id(), command.amount()));
+          ```
+      event CountRecorded
+        id CounterId
+        amount Int
+      specification RecordingACount
+        when RecordCount
+          id = "counter"
+          amount = 4
+        then CountRecorded
+          for "counter"
+          id = "counter"
+          amount = 4
+
+    slice Automation GuardCounts
+      reaction GuardRecordedCount
+        when CountRecorded
+          ```java
+          // inline-java-bodies: reaction effect
+          if (input.amount() < 0) throw new IllegalStateException("A negative count was recorded at " + occurred);
+          ```
+
+    slice StateView Totals
+      readmodel RebuiltTotal
+        id CounterId key
+        amount Int
+      reducer RebuildTotal => RebuiltTotal
+        on CountRecorded
+          ```java
+          // inline-java-bodies: reducer transition
+          return new RebuiltTotal(event.id(), (current == null ? 0L : current.amount()) + event.amount());
+          ```
+      query DoubledTotals => RebuiltTotal[]
+        performer
+          ```java
+          // inline-java-bodies: query performer
+          return store.all().stream().map(total -> new RebuiltTotal(total.id(), total.amount() * 2)).toList();
+          ```
+      specification RebuildFromEvents
+        given CountRecorded
+          for "counter"
+          id = "counter"
+          amount = 4
+        then readmodel RebuiltTotal
+          id = "counter"
+          amount = 4

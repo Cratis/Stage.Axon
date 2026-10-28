@@ -1,10 +1,14 @@
 import { createWorkItem } from "../../src/work/items/create.ts";
 import { renameWorkItem } from "../../src/work/items/rename.ts";
+import { echoClass } from "../../src/work/items/requestwirenames.ts";
 import { workItemById, type WorkItems } from "../../src/work/items/overview.ts";
 import { connect, eventually, expect, newItem, observe, ok, run } from "./support.ts";
 
 run(async () => {
     const { transport } = connect();
+    const echoed = await transport.execute(echoClass, { class: "wire-name-arrived" });
+    expect(echoed, { status: "ok", value: { value: "wire-name-arrived" } }, "the modelled class key to reach the Java record's class_ component");
+
     const item = newItem({ state: "inProgress", priority: 5 });
     const watch = observe(transport, workItemById, { workItemId: item.id });
 

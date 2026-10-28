@@ -59,6 +59,14 @@ module Work
       event WorkItemRenamed
         title String
 
+    slice StateChange RequestWireNames
+      command EchoClass
+        class String
+        authorize IsEditor
+
+        returns
+          value = class
+
     slice StateView Overview
       readmodel WorkItems
         workItemId WorkItemId

@@ -10,6 +10,8 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticCommand command, CommandJavaTypes types)
 {
+    readonly CommandValidationMembers _members = new(context.Request.Model.Application, command);
+
     internal string Render(string package)
     {
         var name = JavaNames.Type(command.Name);
@@ -17,14 +19,17 @@ internal sealed class CommandRulesEmitter(AxonEmissionContext context, SemanticC
         ClaimRules(builder);
         var validator = builder.Reference("jakarta.validation.Validator");
         builder.Line($"@{builder.Reference("org.springframework.stereotype.Component")}").Block($"public final class {name}Rules", body =>
+        {
             body.Line($"private final {validator} validator;").Line()
                 .Block($"public {name}Rules({validator} validator)", constructor => constructor.Line("this.validator = validator;")).Line()
                 .Block($"public void validateInput({name} command)", method => BeanValidation(method).Line("validation.throwIfInvalid();")).Line()
-                .Block($"public void validate({name} command)", RenderValidation));
+                .Block($"public void validate({name} command)", RenderValidation);
+            _members.Emit(body);
+        });
         return builder.Build();
     }
 
-    JavaCodeBuilder BeanValidation(JavaCodeBuilder builder) => builder.Line($"var validation = new {builder.Reference(AxonRuntimePackage.Type(types.BasePackage, "ValidationContext"))}();").Line($"validator.validate(command).stream().sorted({builder.Reference("java.util.Comparator")}.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject(violation.getPropertyPath().toString(), violation.getMessage()));");
+    JavaCodeBuilder BeanValidation(JavaCodeBuilder builder) => builder.Line($"var validation = new {builder.Reference(AxonRuntimePackage.Type(types.BasePackage, "ValidationContext"))}();").Line($"validator.validate(command).stream().sorted({builder.Reference("java.util.Comparator")}.comparing(violation -> violation.getPropertyPath().toString())).forEach(violation -> validation.reject({_members.PathExpression}, violation.getMessage()));");
 
     void ClaimRules(JavaCodeBuilder builder)
     {
