@@ -44,7 +44,9 @@ internal sealed class CommandDomainChecks(AxonEmissionContext context, SemanticC
 
     bool RenderRules(JavaCodeBuilder builder)
     {
-        if (!RenderPropertyRules(builder) || !RenderConceptRules(builder) || !RenderRequirements(builder)) return false;
+        if (!RenderPropertyRules(builder)) return false;
+        if (!RenderConceptRules(builder)) return false;
+        if (!RenderRequirements(builder)) return false;
         if (command.CodeValidations.IsEmpty) return true;
         Unsupported(builder, "run attached command validation code");
         return false;

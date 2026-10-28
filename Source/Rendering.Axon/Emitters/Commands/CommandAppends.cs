@@ -15,8 +15,6 @@ internal sealed class CommandAppends(AxonEmissionContext context, SemanticComman
 
     internal bool UsesOccurred { get; private set; }
 
-    internal static bool UsesSubject(SemanticCommand command) => command.Produces.Any(produced => produced.Mappings.Any(mapping => mapping.Source is SemanticEventContextExpression { Value: SemanticEventContextValueKind.CausedBySubject }));
-
     internal static SemanticEventContract Contract(AxonEmissionContext context, SemanticId id) => ScopeSelection.Locate(context.Request.Model.Application)
         .SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id).Single(contract => contract.Id == id);
 
