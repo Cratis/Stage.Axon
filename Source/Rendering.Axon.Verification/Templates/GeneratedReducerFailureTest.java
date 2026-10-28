@@ -1,6 +1,6 @@
 package __APPLICATION__.runtime;
 
-import __APPLICATION__.accounts.totals.record.RecordCount;
+import __APPLICATION__.accounts.totals.record_.RecordCount;
 import __APPLICATION__.accounts.totals.delete.DeleteCounter;
 import __APPLICATION__.accounts.totals.quarantined.QuarantinedTotal;
 import __APPLICATION__.accounts.totals.quarantined.QuarantinedTotals;
@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Flow;
@@ -110,7 +111,7 @@ class GeneratedReducerFailureTest {
         http.perform(get("/api/accounts/totals/protected-quarantined-totals").with(user("reader"))).andExpect(status().isForbidden());
         var response = http.perform(get("/api/accounts/totals/protected-quarantined-totals").with(user("admin").roles("Admin")))
                 .andExpect(status().isServiceUnavailable()).andReturn().getResponse();
-        assertEquals("", response.getContentAsString());
+        assertUnavailableBody(response.getContentAsString());
     }
 
     private void assertUnavailableHttp(String name, boolean live) throws Exception {
@@ -118,7 +119,28 @@ class GeneratedReducerFailureTest {
         if (live) request.accept("text/event-stream");
         var result = http.perform(request).andExpect(status().isServiceUnavailable()).andReturn();
         assertFalse(result.getRequest().isAsyncStarted(), "No live stream may open");
-        assertEquals("", result.getResponse().getContentAsString(), "No implementation details or row content");
+        assertUnavailableBody(result.getResponse().getContentAsString());
+    }
+
+    private void assertUnavailableBody(String body) throws Exception {
+        var message = "No implementation details or row content";
+        if (body.isEmpty()) return;
+        var problem = mapper.readTree(body);
+        assertNotNull(problem, message);
+        assertTrue(problem.isObject(), message);
+        assertTrue(Set.of("type", "title", "status", "instance").containsAll(problem.propertyNames()), message);
+        for (var value : problem.values()) assertTrue(value.isValueNode(), message);
+        if (problem.has("status")) {
+            var status = problem.get("status");
+            assertTrue(status.isIntegralNumber() && status.canConvertToInt(), message);
+            assertEquals(503, status.intValue(), message);
+        }
+        var content = problem.toString();
+        for (var rowContent : Set.of("retained", "\"id\"", "\"amount\"", "\"value\"", "\"rows\"")) {
+            assertFalse(content.contains(rowContent), message);
+        }
+        assertFalse(content.matches("(?s).*\\b(?:991|4|1)\\b.*"), message);
+        assertFalse(content.matches("(?is).*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*"), message);
     }
 
     private void assertUnavailableSubscription() throws Exception {
