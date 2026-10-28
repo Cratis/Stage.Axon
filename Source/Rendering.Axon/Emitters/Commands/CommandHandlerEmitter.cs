@@ -16,7 +16,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandHandlerEmitter(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource? source)
 {
-    static readonly string[] _forbiddenAppenderTokens = ["EventAppender", "EventSink", "EventGateway", "EventStore", "forContext"];
+    static readonly string[] _forbiddenAppenderTokens = ["EventAppender", "EventSink", "EventGateway", "EventStore", "forContext", "\\u"];
     readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
 
     bool _usesClock;

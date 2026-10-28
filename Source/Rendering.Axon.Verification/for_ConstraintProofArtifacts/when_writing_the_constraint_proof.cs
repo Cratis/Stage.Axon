@@ -29,6 +29,7 @@ public partial class when_writing_the_constraint_proof : Specification
     [Fact] void should_repeat_eight_contenders_twenty_five_times() => (source.Contains("CONTENDERS = 8", StringComparison.Ordinal) && source.Contains("REPETITIONS = 25", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_bound_the_start_gate() => source.ShouldContain("latch.await(5, TimeUnit.SECONDS)");
     [Fact] void should_prove_swallowed_conflicts() => source.ShouldContain("void swallowedConflictStillFails()");
+    [Fact] void should_prove_swallowed_delegate_failures() => source.ShouldContain("void swallowedDelegateFailureKeepsTheOriginalClaim()");
     [Fact] void should_not_disable_native_tests() => source.ShouldNotContain("@Disabled");
     [Fact]
     void should_import_all_qualified_types() => source.Split('\n')

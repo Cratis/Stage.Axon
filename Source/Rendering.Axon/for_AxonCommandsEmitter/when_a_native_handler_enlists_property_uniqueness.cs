@@ -24,8 +24,10 @@ public class when_a_native_handler_enlists_property_uniqueness : when_a_native_h
     [Fact] void should_handle_metadata_appends() => constraints.ShouldContain("void append(List<?> events, Metadata metadata)");
     [Fact] void should_unwrap_messages() => constraints.ShouldContain("event instanceof Message message ? message.payload() : event");
     [Fact] void should_apply_before_delegating() => (constraints.IndexOf("apply(store, payload, context);", StringComparison.Ordinal) < constraints.IndexOf("appender.append(events, metadata);", StringComparison.Ordinal)).ShouldBeTrue();
-    [Fact] void should_poison_prepare_commit() => constraints.ShouldContain("context.runOnPrepareCommit(ignored -> { throw conflict; });");
-    [Fact] void should_rethrow_conflicts() => constraints.ShouldContain("catch (UniqueValueConflict conflict)");
+    [Fact] void should_poison_prepare_commit() => constraints.ShouldContain("context.runOnPrepareCommit(ignored -> { throw new CompletionException(failure); });");
+    [Fact] void should_catch_every_failure() => constraints.ShouldContain("catch (Throwable failure)");
+    [Fact] void should_rethrow_the_original_failure() => constraints.ShouldContain("throw failure;");
+    [Fact] void should_include_delegation_in_the_poisoning_boundary() => (constraints.IndexOf("appender.append(events, metadata);", StringComparison.Ordinal) < constraints.IndexOf("catch (Throwable failure)", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_delegate_descriptions() => constraints.ShouldContain("appender.describeTo(descriptor);");
     [Fact]
     void should_use_imports_for_framework_types() => constraints.Split('\n')

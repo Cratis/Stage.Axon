@@ -52,7 +52,7 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
         var list = body.Reference("java.util.List");
         var metadata = body.Reference("org.axonframework.messaging.core.Metadata");
         var message = body.Reference("org.axonframework.messaging.core.Message");
-        var conflict = body.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueConflict"));
+        var completionException = body.Reference("java.util.concurrent.CompletionException");
         var descriptor = body.Reference("org.axonframework.common.infra.ComponentDescriptor");
         body.Block($"public static {appender} enforcing({store} store, {appender} appender, {processing} context)", method => method.RawBody($$"""
                     return new {{appender}}() {
@@ -68,11 +68,11 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
                                     var payload = event instanceof {{message}} message ? message.payload() : event;
                                     apply(store, payload, context);
                                 }
-                            } catch ({{conflict}} conflict) {
-                                context.runOnPrepareCommit(ignored -> { throw conflict; });
-                                throw conflict;
+                                appender.append(events, metadata);
+                            } catch (Throwable failure) {
+                                context.runOnPrepareCommit(ignored -> { throw new {{completionException}}(failure); });
+                                throw failure;
                             }
-                            appender.append(events, metadata);
                         }
 
                         @Override

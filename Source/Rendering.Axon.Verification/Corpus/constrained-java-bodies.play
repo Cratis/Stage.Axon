@@ -45,6 +45,21 @@ module Accounts
       event AliasReleased
         id AccountId
 
+    slice StateChange QuietRelease
+      command ReleaseAliasQuietly
+        id AccountId identifier
+        produces AliasReleased
+          for id
+          id = id
+        handler
+          ```java
+          try {
+              appender.append(new AliasReleased(command.id(), command.id()), null);
+          } catch (RuntimeException failure) {
+              return;
+          }
+          ```
+
     slice StateChange QuietClaim
       command ClaimAliasQuietly
         id AccountId identifier

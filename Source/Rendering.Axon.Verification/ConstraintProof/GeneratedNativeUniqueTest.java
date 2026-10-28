@@ -3,6 +3,7 @@ package __RUNTIME__;
 import __APPLICATION__.accounts.aliases.claim.ClaimAlias;
 import __APPLICATION__.accounts.aliases.failingclaim.ClaimAliasThenFail;
 import __APPLICATION__.accounts.aliases.quietclaim.ClaimAliasQuietly;
+import __APPLICATION__.accounts.aliases.quietrelease.ReleaseAliasQuietly;
 import __APPLICATION__.accounts.aliases.release.ReleaseAlias;
 import __APPLICATION__.accounts.events.AliasClaimed;
 import __APPLICATION__.accounts.events.EventTags;
@@ -133,6 +134,21 @@ class GeneratedNativeUniqueTest {
         conflict(new ClaimAliasQuietly(other, alias));
         assertEquals(0, facts(other).size());
         assertEquals(1, facts(owner).size());
+        send(new ReleaseAlias(owner));
+        claim(other, alias);
+        assertEquals(1, facts(other).size());
+    }
+
+    @Test
+    void swallowedDelegateFailureKeepsTheOriginalClaim() throws Exception {
+        var owner = new AccountId(unique());
+        var other = new AccountId(unique());
+        var alias = unique();
+        claim(owner, alias);
+        assertThrows(Exception.class, () -> send(new ReleaseAliasQuietly(owner)));
+        assertEquals(1, facts(owner).size());
+        conflict(new ClaimAlias(other, alias));
+        assertEquals(0, facts(other).size());
         send(new ReleaseAlias(owner));
         claim(other, alias);
         assertEquals(1, facts(other).size());
