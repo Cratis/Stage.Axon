@@ -16,6 +16,6 @@ public class when_the_read_model_is_named_result : given.a_query_collision
 
     [Fact] void should_qualify_the_model_inside_the_nested_result() => Code("FindTotal").ShouldContain($"public record Result(List<{_package}.Result> rows)");
     [Fact] void should_not_import_a_type_shadowed_by_the_nested_result() => Code("FindTotal").ShouldNotContain($"import {_package}.Result;");
-    [Fact] void should_use_the_same_package_model_in_the_handler() => Code("FindTotalHandler").ShouldContain("ReadModelStore<Object, Result> store;");
+    [Fact] void should_use_the_same_package_model_in_the_handler() => Code("FindTotalHandler").ShouldContain("private final ResultRepository repository;");
     [Fact] void should_not_import_the_handlers_own_package() => Code("FindTotalHandler").ShouldNotContain($"import {_package}.Result;");
 }

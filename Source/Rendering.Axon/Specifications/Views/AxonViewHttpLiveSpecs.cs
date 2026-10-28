@@ -23,7 +23,10 @@ internal static class AxonViewHttpLiveSpecs
         if (projector[..projector.LastIndexOf('.')] == package) code.Declare(projectorName);
         else projectorName = code.Reference(projector);
         var arguments = eventArguments(code);
-        var storeType = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
+        var owner = ScopeSelection.Locate(context.Request.Model.Application).First(slice => slice.Slice.ReadModels.Any(model => types.Package(slice) + "." + JavaNames.Type(model.Name) == modelType));
+        var readModel = owner.Slice.ReadModels.First(model => types.Package(owner) + "." + JavaNames.Type(model.Name) == modelType);
+        var repositoryType = ViewRepositories.Type(code, types, owner, package, ReadModelEntities.RepositoryName(readModel));
+        var entityType = ViewRepositories.Type(code, types, owner, package, ReadModelEntities.EntityName(readModel));
         var applicationType = code.Reference(types.BasePackage + ".Application");
         code.Line($$"""
             class {{name}} {
@@ -34,9 +37,9 @@ internal static class AxonViewHttpLiveSpecs
                         var port = application.getEnvironment().getProperty("local.server.port", Integer.class);
                         var configuration = application.getBean({{code.Reference("org.axonframework.common.configuration.Configuration")}}.class);
                         var projector = application.getBean({{projectorName}}.class);
-                        var store = application.getBean({{JavaCodeBuilder.StringLiteral(modelType)}}, {{storeType}}.class);
+                        var repository = application.getBean({{repositoryType}}.class);
                         var streams = application.getBean({{JavaNames.Type(query.Name)}}Streams.class);
-                        store.clear();
+                        repository.deleteAll();
                         try (var client = {{code.Reference("java.net.http.HttpClient")}}.newHttpClient();
                              var executor = {{code.Reference("java.util.concurrent.Executors")}}.newVirtualThreadPerTaskExecutor()) {
                             var request = {{code.Reference("java.net.http.HttpRequest")}}.newBuilder({{code.Reference("java.net.URI")}}.create("http://127.0.0.1:" + port + {{JavaCodeBuilder.StringLiteral(QueryEndpoint.Route(located, query))}}))
@@ -59,12 +62,12 @@ internal static class AxonViewHttpLiveSpecs
                                 var changed = mapper.readTree(executor.submit(() -> nextData(reader)).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS));
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(changed.isArray());
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(1, changed.size());
-                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(mapper.readTree(mapper.writeValueAsString(store.all())), changed);
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(mapper.readTree(mapper.writeValueAsString(repository.findAll().stream().map({{entityType}}::toModel).toList())), changed);
                                 var snapshotRequest = {{code.Reference("java.net.http.HttpRequest")}}.newBuilder(request.uri()).GET().build();
                                 var snapshot = client.send(snapshotRequest, {{code.Reference("java.net.http.HttpResponse")}}.BodyHandlers.ofString());
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(200, snapshot.statusCode());
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(snapshot.headers().firstValue("Content-Type").orElse("").startsWith("application/json"));
-                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(mapper.readTree(mapper.writeValueAsString(store.all())), mapper.readTree(snapshot.body()));
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(mapper.readTree(mapper.writeValueAsString(repository.findAll().stream().map({{entityType}}::toModel).toList())), mapper.readTree(snapshot.body()));
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(1, streams.activeCount());
                                 var closing = System.nanoTime();
                                 application.close();

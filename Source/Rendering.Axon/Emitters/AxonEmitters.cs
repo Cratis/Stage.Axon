@@ -18,7 +18,6 @@ internal static class AxonEmitters
         new Projections.AxonProjectionsEmitter(),
         new Queries.AxonQueriesEmitter(),
         new Automations.AxonAutomationsEmitter(),
-        new Persistence.AxonPersistenceEmitter(),
         new Security.AxonSecurityEmitter(),
         new Specifications.AxonSpecificationsEmitter(),
         new Client.AxonClientEmitter(),

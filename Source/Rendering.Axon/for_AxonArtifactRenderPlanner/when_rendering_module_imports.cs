@@ -53,7 +53,6 @@ public partial class when_rendering_module_imports : Specification
 
     [Theory]
     [InlineData("ReadModelStore")]
-    [InlineData("ReadModelTransaction")]
     [InlineData("persistent.UniqueClaim")]
     [InlineData("persistent.PersistentConfiguration")]
     [InlineData("persistent.JpaUniqueValueStore")]

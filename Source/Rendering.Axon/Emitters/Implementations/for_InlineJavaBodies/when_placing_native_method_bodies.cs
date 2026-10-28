@@ -43,13 +43,46 @@ public class when_placing_native_method_bodies : a_view_request
         var context = Context(seed.Role, seed.Source.SemanticId, body);
         var located = ScopeSelection.Select(_request).First(slice => slice.Slice.ReadModels.Any(model => model.Id == seed.QueryShape.ReadModel));
         var query = QueryPerformer.Queries(context, located).Single();
-        QueryPerformer.Emit(context, "sample.queries", query, "sample.queries.Item");
+        QueryPerformer.Emit(context, "sample.queries", query, "sample.queries.Item", "sample.queries.ItemRepository");
         var code = Text(context.Artifacts[0]);
         code.ShouldContain(body);
         code.ShouldContain("perform(");
-        code.ShouldContain("ReadModelStore<Object, Item> store)");
+        code.ShouldContain("ItemRepository repository)");
         code.ShouldNotContain("UnsupportedOperationException");
         context.ConsumedImplementations.ShouldContain(seed.RequirementId);
+    }
+
+    [Fact]
+    void should_place_a_body_that_declares_its_own_store_variable()
+    {
+        const string body = "var store = repository.findAll(); return store.stream().map(Object::toString).map(text -> (Item) null).toList();";
+        var seed = _request.ImplementationRequirements.Single(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer);
+        var context = Context(seed.Role, seed.Source.SemanticId, body);
+        var located = ScopeSelection.Select(_request).First(slice => slice.Slice.ReadModels.Any(model => model.Id == seed.QueryShape.ReadModel));
+        var query = QueryPerformer.Queries(context, located).Single();
+        QueryPerformer.Emit(context, "sample.queries", query, "sample.queries.Item", "sample.queries.ItemRepository");
+        var code = Text(context.Artifacts[0]);
+        code.ShouldNotContain("// " + body);
+        code.ShouldNotContain("UnsupportedOperationException");
+    }
+
+    [Theory]
+    [InlineData("ReadModelStore<Object, Item> store = null; return java.util.List.of();")]
+    [InlineData("return store.all().stream().limit(5).toList();")]
+    public void should_keep_a_body_that_still_reads_the_removed_read_model_store_compilable(string body)
+    {
+        var seed = _request.ImplementationRequirements.Single(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer);
+        var context = Context(seed.Role, seed.Source.SemanticId, body);
+        var located = ScopeSelection.Select(_request).First(slice => slice.Slice.ReadModels.Any(model => model.Id == seed.QueryShape.ReadModel));
+        var query = QueryPerformer.Queries(context, located).Single();
+        QueryPerformer.Emit(context, "sample.queries", query, "sample.queries.Item", "sample.queries.ItemRepository");
+        var code = Text(context.Artifacts[0]);
+        code.ShouldContain("rewritten against the typed Spring Data repository");
+        code.ShouldContain("// " + body);
+        code.Split('\n').ShouldEachConformTo(line => !line.TrimStart().StartsWith(body, StringComparison.Ordinal));
+        code.ShouldContain("throw new UnsupportedOperationException");
+        context.ConsumedImplementations.ShouldContain(seed.RequirementId);
+        context.Degradation.UnsupportedConstructs.Count(diagnostic => diagnostic.Code == "STAGE-AXON-0401" && diagnostic.Message.Contains("ReadModelStore", StringComparison.Ordinal)).ShouldEqual(1);
     }
 
     [Theory]
