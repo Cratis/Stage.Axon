@@ -20,9 +20,10 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
     {
         var application = context.Request.Model.Application;
         var types = new ViewJavaTypes(application, context.BasePackage);
+        var emitted = new HashSet<SemanticId>();
         foreach (var located in ScopeSelection.Select(context.Request))
         {
-            foreach (var query in located.Slice.Queries.Concat(QueryPerformer.Queries(context, located)))
+            foreach (var query in located.Slice.Queries.Concat(QueryPerformer.Queries(context, located)).Where(query => emitted.Add(query.Id)))
             {
                 if (QueryPerformer.Requirement(context, query)?.QueryShape?.Arguments.Any(argument => argument.Type is null) == true)
                 {

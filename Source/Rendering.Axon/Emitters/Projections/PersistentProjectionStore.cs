@@ -18,7 +18,7 @@ internal static class PersistentProjectionStore
         var persistent = code.Reference(types.BasePackage + ".persistence.JpaReadModelStore");
         var bootstrap = code.Reference(types.BasePackage + ".persistence.PersistentViewConfiguration");
         var qualifier = JavaCodeBuilder.StringLiteral(package + "." + name);
-        code.DiffersFromScreenplay("Default read-model rows are volatile. The persistent profile supports guarded flat projections only; scoped/reducer state is not recovered (STAGE-AXON-0308).")
+        code.DiffersFromScreenplay("Default-profile read-model rows are volatile. The persistent profile stores this read model durably (STAGE-AXON-0308).")
             .Line($"@{code.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
             .Line($"@{code.Reference("org.springframework.context.annotation.PropertySource")}(\"classpath:axon-views.properties\")")
             .Block($"public class {name}StoreConfiguration", body => body

@@ -11,7 +11,22 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 /// Identifies a body slot. <paramref name="Slice"/> and <paramref name="MemberPrefix"/> additionally accept the shape the Screenplay compiler
 /// produces for reaction triggers: a slice-owned requirement whose member begins with the owning reaction's name.
 /// </summary>
-internal sealed record InlineBodySlot(string? RequirementId, SemanticImplementationRole Role, SemanticId Owner, SemanticId? Slice = null, string? MemberPrefix = null);
+internal sealed record InlineBodySlot(string? RequirementId, SemanticImplementationRole Role, SemanticId Owner, SemanticId? Slice = null, string? MemberPrefix = null)
+{
+    /// <summary>Creates the one slot a reaction trigger body is placed into and audited against: reaction-owned, or slice-owned with the reaction's name as member prefix.</summary>
+    /// <param name="requirementId">The trigger's implementation requirement identifier.</param>
+    /// <param name="reaction">The reaction owning the trigger.</param>
+    /// <param name="slice">The identifier of the slice containing the reaction.</param>
+    /// <returns>The reaction slot.</returns>
+    internal static InlineBodySlot ForReaction(string? requirementId, SemanticReaction reaction, SemanticId? slice) =>
+        new(requirementId, SemanticImplementationRole.ReactionEffect, reaction.Id, slice, reaction.Name + "/");
+
+    /// <summary>Gets whether the requirement addresses this slot, either directly owned or slice-owned with the member prefix.</summary>
+    /// <param name="requirement">The requirement to test.</param>
+    /// <returns><see langword="true"/> when the requirement belongs to the slot.</returns>
+    internal bool Addresses(SemanticImplementationRequirement requirement) =>
+        requirement.Role == Role && (requirement.Source.SemanticId == Owner || InlineJavaBodies.SliceOwned(requirement, this));
+}
 
 internal static class InlineJavaBodies
 {
@@ -31,16 +46,8 @@ internal static class InlineJavaBodies
             reason = "The resolved implementation content is unavailable.";
             return false;
         }
-        if (content.Contains('\r'))
-        {
-            reason = "Native Java bodies must be LF-only: CR and CRLF cannot be transported verbatim by text artifacts.";
-            return false;
-        }
-        if (Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content))) != requirement.ContentHash)
-        {
-            reason = "The implementation content does not match its recorded SHA-256 revision.";
-            return false;
-        }
+        reason = ContentReason(content, requirement);
+        if (reason.Length > 0) return false;
         body = content;
         return true;
     }
@@ -48,18 +55,30 @@ internal static class InlineJavaBodies
     internal static IEnumerable<SemanticImplementationRequirement> Requirements(AxonEmissionContext context) =>
         context.Request.ImplementationRequirements.IsDefault ? [] : context.Request.ImplementationRequirements;
 
+    internal static bool SliceOwned(SemanticImplementationRequirement requirement, InlineBodySlot slot) =>
+        slot.Slice is { } slice && slot.MemberPrefix is { } prefix && requirement.Role == slot.Role && requirement.Source.SemanticId == slice &&
+        requirement.Owner.Kind == SemanticKind.Slice && requirement.Member?.StartsWith(prefix, StringComparison.Ordinal) == true;
+
+    static string ContentReason(string content, SemanticImplementationRequirement requirement)
+    {
+        (bool Invalid, string Reason)[] checks =
+        [
+            (content.Contains('\r'), "Native Java bodies must be LF-only: CR and CRLF cannot be transported verbatim by text artifacts."),
+            (Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content))) != requirement.ContentHash, "The implementation content does not match its recorded SHA-256 revision."),
+            (requirement.Role == SemanticImplementationRole.PolicyPredicate && content.Contains("\\u", StringComparison.Ordinal), "Java Unicode escapes are not supported in inline policy bodies; access is denied.")
+        ];
+        return checks.FirstOrDefault(check => check.Invalid).Reason ?? string.Empty;
+    }
+
     static SemanticKind OwnerKind(SemanticImplementationRole role) => role switch
     {
         SemanticImplementationRole.CommandHandler => SemanticKind.Command,
         SemanticImplementationRole.ReactionEffect => SemanticKind.Reaction,
         SemanticImplementationRole.QueryPerformer => SemanticKind.Query,
         SemanticImplementationRole.ReducerTransition => SemanticKind.Slice,
+        SemanticImplementationRole.PolicyPredicate => SemanticKind.Application,
         _ => SemanticKind.Unknown
     };
-
-    static bool SliceOwned(SemanticImplementationRequirement requirement, InlineBodySlot slot) =>
-        slot.Slice is { } slice && slot.MemberPrefix is { } prefix && requirement.Role == slot.Role && requirement.Source.SemanticId == slice &&
-        requirement.Owner.Kind == SemanticKind.Slice && requirement.Member?.StartsWith(prefix, StringComparison.Ordinal) == true;
 
     static string ForeignLanguage(string language) =>
         $"The Axon target only realizes Java bodies; language '{language}' is not supported. Supply the body in Java (or render it with a target that realizes this language) and render again.";
@@ -76,7 +95,7 @@ internal static class InlineJavaBodies
             (requirement.ContextVersion != 1 || requirement.ResultVersion != 1, "The implementation context or result contract revision is unsupported."),
             (requirement.IsAmbiguous || requirement.IsProvisional, "Ambiguous or provisional implementation identities cannot be placed."),
             (requirement.AttachmentResolution != SemanticAttachmentResolution.Resolved, "The implementation attachment has not been resolved."),
-            (requirement.RequiredCapability != (role == SemanticImplementationRole.ReducerTransition ? "pure" : "provider-defined"), "The implementation capability is not supported by this native body slot.")
+            (requirement.RequiredCapability != (role is SemanticImplementationRole.ReducerTransition or SemanticImplementationRole.PolicyPredicate ? "pure" : "provider-defined"), "The implementation capability is not supported by this native body slot.")
         ];
         return checks.FirstOrDefault(check => check.Invalid).Reason ?? string.Empty;
     }

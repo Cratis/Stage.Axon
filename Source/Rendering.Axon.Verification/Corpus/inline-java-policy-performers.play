@@ -1,0 +1,45 @@
+domain Stage.InlineJavaPolicyPerformers
+
+concept AccountId : Uuid
+
+policy PerformedFinance
+  ```java
+    return claims.get("department") instanceof String department && department.startsWith("Finance");
+    ```
+
+module Accounts
+  feature Registry
+    slice StateChange Register
+      command RegisterAccount
+        id AccountId identifier
+        alias String
+        produces AccountRegistered
+          for id
+          alias = alias
+
+      event AccountRegistered
+        alias String
+
+    slice StateView Active
+      readmodel ActiveAccounts
+        accountId AccountId
+        alias String
+
+      query PerformedAccounts => ActiveAccounts[]
+        authorize PerformedFinance
+        performer
+          ```java
+          return store.all();
+          ```
+
+      query LivePerformedAccounts => observable ActiveAccounts[]
+        authorize PerformedFinance
+        performer
+          ```java
+          return store.all();
+          ```
+
+      projection ActiveProjection => ActiveAccounts
+        from AccountRegistered
+          accountId = $eventSourceId
+          alias = alias
