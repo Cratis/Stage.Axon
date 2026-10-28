@@ -97,7 +97,7 @@ public partial class when_preparing_native_proofs : Specification
     [Fact] void should_filter_terminal_entries_before_collecting_messages() => _sources["GeneratedIngressSupport.java"].ShouldContain("stream.filter(entry -> !(entry.message() instanceof TerminalEventMessage))");
     [Fact] void should_never_append_directly_from_proofs() => _all.ShouldNotContain("appender.append(");
     [Fact] void should_never_construct_append_units_of_work() => _all.ShouldNotContain("executeWithResult(");
-    [Fact] void should_use_bounded_native_contenders() => _all.ShouldContain("observed.await(5, TimeUnit.SECONDS)");
+    [Fact] void should_use_bounded_native_contenders() => _all.ShouldContain("barrier.await(5, TimeUnit.SECONDS)");
     [Fact] void should_not_sleep_in_native_proofs() => _all.ShouldNotContain("Thread.sleep(");
     [Fact]
     void should_use_imports_for_framework_types() => _all.Split('\n')
