@@ -1,9 +1,11 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
+using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 
@@ -25,7 +27,7 @@ internal sealed class AxonScaffoldEmitter : IAxonEmitter
         AddAsset(context, "mvnw", "mvnw");
         AddAsset(context, "mvnw.cmd", "mvnw.cmd");
         AddAsset(context, "maven-wrapper.properties", ".mvn/wrapper/maven-wrapper.properties");
-        context.AddJava(context.BasePackage, "Application", AxonApplicationScaffold.Application(context.BasePackage));
+        context.AddJava(context.BasePackage, "Application", AxonApplicationScaffold.Application(context.BasePackage, UsesScheduling(context)));
         context.AddJava(context.BasePackage + ".infrastructure", "AxonConfiguration", AxonApplicationScaffold.Infrastructure(context.BasePackage));
         context.Artifacts.Add(PlannedArtifact.CreateText(".gitignore", "target/\ndata/\n.idea/\n*.iml\n"));
         context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/application-persistent.properties", AxonPersistentScaffold.Properties));
@@ -35,6 +37,10 @@ internal sealed class AxonScaffoldEmitter : IAxonEmitter
         context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/application.yml", "server:\n  address: 127.0.0.1\nspring:\n  application:\n    name: " + context.BasePackage + (bearer ? "\n  security:\n    oauth2:\n      resourceserver:\n        jwt:\n          authorities-claim-name: roles\n          authority-prefix: ROLE_" : string.Empty) + "\naxon:\n  axonserver:\n    enabled: false\n"));
         context.Artifacts.Add(PlannedArtifact.CreateText("README.md", "# Generated Axon application\n\nRequires JDK 25 or later.\n\n```sh\nchmod +x mvnw\n./mvnw verify\n./mvnw spring-boot:run\n```\n\nOn Windows use `mvnw.cmd`. Maven Wrapper 3.3.4 downloads Maven 3.9.16 on first use. The wrapper scripts retain their Apache-2.0 license headers.\n\nThe default event store, tokens and read-model stores are in memory. Data is lost on restart; do not use this default for production. The service binds to loopback by default. " + (bearer ? "Protected endpoints accept bearer JWTs in the `Authorization` header. Set `spring.security.oauth2.resourceserver.jwt.issuer-uri` (or `jwk-set-uri` together with `issuer-uri`, or `public-key-location`) and `spring.security.oauth2.resourceserver.jwt.audiences`; until a provider is configured every token is rejected. A configured decoder source requires non-empty `spring.security.oauth2.resourceserver.jwt.audiences`, otherwise startup is refused. Roles are read from the `roles` claim (`authorities-claim-name`, `authority-prefix`)." : "Supply an identity provider before exposing protected endpoints.") + " No users or credentials are generated.\n\nFor a local demo only, run `./mvnw spring-boot:run -Dspring-boot.run.profiles=demo` (or set `SPRING_PROFILES_ACTIVE=demo`). The opt-in `demo` profile authenticates every HTTP request as `demo` with all modeled roles, ignores Basic and bearer credentials, and logs a startup WARN. It is off by default. Never activate it in production.\n\nThis backend does not use Axon Server or containers. An optional application-owned `axonserver` profile may enable Axon Server; it is not generated or exercised in CI. Unsupported Screenplay constructs produce diagnostics and explicit intent comments; inspect these before deployment.\n"));
     }
+
+    static bool UsesScheduling(AxonEmissionContext context) => ScopeSelection.Locate(context.Request.Model.Application)
+        .SelectMany(located => located.Slice.Reactions).SelectMany(reaction => reaction.Triggers)
+        .Any(trigger => trigger.Kind is SemanticReactionTriggerKind.Interval or SemanticReactionTriggerKind.Schedule);
 
     static void AddAsset(AxonEmissionContext context, string resource, string path)
     {

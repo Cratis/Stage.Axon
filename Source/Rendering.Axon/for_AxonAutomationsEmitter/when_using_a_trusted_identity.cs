@@ -13,8 +13,8 @@ public class when_using_a_trusted_identity : given.a_reaction_model
 
     void Because() => Render();
 
-    [Fact] void should_use_only_the_declared_roles() => Code("SubmitOrderReaction").ShouldContain("List.of(new SimpleGrantedAuthority(\"ROLE_Sales\"))");
-    [Fact] void should_not_grant_a_system_role_implicitly() => Code("SubmitOrderReaction").ShouldNotContain("ROLE_SYSTEM");
-    [Fact] void should_install_a_fresh_context() => Code("SubmitOrderReaction").ShouldContain("SecurityContextHolder.createEmptyContext()");
-    [Fact] void should_restore_the_previous_context_in_finally() => Code("SubmitOrderReaction").ShouldContain("finally {\n            SecurityContextHolder.setContext(previous);");
+    [Fact] void should_use_only_the_declared_roles() => Code("SubmitOrderEndpoint").ShouldContain("List.of(new SimpleGrantedAuthority(\"ROLE_Sales\"))");
+    [Fact] void should_not_grant_a_system_role_implicitly() => Code("SubmitOrderEndpoint").ShouldNotContain("ROLE_SYSTEM");
+    [Fact] void should_install_a_fresh_context() => Code("SubmitOrderEndpoint").ShouldContain("SecurityContextHolder.createEmptyContext()");
+    [Fact] void should_restore_the_previous_context_in_finally() => Code("SubmitOrderEndpoint").ShouldContain("finally {\n            SecurityContextHolder.setContext(previous);");
 }
