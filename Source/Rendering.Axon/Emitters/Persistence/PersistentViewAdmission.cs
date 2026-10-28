@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Queries;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
@@ -13,14 +14,23 @@ internal static class PersistentViewAdmission
 
     internal static bool Supports(AxonEmissionContext context, SemanticId model) => RefusalReason(context, model) is null;
 
+    internal static bool Writerless(AxonEmissionContext context, SemanticId model)
+    {
+        var (projections, reducers) = Writers(context, model);
+        return projections.Length == 0 && reducers.Length == 0;
+    }
+
+    internal static bool HasQueryPerformer(AxonEmissionContext context, SemanticId model) =>
+        ScopeSelection.Select(context.Request)
+            .SelectMany(owner => owner.Slice.Queries.Concat(QueryPerformer.Queries(context, owner)))
+            .Any(query => query.ReadModel == model && QueryPerformer.Required(context, query) &&
+                QueryPerformer.Requirement(context, query)?.QueryShape?.Arguments.Any(argument => argument.Type is null) != true);
+
     internal static string? RefusalReason(AxonEmissionContext context, SemanticId model)
     {
-        var owners = ScopeSelection.Select(context.Request).ToArray();
-        var slices = owners.Select(owner => owner.Slice).ToArray();
-        var projections = slices.SelectMany(slice => slice.Projections).Where(projection => projection.ReadModel == model).ToArray();
-        var readModel = slices.SelectMany(slice => slice.ReadModels).FirstOrDefault(candidate => candidate.Id == model);
+        var (projections, reducers) = Writers(context, model);
+        var readModel = ScopeSelection.Select(context.Request).SelectMany(owner => owner.Slice.ReadModels).FirstOrDefault(candidate => candidate.Id == model);
         if (readModel is null) return "its shape is not admitted for persistence";
-        var reducers = owners.SelectMany(owner => owner.Slice.Reducers.Where(reducer => reducer.ReadModel == model).Select(reducer => (Owner: owner, Reducer: reducer))).ToArray();
         var admitted = projections.Length > 0
             ? reducers.Length == 0 && projections.All(projection => Flat(context, readModel, projection))
             : reducers.Length == 1 && Placed(context, reducers[0].Owner, reducers[0].Reducer);
@@ -37,6 +47,14 @@ internal static class PersistentViewAdmission
         if (reducer.From is not null || reducer.Transitions.IsEmpty) return false;
         var admission = ReducerBodies.Admission(context, owner, reducer);
         return admission.Blocked is null && admission.Transitions.Values.All(transition => transition.Placed);
+    }
+
+    static (SemanticProjection[] Projections, (LocatedSemanticSlice Owner, SemanticReducer Reducer)[] Reducers) Writers(AxonEmissionContext context, SemanticId model)
+    {
+        var owners = ScopeSelection.Select(context.Request);
+        return (
+            owners.SelectMany(owner => owner.Slice.Projections).Where(projection => projection.ReadModel == model).ToArray(),
+            owners.SelectMany(owner => owner.Slice.Reducers.Where(reducer => reducer.ReadModel == model).Select(reducer => (Owner: owner, Reducer: reducer))).ToArray());
     }
 
     static IEnumerable<string> WriterReasons(int projections, int reducers)
