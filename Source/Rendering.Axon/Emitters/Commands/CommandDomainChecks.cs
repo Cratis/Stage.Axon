@@ -16,6 +16,8 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 /// <param name="types">The Java type mapper.</param>
 internal sealed class CommandDomainChecks(AxonEmissionContext context, SemanticCommand command, CommandJavaTypes types)
 {
+    bool HasConceptRules => command.Properties.Any(property => property.Type.Kind == SemanticTypeReferenceKind.Concept && !Concept(property).Validations.IsEmpty);
+
     internal void Claim(JavaCodeBuilder builder)
     {
         foreach (var rule in command.Validations)
@@ -42,8 +44,6 @@ internal sealed class CommandDomainChecks(AxonEmissionContext context, SemanticC
         builder.Line($"if (!failures.isEmpty()) throw new {builder.Reference("java.lang.IllegalArgumentException")}({builder.Reference("java.lang.String")}.join(\"; \", failures));");
         return true;
     }
-
-    bool HasConceptRules => command.Properties.Any(property => property.Type.Kind == SemanticTypeReferenceKind.Concept && !Concept(property).Validations.IsEmpty);
 
     SemanticConcept Concept(SemanticProperty property) => context.Request.Model.Application.Concepts.Single(concept => concept.Id == property.Type.Target);
 

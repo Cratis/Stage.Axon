@@ -40,14 +40,13 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
     internal void EmitConstruction(JavaCodeBuilder method, string input)
     {
         _code = method;
-        method.Line("Object command;");
-        method.Block("try", attempt => attempt.Line($"command = {input};"));
-        method.Block("catch (IllegalArgumentException error)", rejection =>
-        {
-            foreach (var error in specification.ThenErrors.Where(error => error.Message is not null))
-                rejection.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(String.valueOf(error.getMessage())).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
-            rejection.Line("return;");
-        });
+        method.Line("Object command;").Block("try", attempt => attempt.Line($"command = {input};"))
+            .Block("catch (IllegalArgumentException error)", rejection =>
+            {
+                foreach (var error in specification.ThenErrors.Where(error => error.Message is not null))
+                    rejection.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(String.valueOf(error.getMessage())).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
+                rejection.Line("return;");
+            });
     }
 
     internal void EmitReferences(JavaCodeBuilder method, IReadOnlyList<string> expected) => new CommandFixtureAssertions(context, command, specification) { _code = method }.Emit(method, expected);
