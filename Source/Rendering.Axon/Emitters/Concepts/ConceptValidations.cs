@@ -4,6 +4,7 @@
 using System.Globalization;
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Concepts;
@@ -53,10 +54,8 @@ internal static class ConceptValidations
             }
             var path = concept.Id + "/validation/" + rule.Kind;
             var intent = "validate " + concept.Name + " using " + rule.Kind;
-            context.Degradation.Unsupported(AxonRefusalCodes.Implementation, concept.Id, "This concept validation requires an implementation.", intent, path);
-            body.UnsupportedIntent(intent, path, AxonRefusalCodes.Implementation);
-            if (rule.Severity == SemanticValidationSeverity.Error)
-                body.Line($"if (value != null) throw new {body.Reference("java.lang.UnsupportedOperationException")}(" + JavaCodeBuilder.StringLiteral(AxonRefusalCodes.Implementation + ": " + intent) + ");");
+            body.DiffersFromScreenplay(UnimplementedValidation.Report(context, concept.Id, intent, path))
+                .UnsupportedIntent(intent, path, AxonRefusalCodes.ImplementationValidation);
         }
     }
 

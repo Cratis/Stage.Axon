@@ -36,7 +36,7 @@ public class when_persisting_a_reducer_only_model : given.a_flat_view
 
     [Fact] void should_admit_fully_placed_transitions() => PersistentViewAdmission.Supports(_placed, ReadModelId("RebuiltTotal")).ShouldBeTrue();
     [Fact] void should_warn_for_placed_persistence_without_crashing() => Code(_placed, "RebuiltTotalStoreConfiguration").ShouldContain("STAGE-AXON-0308");
-    [Fact] void should_report_the_warning() => _placed.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == ReadModelId("RebuiltTotal") && diagnostic.Code == "STAGE-AXON-0308").ShouldBeTrue();
+    [Fact] void should_report_the_warning() => _placed.Degradation.Warnings.Any(diagnostic => diagnostic.Artifact == ReadModelId("RebuiltTotal") && diagnostic.Code == "STAGE-AXON-0308").ShouldBeTrue();
     [Fact] void should_keep_the_memory_store() => Code(_placed, "RebuiltTotalStoreConfiguration").ShouldContain("InMemoryReadModelStore");
     [Fact] void should_refuse_unplaced_transitions() => PersistentViewAdmission.Supports(_unplaced, ReadModelId("RebuiltTotal")).ShouldBeFalse();
     [Fact] void should_warn_for_unplaced_persistence() => Code(_unplaced, "RebuiltTotalStoreConfiguration").ShouldContain("STAGE-AXON-0308");

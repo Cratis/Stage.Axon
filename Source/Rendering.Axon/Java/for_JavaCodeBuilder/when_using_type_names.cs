@@ -45,11 +45,13 @@ public class when_using_type_names : Specification
     }
 
     [Fact]
-    void should_refuse_to_claim_an_application_type_name_after_a_framework_type_took_it()
+    void should_keep_a_declared_name_after_a_framework_type_took_it()
     {
         var builder = new JavaCodeBuilder("example");
         builder.Reference("org.axonframework.eventsourcing.annotation.Event");
-        Catch.Exception(() => builder.Declare("Event")).ShouldBeOfExactType<SimpleNameAlreadyClaimed>();
+        builder.Declare("Event");
+        builder.Reference("org.axonframework.eventsourcing.annotation.Event").ShouldEqual("org.axonframework.eventsourcing.annotation.Event");
+        builder.Build().ShouldNotContain("import org.axonframework.eventsourcing.annotation.Event;");
     }
 
     [Fact]
