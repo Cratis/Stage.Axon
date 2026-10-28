@@ -17,7 +17,7 @@ internal sealed class AxonScaffoldEmitter : IAxonEmitter
     {
         if (AxonMavenProject.IsLocalVersion(runtimeVersion))
         {
-            context.Degradation.Warn("STAGE-AXON-LOCAL-RUNTIME", context.Request.Model.Application.Id, AxonMavenProject.LocalBuildWarning(runtimeVersion));
+            context.Degradation.Warn(AxonRefusalCodes.LocalRuntime, context.Request.Model.Application.Id, AxonMavenProject.LocalBuildWarning(runtimeVersion));
         }
 
         var bearer = HttpAuthenticationInput.Bearer(context.Request.Profile);
