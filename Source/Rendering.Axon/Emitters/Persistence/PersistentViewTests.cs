@@ -6,6 +6,7 @@ using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Queries;
+using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 using Cratis.Stage.Rendering.Axon.Specifications.Views;
@@ -34,7 +35,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         var name = modelName + "Persistent";
         var events = spec.GivenEvents.Select(given => AxonViewEvents.Expression(context, types, given)).ToArray();
         string Render(string source) => source.Replace("__PACKAGE__", package, StringComparison.Ordinal)
-            .Replace("__RUNTIME__", types.BasePackage + ".runtime", StringComparison.Ordinal)
+            .Replace("__RUNTIME_MODULE__", AxonRuntimePackage.ModulePackage, StringComparison.Ordinal)
             .Replace("__PERSISTENCE__", persistence, StringComparison.Ordinal)
             .Replace("__APPLICATION__", types.BasePackage, StringComparison.Ordinal)
             .Replace("__MODEL__", package + "." + modelName, StringComparison.Ordinal).Replace("__NAME__", name, StringComparison.Ordinal)
@@ -111,7 +112,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
     string Imports(string package, SemanticKeyedQuery query) => string.Join(", ", new[]
     {
         types.BasePackage + ".infrastructure.AxonConfiguration.class", types.BasePackage + ".infrastructure.SecurityConfiguration.class",
-        types.BasePackage + ".runtime.persistent.PersistentConfiguration.class", persistence + ".PersistentViewConfiguration.class",
+        AxonRuntimePackage.Type(types.BasePackage, "persistent.PersistentConfiguration") + ".class", persistence + ".PersistentViewConfiguration.class",
         package + "." + JavaNames.Type(query.Name) + "Handler.class", package + "." + JavaNames.Type(query.Name) + "Endpoint.class"
     }.Concat(PersistentProjectorImports()).Distinct(StringComparer.Ordinal));
 

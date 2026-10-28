@@ -1,4 +1,4 @@
-package __RUNTIME__;
+package io.cratis.stage.axon.runtime;
 
 import java.time.Duration;
 import java.util.List;

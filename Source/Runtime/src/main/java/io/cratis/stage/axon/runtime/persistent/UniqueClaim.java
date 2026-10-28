@@ -1,4 +1,4 @@
-package __RUNTIME__.persistent;
+package io.cratis.stage.axon.runtime.persistent;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
