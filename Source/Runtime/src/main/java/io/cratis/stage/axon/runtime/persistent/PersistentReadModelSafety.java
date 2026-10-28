@@ -1,4 +1,4 @@
-package __RUNTIME__.persistent;
+package io.cratis.stage.axon.runtime.persistent;
 
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;

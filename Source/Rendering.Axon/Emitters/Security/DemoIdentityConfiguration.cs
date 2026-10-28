@@ -14,6 +14,11 @@ internal static class DemoIdentityConfiguration
             .Import("java.io.IOException")
             .Import("java.util.Arrays")
             .Import("java.util.List")
+            .Import("java.util.HashMap")
+            .Import("java.util.Map")
+            .Import("org.springframework.boot.context.properties.bind.Bindable")
+            .Import("org.springframework.boot.context.properties.bind.Binder")
+            .Import("org.springframework.core.env.Environment")
             .Import("jakarta.servlet.FilterChain")
             .Import("jakarta.servlet.ServletException")
             .Import("jakarta.servlet.http.HttpServletRequest")
@@ -42,7 +47,7 @@ internal static class DemoIdentityConfiguration
             .Block("public class DemoIdentityConfiguration", body =>
             {
                 body.Line("@Bean")
-                    .Block("SecurityFilterChain demoSecurity(HttpSecurity http, @Value(\"${stage.axon.cors.allowed-origins:}\") String allowedOrigins) throws Exception", method => Chain(method, roles));
+                    .Block("SecurityFilterChain demoSecurity(HttpSecurity http, Environment environment, @Value(\"${stage.axon.cors.allowed-origins:}\") String allowedOrigins) throws Exception", method => Chain(method, roles));
                 Cors(body);
                 Filter(body);
             }).Build();
@@ -55,12 +60,14 @@ internal static class DemoIdentityConfiguration
         var warning = "DEMO IDENTITY ENABLED: every request is authenticated as 'demo' with roles [" + string.Join(", ", roles) + "]. Never activate the demo profile in production.";
         method.Line("LoggerFactory.getLogger(DemoIdentityConfiguration.class).warn(" + JavaCodeBuilder.StringLiteral(warning) + ");")
             .Line("List<GrantedAuthority> authorities = List.of(" + authorities + ");")
+            .Line("var claims = new HashMap<String, String>(Binder.get(environment).bind(\"stage.axon.demo.claims\", Bindable.mapOf(String.class, String.class)).orElseGet(HashMap::new));")
+            .Line("claims.putIfAbsent(\"sub\", \"demo\");")
             .Line("// Explicit demo mode ignores Basic and bearer credentials; method security still enforces access.")
             .Line("return http.csrf(csrf -> csrf.disable())")
             .Line("    .cors(cors -> cors.configurationSource(cors(allowedOrigins)))")
             .Line("    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))")
             .Line("    .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())")
-            .Line("    .addFilterAfter(identity(authorities), SecurityContextHolderFilter.class).build();");
+            .Line("    .addFilterAfter(identity(authorities, claims), SecurityContextHolderFilter.class).build();");
     }
 
     static void Cors(JavaCodeBuilder body) => body.Line()
@@ -75,12 +82,14 @@ internal static class DemoIdentityConfiguration
             .Line("return source;"));
 
     static void Filter(JavaCodeBuilder body) => body.Line()
-        .Block("private static OncePerRequestFilter identity(List<GrantedAuthority> authorities)", method => method
+        .Block("private static OncePerRequestFilter identity(List<GrantedAuthority> authorities, Map<String, String> claims)", method => method
             .Line("return new OncePerRequestFilter() {")
             .Line("    @Override")
             .Line("    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {")
             .Line("        var context = SecurityContextHolder.createEmptyContext();")
-            .Line("        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(\"demo\", null, authorities));")
+            .Line("        var token = UsernamePasswordAuthenticationToken.authenticated(\"demo\", null, authorities);")
+            .Line("        token.setDetails(claims);")
+            .Line("        context.setAuthentication(token);")
             .Line("        SecurityContextHolder.setContext(context);")
             .Line("        try { chain.doFilter(request, response); }")
             .Line("        finally { SecurityContextHolder.clearContext(); }")
