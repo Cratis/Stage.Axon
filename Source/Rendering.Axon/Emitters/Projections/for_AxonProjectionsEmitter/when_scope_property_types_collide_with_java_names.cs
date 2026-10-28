@@ -18,7 +18,7 @@ public class when_scope_property_types_collide_with_java_names : given.a_view_re
         var code = Render(kind, original, "String");
         code.ShouldContain($"import axonviews.{(kind == "type" ? "types" : "concepts")}.String;");
         code.ShouldNotContain("import java.lang.String;");
-        code.ShouldContain(".put(java.lang.String.valueOf(java.lang.String.valueOf(event.cardId().value())), initial ->");
+        code.ShouldContain(".put(java.lang.String.valueOf(java.lang.String.valueOf(event.cardId().value())), new JoinRootChild00(event, StoredScopeMessage.capture(message)))");
         code.ShouldContain(".get(java.lang.String.valueOf(state.cardId().value()))");
         code.ShouldContain("var identity = java.lang.String.valueOf(item.cardId().value());");
         code.ShouldNotContain(".put(String.valueOf(");

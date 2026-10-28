@@ -52,6 +52,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             }
             body.Line($"return new {ScopedProjectionEmitter.ChangeType(root)}<>(state, touched, ancestors);");
         });
+        EmitHydration(code, node, @event);
     }
 
     internal void Caches(JavaCodeBuilder code, ProjectionScopeNode node, SemanticEventContract @event)
@@ -61,10 +62,22 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             var join = node.Scope.Joins[index];
             if (join.EventContract != @event.Id) continue;
             var key = _values.Key(join.Key ?? SemanticProjectionKey.EventSourceIdentity, @event);
-            code.Line($"{ScopedProjectionEmitter.Cache(node, index)}.put({Reference("java.lang.String", "String")}.valueOf({key}), initial -> {{")
-                .Line("var state = initial;");
-            _mappings.Apply(code, node, join.Mappings, @event);
-            code.Line("return state;").Line("});");
+            code.Line($"{ScopedProjectionEmitter.Cache(node, index)}.put({Reference("java.lang.String", "String")}.valueOf({key}), new {ProjectionScopeState.Join(node, index)}(event, StoredScopeMessage.capture(message)));");
+        }
+    }
+
+    void EmitHydration(JavaCodeBuilder code, ProjectionScopeNode node, SemanticEventContract @event)
+    {
+        for (var index = 0; index < node.Scope.Joins.Length; index++)
+        {
+            var join = node.Scope.Joins[index];
+            if (join.EventContract != @event.Id) continue;
+            code.Block($"private {Reference(node.Type)} hydrate{ProjectionScopeState.Join(node, index)}({ProjectionScopeState.Join(node, index)} joined, {Reference(node.Type)} initial)", body =>
+            {
+                body.Line("var event = joined.event();").Line("var message = joined.message().restore(event);").Line("var state = initial;");
+                _mappings.Apply(body, node, join.Mappings, @event);
+                body.Line("return state;");
+            });
         }
     }
 
@@ -94,7 +107,7 @@ internal sealed class ProjectionScopeMethods(AxonEmissionContext context, ViewJa
             var key = types.Unwrap(property.Type, value);
             code.Block($"if ({value} != null)", hydrate => hydrate
                 .Line($"var joined = {ScopedProjectionEmitter.Cache(node, index)}.get({Reference("java.lang.String", "String")}.valueOf({key}));")
-                .Line("if (joined != null) state = joined.apply(state);"));
+                .Line($"if (joined != null) state = hydrate{ProjectionScopeState.Join(node, index)}(joined, state);"));
         }
     }
 

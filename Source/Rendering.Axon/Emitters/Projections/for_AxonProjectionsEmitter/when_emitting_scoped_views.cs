@@ -29,8 +29,8 @@ public class when_emitting_scoped_views : given.a_view_request
     [Fact] void should_update_root_properties_fluently() => _projector.ShouldContain("state.with");
     [Fact] void should_pass_explicit_message_arguments_in_specs() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("BoardViewSpecificationsTest.java", StringComparison.Ordinal))).ShouldContain(", null);");
     [Fact] void should_copy_children_into_immutable_lists() => _projector.ShouldContain("List.copyOf(rootChild0)");
-    [Fact] void should_preserve_original_deferred_event_values() => _projector.ShouldContain("pending.add(writes -> projectCardAdded(event, message, writes))");
-    [Fact] void should_backfill_joins() => _projector.ShouldContain("joined.apply(state)");
+    [Fact] void should_preserve_original_deferred_event_values() => _projector.ShouldContain("pending.add(new DeferredCardAdded(event, StoredScopeMessage.capture(message)))");
+    [Fact] void should_backfill_joins() => _projector.ShouldContain("hydrateJoinRootChild00(joined, state)");
     [Fact] void should_remove_instances() => _projector.ShouldContain("return new ScopeChange<>(null, true, true)");
     [Fact] void should_inject_java_time_clock() => _projector.ShouldContain("Clock clock");
     [Fact] void should_import_list_helpers() => _projector.ShouldContain("import java.util.List;");
