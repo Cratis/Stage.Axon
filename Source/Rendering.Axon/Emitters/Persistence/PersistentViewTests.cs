@@ -34,6 +34,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         var modelName = JavaNames.Type(model.Name);
         var name = modelName + "Persistent";
         var events = spec.GivenEvents.Select(given => AxonViewEvents.Expression(context, types, given)).ToArray();
+        var rowOrder = RowOrder(owner, model, target.Observed);
         string Render(string source) => source.Replace("__PACKAGE__", package, StringComparison.Ordinal)
             .Replace("__RUNTIME_MODULE__", AxonRuntimePackage.ModulePackage, StringComparison.Ordinal)
             .Replace("__PERSISTENCE__", persistence, StringComparison.Ordinal)
@@ -52,7 +53,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             .Replace("__EXPECTED__", string.Join('\n', events.Select(expression => $"        projector.on({expression}{target.Arguments});")), StringComparison.Ordinal)
             .Replace("__ARGUMENT__", target.Arguments, StringComparison.Ordinal)
             .Replace("__NORMALIZE__", PersistentViewProofNormalization.Body(context.Request.Model.Application, types, model, owner.Slice.Projections.Where(candidate => candidate.ReadModel == model.Id)), StringComparison.Ordinal)
-            .Replace("__TAGS__", Tags(spec), StringComparison.Ordinal)
+            .Replace("__TAGS__", Tags(spec.GivenEvents.Select(given => given.EventContract).Concat(rowOrder.Spec?.GivenEvents.Select(given => given.EventContract) ?? [])), StringComparison.Ordinal)
             .Replace("__FIXTURE_EVENTS__", string.Join(", ", events), StringComparison.Ordinal);
         void Add(string suffix, string source) => context.Artifacts.Add(PlannedArtifact.CreateText(
             $"src/test/java/{package.Replace('.', '/')}/{name}{suffix}.java", PersistentJavaTemplate.Render(Render(source)), [model.Id, spec.Id]));
@@ -63,6 +64,13 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         Add("StoreTest", PersistentViewContractTests.Source);
         Add("LegacyTest", PersistentViewLegacyProof.Source);
         Add("EnvelopeTest", PersistentViewEnvelopeTests.Source);
+        if (rowOrder.Spec is { } rowSpec)
+        {
+            Add("RowOrderTest", PersistentViewRowOrderProof.Source
+                .Replace("__ROW_KEY__", rowOrder.Key, StringComparison.Ordinal)
+                .Replace("__ROW_FIRST__", AxonViewEvents.Expression(context, types, rowSpec.GivenEvents[0], source: "firstSource"), StringComparison.Ordinal)
+                .Replace("__ROW_COMPETING__", AxonViewEvents.Expression(context, types, rowSpec.GivenEvents[1], source: "competingSource"), StringComparison.Ordinal));
+        }
         var live = owner.Slice.Projections.Any(projection => projection.ReadModel == model.Id) ? LiveQuery(owner, model) : null;
         if (live is not null && spec.GivenEvents.Length == 1) Add("SubscriptionTest", PersistentViewSubscriptionProof.Source.Replace("__LIVE_QUERY__", package + "." + JavaNames.Type(live.Name), StringComparison.Ordinal));
         if (live is not null && target.Observed.Count(contract => contract == spec.GivenEvents[0].EventContract) == 1)
@@ -88,7 +96,29 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         return (name + "ReducerProjector", ", null" + updates.DefaultArgument, $", new {qualifiedName}Reducer() {{}}", $", {qualifiedName}ReducerConfiguration.class", [.. reducer.Transitions.Select(transition => transition.EventContract)]);
     }
 
-    string Tags(SemanticSpecification spec) => string.Join('\n', spec.GivenEvents.Select(given => given.EventContract).Distinct().Select(id =>
+    (SemanticSpecification? Spec, string? Key) RowOrder(LocatedSemanticSlice owner, SemanticReadModel model, IReadOnlyCollection<SemanticId> observed)
+    {
+        var values = new ProjectionValues(context, types);
+        var contracts = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).ToArray();
+        var transitions = owner.Slice.Projections.Where(projection => projection.ReadModel == model.Id).SelectMany(ProjectionTransitions.From).ToArray();
+        foreach (var spec in owner.Slice.Specifications.Where(spec => ViewSpecificationSupport.Legacy(spec, model, types) && spec.GivenEvents.Length == 2 &&
+            spec.ThenReadModels.Any(expected => expected.ReadModel == model.Id) && spec.GivenEvents.All(given => observed.Contains(given.EventContract))))
+        {
+            var keys = spec.GivenEvents.Select(given =>
+            {
+                var contract = contracts.Single(candidate => candidate.Id == given.EventContract);
+                var tag = AxonEventSources.PrimaryTag(context, contract);
+                if (tag.JavaType != AxonRuntimePackage.Type(types.BasePackage, "EventSourceId") || contract.Properties.Any(property => JavaNames.Member(property.Name) == tag.ComponentName)) return null;
+                var from = transitions.Where(from => from.EventContract == given.EventContract).ToArray();
+                if (from.Length != 1 || from[0].Key is SemanticProjectionValueKey { Value: SemanticProjectionEventSourceIdentity }) return null;
+                return values.Key(from[0].Key, contract)?.Replace("event.", AxonViewEvents.Expression(context, types, given) + ".", StringComparison.Ordinal);
+            }).ToArray();
+            if (keys.All(key => key is not null) && keys.Distinct().Count() == 1) return (spec, keys[0]);
+        }
+        return (null, null);
+    }
+
+    string Tags(IEnumerable<SemanticId> events) => string.Join('\n', events.Distinct().Select(id =>
     {
         var contract = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(contract => contract.Id == id);
         var tag = AxonEventSources.PrimaryTag(context, contract);

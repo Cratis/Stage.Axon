@@ -114,6 +114,11 @@ public class when_emitting_multi_segment_proof : Projections.for_AxonProjections
         }
     }
 
+    [Fact] void should_emit_a_source_independent_last_writer_proof() => Code("TotalPersistentRowOrderTest").ShouldContain("assertNotEquals(normalized(reference.all()), normalized(inverted.all())");
+    [Fact] void should_pause_only_the_old_source_segment() => Code("TotalPersistentRowOrderTest").ShouldContain("releaseSegment(held.getSegmentId(), 1, TimeUnit.DAYS)");
+    [Fact] void should_wait_for_a_committed_competing_token_before_reclaim() => Code("TotalPersistentRowOrderTest").ShouldContain("coversHead(application, terminalHead, rowSegment.getSegmentId())");
+    [Fact] void should_require_every_segment_to_cover_the_terminal_head() => Code("TotalPersistentRowOrderTest").ShouldContain("coversHead(application, terminalHead, null)");
+
     string Proof => Code("TotalPersistentMultiSegmentTest");
     string Support => Code("TotalPersistentSupport");
 
