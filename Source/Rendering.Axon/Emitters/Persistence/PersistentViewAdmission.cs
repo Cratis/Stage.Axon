@@ -9,9 +9,6 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
 
 internal static class PersistentViewAdmission
 {
-    // Held for the multi-segment duplicate-apply follow-up: rollback/restart applies event #2 twice.
-    static bool MultiSegmentRecoveryProven => false;
-
     internal static bool Context(SemanticProjectionEventContextValue value) => new[] { "eventSourceId", "occurred", "correlationId" }.Contains(value.Path, StringComparer.Ordinal);
 
     internal static bool Supports(AxonEmissionContext context, SemanticId model)
@@ -24,7 +21,7 @@ internal static class PersistentViewAdmission
         var reducers = owners.SelectMany(owner => owner.Slice.Reducers.Where(reducer => reducer.ReadModel == model).Select(reducer => (Owner: owner, Reducer: reducer))).ToArray();
         if (projections.Length > 0)
             return reducers.Length == 0 && projections.All(projection => Flat(context, readModel, projection));
-        return MultiSegmentRecoveryProven && reducers.Length == 1 && Placed(context, reducers[0].Owner, reducers[0].Reducer);
+        return reducers.Length == 1 && Placed(context, reducers[0].Owner, reducers[0].Reducer);
     }
 
     internal static bool Placed(AxonEmissionContext context, LocatedSemanticSlice owner, SemanticReducer reducer)
@@ -38,7 +35,6 @@ internal static class PersistentViewAdmission
     {
         var transitions = ProjectionTransitions.From(projection).ToArray();
         if (!ProjectionHandlerShape.RootOnly(projection) || transitions.Length == 0) return false;
-        if (!MultiSegmentRecoveryProven && ProjectionHandlerShape.Scoped(projection)) return false;
         if (!ProjectionHandlerShape.Scoped(projection) && transitions.Any(from => from.Mappings.Any(mapping => mapping.Factor is SemanticProjectionEventContextValue))) return false;
         return transitions.All(from => From(context, model, from));
     }

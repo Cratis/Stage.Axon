@@ -73,7 +73,7 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     [Fact]
     void should_keep_application_specific_runtime_helpers()
     {
-        foreach (var name in new[] { "EventSourceId", "ReadModelStore", "InMemoryReadModelStore", "SseBridge" })
+        foreach (var name in new[] { "ReadModelStore", "InMemoryReadModelStore", "ReadModelTransaction" })
         {
             context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith($"/runtime/{name}.java", StringComparison.Ordinal)).ShouldBeTrue();
         }

@@ -33,12 +33,13 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_keep_the_direct_call_signature() => Code("TotalProjectionProjector").ShouldContain("public void on(Increased event, QueryUpdateEmitter updates)");
     [Fact] void should_bind_the_actual_handler_context() => Code("TotalProjectionProjector").ShouldContain("JpaReadModelStore.bind(store, context)");
     [Fact] void should_request_the_handler_context() => Code("TotalProjectionProjector").ShouldContain("QueryUpdateEmitter updates, ProcessingContext context)");
-    [Fact] void should_defer_live_notifications_until_commit() => Code("TotalProjectionProjector").ShouldContain("context.runOnAfterCommit");
+    [Fact] void should_let_the_bound_emitter_defer_live_notifications() => Code("TotalProjectionProjector").ShouldContain("apply(event, updates, JpaReadModelStore.bind(store, context));");
+    [Fact] void should_not_register_nested_after_commit_handlers() => Code("TotalProjectionProjector").ShouldNotContain("runOnAfterCommit");
     [Fact] void should_provide_only_qualified_persistent_stores() => Code("TotalStoreConfiguration").ShouldContain("return new JpaReadModelStore<>(factory, mapper, \"axonviews.views.counters.totals.Total\", Total.class)");
     [Fact] void should_depend_on_generation_admission() => Code("TotalStoreConfiguration").ShouldContain("PersistentViewConfiguration generation");
     [Fact] void should_pin_pooled_processing() => Code("PersistentViewConfiguration").ShouldContain("EventProcessorDefinition.pooledStreamingMatching(");
     [Fact] void should_pin_propagating_errors() => Code("PersistentViewConfiguration").ShouldContain("config.errorHandler(PropagatingErrorHandler.INSTANCE)");
-    [Fact] void should_preserve_immediate_memory_notifications() => Code("TotalProjectionProjector").ShouldContain("if (!(store instanceof JpaReadModelStore<?>))");
+    [Fact] void should_stage_memory_writes_until_commit() => Code("TotalProjectionProjector").ShouldContain("ReadModelTransaction.bind(store, context)");
     [Fact] void should_refuse_async_writes() => Code("JpaReadModelStore").ShouldContain("Thread.currentThread() != handlerThread");
     [Fact] void should_test_async_refusal() => Code("TotalPersistentStoreTest").ShouldContain("CompletableFuture.runAsync(() -> bound.put(key, value))");
     [Fact] void should_refuse_contextless_writes() => Code("JpaReadModelStore").ShouldContain("if (context == null) throw new IllegalStateException");
@@ -85,6 +86,9 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_source_the_same_tag_before_appending() => Code("TotalPersistentSupport").ShouldContain("eventStore.transaction(context).source(SourcingCondition.conditionFor(EventCriteria.havingTags(tag(event))))");
     [Fact] void should_consume_the_source_in_the_append_unit_of_work() => Code("TotalPersistentSupport").ShouldContain(".reduce(0, (count, entry) -> count + 1).thenApply(count -> {");
     [Fact] void should_emit_modeled_primary_tags() => Code("TotalPersistentFixture").ShouldContain("tagged.eventSourceId().toString()");
+    [Fact] void should_use_the_module_event_tag_constant() => Code("TotalPersistentFixture").ShouldContain("return new Tag(EventTags.EVENT_SOURCE_ID, tagged.eventSourceId().toString())");
+    [Fact] void should_import_the_module_event_tags() => Code("TotalPersistentFixture").ShouldContain(".EventTags;");
+    [Fact] void should_not_emit_the_literal_tag_key() => Code("TotalPersistentFixture").ShouldNotContain("new Tag(\"eventSourceId\"");
     [Fact] void should_read_sequences_without_writing() => Code("TotalPersistentFixture").ShouldContain("connection.setReadOnly(true)");
     [Fact] void should_require_contiguous_aggregate_sequences() => Code("TotalPersistentFixture").ShouldContain("FIXTURE: C1 aggregate sequences must be exactly 0..n-1");
     [Fact]
