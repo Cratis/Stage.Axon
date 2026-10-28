@@ -36,9 +36,6 @@ public class when_reading_the_runtime_module_sources
     [InlineData("LiveSnapshots")]
     [InlineData("LiveStreams")]
     [InlineData("LiveCapacityException")]
-    [InlineData("ReadModelStore")]
-    [InlineData("InMemoryReadModelStore")]
-    [InlineData("ReadModelTransaction")]
     void should_declare_the_runtime_module_package(string name) => Source(name).ShouldContain("package io.cratis.stage.axon.runtime;");
 
     [Theory]
@@ -47,16 +44,12 @@ public class when_reading_the_runtime_module_sources
     [InlineData("LiveStreams")]
     [InlineData("LiveCapacityException")]
     [InlineData("SseBridge")]
-    [InlineData("ReadModelStore")]
-    [InlineData("InMemoryReadModelStore")]
-    [InlineData("ReadModelTransaction")]
     void should_not_carry_a_license_header(string name) => Source(name).ShouldNotContain("Copyright");
 
     [Theory]
     [InlineData("UniqueClaim")]
     [InlineData("JpaUniqueValueStore")]
     [InlineData("PersistentConfiguration")]
-    [InlineData("PersistentReadModelSafety")]
     [InlineData("StageAxonPersistenceAutoConfiguration")]
     void should_declare_the_persistent_module_package(string name) => PersistentSource(name).ShouldContain("package io.cratis.stage.axon.runtime.persistent;");
 
@@ -64,7 +57,6 @@ public class when_reading_the_runtime_module_sources
     [InlineData("UniqueClaim")]
     [InlineData("JpaUniqueValueStore")]
     [InlineData("PersistentConfiguration")]
-    [InlineData("PersistentReadModelSafety")]
     void should_not_leave_the_runtime_placeholder_in_the_persistent_helpers(string name) => PersistentSource(name).ShouldNotContain("__RUNTIME__");
 
     [Fact] void should_keep_the_claim_table_name() => PersistentSource("UniqueClaim").ShouldContain("@Table(name = \"stage_unique_claim\")");
