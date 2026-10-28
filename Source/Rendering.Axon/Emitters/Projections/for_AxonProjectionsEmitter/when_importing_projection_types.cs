@@ -48,7 +48,7 @@ public class when_importing_projection_types : given.a_view_request
     [Fact] void should_use_short_reducer_bean_annotations() => _configuration.ShouldContain("@Bean(\"axonviews.reduction.counters.rebuilt.RebuiltTotalReducer\")");
     [Fact] void should_import_a_colliding_application_record() => _collidingProjector.ShouldContain("import axonviews.types.List;");
     [Fact] void should_not_import_the_colliding_framework_type() => _collidingProjector.ShouldNotContain("import java.util.List;");
-    [Fact] void should_keep_framework_collections_qualified() => _collidingProjector.ShouldContain("private final java.util.List<BooleanSupplier> pending");
+    [Fact] void should_keep_framework_collections_qualified() => _collidingProjector.ShouldContain("private final java.util.List<Predicate<ReadModelStore<Object, Board>>> pending");
     [Fact] void should_keep_application_children_short() => _collidingProjector.ShouldContain("new ArrayList<List>()");
     [Fact] void should_keep_nested_collection_types_unambiguous() => _collidingModel.ShouldContain("java.util.List<List> cards");
 }
