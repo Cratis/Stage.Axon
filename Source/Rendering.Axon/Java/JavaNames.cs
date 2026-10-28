@@ -9,6 +9,8 @@ internal static class JavaNames
         "abstract assert boolean break byte case catch char class const continue default do double else enum extends final finally float for goto if implements import instanceof int interface long native new package private protected public return short static strictfp super switch synchronized this throw throws transient try void volatile while true false null _ exports module open opens provides requires to transitive uses with record sealed permits var yield when".Split(' '),
         StringComparer.Ordinal);
 
+    static readonly HashSet<string> _objectMembers = new("getClass hashCode equals toString clone finalize notify notifyAll wait".Split(' '), StringComparer.Ordinal);
+
     internal static string Type(string name)
     {
         var words = new string([.. name.Select(character => char.IsAsciiLetterOrDigit(character) ? character : ' ')])
@@ -22,6 +24,8 @@ internal static class JavaNames
         return Protect(char.ToLowerInvariant(type[0]) + type[1..]);
     }
 
+    internal static bool RenamesObjectMember(string name) => _objectMembers.Contains(Member(name).TrimEnd('_'));
+
     internal static string PackageSegment(string name) => Protect(
         new string([.. name.ToLowerInvariant().Where(char.IsAsciiLetterOrDigit)]));
 
@@ -29,6 +33,6 @@ internal static class JavaNames
     {
         if (name.Length == 0) return "generated";
         if (char.IsAsciiDigit(name[0])) name = "_" + name;
-        return _reserved.Contains(name) ? name + "_" : name;
+        return _reserved.Contains(name) || _objectMembers.Contains(name) ? name + "_" : name;
     }
 }

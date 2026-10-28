@@ -14,6 +14,7 @@ internal static partial class AxonNamesInput
 {
     internal const string Name = "axon-names";
 
+    static readonly string[] _jdkRoots = ["java", "javax", "jdk", "sun", "com.sun"];
     static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -70,9 +71,15 @@ internal static partial class AxonNamesInput
 
     internal static bool ValidArtifactId(string artifactId) => ArtifactIds.IsMatch(artifactId);
 
-    internal static string BasePackage(ArtifactRenderRequest request) =>
-        TryRead(request.Profile, out var names) && names?.JavaPackage is { } package && ValidPackage(package)
-            ? package : JavaNames.PackageSegment(request.Model.Application.Name);
+    internal static string BasePackage(ArtifactRenderRequest request, Action<string, string>? renamed = null)
+    {
+        var package = TryRead(request.Profile, out var names) && names?.JavaPackage is { } configured && ValidPackage(configured)
+            ? configured : JavaNames.PackageSegment(request.Model.Application.Name);
+        if (!_jdkRoots.Any(root => package == root || package.StartsWith(root + ".", StringComparison.Ordinal))) return package;
+        var prefixed = "generated." + package;
+        renamed?.Invoke(package, prefixed);
+        return prefixed;
+    }
 
     internal static string ArtifactId(ArtifactRenderRequest request, string basePackage) =>
         TryRead(request.Profile, out var names) && names?.ProjectName is { } projectName && ValidArtifactId(projectName)

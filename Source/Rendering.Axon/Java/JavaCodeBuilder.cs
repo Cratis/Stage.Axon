@@ -57,8 +57,7 @@ internal sealed partial class JavaCodeBuilder(string package)
     /// </summary>
     internal JavaCodeBuilder Import(string type)
     {
-        Claim(SimpleName(type), type);
-        _imports.Add(type);
+        Reference(type);
         return this;
     }
 
@@ -68,7 +67,8 @@ internal sealed partial class JavaCodeBuilder(string package)
     /// </summary>
     internal JavaCodeBuilder Declare(string simpleName)
     {
-        Claim(simpleName, LocalType);
+        if (_simpleNames.TryGetValue(simpleName, out var owner)) _imports.Remove(owner);
+        _simpleNames[simpleName] = LocalType;
         return this;
     }
 
@@ -149,11 +149,4 @@ internal sealed partial class JavaCodeBuilder(string package)
         qualifiedName.StartsWith("java.lang.", StringComparison.Ordinal) && qualifiedName.IndexOf('.', "java.lang.".Length) < 0;
 
     static string CommentText(string text) => text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace('\r', ' ').Replace('\n', ' ');
-
-    void Claim(string simpleName, string owner)
-    {
-        if (_simpleNames.TryGetValue(simpleName, out var existing) && existing != owner) throw new SimpleNameAlreadyClaimed(simpleName, existing);
-
-        _simpleNames[simpleName] = owner;
-    }
 }

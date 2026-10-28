@@ -37,7 +37,7 @@ public class when_mapping_event_context : given.a_flat_view
     [Fact] void should_keep_scoped_views_refused() => PersistentViewAdmission.Supports(_contexts["occurred"], ReadModelId("Board")).ShouldBeFalse();
     [Fact] void should_use_the_delivered_timestamp() => Projector.ShouldContain("message.timestamp()");
     [Fact] void should_warn_for_every_context_path_without_crashing() => _contexts.Values.ShouldEachConformTo(context => Code(context, "TotalStoreConfiguration").Contains("STAGE-AXON-0308", StringComparison.Ordinal));
-    [Fact] void should_report_the_warning() => _contexts.Values.ShouldEachConformTo(context => context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == ReadModelId("Total") && diagnostic.Code == "STAGE-AXON-0308"));
+    [Fact] void should_report_the_warning() => _contexts.Values.ShouldEachConformTo(context => context.Degradation.UnsupportedConstructs.Concat(context.Degradation.Warnings).Any(diagnostic => diagnostic.Artifact == ReadModelId("Total") && diagnostic.Code == "STAGE-AXON-0308"));
     [Fact] void should_keep_the_memory_store() => _contexts.Values.ShouldEachConformTo(context => Code(context, "TotalStoreConfiguration").Contains("InMemoryReadModelStore", StringComparison.Ordinal));
     [Fact] void should_not_emit_persistent_proofs_for_unsupported_context() => _contexts.Where(pair => pair.Key == "sequenceNumber").ShouldEachConformTo(pair => !pair.Value.Artifacts.Exists(artifact => artifact.RelativePath.Contains("/TotalPersistent", StringComparison.Ordinal)));
     [Fact] void should_not_guard_an_admitted_persistent_view() => Code(_contexts["occurred"], "TotalStoreConfiguration").ShouldNotContain("persistentReadModelSafety");

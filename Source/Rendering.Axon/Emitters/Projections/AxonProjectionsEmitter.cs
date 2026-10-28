@@ -27,7 +27,16 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             foreach (var projection in located.Slice.Projections)
             {
                 var model = located.Slice.ReadModels.FirstOrDefault(candidate => candidate.Id == projection.ReadModel);
-                if (model is null) continue;
+                if (model is null)
+                {
+                    const string reason = "read model outside slice";
+                    context.Degradation.Unsupported(AxonRefusalCodes.ProjectionMapping, projection.Id, reason);
+                    var stub = new JavaCodeBuilder(package).DiffersFromScreenplay(reason)
+                        .UnsupportedIntent("project events", projection.Id.ToString(), AxonRefusalCodes.ProjectionMapping)
+                        .Block($"public class {JavaNames.Type(projection.Name)}Projector", _ => { });
+                    context.AddJava(package, JavaNames.Type(projection.Name) + "Projector", stub.Build());
+                    continue;
+                }
                 EmitProjector(context, types, package, projection, model);
                 namespaces.Add(package);
             }
@@ -77,7 +86,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var reason = PersistentViewAdmission.RefusalReason(context, model.Id);
         if (reason is null)
         {
-            context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default-profile read-model rows are volatile; durable checkpoints may skip prior events after restart. The persistent profile stores this read model durably, with generation checks and processor-bound transactions.");
+            context.Degradation.Warn(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default-profile read-model rows are volatile; durable checkpoints may skip prior events after restart. The persistent profile stores this read model durably, with generation checks and processor-bound transactions.");
             PersistentProjectionStore.Emit(context, types, package, model);
             return;
         }

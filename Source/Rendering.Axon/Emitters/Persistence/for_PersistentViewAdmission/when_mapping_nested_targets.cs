@@ -45,7 +45,7 @@ public class when_mapping_nested_targets : given.a_flat_view
 
     [Fact] void should_admit_root_nested_targets() => PersistentViewAdmission.Supports(_context, ReadModelId("Board")).ShouldBeTrue();
     [Fact] void should_warn_without_crashing() => Code(_context, "BoardStoreConfiguration").ShouldContain("STAGE-AXON-0308");
-    [Fact] void should_report_the_warning() => _context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == ReadModelId("Board") && diagnostic.Code == "STAGE-AXON-0308").ShouldBeTrue();
+    [Fact] void should_report_the_warning() => _context.Degradation.Warnings.Any(diagnostic => diagnostic.Artifact == ReadModelId("Board") && diagnostic.Code == "STAGE-AXON-0308").ShouldBeTrue();
     [Fact] void should_keep_the_memory_store() => Code(_context, "BoardStoreConfiguration").ShouldContain("InMemoryReadModelStore");
     [Fact] void should_not_emit_persistent_proofs() => _context.Artifacts.Exists(artifact => artifact.RelativePath.Contains("/BoardPersistent", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_resolve_the_leaf_property() => _records.Property(_board.Properties, [_details, _note])!.Id.ShouldEqual(_note);

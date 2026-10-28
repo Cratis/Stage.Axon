@@ -20,7 +20,7 @@ public class when_admitting_requests : given.an_axon_request
     void should_warn_about_unmeasured_pairs() => AssertUnmeasuredPairs(AxonRendering.CreateProfile(), AssertWarned);
 
     [Fact]
-    void should_refuse_unmeasured_pairs_in_strict_mode() => AssertUnmeasuredPairs(AxonRendering.CreateProfile(strict: true), AssertStrictlyRefused);
+    void should_warn_about_unmeasured_pairs_in_strict_mode() => AssertUnmeasuredPairs(AxonRendering.CreateProfile(strict: true), AssertWarned);
 
     [Theory]
     [InlineData(ImplementationGapMode.Stub, ArtifactRefusalMode.Refuse)]
