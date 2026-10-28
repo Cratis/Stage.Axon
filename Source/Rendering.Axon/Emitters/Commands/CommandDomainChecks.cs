@@ -16,6 +16,8 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 /// <param name="types">The Java type mapper.</param>
 internal sealed class CommandDomainChecks(AxonEmissionContext context, SemanticCommand command, CommandJavaTypes types)
 {
+    bool HasRules => !command.Validations.IsEmpty || !command.Requirements.IsEmpty || !command.CodeValidations.IsEmpty || HasConceptRules;
+
     bool HasConceptRules => command.Properties.Any(property => property.Type.Kind == SemanticTypeReferenceKind.Concept && !Concept(property).Validations.IsEmpty);
 
     internal void Claim(JavaCodeBuilder builder)
@@ -32,17 +34,20 @@ internal sealed class CommandDomainChecks(AxonEmissionContext context, SemanticC
     /// <returns><c>true</c> when the body may continue; otherwise <c>false</c>.</returns>
     internal bool Emit(JavaCodeBuilder builder)
     {
-        if (command.Validations.IsEmpty && command.Requirements.IsEmpty && command.CodeValidations.IsEmpty && !HasConceptRules) return true;
+        if (!HasRules) return true;
         var failures = builder.Reference("java.util.ArrayList");
         builder.Line($"var failures = new {failures}<{builder.Reference("java.lang.String")}>();");
-        if (!RenderPropertyRules(builder) || !RenderConceptRules(builder) || !RenderRequirements(builder)) return false;
-        if (!command.CodeValidations.IsEmpty)
-        {
-            Unsupported(builder, "run attached command validation code");
-            return false;
-        }
+        if (!RenderRules(builder)) return false;
         builder.Line($"if (!failures.isEmpty()) throw new {builder.Reference("java.lang.IllegalArgumentException")}({builder.Reference("java.lang.String")}.join(\"; \", failures));");
         return true;
+    }
+
+    bool RenderRules(JavaCodeBuilder builder)
+    {
+        if (!RenderPropertyRules(builder) || !RenderConceptRules(builder) || !RenderRequirements(builder)) return false;
+        if (command.CodeValidations.IsEmpty) return true;
+        Unsupported(builder, "run attached command validation code");
+        return false;
     }
 
     SemanticConcept Concept(SemanticProperty property) => context.Request.Model.Application.Concepts.Single(concept => concept.Id == property.Type.Target);

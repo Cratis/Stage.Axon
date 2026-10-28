@@ -78,12 +78,14 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             });
     }
 
+    string SubjectParameter(JavaCodeBuilder code) => !CommandAppends.UsesSubject(command) ? string.Empty : $", @{code.Reference("org.axonframework.messaging.core.annotation.MetadataValue")}(\"username\") {code.Reference("java.lang.String")} username";
+
     string Parameters(string name, JavaCodeBuilder code, string package)
     {
         var appender = command.Handler is not null && Constrained ? "unconstrainedAppender" : "appender";
         var parameters = name + $" command, {code.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} {appender}";
         if (Constrained && source?.Generated != true) parameters += $", {code.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
-        if (CommandAppends.UsesSubject(command)) parameters += $", @{code.Reference("org.axonframework.messaging.core.annotation.MetadataValue")}(\"username\") {code.Reference("java.lang.String")} username";
+        parameters += SubjectParameter(code);
         if (source is null) return parameters;
         if (source.Generated) return parameters + $", {code.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
         var selector = source.TagKey == source.Member ? "(idProperty = " + source.ReferenceTag(code, package) + ")" : string.Empty;
@@ -115,25 +117,21 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         if (response.ReturnType != "void") body.Line("return " + body.ReferenceExpression(response.Value!) + ";");
     }
 
+    bool ResolveNative(JavaCodeBuilder body, SemanticCommandHandler handler, out string content)
+    {
+        content = string.Empty;
+        var slot = new InlineBodySlot(handler.RequirementId, SemanticImplementationRole.CommandHandler, command.Id);
+        if (handler.ResultVersion != 1) return Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation with an unsupported result revision");
+        if (!InlineJavaBodies.TryResolve(context, slot, out var resolved, out var reason)) return Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation: " + reason);
+        content = resolved;
+        if (!Constrained || !_forbiddenAppenderTokens.Any(token => resolved.Contains(token, StringComparison.Ordinal))) return true;
+        Unsupported(body, AxonRefusalCodes.Constraint, "enforce modeled uniqueness for every event a native command body appends");
+        return false;
+    }
+
     void HandleNative(JavaCodeBuilder body, SemanticCommandHandler handler, string package, CommandResponses response)
     {
-        var slot = new InlineBodySlot(handler.RequirementId, SemanticImplementationRole.CommandHandler, command.Id);
-        if (handler.ResultVersion != 1)
-        {
-            Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation with an unsupported result revision");
-            return;
-        }
-        if (!InlineJavaBodies.TryResolve(context, slot, out var content, out var reason))
-        {
-            Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation: " + reason);
-            return;
-        }
-        if (Constrained && _forbiddenAppenderTokens.Any(token => content.Contains(token, StringComparison.Ordinal)))
-        {
-            Unsupported(body, AxonRefusalCodes.Constraint, "enforce modeled uniqueness for every event a native command body appends");
-            return;
-        }
-        if (!Validate(body)) return;
+        if (!ResolveNative(body, handler, out var content) || !Validate(body)) return;
         foreach (var produced in command.Produces) AxonEventsEmitter.TypeFor(context, CommandAppends.Contract(context, produced.EventContract).Id, body, package);
         if (Constrained)
         {
