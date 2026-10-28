@@ -34,7 +34,7 @@ public class when_emitting_row_sequencing : Persistence.for_PersistentViewAdmiss
         code.ShouldContain("return Optional.of(String.valueOf(event.counterId().value()));");
     }
     [Fact] void should_leave_stateful_projectors_without_a_policy() => Code(_context, "BoardProjectionProjector").ShouldNotContain("@SequencingPolicy");
-    [Fact] void should_leave_refused_composite_projectors_without_a_policy() => Code(_context, "MetricProjectionProjector").ShouldNotContain("@SequencingPolicy");
+    [Fact] void should_route_admitted_part_key_removals() => Code(_context, "MetricProjectionProjector").ShouldContain("@SequencingPolicy(type = MetricRemovedSequence.class)");
     [Fact] void should_route_the_rollback_witness_like_the_projector() => Code(_context, "TotalPersistentSupport").ShouldContain("@SequencingPolicy(type = TotalProjectionProjector.IncreasedSequence.class)");
 
     [Fact]

@@ -15,7 +15,7 @@ internal static class PersistentProjectionStore
         var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration");
         var store = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
         var memory = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"));
-        var persistent = code.Reference(types.BasePackage + ".persistence.JpaReadModelStore");
+        var persistent = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "views.JpaReadModelStore"));
         var bootstrap = code.Reference(types.BasePackage + ".persistence.PersistentViewConfiguration");
         var qualifier = JavaCodeBuilder.StringLiteral(package + "." + name);
         code.DiffersFromScreenplay("Default-profile read-model rows are volatile. The persistent profile stores this read model durably (STAGE-AXON-0308).")

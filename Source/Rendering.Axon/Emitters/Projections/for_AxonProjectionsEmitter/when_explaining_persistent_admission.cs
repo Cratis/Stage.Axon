@@ -25,8 +25,8 @@ public class when_explaining_persistent_admission : given.a_view_request
     [Fact] void should_explain_reducer_store_admission() => Code("RebuiltTotalStoreConfiguration").ShouldContain("stores this read model durably");
     [Fact] void should_explain_persistent_scope_refusal() => Message("Board").ShouldContain("Persistent startup refuses this read model because");
     [Fact] void should_name_the_stateful_scope() => Message("Board").ShouldContain("stateful scope");
-    [Fact] void should_name_the_composite_key() => Message("Metric").ShouldContain("composite");
-    [Fact] void should_also_name_row_removal() => Message("Metric").ShouldContain("removes rows");
+    [Fact] void should_admit_the_part_key() => Message("Metric").ShouldContain("stores this read model durably");
+    [Fact] void should_keep_stateful_row_removal_refused() => Message("Board").ShouldContain("removes rows");
     [Fact] void should_put_the_reason_in_the_refused_store_comment() => Code("BoardStoreConfiguration").ShouldContain("stateful scope");
 
     string Message(string name) => _context.Degradation.UnsupportedConstructs.Single(diagnostic => diagnostic.Artifact == ReadModelId(name) && diagnostic.Code == "STAGE-AXON-0308").Message;

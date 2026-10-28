@@ -16,27 +16,33 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
     {
         var name = JavaNames.Type(projection.Name) + "Projector";
         var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type);
-        var policies = new ProjectionPolicyNames(context.Request.Model.Application, ProjectionTransitions.From(projection).Select(from => from.EventContract));
+        var removals = projection.Scope?.Removals ?? [];
+        var contracts = ProjectionTransitions.From(projection).Select(from => from.EventContract).Concat(removals.Select(removal => removal.EventContract)).Distinct().ToArray();
+        var policies = new ProjectionPolicyNames(context.Request.Model.Application, contracts);
         policies.Declare(code);
         foreach (var property in model.Properties) types.ClaimProjectionType(property.Type, code);
         new ProjectionUpdates(context, types, model.Id).Claim(code, package);
-        foreach (var from in ProjectionTransitions.From(projection)) types.EventType(from.EventContract, code);
+        foreach (var contract in contracts) types.EventType(contract, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
             .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
             .Block($"public class {name}", body =>
             {
                 Fields(body, name);
-                foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
+                foreach (var contract in contracts)
                 {
-                    var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(candidate => candidate.Id == group.Key);
+                    var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(candidate => candidate.Id == contract);
+                    var from = ProjectionTransitions.From(projection).Where(from => from.EventContract == contract).ToArray();
+                    var removed = removals.Where(removal => removal.EventContract == contract).ToArray();
                     var values = new ProjectionValues(context, types, body);
-                    var keys = group.Count() < 2 ? [] : ProjectionHandlerBinding.PreReserved([.. group.Select(from => values.Key(from.Key, @event))]);
-                    new ProjectionHandlerBinding(context, types, model, package, keys: keys, sequence: new ProjectionSequencing(context, types, model).Projection(group, body, policies)).Emit(
+                    var rowKeys = from.Select(transition => transition.Key).Concat(removed.Select(removal => removal.Key)).ToArray();
+                    var keys = rowKeys.Length < 2 ? [] : ProjectionHandlerBinding.PreReserved([.. rowKeys.Select(key => values.Key(key, @event))]);
+                    new ProjectionHandlerBinding(context, types, model, package, keys: keys, sequence: new ProjectionSequencing(context, types, model).ForKeys(contract, rowKeys, body, policies)).Emit(
                     body,
-                    types.EventType(group.Key, body),
+                    types.EventType(contract, body),
                     method =>
                     {
-                        foreach (var from in group) From(method, @event, from);
+                        foreach (var transition in from) From(method, @event, transition);
+                        foreach (var removal in removed) method.Line($"store.remove({values.Key(removal.Key, @event)});");
                     },
                     message: true);
                 }

@@ -1,6 +1,7 @@
 package __RUNTIME__;
 
 import io.cratis.stage.axon.runtime.ReadModelStore;
+import io.cratis.stage.axon.runtime.views.JpaReadModelStore;
 import io.cratis.stage.axon.runtime.UniqueValueConflict;
 import io.cratis.stage.axon.runtime.UniqueValueStore;
 import io.cratis.stage.axon.runtime.persistent.JpaUniqueValueStore;
@@ -118,7 +119,7 @@ class PersistentRestartProbe {
         assertInstanceOf(JpaUniqueValueStore.class, application.getBean(UniqueValueStore.class));
         var views = application.getBeansOfType(ReadModelStore.class);
         if (!Boolean.getBoolean("stage.expectViews")) assertTrue(views.isEmpty(), "Viewless fixture must remain viewless");
-        views.forEach((name, store) -> assertTrue(store.getClass().getName().endsWith(".persistence.JpaReadModelStore"),
+        views.forEach((name, store) -> assertTrue(store instanceof JpaReadModelStore<?>,
                 "Persistent view must not fall back to memory: " + name));
         assertTrue(application.getBeansOfType(PersistentReadModelSafety.class).isEmpty());
     }

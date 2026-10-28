@@ -13,7 +13,6 @@ public class when_emitting_short_persistence_names : Projections.for_AxonProject
 {
     AxonEmissionContext _context;
     string _configuration;
-    string _bootstrap;
     string _store;
 
     void Because()
@@ -23,7 +22,6 @@ public class when_emitting_short_persistence_names : Projections.for_AxonProject
         new AxonQueriesEmitter().Emit(_context);
         new AxonPersistenceEmitter().Emit(_context);
         _configuration = Code("PersistentViewConfiguration");
-        _bootstrap = Code("PersistentViewBootstrap");
         _store = Code("TotalPersistentStoreTest");
     }
 
@@ -41,8 +39,6 @@ public class when_emitting_short_persistence_names : Projections.for_AxonProject
     [Fact] void should_keep_the_spring_configuration_import() => _configuration.ShouldContain("import org.springframework.context.annotation.Configuration;");
     [Fact] void should_not_import_the_axon_configuration() => _configuration.ShouldNotContain("import org.axonframework.common.configuration.Configuration;");
     [Fact] void should_not_qualify_the_framework_types_in_the_body() => _configuration.ShouldNotContain("@org.springframework.context.annotation.Bean");
-    [Fact] void should_import_stream_in_the_bootstrap() => _bootstrap.ShouldContain("import java.util.stream.Stream;");
-    [Fact] void should_use_the_short_stream_in_the_bootstrap() => _bootstrap.ShouldContain("return Stream.of(AggregateEventEntry.class");
 
     [Fact] void should_import_mockito_in_the_store_proof() => _store.ShouldContain("import org.mockito.Mockito;");
     [Fact] void should_use_short_mockito_in_the_store_proof() => _store.ShouldContain("JpaReadModelStore.bind(left, Mockito.mock(ProcessingContext.class))");

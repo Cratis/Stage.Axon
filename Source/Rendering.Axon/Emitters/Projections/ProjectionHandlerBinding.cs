@@ -82,7 +82,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
     {
         if (scopeState is not null && PersistentViewAdmission.Supports(context, model.Id))
             throw new InvalidOperationException($"Scoped projector state is not staged for persistent-admitted model {model.Id}.");
-        var adapter = PersistentViewAdmission.Supports(context, model.Id) ? method.Reference(types.BasePackage + ".persistence.JpaReadModelStore") : null;
+        var adapter = PersistentViewAdmission.Supports(context, model.Id) ? method.Reference(AxonRuntimePackage.Type(types.BasePackage, "views.JpaReadModelStore")) : null;
         var transaction = method.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelTransaction"));
 
         // The context-bound emitter already defers in-memory invalidations to AFTER_COMMIT, after the staged writes apply.
