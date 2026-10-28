@@ -120,7 +120,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
     {
         var contract = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Id == given.EventContract);
         var tag = AxonEventSources.PrimaryTag(context, contract);
-        if (tag.JavaType != AxonRuntimePackage.Type(types.BasePackage, "EventSourceId")) return null;
+        if (tag.JavaType != AxonEventSources.FallbackType(types.BasePackage)) return null;
         if (contract.Properties.Any(property => JavaNames.Member(property.Name) == tag.ComponentName)) return null;
         var from = transitions.Where(from => from.EventContract == given.EventContract).ToArray();
         if (from.Length != 1) return null;
