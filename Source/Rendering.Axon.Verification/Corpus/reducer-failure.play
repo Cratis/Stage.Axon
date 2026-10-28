@@ -11,7 +11,7 @@ module Accounts
       command RecordCount
         id CounterId identifier
         amount Int
-        produces CountRecorded for id
+        produces CountRecorded
           id = id
           amount = amount
       event CountRecorded
@@ -21,7 +21,7 @@ module Accounts
     slice StateChange Delete
       command DeleteCounter
         id CounterId identifier
-        produces CounterDeleted for id
+        produces CounterDeleted
           id = id
       event CounterDeleted
         id CounterId
