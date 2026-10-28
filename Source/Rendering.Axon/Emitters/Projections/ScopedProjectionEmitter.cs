@@ -84,10 +84,11 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
         // The scope state is one immutable snapshot, staged through its own store so a rolled back unit of work leaves none of it behind.
         code.Line($"private final {code.Reference(types.BasePackage + ".runtime.ReadModelStore")}<{code.Reference("java.lang.Object")}, {state}> scope = new {code.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore")}<>();")
             .Line($"private {state} applied;")
+            .Line("private boolean clean;")
             .Line($"private record {state}({components}) {{}}")
             .Block($"private void restore({state} state)", method =>
             {
-                method.Line("if (state == applied) return;").Line("keys.clear();").Line("pending.clear();");
+                method.Line("if (clean && state == applied) return;").Line("keys.clear();").Line("pending.clear();");
                 foreach (var cache in caches) method.Line($"{cache.Name}.clear();");
                 method.Block("if (state != null)", restored =>
                 {
@@ -95,7 +96,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
                     foreach (var cache in caches) restored.Line($"{cache.Name}.putAll(state.{cache.Name}());");
                 }).Line("applied = state;");
             })
-            .Block($"private {state} snapshot()", method => method.Line($"return applied = new {state}({string.Join(", ", new[] { $"{list}.copyOf(keys)", $"{list}.copyOf(pending)" }.Concat(caches.Select(cache => $"{code.Reference("java.util.Map")}.copyOf({cache.Name})")))});"));
+            .Block($"private {state} snapshot()", method => method.Line("clean = true;").Line($"return applied = new {state}({string.Join(", ", new[] { $"{list}.copyOf(keys)", $"{list}.copyOf(pending)" }.Concat(caches.Select(cache => $"{code.Reference("java.util.Map")}.copyOf({cache.Name})")))});"));
     }
 
     void Handler(JavaCodeBuilder code, SemanticEventContract @event, ProjectionScopeMethods methods)
@@ -110,7 +111,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             body =>
             {
                 // The fields are dirty until snapshot() completes, so a failure part-way through forces the next unit of work to restore.
-                body.Line("restore(scope.get(\"scope\").orElse(null));").Line("applied = null;");
+                body.Line("restore(scope.get(\"scope\").orElse(null));").Line("clean = false;");
                 foreach (var node in _root.All) methods.Caches(body, node, @event);
                 var deferred = _root.All.Any(node => node.Identity is not null && (node.Scope.From.Any(from => from.EventContract == @event.Id) || node.Scope.Removals.Any(removal => removal.EventContract == @event.Id)));
                 body.Line($"boolean modified = {method}(event, message, store);");

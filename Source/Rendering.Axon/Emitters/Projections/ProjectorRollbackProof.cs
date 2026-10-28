@@ -11,6 +11,7 @@ internal static class ProjectorRollbackProof
         import __RUNTIME__.InMemoryReadModelStore;
         import __RUNTIME__.ReadModelStore;
         import java.util.List;
+        import java.util.Optional;
         import java.util.Set;
         import java.util.concurrent.CompletableFuture;
         import java.util.concurrent.CountDownLatch;
@@ -18,6 +19,7 @@ internal static class ProjectorRollbackProof
         import java.util.concurrent.TimeUnit;
         import java.util.concurrent.TimeoutException;
         import java.util.function.Consumer;
+        import java.util.function.UnaryOperator;
         import org.axonframework.messaging.core.ApplicationContext;
         import org.axonframework.messaging.core.Message;
         import org.axonframework.messaging.core.annotation.AnnotationMessageTypeResolver;
@@ -40,6 +42,26 @@ internal static class ProjectorRollbackProof
             }
 
         __TESTS__
+            private static final class FailingStore<V> implements ReadModelStore<Object, V> {
+                private final ReadModelStore<Object, V> inner;
+                private volatile boolean armed;
+
+                FailingStore(ReadModelStore<Object, V> inner) {
+                    this.inner = inner;
+                }
+
+                private void check() {
+                    if (armed) throw new IllegalStateException("projection-failure-injected");
+                }
+
+                @Override public Optional<V> get(Object key) { check(); return inner.get(key); }
+                @Override public List<V> all() { check(); return inner.all(); }
+                @Override public void put(Object key, V value) { check(); inner.put(key, value); }
+                @Override public void remove(Object key) { check(); inner.remove(key); }
+                @Override public void clear() { check(); inner.clear(); }
+                @Override public V update(Object key, UnaryOperator<V> update) { check(); return inner.update(key, update); }
+            }
+
             private void rejectedInCommit(ProcessingContext context) {
                 context.runOnCommit(committing -> { throw new IllegalStateException("rollback-injected"); });
             }
@@ -89,6 +111,23 @@ internal static class ProjectorRollbackProof
         __COMMITTED__
                 Assertions.assertEquals(Set.copyOf(expected.all()), Set.copyOf(store.all()), "rolled-back events must leave no scope state behind");
         __SNAPSHOT__
+            }
+
+            @Test void __METHOD__AfterAFailedProjection() {
+                var expected = new InMemoryReadModelStore<Object, __MODEL__>();
+                var oracle = projector(expected);
+        __COMMITTED_REFERENCE__
+                var store = new FailingStore<__MODEL__>(new InMemoryReadModelStore<>());
+                var projector = projector(store);
+                store.armed = true;
+                Assertions.assertThrows(Exception.class, () -> run(context -> {
+        __ROLLED__
+                    rejectedInCommit(context);
+                }));
+                store.armed = false;
+                Assertions.assertTrue(store.all().isEmpty(), "A failed projection must leave no rows");
+        __COMMITTED__
+                Assertions.assertEquals(Set.copyOf(expected.all()), Set.copyOf(store.all()), "a projection that failed part-way must leave no scope state behind");
             }
 
         """;
