@@ -114,6 +114,8 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
         if (source.Kind == target.Kind && source.Target == target.Target && source.Primitive == target.Primitive && source.IsCollection == target.IsCollection)
             return path.Value.Code;
         var value = types.Unwrap(source, path.Value.Code);
+        if (!source.IsCollection && !target.IsCollection && types.PrimitiveOf(source) == SemanticPrimitiveType.WholeNumber && types.PrimitiveOf(target) == SemanticPrimitiveType.DecimalNumber)
+            value = $"{Reference("java.math.BigDecimal")}.valueOf({value})";
         var wrapped = types.Wrap(target, value);
         return source.IsOptional ? $"({path.Value.Code} == null ? null : {wrapped})" : wrapped;
     }

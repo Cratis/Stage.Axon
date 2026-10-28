@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text.RegularExpressions;
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Java;
@@ -9,6 +10,9 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Security;
 
 internal static class PoliciesConfiguration
 {
+    // A body that declares a local or pattern variable named like an emitted parameter would not compile; the body stays as written and the parameter moves.
+    internal static bool Declares(string body, string name) => Regex.IsMatch(JavaCodeMask.Blank(body), $@"(?:\bvar|\bfinal|[>\]]|\b(?!(?:return|new|throw|else|case|instanceof)\b)\w+)\s+{name}\b\s*(?:=(?!=)|;|:|\)|,|\?|&&)", RegexOptions.None, TimeSpan.FromSeconds(1));
+
     internal static void Emit(AxonEmissionContext context)
     {
         // Screenplay 4.250.0 forbids opaque policies under NOT; keep FAILED propagation defensive for every operator.
@@ -99,6 +103,8 @@ internal static class PoliciesConfiguration
     {
         // Bodies are trusted Java, not sandboxed. A separate compilation unit isolates lexical scope from the evaluator and sibling bodies.
         var name = PolicyPredicates.PolicyClass(policy);
+        var authentication = Declares(body, "authentication") ? "authenticationInput" : "authentication";
+        var claims = Declares(body, "claims") ? "claimsInput" : "claims";
         var code = $$"""
             package {{context.BasePackage}}.infrastructure;
 
@@ -106,7 +112,7 @@ internal static class PoliciesConfiguration
             import org.springframework.security.core.Authentication;
 
             public final class {{name}} {
-                public static boolean evaluate(Authentication authentication, Map<String, Object> claims) throws Exception {
+                public static boolean evaluate(Authentication {{authentication}}, Map<String, Object> {{claims}}) throws Exception {
             {{body}}
                 }
             }

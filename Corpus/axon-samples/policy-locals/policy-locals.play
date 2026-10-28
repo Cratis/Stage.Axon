@@ -1,0 +1,41 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+concept AccountId : Uuid
+
+policy IsFinanceStaff
+  ```java
+    var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+    var principal = authentication == null ? null : authentication.getPrincipal();
+    var department = principal instanceof java.util.Map<?, ?> claims ? claims.get("department") : null;
+    return department instanceof String value && value.startsWith("Finance");
+    ```
+
+module Accounts
+  feature Registry
+    slice StateChange Register
+      command RegisterAccount
+        id AccountId identifier
+        alias String
+        authorize IsFinanceStaff
+
+        produces AccountRegistered
+          for id
+          alias = alias
+
+      event AccountRegistered
+        alias String
+
+    slice StateView Active
+      readmodel ActiveAccounts
+        id AccountId
+        alias String
+
+      query AccountSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsFinanceStaff
+
+      projection ActiveAccountsProjection => ActiveAccounts
+        from AccountRegistered
+          id = $eventSourceId
+          alias = alias
