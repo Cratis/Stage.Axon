@@ -24,17 +24,18 @@ internal static class AxonViewEvents
         return identity is null ? given : given with { Values = [.. given.Values.Where(value => value.TargetProperty != identity.Id), new(identity.Id, given.EventSource.Value)] };
     }
 
-    internal static string Expression(AxonEmissionContext context, ViewJavaTypes types, SemanticSpecificationEvent given, JavaCodeBuilder? code = null)
+    internal static string Expression(AxonEmissionContext context, ViewJavaTypes types, SemanticSpecificationEvent given, JavaCodeBuilder? code = null, string? source = null)
     {
         var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == given.EventContract);
-        var source = given.EventSource?.Value is SemanticTextValue text ? JavaCodeBuilder.StringLiteral(text.Value) : "\"spec-source\"";
+        var identitySource = given.EventSource?.Value is SemanticTextValue text ? JavaCodeBuilder.StringLiteral(text.Value) : "\"spec-source\"";
         var primary = AxonEventSources.PrimaryTag(context, @event);
         var eventType = code is null ? types.EventType(given.EventContract) : types.EventType(given.EventContract, code);
         var arguments = @event.Properties.Select(property => given.Values.FirstOrDefault(value => value.TargetProperty == property.Id) is { } value
             ? Literal(types, code, value.Value, property.Type) : Default(types, code, property.Type)).ToList();
         if (!@event.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName))
         {
-            var identity = $"new {(code is null ? primary.JavaType : code.Reference(primary.JavaType))}({source})";
+            if (source is not null && primary.JavaType == AxonRuntimePackage.Type(types.BasePackage, "EventSourceId")) identitySource = source;
+            var identity = $"new {(code is null ? primary.JavaType : code.Reference(primary.JavaType))}({identitySource})";
             if (primary.JavaType != AxonRuntimePackage.Type(types.BasePackage, "EventSourceId") && given.EventSource is { } eventSource)
                 identity = Literal(types, code, eventSource.Value, eventSource.Type);
             arguments.Insert(0, identity);
