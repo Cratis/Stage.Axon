@@ -28,4 +28,12 @@ public class when_members_are_reserved_by_object
 
     [Fact]
     void should_leave_non_reserved_members_unchanged() => JavaNames.Member("value").ShouldEqual("value");
+
+    [Theory]
+    [InlineData("wait")]
+    [InlineData("clone")]
+    [InlineData("equals")]
+    [InlineData("notify")]
+    [InlineData("finalize")]
+    void should_leave_package_segments_with_object_member_names_unchanged(string name) => JavaNames.PackageSegment(name).ShouldEqual(name);
 }

@@ -21,7 +21,8 @@ internal static class JavaNames
     internal static string Member(string name)
     {
         var type = Type(name);
-        return Protect(char.ToLowerInvariant(type[0]) + type[1..]);
+        var member = Protect(char.ToLowerInvariant(type[0]) + type[1..]);
+        return _objectMembers.Contains(member) ? member + "_" : member;
     }
 
     internal static bool RenamesObjectMember(string name) => _objectMembers.Contains(Member(name).TrimEnd('_'));
@@ -33,6 +34,6 @@ internal static class JavaNames
     {
         if (name.Length == 0) return "generated";
         if (char.IsAsciiDigit(name[0])) name = "_" + name;
-        return _reserved.Contains(name) || _objectMembers.Contains(name) ? name + "_" : name;
+        return _reserved.Contains(name) ? name + "_" : name;
     }
 }
