@@ -54,5 +54,8 @@ public class when_persisting_a_reducer_only_model : given.a_flat_view
     [Fact] void should_emit_persistent_proofs_for_placed_reducers() => _placed.Artifacts.Exists(artifact => artifact.RelativePath.Contains("/RebuiltTotalPersistent", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_not_emit_a_proof_for_unplaced_reducers() => _unplaced.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("RebuiltTotalPersistentTest.java", StringComparison.Ordinal)).ShouldBeFalse();
 
+    [Fact] void should_explain_unplaced_reducer_refusal() => Code(_unplaced, "RebuiltTotalStoreConfiguration").ShouldContain("reducer is not fully placed");
+    [Fact] void should_explain_mixed_writer_refusal() => Code(_mixed, "RebuiltTotalStoreConfiguration").ShouldContain("both a projection and a reducer");
+
     string Projector => Code(_placed, "RebuiltTotalReducerProjector");
 }

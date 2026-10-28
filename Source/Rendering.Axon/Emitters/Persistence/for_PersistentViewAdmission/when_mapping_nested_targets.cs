@@ -55,4 +55,5 @@ public class when_mapping_nested_targets : given.a_flat_view
     [Fact] void should_default_optional_composites() => Code(_context, "BoardProjectionProjector").ShouldContain("state.details() == null ? new BoardDetails(");
     [Fact] void should_not_stage_pending_scoped_writes() => Code(_context, "BoardProjectionProjector").ShouldNotContain("pending");
     [Fact] void should_keep_an_unadmitted_collection_scope_guarded() => Code(Render(slice => slice), "BoardStoreConfiguration").ShouldContain("STAGE-AXON-0308");
+    [Fact] void should_explain_the_unadmitted_stateful_scope() => Code(Render(slice => slice), "BoardStoreConfiguration").ShouldContain("stateful scope");
 }

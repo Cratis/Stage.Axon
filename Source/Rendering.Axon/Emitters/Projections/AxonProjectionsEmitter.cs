@@ -64,29 +64,48 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
     {
         var name = JavaNames.Type(model.Name);
         ViewJavaTypes.Add(context, package, name, ReadModelRecords.Code(types, package, model), model.Id);
-        if (PersistentViewAdmission.Supports(context, model.Id))
+        if (PersistentViewAdmission.Writerless(context, model.Id))
         {
-            context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default read-model rows are volatile; durable checkpoints may skip prior events. The persistent profile supports guarded flat projections only, with generation checks and processor-bound transactions; scoped/reducer recovery remains refused.");
+            var guardPersistent = PersistentViewAdmission.HasQueryPerformer(context, model.Id);
+            var writerless = guardPersistent
+                ? "No projection or reducer in the rendered scope writes this read model; only query performers can change it, and their writes are volatile. Persistent startup refuses this read model because those writes are not durable; automatic replay is not established recovery. Add a projection or reducer that writes it."
+                : "No projection or reducer in the rendered scope writes this read model, and no query performer receives its store: nothing writes it, so it always reads empty in every profile. There is no state to recover, so it does not block persistent startup. Add a projection or reducer that writes it.";
+            context.Degradation.Unsupported(AxonRefusalCodes.UnwrittenReadModel, model.Id, writerless);
+            EmitMemoryStore(writerless + $" ({AxonRefusalCodes.UnwrittenReadModel}).", guardPersistent);
+            return;
+        }
+        var reason = PersistentViewAdmission.RefusalReason(context, model.Id);
+        if (reason is null)
+        {
+            context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default-profile read-model rows are volatile; durable checkpoints may skip prior events after restart. The persistent profile stores this read model durably, with generation checks and processor-bound transactions.");
             PersistentProjectionStore.Emit(context, types, package, model);
             return;
         }
-        context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused.");
-        var configuration = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration");
-        var storeType = configuration.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
-        var memoryStoreType = configuration.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"));
-        var safetyType = configuration.Reference(AxonRuntimePackage.Type(types.BasePackage, "persistent.PersistentReadModelSafety"));
-        configuration
-            .DiffersFromScreenplay($"Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused ({AxonRefusalCodes.ReadModelPersistence}).")
-            .Line($"@{configuration.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
-            .Line($"@{configuration.Reference("org.springframework.context.annotation.PropertySource")}(\"classpath:axon-views.properties\")")
-            .Block($"public class {name}StoreConfiguration", body => body
-                .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
-                .Block($"public {storeType}<{body.Reference("java.lang.Object")}, {name}> store()", method => method.Line($"return new {memoryStoreType}<>();"))
-                .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name + ".persistentReadModelSafety")})")
-                .Line($"@{body.Reference("org.springframework.context.annotation.Profile")}(\"persistent\")")
-                .Block($"public static {safetyType} persistentReadModelSafety()", method =>
-                    method.Line($"return new {safetyType}({JavaCodeBuilder.StringLiteral(package + "." + name)});")));
-        ViewJavaTypes.Add(context, package, name + "StoreConfiguration", configuration.Build(), model.Id);
+        context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, $"Default-profile read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Persistent startup refuses this read model because {reason}; automatic replay is not established recovery.");
+        EmitMemoryStore($"Default-profile read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Persistent startup refuses this read model because {reason}; automatic replay is not established recovery ({AxonRefusalCodes.ReadModelPersistence}).", guardPersistent: true);
+
+        void EmitMemoryStore(string comment, bool guardPersistent)
+        {
+            var configuration = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration");
+            var storeType = configuration.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
+            var memoryStoreType = configuration.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"));
+            configuration
+                .DiffersFromScreenplay(comment)
+                .Line($"@{configuration.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
+                .Line($"@{configuration.Reference("org.springframework.context.annotation.PropertySource")}(\"classpath:axon-views.properties\")")
+                .Block($"public class {name}StoreConfiguration", body =>
+                {
+                    body.Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
+                        .Block($"public {storeType}<{body.Reference("java.lang.Object")}, {name}> store()", method => method.Line($"return new {memoryStoreType}<>();"));
+                    if (!guardPersistent) return;
+                    var safetyType = body.Reference(AxonRuntimePackage.Type(types.BasePackage, "persistent.PersistentReadModelSafety"));
+                    body.Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({JavaCodeBuilder.StringLiteral(package + "." + name + ".persistentReadModelSafety")})")
+                        .Line($"@{body.Reference("org.springframework.context.annotation.Profile")}(\"persistent\")")
+                        .Block($"public static {safetyType} persistentReadModelSafety()", method =>
+                            method.Line($"return new {safetyType}({JavaCodeBuilder.StringLiteral(package + "." + name)});"));
+                });
+            ViewJavaTypes.Add(context, package, name + "StoreConfiguration", configuration.Build(), model.Id);
+        }
     }
 
     static void EmitProjector(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticProjection projection, SemanticReadModel model)

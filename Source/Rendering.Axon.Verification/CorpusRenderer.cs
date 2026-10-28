@@ -59,13 +59,29 @@ internal static class CorpusRenderer
         }
 
         await WriteArtifacts(destination, plan);
-        if (name == IngressProofModel.Application || name == IngressProofModel.PersistentApplication) await IngressProofArtifacts.Write(destination, name);
-        if (name == ClientProofArtifacts.Application) await ClientProofArtifacts.Write(destination);
+        await WriteProofs(destination, name);
         Console.WriteLine($"{name}: rendered {plan.Artifacts.Length} artifacts; {plan.Diagnostics.Length} diagnostics; no refusals");
+    }
+
+    static async Task WriteProofs(string destination, string name)
+    {
+        switch (name)
+        {
+            case IngressProofModel.Application:
+            case IngressProofModel.PersistentApplication:
+            case "inline-java-policies":
+            case "inline-java-policy-performers":
+                await IngressProofArtifacts.Write(destination, name);
+                break;
+            case ClientProofArtifacts.Application:
+                await ClientProofArtifacts.Write(destination);
+                break;
+        }
     }
 
     static ArtifactRenderPlan Plan(string name, LoadedSemanticModel loaded) => name switch
     {
+        "inline-java-policies" or "inline-java-policy-performers" => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: BearerProfile),
         IngressProofModel.Application => IngressProofModel.Plan(loaded, BearerProfile),
         IngressProofModel.PersistentApplication => IngressProofModel.PersistentPlan(loaded, Profile),
         _ => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: Profile)

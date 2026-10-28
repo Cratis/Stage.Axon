@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
+using Cratis.Stage.Rendering.Axon.Emitters.Queries;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
@@ -11,17 +12,34 @@ internal static class PersistentViewAdmission
 {
     internal static bool Context(SemanticProjectionEventContextValue value) => new[] { "eventSourceId", "occurred", "correlationId" }.Contains(value.Path, StringComparer.Ordinal);
 
-    internal static bool Supports(AxonEmissionContext context, SemanticId model)
+    internal static bool Supports(AxonEmissionContext context, SemanticId model) => RefusalReason(context, model) is null;
+
+    internal static bool Writerless(AxonEmissionContext context, SemanticId model)
     {
-        var owners = ScopeSelection.Select(context.Request).ToArray();
-        var slices = owners.Select(owner => owner.Slice).ToArray();
-        var projections = slices.SelectMany(slice => slice.Projections).Where(projection => projection.ReadModel == model).ToArray();
-        var readModel = slices.SelectMany(slice => slice.ReadModels).FirstOrDefault(candidate => candidate.Id == model);
-        if (readModel is null) return false;
-        var reducers = owners.SelectMany(owner => owner.Slice.Reducers.Where(reducer => reducer.ReadModel == model).Select(reducer => (Owner: owner, Reducer: reducer))).ToArray();
-        if (projections.Length > 0)
-            return reducers.Length == 0 && projections.All(projection => Flat(context, readModel, projection));
-        return reducers.Length == 1 && Placed(context, reducers[0].Owner, reducers[0].Reducer);
+        var (projections, reducers) = Writers(context, model);
+        return projections.Length == 0 && reducers.Length == 0;
+    }
+
+    internal static bool HasQueryPerformer(AxonEmissionContext context, SemanticId model) =>
+        ScopeSelection.Select(context.Request)
+            .SelectMany(owner => owner.Slice.Queries.Concat(QueryPerformer.Queries(context, owner)))
+            .Any(query => query.ReadModel == model && QueryPerformer.Required(context, query) &&
+                QueryPerformer.Requirement(context, query)?.QueryShape?.Arguments.Any(argument => argument.Type is null) != true);
+
+    internal static string? RefusalReason(AxonEmissionContext context, SemanticId model)
+    {
+        var (projections, reducers) = Writers(context, model);
+        var readModel = ScopeSelection.Select(context.Request).SelectMany(owner => owner.Slice.ReadModels).FirstOrDefault(candidate => candidate.Id == model);
+        if (readModel is null) return "its shape is not admitted for persistence";
+        var admitted = projections.Length > 0
+            ? reducers.Length == 0 && projections.All(projection => Flat(context, readModel, projection))
+            : reducers.Length == 1 && Placed(context, reducers[0].Owner, reducers[0].Reducer);
+        if (admitted) return null;
+        var reasons = new List<string>();
+        reasons.AddRange(WriterReasons(projections.Length, reducers.Length));
+        if (reducers.Any(reducer => !Placed(context, reducer.Owner, reducer.Reducer))) reasons.Add("its reducer is not fully placed (unauthored transitions or an event filter)");
+        foreach (var projection in projections) reasons.AddRange(ProjectionReasons(context, readModel, projection));
+        return reasons.Count == 0 ? "its shape is not admitted for persistence" : string.Join("; ", reasons);
     }
 
     internal static bool Placed(AxonEmissionContext context, LocatedSemanticSlice owner, SemanticReducer reducer)
@@ -31,11 +49,52 @@ internal static class PersistentViewAdmission
         return admission.Blocked is null && admission.Transitions.Values.All(transition => transition.Placed);
     }
 
+    static (SemanticProjection[] Projections, (LocatedSemanticSlice Owner, SemanticReducer Reducer)[] Reducers) Writers(AxonEmissionContext context, SemanticId model)
+    {
+        var owners = ScopeSelection.Select(context.Request);
+        return (
+            owners.SelectMany(owner => owner.Slice.Projections).Where(projection => projection.ReadModel == model).ToArray(),
+            owners.SelectMany(owner => owner.Slice.Reducers.Where(reducer => reducer.ReadModel == model).Select(reducer => (Owner: owner, Reducer: reducer))).ToArray());
+    }
+
+    static IEnumerable<string> WriterReasons(int projections, int reducers)
+    {
+        if (projections == 0 && reducers == 0) yield return "it has no projection or reducer that writes it";
+        if (projections > 0 && reducers > 0) yield return "it has both a projection and a reducer writer";
+        if (reducers > 1) yield return "it has more than one reducer writer";
+    }
+
+    static bool Stateful(SemanticProjectionScope scope) => scope.Every is not null ||
+        new[] { scope.Children.Length, scope.Nested.Length, scope.Joins.Length }.Any(count => count > 0);
+
+    static bool UnsupportedMappings(AxonEmissionContext context, SemanticReadModel model, SemanticProjection projection) =>
+        UnsupportedFactor(projection) || ProjectionTransitions.From(projection).Any(from => !From(context, model, from));
+
+    static bool UnsupportedFactor(SemanticProjection projection) => !ProjectionHandlerShape.Scoped(projection) &&
+        ProjectionTransitions.From(projection).Any(from => from.Mappings.Any(mapping => mapping.Factor is SemanticProjectionEventContextValue));
+
+    static IEnumerable<string> ProjectionReasons(AxonEmissionContext context, SemanticReadModel model, SemanticProjection projection)
+    {
+        var transitions = ProjectionTransitions.From(projection).ToArray();
+        if (projection.Scope is { } scope)
+        {
+            if (Stateful(scope))
+                yield return "its projection uses a stateful scope (every, children, nested scopes or joins)";
+            if (scope.From.Any(from => from.Key is not SemanticProjectionValueKey))
+                yield return "its projection uses a composite root key";
+            if (scope.Removals.Length > 0 || scope.JoinRemovals.Length > 0)
+                yield return "its projection removes rows";
+        }
+        if (transitions.Length == 0) yield return "its projection has no event transitions";
+        if (UnsupportedMappings(context, model, projection))
+            yield return "its projection maps an unsupported event-context value, target or expression";
+    }
+
     static bool Flat(AxonEmissionContext context, SemanticReadModel model, SemanticProjection projection)
     {
         var transitions = ProjectionTransitions.From(projection).ToArray();
         if (!ProjectionHandlerShape.RootOnly(projection) || transitions.Length == 0) return false;
-        if (!ProjectionHandlerShape.Scoped(projection) && transitions.Any(from => from.Mappings.Any(mapping => mapping.Factor is SemanticProjectionEventContextValue))) return false;
+        if (UnsupportedFactor(projection)) return false;
         return transitions.All(from => From(context, model, from));
     }
 

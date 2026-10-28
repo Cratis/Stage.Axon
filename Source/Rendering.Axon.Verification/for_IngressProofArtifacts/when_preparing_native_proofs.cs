@@ -28,12 +28,69 @@ public partial class when_preparing_native_proofs : Specification
     [Fact]
     void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
     [
-        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
+        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
         "GeneratedPersistentUniqueConcurrencyTest.java", "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
+    [Fact]
+    void should_include_the_inline_policy_failure_and_composition_proofs()
+    {
+        var sources = IngressProofArtifacts.Sources("inline-java-policies");
+        sources.Count.ShouldEqual(2);
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("inlineFailureAndAnonymousNeverGrant");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("roleGrantOrLegitimatePolicyDenyGrants");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("failedOperandDeniesAndAndOr");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("scopeEscapeCannotPromoteSiblingFailure");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("financeWithoutWriterDeniesTheConjunction");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("inlinePoliciesProtectLiveQueries");
+        sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain("stage.axon.demo.claims.department=Finance Operations");
+    }
+
+    [Fact]
+    void should_include_the_inline_policy_performed_query_proofs()
+    {
+        var sources = IngressProofArtifacts.Sources("inline-java-policy-performers");
+        sources.Count.ShouldEqual(1);
+        sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("inlinePoliciesProtectPerformedQueriesOverHttp");
+        sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("inlinePoliciesProtectPerformedQueriesOverSse");
+    }
+
+    [Fact]
+    void should_send_the_generated_inline_policy_command_field()
+    {
+        var sources = IngressProofArtifacts.Sources("inline-java-policies");
+        foreach (var source in sources.Values)
+        {
+            source.ShouldContain("\\\"id\\\":\\\"");
+            source.ShouldNotContain("\\\"accountId\\\":");
+        }
+    }
+
+    [Fact]
+    void should_require_async_start_for_allowed_inline_policy_commands()
+    {
+        var sources = IngressProofArtifacts.Sources("inline-java-policies");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("http.perform(command().with(authentication(caller(\"Finance Operations\"))))\n                .andExpect(request().asyncStarted()).andReturn();");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("http.perform(command().with(authentication(caller)))\n                .andExpect(request().asyncStarted()).andReturn();");
+        sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain(".andExpect(request().asyncStarted()).andReturn();");
+    }
+
+    [Fact]
+    void should_assert_synchronous_inline_policy_query_denials_directly()
+    {
+        var source = IngressProofArtifacts.Sources("inline-java-policies")["GeneratedInlinePolicyTest.java"];
+        source.ShouldContain("if (result.andReturn().getRequest().isAsyncStarted())");
+        source.ShouldContain("var response = result.andExpect(request().asyncStarted()).andReturn();\n            return http.perform(asyncDispatch(response));\n        }\n        return result;");
+    }
+
     [Fact] void should_resolve_all_template_packages() => _all.ShouldNotContain("__APPLICATION__");
     [Fact] void should_resolve_the_runtime_package() => _all.ShouldNotContain("__RUNTIME__");
     [Fact] void should_resolve_the_runtime_module_package() => _all.ShouldNotContain("__RUNTIME_MODULE__");
+    [Fact]
+    void should_import_runtime_module_types_where_they_are_used() => _sources
+        .Where(source => source.Value.Contains("ReadModelStore<", StringComparison.Ordinal)
+            && !source.Value.Contains($"import {IngressProofArtifacts.RuntimeModulePackage}.ReadModelStore;", StringComparison.Ordinal))
+        .Select(source => source.Key)
+        .ShouldBeEmpty();
     [Fact] void should_not_add_license_headers_to_java() => _all.ShouldNotContain("Copyright (c) Cratis");
     [Fact] void should_drive_real_generated_commands() => _all.ShouldContain("gateway.send(command, Void.class)");
     [Fact] void should_collect_event_messages_directly() => _sources["GeneratedIngressSupport.java"].ShouldContain(".collect(ArrayList<EventMessage>::new, (all, entry) -> all.add(entry))");
