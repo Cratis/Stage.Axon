@@ -10,13 +10,18 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
 
 internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, SemanticReaction reaction)
 {
+    readonly SortedDictionary<int, string> _rejections = [];
+
+    /// <summary>Gets why each native trigger body could not be placed, keyed by trigger index.</summary>
+    internal IReadOnlyDictionary<int, string> Rejections => _rejections;
+
     internal PreparedReactionTrigger? Prepare(SemanticReactionTrigger trigger, int index)
     {
         if (!SupportedEffects(trigger) || !SupportedIdentity(trigger)) return null;
         var annotation = ReactionScheduling.Annotation(trigger);
         var input = ReactionInput.Create(context, trigger);
         if (annotation is null || input is null) return null;
-        var prepared = trigger.RequirementId is not null ? PrepareNative(trigger, annotation, input) : PrepareDeclarative(trigger, index, annotation, input);
+        var prepared = trigger.RequirementId is not null ? PrepareNative(trigger, index, annotation, input) : PrepareDeclarative(trigger, index, annotation, input);
         if (prepared is null || trigger.Kind is not (SemanticReactionTriggerKind.Interval or SemanticReactionTriggerKind.Schedule)) return prepared;
         return context.Degradation.Approximate(
             AxonRefusalCodes.Schedule,
@@ -55,10 +60,14 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
         return WithGuard(trigger, new(annotation, input, invocation, null) { Production = production });
     }
 
-    PreparedReactionTrigger? PrepareNative(SemanticReactionTrigger trigger, string annotation, ReactionInput input)
+    PreparedReactionTrigger? PrepareNative(SemanticReactionTrigger trigger, int index, string annotation, ReactionInput input)
     {
         var slot = new InlineBodySlot(trigger.RequirementId, SemanticImplementationRole.ReactionEffect, reaction.Id);
-        if (!InlineJavaBodies.TryResolve(context, slot, out var content, out _)) return null;
+        if (!InlineJavaBodies.TryResolve(context, slot, out var content, out var reason))
+        {
+            _rejections[index] = reason;
+            return null;
+        }
         return WithGuard(trigger, new(annotation, input, string.Empty, null) { NativeBody = content });
     }
 
