@@ -57,12 +57,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
             BindMemory(method, messageArgument, transaction, staged);
             return;
         }
-        method.Block($"if (store instanceof {adapter}<?>)", persistent =>
-        {
-            persistent.Line($"apply(event{messageArgument}{_updates.DefaultArgument}, {adapter}.bind(store, context));");
-            if (_updates.Enabled)
-                persistent.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
-        });
+        method.Block($"if (store instanceof {adapter}<?>)", persistent => persistent.Line($"apply(event{messageArgument}{(_updates.Enabled ? ", updates" : string.Empty)}, {adapter}.bind(store, context));"));
         if (keys is { Count: >= 2 })
             method.Block("else", memory => BindMemory(memory, messageArgument, transaction, staged));
         else

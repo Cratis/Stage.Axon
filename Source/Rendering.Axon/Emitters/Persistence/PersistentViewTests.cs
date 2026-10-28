@@ -90,7 +90,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
     {
         var contract = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(contract => contract.Id == id);
         var tag = AxonEventSources.PrimaryTag(context, contract);
-        return $"        if (event instanceof {types.EventType(id)} tagged) return new Tag({JavaCodeBuilder.StringLiteral(tag.TagKey)}, tagged.{tag.ComponentName}().toString());";
+        return $"        if (event instanceof {types.EventType(id)} tagged) return new Tag({EventTagsEmitter.Reference(context, contract)}, tagged.{tag.ComponentName}().toString());";
     }));
 
     SemanticSpecification? Specification(LocatedSemanticSlice owner, SemanticReadModel model, IReadOnlyCollection<SemanticId> observed)

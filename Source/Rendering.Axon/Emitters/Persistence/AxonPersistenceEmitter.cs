@@ -48,6 +48,11 @@ internal sealed class AxonPersistenceEmitter : IAxonEmitter
                     return EventProcessorDefinition.pooledStreamingMatching("{{name}}")
                             .customized(config -> {
                                 config.errorHandler(PropagatingErrorHandler.INSTANCE);
+                                // A concrete first position, not Axon's default replay token without a current position:
+                                // a segment that has not stored a token yet would otherwise make the restarted stream
+                                // open at the current first event, whose gap-free tokens the other segments' stored
+                                // tokens do not cover, so those segments would apply their events a second time.
+                                config.initialToken(source -> source.firstToken(null));
                                 return config;
                             });
                 }
