@@ -36,8 +36,8 @@ public class when_rendering_unsupported_validation : for_AxonArtifactRenderPlann
     }
 
     [Fact] void should_warn_instead_of_breaking_the_render() => context.Degradation.UnsupportedConstructs.Single().Severity.ShouldEqual(ArtifactRenderDiagnosticSeverity.Warning);
-    [Fact] void should_use_a_registered_code() => context.Degradation.UnsupportedConstructs.Single().Code.ShouldEqual(AxonRefusalCodes.CommandValidation);
+    [Fact] void should_use_a_registered_code() => context.Degradation.UnsupportedConstructs.Single().Code.ShouldEqual(AxonRefusalCodes.ImplementationValidation);
     [Fact] void should_preserve_the_intent_in_generated_source() => rules.ShouldContain("// Screenplay wanted to validate");
-    [Fact] void should_explain_the_target_limitation() => rules.ShouldContain("but this is not supported by the Axon target yet (STAGE-AXON-0107).");
-    [Fact] void should_not_silently_pass_the_guard() => rules.ShouldContain("throw new UnsupportedOperationException(\"STAGE-AXON-0107:");
+    [Fact] void should_explain_the_target_limitation() => rules.ShouldContain("but this is not supported by the Axon target yet (STAGE-AXON-IMPL-VALIDATION).");
+    [Fact] void should_accept_values_without_rejecting_the_unimplemented_rule() => rules.ShouldNotContain("throw new UnsupportedOperationException");
 }

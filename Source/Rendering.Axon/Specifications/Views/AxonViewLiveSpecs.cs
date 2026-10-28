@@ -17,7 +17,7 @@ internal static class AxonViewLiveSpecs
     {
         if (query.Argument is not null || query.KeyParts.Length > 0 || query.Filters.Length > 0 || query.Cardinality != SemanticQueryCardinality.Many || query.Authorization is not null) return;
         var projection = owner.Slice.Projections.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
-        if (projection is null) return;
+        if (projection is null || !ProjectionHandlerShape.RootOnly(projection)) return;
         var given = owner.Slice.Specifications.SelectMany(specification => specification.GivenEvents)
             .FirstOrDefault(fact => ProjectionTransitions.From(projection).Any(from => from.EventContract == fact.EventContract));
         if (given is null) return;
@@ -45,7 +45,7 @@ internal static class AxonViewLiveSpecs
             return AxonViewEvents.Expression(context, types, given, builder) + ProjectionHandlerShape.Arguments(projection, updates, updates.Enabled ? builder.Reference("org.axonframework.messaging.queryhandling.QueryUpdateEmitter") + ".forContext(processing)" : "null");
         }
         var eventArguments = EventArguments(code);
-        var storeType = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
+        var repositoryType = ViewRepositories.Type(code, types, owner, package, ReadModelEntities.RepositoryName(model));
         var applicationType = code.Reference(types.BasePackage + ".Application");
         var source = code.Line($$"""
             @{{code.Reference("org.springframework.boot.test.context.SpringBootTest")}}(classes = {{applicationType}}.class)
@@ -58,12 +58,11 @@ internal static class AxonViewLiveSpecs
                 @{{code.Reference("org.springframework.beans.factory.annotation.Autowired")}}
                 private {{projectorName}} projector;
                 @{{code.Reference("org.springframework.beans.factory.annotation.Autowired")}}
-                @{{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}}({{JavaCodeBuilder.StringLiteral(modelType)}})
-                private {{storeType}}<Object, {{modelName}}> store;
+                private {{repositoryType}} repository;
 
                 @{{code.Reference("org.junit.jupiter.api.Test")}}
                 void shouldDeliverInitialSnapshotAndUpdateAndCancelAxonPublisher() throws Exception {
-                    store.clear();
+                    repository.deleteAll();
                     var initial = new {{code.Reference("java.util.concurrent.CountDownLatch")}}(1);
                     var changed = new {{code.Reference("java.util.concurrent.CountDownLatch")}}(1);
                     var cancelled = new {{code.Reference("java.util.concurrent.CountDownLatch")}}(1);

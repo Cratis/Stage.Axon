@@ -36,7 +36,7 @@ public class when_a_model_claims_the_list_name : given.a_native_view_request
         _java = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ListViewSpecificationsTest.java", StringComparison.Ordinal)));
     }
 
-    [Fact] void should_keep_the_model_short() => _java.ShouldContain("ReadModelStore<Object, List> store");
+    [Fact] void should_keep_the_model_short() => _java.ShouldContain("ListRepository repository");
     [Fact] void should_qualify_the_colliding_framework_list() => _java.ShouldContain("java.util.List.of(");
     [Fact] void should_not_import_the_colliding_framework_list() => _java.ShouldNotContain("import java.util.List;");
     [Fact] void should_still_shorten_the_security_holder() => _java.ShouldContain("import org.springframework.security.core.context.SecurityContextHolder;");

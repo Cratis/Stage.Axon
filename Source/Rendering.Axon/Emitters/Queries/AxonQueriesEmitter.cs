@@ -34,12 +34,14 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                 var owner = ScopeSelection.Locate(application).First(slice => slice.Slice.ReadModels.Any(model => model.Id == query.ReadModel));
                 var model = owner.Slice.ReadModels.First(model => model.Id == query.ReadModel);
                 var modelType = types.Package(owner) + "." + JavaNames.Type(model.Name);
+                var repositoryType = types.Package(owner) + "." + ReadModelEntities.RepositoryName(model);
+                var entityType = types.Package(owner) + "." + ReadModelEntities.EntityName(model);
                 var shape = new QueryShape(query, model, types, QueryPerformer.Requirement(context, query));
                 var package = types.Package(located);
                 var name = JavaNames.Type(query.Name);
                 EmitRecord(context, package, query, name, modelType, shape);
-                if (QueryPerformer.Required(context, query)) QueryPerformer.Emit(context, package, query, modelType);
-                EmitHandler(context, types, package, query, name, modelType, shape);
+                if (QueryPerformer.Required(context, query)) QueryPerformer.Emit(context, package, query, modelType, repositoryType);
+                EmitHandler(context, types, package, query, name, modelType, repositoryType, entityType, shape);
                 new QueryEndpoint(context, types, located, query, modelType, shape).Emit();
                 if (query.Delivery != SemanticQueryDelivery.Live) continue;
                 LiveQuerySubscription.Emit(context, package, query, modelType);
@@ -72,20 +74,21 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
         ViewJavaTypes.Add(context, package, name, code.Build(), query.Id);
     }
 
-    static void EmitHandler(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticKeyedQuery query, string name, string modelType, QueryShape shape)
+    static void EmitHandler(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticKeyedQuery query, string name, string modelType, string repositoryType, string entityType, QueryShape shape)
     {
         var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Handler").Declare(name + "Performer");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Handler", name + "Performer");
-        var store = code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"));
+        var repository = QueryModelReference.Claim(code, package, repositoryType, name, name + "Handler", name + "Performer");
+        var entity = QueryModelReference.Claim(code, package, entityType, name, name + "Handler", name + "Performer");
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")
             .Block($"public class {name}Handler", body =>
             {
                 var performed = QueryPerformer.Required(context, query);
-                body.Line($"private final {store}<{body.Reference("java.lang.Object")}, {modelName}> store;");
+                body.Line($"private final {repository} repository;");
                 if (performed) body.Line($"private final {name}Performer performer;");
-                body.Block($"public {name}Handler(@{body.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(modelType)}) {store}<{body.Reference("java.lang.Object")}, {modelName}> store{(performed ? $", {name}Performer performer" : string.Empty)})", constructor =>
+                body.Block($"public {name}Handler({repository} repository{(performed ? $", {name}Performer performer" : string.Empty)})", constructor =>
                 {
-                    constructor.Line("this.store = store;");
+                    constructor.Line("this.repository = repository;");
                     if (performed) constructor.Line("this.performer = performer;");
                 });
                 var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
@@ -94,8 +97,8 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
                 {
                     var predicate = QueryPerformer.Required(context, query) ? string.Empty : shape.Predicate(method);
                     method.Line(performed
-                        ? $"var rows = {method.Reference("java.util.List")}.copyOf(performer.perform(query, store));"
-                        : $"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
+                        ? $"var rows = {method.Reference("java.util.List")}.copyOf(performer.perform(query, repository));"
+                        : $"var rows = repository.findAll({method.Reference("org.springframework.data.domain.Sort")}.by(\"rowKey\")).stream().map({entity}::toModel){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
                     if (query.Cardinality == SemanticQueryCardinality.One)
                         method.Line($"{method.Reference(AxonRuntimePackage.Type(types.BasePackage, "QueryResults"))}.exactlyOne(rows);");
                     if (query.Cardinality == SemanticQueryCardinality.ZeroOrOne)

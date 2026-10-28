@@ -44,7 +44,7 @@ public class when_caller_claims_are_not_representable : for_AxonArtifactRenderPl
         Assert.DoesNotContain("throw new UnsupportedOperationException", java, StringComparison.Ordinal);
         UnsupportedSummary.Emit(context);
         var summary = Text(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md"));
-        Assert.Contains($"| {Code} | {specification.Id}/givenCaller/claims | preserve all modeled caller claims", summary, StringComparison.Ordinal);
+        Assert.Matches($@"\| {Code} \| [^\n]*\(givenCaller/claims\) \| [^\n]*\| preserve all modeled caller claims", summary);
         Assert.Equal(strict, context.Degradation.Refusals.Any(refusal => refusal.Codes.Contains(Code)));
     }
 

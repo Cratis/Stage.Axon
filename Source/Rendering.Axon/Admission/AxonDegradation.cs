@@ -14,6 +14,7 @@ internal sealed class AxonDegradation(ArtifactRenderProfile profile)
     readonly List<ArtifactRenderDiagnostic> _diagnostics = [];
     readonly List<AxonUnsupportedIntent> _intents = [];
     readonly List<ArtifactRenderDiagnostic> _warnings = [];
+    readonly List<string> _notes = [];
 
     internal bool Strict { get; } = profile.Inputs.Any(input => input.Name == AxonRendering.StrictInput && Encoding.UTF8.GetString(input.Bytes.AsSpan()) == "true");
 
@@ -23,6 +24,8 @@ internal sealed class AxonDegradation(ArtifactRenderProfile profile)
 
     internal IReadOnlyList<AxonUnsupportedIntent> Intents => _intents;
 
+    internal IReadOnlyList<string> Notes => _notes;
+
     /// <summary>Warnings that are never refusals, are not unsupported intents and stay out of the unsupported summary.</summary>
     internal IReadOnlyList<ArtifactRenderDiagnostic> Warnings => _warnings;
 
@@ -30,6 +33,11 @@ internal sealed class AxonDegradation(ArtifactRenderProfile profile)
         ? [.. _diagnostics.Where(diagnostic => diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Error).GroupBy(diagnostic => (diagnostic.Artifact, Kind: "construct"))
             .Select(group => new ArtifactRenderRefusal(group.Key.Artifact, group.Key.Kind, [.. group.Select(diagnostic => diagnostic.Code).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)]))]
         : [];
+
+    internal void Note(string text)
+    {
+        if (!string.IsNullOrWhiteSpace(text) && !_notes.Contains(text, StringComparer.Ordinal)) _notes.Add(text);
+    }
 
     internal bool Approximate(string code, SemanticId construct, string reason, string intent, string modelPath)
     {

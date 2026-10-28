@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text.RegularExpressions;
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
@@ -10,8 +11,16 @@ using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
 
-internal static class QueryPerformer
+internal static partial class QueryPerformer
 {
+    const string LegacyStoreReason = "The inline performer body reads the removed ReadModelStore ('store'), so it is kept only as a comment and the performer throws until the body is rewritten against the typed Spring Data repository passed as 'repository' (for example repository.findAll()).";
+
+    [GeneratedRegex(@"\bstore\s*\.", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex StoreUse { get; }
+
+    [GeneratedRegex(@"\bstore\s*[=:;,)]", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex StoreDeclaration { get; }
+
     internal static SemanticImplementationRequirement? Requirement(AxonEmissionContext context, SemanticKeyedQuery query) =>
         (context.Request.ImplementationRequirements.IsDefault ? [] : context.Request.ImplementationRequirements).FirstOrDefault(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer && requirement.Source.SemanticId == query.Id);
 
@@ -25,7 +34,7 @@ internal static class QueryPerformer
                 Authorization = requirement.QueryShape.Authorization
             });
 
-    internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query, string modelType)
+    internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query, string modelType, string repositoryType)
     {
         var name = JavaNames.Type(query.Name);
         const string reason = "Query performer bodies are not translated; implement the generated performer interface as a Spring bean.";
@@ -34,12 +43,23 @@ internal static class QueryPerformer
         if (!native) context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, reason, "answer the query with its modeled performer", query.Id.ToString());
         var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Performer");
         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Performer");
-        var store = code.Reference(AxonRuntimePackage.Type(context.BasePackage, "ReadModelStore"));
+        var repository = QueryModelReference.Claim(code, package, repositoryType, name, name + "Performer");
+        var legacy = native && ReadsLegacyStore(content);
+        if (legacy)
+        {
+            context.Degradation.Unsupported(AxonRefusalCodes.QueryPerformer, query.Id, LegacyStoreReason, "answer the query with its modeled performer", query.Id.ToString());
+        }
         if (!native) code.DiffersFromScreenplay("the modeled performer is a typed Spring extension point; implementation bodies are not translated.");
         code.Block($"public interface {name}Performer", body => body
-                .Block($"default {code.Reference("java.util.List")}<{modelName}> perform({name} query, {store}<{code.Reference("java.lang.Object")}, {modelName}> store)", method =>
+                .Block($"default {code.Reference("java.util.List")}<{modelName}> perform({name} query, {repository} repository)", method =>
                 {
-                    if (native)
+                    if (legacy)
+                    {
+                        method.UnsupportedIntent("answer the query with its modeled performer: " + LegacyStoreReason, query.Id.ToString(), AxonRefusalCodes.QueryPerformer);
+                        foreach (var line in content.ReplaceLineEndings("\n").Split('\n')) method.Line("// " + line);
+                        method.Line($"throw new {method.Reference("java.lang.UnsupportedOperationException")}({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.QueryPerformer + ": " + LegacyStoreReason)});");
+                    }
+                    else if (native)
                     {
                         method.RawBody(content);
                     }
@@ -59,4 +79,8 @@ internal static class QueryPerformer
                 .Block($"public {name}Performer {JavaNames.Member(name)}Performer()", method => method.Line($"return new {name}Performer() {{}};")));
         context.AddJava(package, name + "PerformerConfiguration", configuration.Build(), sources: query.Id);
     }
+
+    // The old signature passed the store as an undeclared 'store' parameter; a body that declares its own 'store' is not legacy.
+    static bool ReadsLegacyStore(string content) =>
+        content.Contains("ReadModelStore", StringComparison.Ordinal) || (StoreUse.IsMatch(content) && !StoreDeclaration.IsMatch(content));
 }

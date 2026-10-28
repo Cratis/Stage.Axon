@@ -19,26 +19,28 @@ internal sealed class ReactionSpecificationsEmitter(AxonEmissionContext context,
         foreach (var specification in located.Slice.Specifications.Where(specification => specification.WhenTrigger?.Kind == SemanticReactionTriggerKind.ApplicationTrigger))
         {
             var index = Enumerable.Range(0, reaction.Triggers.Length).FirstOrDefault(index => reaction.Triggers[index].Source == specification.WhenTrigger!.Trigger, -1);
-            if (index >= 0) EmitSpecification(package, specification, index);
+            if (index >= 0) EmitSpecification(package, specification);
         }
     }
 
-    void EmitSpecification(string package, SemanticSpecification specification, int index)
+    void EmitSpecification(string package, SemanticSpecification specification)
     {
-        var scenario = new ReactionSpecificationScenario(context, specification, index);
+        var scenario = new ReactionSpecificationScenario(context, specification);
         var supported = scenario.CanEmit;
         var name = JavaNames.Type(reaction.Name) + JavaNames.Type(specification.Name) + "SpecificationsTest";
         var method = "spec_" + JavaNames.Member(specification.Name);
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(JavaNames.Type(reaction.Name) + "Reaction");
+        var code = new JavaCodeBuilder(package).Declare(name);
+        var endpoint = context.BasePackage + ".triggers." + JavaNames.Type(context.Request.Model.Application.Triggers.Single(candidate => candidate.Id == specification.WhenTrigger!.Trigger).Name) + "Endpoint";
         if (supported)
         {
             scenario.Claim(code);
+            ReactionJavaReferences.Claim(code, [endpoint]);
             code.Line("@" + code.Reference("org.springframework.boot.test.context.SpringBootTest")).Line("@" + code.Reference("org.springframework.test.annotation.DirtiesContext"));
         }
         code.Block("class " + name, body =>
         {
             CommandFixtureSecurity.ReportUnsupportedClaims(context, body, specification);
-            if (supported) Fields(body);
+            if (supported) Fields(body, endpoint);
             body.Line("@" + body.Reference("org.junit.jupiter.api.Test")).Line($"@{body.Reference("org.junit.jupiter.api.DisplayName")}({JavaCodeBuilder.StringLiteral(specification.Id.ToString())})");
             if (!supported) body.Line($"@{body.Reference("org.junit.jupiter.api.Disabled")}({JavaCodeBuilder.StringLiteral(Refusal + ": unsupported application-trigger specification fixtures")})");
             body.Block("void " + method + "() throws Exception", test =>
@@ -49,6 +51,7 @@ internal sealed class ReactionSpecificationsEmitter(AxonEmissionContext context,
                 }
                 else
                 {
+                    if (!scenario.CallerAdmitted) test.DiffersFromScreenplay("The modeled caller does not hold the SYSTEM role the application-trigger endpoint requires, so this specification is not run.");
                     test.UnsupportedIntent("verify the complete application-trigger reaction fixtures", specification.Id.ToString(), Refusal)
                         .Line("throw new UnsupportedOperationException(\"Unsupported application-trigger reaction fixtures\");");
                 }
@@ -59,10 +62,10 @@ internal sealed class ReactionSpecificationsEmitter(AxonEmissionContext context,
         context.AddJava(package, name, code.Build(), test: true, sources: [reaction.Id, specification.Id]);
     }
 
-    void Fields(JavaCodeBuilder body)
+    void Fields(JavaCodeBuilder body, string endpoint)
     {
         var autowired = body.Reference("org.springframework.beans.factory.annotation.Autowired");
-        body.Line($"@{autowired} private {JavaNames.Type(reaction.Name)}Reaction reaction;")
+        body.Line($"@{autowired} private {ReactionJavaReferences.Expression(body, endpoint)} endpoint;")
             .Line($"@{autowired} private {body.Reference("org.axonframework.eventsourcing.eventstore.EventStorageEngine")} events;")
             .Line($"@{body.Reference("org.springframework.test.context.bean.override.mockito.MockitoBean")} private {body.Reference("java.time.Clock")} clock;")
             .Line($"@{body.Reference("org.junit.jupiter.api.AfterEach")} void clearCaller() {{ {body.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext(); }}");

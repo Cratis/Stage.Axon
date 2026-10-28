@@ -43,7 +43,6 @@ public class when_selecting_a_file_header : given.an_axon_request
             artifact.Sources.SequenceEqual(original.Sources).ShouldBeTrue();
         }
         plan.Artifacts.Any(artifact => artifact.RelativePath.Contains("/runtime/", StringComparison.Ordinal)).ShouldBeTrue();
-        plan.Artifacts.Any(artifact => artifact.RelativePath.Contains("/persistence/", StringComparison.Ordinal)).ShouldBeTrue();
         plan.Artifacts.Any(artifact => artifact.RelativePath.StartsWith("src/test/java/", StringComparison.Ordinal)).ShouldBeTrue();
     }
 

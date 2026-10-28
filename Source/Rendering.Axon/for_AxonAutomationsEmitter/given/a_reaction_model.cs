@@ -17,6 +17,7 @@ public class a_reaction_model : for_AxonArtifactRenderPlanner.given.an_axon_requ
     private protected SemanticCommand command;
     private protected SemanticApplicationTrigger applicationTrigger;
     private protected SemanticSpecification specification;
+    private protected ImmutableArray<SemanticReaction> otherReactions = [];
 
     void Establish()
     {
@@ -71,7 +72,7 @@ public class a_reaction_model : for_AxonArtifactRenderPlanner.given.an_axon_requ
             ? new[] { slice with { Commands = [command] }, slice with
             {
                 Id = SemanticId.Create(SemanticKind.Slice, "SubmitOrder"), Name = "SubmitOrder", Kind = SemanticSliceKind.Automation,
-                Commands = [], Events = [], Constraints = [], ReadModels = [], Projections = [], Queries = [], Specifications = specification is null ? [] : [specification], Reducers = [], Captures = [], Reactions = [reaction]
+                Commands = [], Events = [], Constraints = [], ReadModels = [], Projections = [], Queries = [], Specifications = specification is null ? [] : [specification], Reducers = [], Captures = [], Reactions = [reaction, .. otherReactions]
             } } : [slice])]
     };
 }

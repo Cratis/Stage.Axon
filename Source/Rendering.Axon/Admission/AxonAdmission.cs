@@ -22,7 +22,7 @@ internal static class AxonAdmission
         var diagnostics = ImmutableArray.CreateBuilder<ArtifactRenderDiagnostic>();
         if (!Supports(request.Model))
         {
-            degradation.Unsupported(AxonRefusalCodes.Version, request.Model.Application.Id, "Axon scaffolding admits only the measured language/semantic pairs 2.0/2.0, 6.0/6.0, 10.0/10.0 and 25.0/25.0; individual features remain subject to admission.");
+            degradation.Warn(AxonRefusalCodes.Version, request.Model.Application.Id, "Axon scaffolding has measured language/semantic pairs 2.0/2.0, 6.0/6.0, 10.0/10.0 and 25.0/25.0; this pair is unmeasured and individual features remain subject to admission.");
         }
 
         InspectProfile(request, diagnostics);

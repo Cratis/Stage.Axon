@@ -36,6 +36,35 @@ module Bodies
           if (input.amount() < 0) throw new IllegalStateException("A negative count was recorded at " + occurred);
           ```
 
+    slice StateChange Acknowledgement
+      command AcknowledgeCount
+        id CounterId identifier
+        amount Int
+        produces CountAcknowledged
+          id = id
+          amount = amount
+        handler
+          ```java
+          // inline-java-bodies: acknowledgement handler
+          if (command.amount() < 0) throw new IllegalArgumentException("A negative count cannot be acknowledged");
+          appender.append(new CountAcknowledged(command.id(), command.id(), command.amount()));
+          ```
+      event CountAcknowledged
+        id CounterId
+        amount Int
+
+    slice Automation AcknowledgeCounts
+      reaction AcknowledgeRecordedCount
+        when CountRecorded
+          invokes AcknowledgeCount
+            id = id
+            amount = amount
+      reaction AcknowledgeAgain
+        when CountRecorded
+          invokes AcknowledgeCount
+            id = id
+            amount = amount
+
     slice StateView Totals
       readmodel RebuiltTotal
         id CounterId key
@@ -50,7 +79,7 @@ module Bodies
         performer
           ```java
           // inline-java-bodies: query performer
-          return store.all().stream().map(total -> new RebuiltTotal(total.id(), total.amount() * 2)).toList();
+          return repository.findAll().stream().map(RebuiltTotalEntity::toModel).map(total -> new RebuiltTotal(total.id(), total.amount() * 2)).toList();
           ```
       specification RebuildFromEvents
         given CountRecorded

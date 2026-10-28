@@ -39,7 +39,7 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
             return matcher.Predicate(entry.Value, property.Type, $"row.{JavaNames.Member(property.Name)}()");
         });
         var key = ViewExpectedKeys.Expression(expected.Key, model, types, code) ?? sourceKey;
-        return $"{code.Reference("org.junit.jupiter.api.Assertions")}.assertTrue(store.get({key}).stream().anyMatch(row -> {string.Join(" && ", predicates)}), \"Expected modeled read-model properties\");";
+        return $"{code.Reference("org.junit.jupiter.api.Assertions")}.assertTrue({ViewRepositories.Get(model, key)}.anyMatch(row -> {string.Join(" && ", predicates)}), \"Expected modeled read-model properties\");";
     }
 
     static bool Handles(ProjectionScopeNode root, SemanticSpecificationEvent given) =>
@@ -72,8 +72,7 @@ internal sealed class NativeViewSpecifications(AxonEmissionContext context, View
         method.Block("try", body =>
         {
             CommandFixtureSecurity.CallerReferences(body, spec.GivenCaller);
-            body.Line($"{body.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<Object, {plan.Model}> store = new {body.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
-                .Line($"var projector = new {plan.Projection}Projector(store);")
+            body.Line($"var projector = new {plan.Projection}Projector(repository);")
                 .Line($"projector.on({AxonViewEvents.Expression(context, types, plan.Event, body)}{plan.Arguments});");
             if (plan.Appended is { } appended) body.Line($"projector.on({AxonViewEvents.Expression(context, types, appended, body)}{plan.Arguments});");
             foreach (var expected in spec.ThenReadModels) body.Line(Assertion(expected, plan.SourceKey, body));

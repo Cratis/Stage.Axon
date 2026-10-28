@@ -36,7 +36,7 @@ public class when_a_model_claims_the_assertions_name : given.a_native_view_reque
         _java = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/AssertionsViewSpecificationsTest.java", StringComparison.Ordinal)));
     }
 
-    [Fact] void should_keep_the_model_short() => _java.ShouldContain("ReadModelStore<Object, Assertions> store");
+    [Fact] void should_keep_the_model_short() => _java.ShouldContain("AssertionsRepository repository");
     [Fact] void should_qualify_the_colliding_framework_type() => _java.ShouldContain("org.junit.jupiter.api.Assertions.assertTrue(");
     [Fact] void should_not_import_the_colliding_framework_type() => _java.ShouldNotContain("import org.junit.jupiter.api.Assertions;");
     [Fact] void should_still_shorten_non_colliding_types() => _java.ShouldContain("import java.util.Objects;");

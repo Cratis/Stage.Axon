@@ -24,10 +24,10 @@ public class when_using_a_released_runtime : for_AxonArtifactRenderPlanner.given
         pom.ShouldContain($"<stage-axon-runtime.version>{version}</stage-axon-runtime.version>");
     }
 
-    // Hashes of the pre-change orders pom, with only its runtime pin replaced by 9.9.9.
+    // Hashes of the orders pom with its runtime pin replaced by 9.9.9; re-pinned when spring-boot-starter-data-jpa-test joined the test scope.
     [Theory]
-    [InlineData(false, "8E586A3C60CD3655AAA45068552A91C459B084446677882A9D69401E632080E8")]
-    [InlineData(true, "51D09CA81484EF5B9F4F73D8EC513870A4CE264E9305B08351DB4A5747F0558F")]
+    [InlineData(false, "28D72B83C00464B87AB6B940B510C46DFAE6C4037E323008F05B62A188DE6208")]
+    [InlineData(true, "6218F903D673FB4BA51A04C16BC9DFF01D7D1B901B8E5548C7FC3D4178EB3F77")]
     void should_preserve_every_byte_of_the_released_pom(bool bearer, string expectedHash)
     {
         var pom = AxonMavenProject.Pom("corpusorders", "corpusorders-application", bearer, "9.9.9");

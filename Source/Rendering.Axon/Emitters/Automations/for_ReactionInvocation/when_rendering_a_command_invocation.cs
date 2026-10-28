@@ -19,7 +19,7 @@ public class when_rendering_a_command_invocation : for_AxonAutomationsEmitter.gi
         Render();
         var located = ScopeSelection.Locate(request.Model.Application).Single(slice => slice.Slice.Commands.Any(candidate => candidate.Id == command.Id));
         _commandType = CommandContractsEmitter.Package(new(request.Model.Application, JavaNames.PackageSegment(request.Model.Application.Name)), located) + "." + JavaNames.Type(command.Name);
-        _code = Code("SubmitOrderReaction");
+        _code = Code("SubmitOrderEndpoint");
     }
 
     [Fact] void should_import_the_invoked_model_type() => _code.ShouldContain("import " + _commandType + ";");

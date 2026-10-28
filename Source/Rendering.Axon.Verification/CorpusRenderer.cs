@@ -40,6 +40,15 @@ internal static class CorpusRenderer
         await WriteReactor(output, modules);
     }
 
+    internal static ArtifactRenderPlan Plan(string name, LoadedSemanticModel loaded) => name switch
+    {
+        "inline-java-policies" or "inline-java-policy-performers" => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: BearerProfile),
+        IngressProofModel.Application => IngressProofModel.Plan(loaded, BearerProfile),
+        IngressProofModel.PersistentApplication => IngressProofModel.PersistentPlan(loaded, Profile),
+        ConstraintProofArtifacts.PersistentApplication => ConstraintProofArtifacts.PersistentPlan(loaded, Profile),
+        _ => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: Profile)
+    };
+
     static async Task RenderApplication(string name, string root, string destination)
     {
         var applicationName = "Corpus" + string.Concat(name.Split('-').Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
@@ -80,20 +89,14 @@ internal static class CorpusRenderer
             case ConstraintProofArtifacts.PersistentApplication:
                 await ConstraintProofArtifacts.Write(destination, name);
                 break;
+            case ReactionCommandProofArtifacts.Application:
+                await ReactionCommandProofArtifacts.Write(destination);
+                break;
             case ReactionConstraintProofArtifacts.Application:
                 await ReactionConstraintProofArtifacts.Write(destination);
                 break;
         }
     }
-
-    static ArtifactRenderPlan Plan(string name, LoadedSemanticModel loaded) => name switch
-    {
-        "inline-java-policies" or "inline-java-policy-performers" => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: BearerProfile),
-        IngressProofModel.Application => IngressProofModel.Plan(loaded, BearerProfile),
-        IngressProofModel.PersistentApplication => IngressProofModel.PersistentPlan(loaded, Profile),
-        ConstraintProofArtifacts.PersistentApplication => ConstraintProofArtifacts.PersistentPlan(loaded, Profile),
-        _ => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: Profile)
-    };
 
     static async Task WriteArtifacts(string destination, ArtifactRenderPlan plan)
     {

@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
@@ -29,7 +30,7 @@ internal sealed class CommandDomainChecks(AxonEmissionContext context, SemanticC
         foreach (var property in command.Properties.Where(property => property.Type.Kind == SemanticTypeReferenceKind.Concept)) ClaimConceptRules(builder, property);
     }
 
-    /// <summary>Emits the inline checks; returns false when an unsupported rule ended the method with a fail-closed throw.</summary>
+    /// <summary>Emits the inline checks; returns whether the body may continue; unimplemented rules degrade to documented no-ops, so it is always true.</summary>
     /// <param name="builder">The handler method body.</param>
     /// <returns><c>true</c> when the body may continue; otherwise <c>false</c>.</returns>
     internal bool Emit(JavaCodeBuilder builder)
@@ -37,19 +38,17 @@ internal sealed class CommandDomainChecks(AxonEmissionContext context, SemanticC
         if (!HasRules) return true;
         var failures = builder.Reference("java.util.ArrayList");
         builder.Line($"var failures = new {failures}<{builder.Reference("java.lang.String")}>();");
-        if (!RenderRules(builder)) return false;
+        RenderRules(builder);
         builder.Line($"if (!failures.isEmpty()) throw new {builder.Reference("java.lang.IllegalArgumentException")}({builder.Reference("java.lang.String")}.join(\"; \", failures));");
         return true;
     }
 
-    bool RenderRules(JavaCodeBuilder builder)
+    void RenderRules(JavaCodeBuilder builder)
     {
-        if (!RenderPropertyRules(builder)) return false;
-        if (!RenderConceptRules(builder)) return false;
-        if (!RenderRequirements(builder)) return false;
-        if (command.CodeValidations.IsEmpty) return true;
-        Unsupported(builder, "run attached command validation code");
-        return false;
+        RenderPropertyRules(builder);
+        RenderConceptRules(builder);
+        RenderRequirements(builder);
+        if (!command.CodeValidations.IsEmpty) Unsupported(builder, "run attached command validation code");
     }
 
     SemanticConcept Concept(SemanticProperty property) => context.Request.Model.Application.Concepts.Single(concept => concept.Id == property.Type.Target);
@@ -62,68 +61,53 @@ internal sealed class CommandDomainChecks(AxonEmissionContext context, SemanticC
         }
     }
 
-    bool RenderPropertyRules(JavaCodeBuilder builder)
+    void RenderPropertyRules(JavaCodeBuilder builder)
     {
         foreach (var rule in command.Validations)
         {
             var property = command.Properties.SingleOrDefault(property => property.Id == rule.Property);
-            if (property is null)
-            {
-                Unsupported(builder, "validate an unresolved property");
-                return false;
-            }
-            if (!RenderRule(builder, property, rule)) return false;
+            if (property is null) Unsupported(builder, "validate an unresolved property");
+            else RenderRule(builder, property, rule);
         }
-        return true;
     }
 
-    bool RenderConceptRules(JavaCodeBuilder builder)
+    void RenderConceptRules(JavaCodeBuilder builder)
     {
         foreach (var property in command.Properties.Where(property => property.Type.Kind == SemanticTypeReferenceKind.Concept))
         {
             foreach (var rule in Concept(property).Validations)
             {
-                if (!RenderRule(builder, property, rule)) return false;
+                RenderRule(builder, property, rule);
             }
         }
-        return true;
     }
 
-    bool RenderRequirements(JavaCodeBuilder builder)
+    void RenderRequirements(JavaCodeBuilder builder)
     {
         foreach (var requirement in command.Requirements)
         {
             var condition = new CommandConditions(command, types).Render(requirement.Condition, builder);
-            if (condition is null)
-            {
-                Unsupported(builder, "evaluate a command requirement using protected state");
-                return false;
-            }
-            builder.Line($"if (!({condition})) failures.add({JavaCodeBuilder.StringLiteral(requirement.Message ?? "Command requirement was not satisfied.")});");
+            if (condition is null) Unsupported(builder, "evaluate a command requirement using protected state");
+            else builder.Line($"if (!({condition})) failures.add({JavaCodeBuilder.StringLiteral(requirement.Message ?? "Command requirement was not satisfied.")});");
         }
-        return true;
     }
 
-    bool RenderRule(JavaCodeBuilder builder, SemanticProperty property, SemanticValidationRule rule)
+    void RenderRule(JavaCodeBuilder builder, SemanticProperty property, SemanticValidationRule rule)
     {
         var member = JavaNames.Member(property.Name);
         var predicate = new CommandValidationPredicates(types, rule, property.Type, $"command.{member}()").Render(builder);
         if (predicate is null)
         {
             Unsupported(builder, $"validate {property.Name} using {rule.Kind}");
-            return false;
+            return;
         }
         builder.Line($"if (!({predicate})) failures.add({JavaCodeBuilder.StringLiteral(rule.Message ?? (property.Name + " failed " + rule.Kind + "."))});");
-        return true;
     }
 
     void Unsupported(JavaCodeBuilder builder, string intent)
     {
         var path = command.Id + "/validation";
-        context.Degradation.Unsupported(AxonRefusalCodes.CommandValidation, command.Id, $"Axon cannot yet {intent}.", intent, path);
-
-        // Keep unsupported guards fail-closed: a warning is not permission to execute an unvalidated command.
-        builder.UnsupportedIntent(intent, path, AxonRefusalCodes.CommandValidation)
-            .Line($"throw new {builder.Reference("java.lang.UnsupportedOperationException")}({JavaCodeBuilder.StringLiteral(AxonRefusalCodes.CommandValidation + ": " + intent)});");
+        builder.DiffersFromScreenplay(UnimplementedValidation.Report(context, command.Id, intent, path))
+            .UnsupportedIntent(intent, path, AxonRefusalCodes.ImplementationValidation);
     }
 }

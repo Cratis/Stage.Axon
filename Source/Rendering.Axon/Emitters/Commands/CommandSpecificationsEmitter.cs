@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -31,6 +32,8 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
     }
 
     static bool MissingValues(string? input, string?[] given, string?[] expected) => input is null || given.Any(value => value is null) || expected.Any(value => value is null);
+
+    static string DegradationCode(string reason) => reason == UnimplementedValidation.Reason ? AxonRefusalCodes.ImplementationValidation : AxonRefusalCodes.CommandSpecification;
 
     static bool HasReadModelFixtures(SemanticSpecification specification) =>
         !specification.GivenReadModels.IsEmpty || !specification.ThenReadModels.IsEmpty || !specification.ThenQueries.IsEmpty || !specification.ThenAbsentReadModels.IsEmpty;
@@ -95,14 +98,13 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         var reason = Unsupported(specification, values);
         if (MissingValues(input, given, expected)) reason ??= "construct the complete typed command and event fixtures";
         var method = "spec_" + JavaNames.Member(specification.Name) + "_" + index;
-        var code = reason is null ? null : AxonRefusalCodes.CommandSpecification;
+        if (DependsOnUnimplementedValidation(specification)) reason = UnimplementedValidation.Reason;
+        var code = reason is null ? null : DegradationCode(reason);
         AxonSpecificationsEmitter.Register(context, specification.Id, testClass, method, code);
         body.Line($"@{body.Reference("org.junit.jupiter.api.Test")}").Line("@" + body.Reference("org.junit.jupiter.api.DisplayName") + "(" + JavaCodeBuilder.StringLiteral(specification.Id.ToString()) + ")");
         if (reason is not null)
         {
-            context.Degradation.Unsupported(code!, specification.Id, "Axon cannot yet " + reason + ".", reason, specification.Id.ToString());
-            body.Line("@" + body.Reference("org.junit.jupiter.api.Disabled") + "(" + JavaCodeBuilder.StringLiteral(code + ": " + reason) + ")").Block("void " + method + "()", test =>
-                test.UnsupportedIntent(reason, specification.Id.ToString(), code!).Line("throw new " + test.Reference("java.lang.UnsupportedOperationException") + "(" + JavaCodeBuilder.StringLiteral(code + ": " + reason) + ");"));
+            DisabledSpecification(body, specification, method, reason);
             return;
         }
         body.Block("void " + method + "()", test =>
@@ -127,6 +129,19 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         });
     }
 
+    void DisabledSpecification(JavaCodeBuilder body, SemanticSpecification specification, string method, string reason)
+    {
+        var validation = reason == UnimplementedValidation.Reason;
+        var code = DegradationCode(reason);
+        context.Degradation.Unsupported(code, specification.Id, validation ? reason : "Axon cannot yet " + reason + ".", reason, specification.Id.ToString());
+        body.Line("@" + body.Reference("org.junit.jupiter.api.Disabled") + "(" + JavaCodeBuilder.StringLiteral(validation ? reason : code + ": " + reason) + ")").Block("void " + method + "()", test =>
+            test.UnsupportedIntent(reason, specification.Id.ToString(), code).Line("throw new " + test.Reference("java.lang.UnsupportedOperationException") + "(" + JavaCodeBuilder.StringLiteral(code + ": " + reason) + ");"));
+    }
+
+    bool DependsOnUnimplementedValidation(SemanticSpecification specification) =>
+        !specification.ThenDenied && !specification.ThenErrors.IsEmpty && context.Degradation.UnsupportedConstructs.Any(diagnostic =>
+            diagnostic.Artifact == command.Id && diagnostic.Code == AxonRefusalCodes.ImplementationValidation);
+
     bool HasUnsupportedCaptures(SemanticSpecification specification) =>
         !specification.GivenCaptures.IsEmpty || specification.GivenGenerated.Any(value => value.Command != command.Id);
 
@@ -139,7 +154,7 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
 
     string? Unsupported(SemanticSpecification specification, CommandFixtureValues values)
     {
-        if (context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == command.Id)) return "verify a command whose implementation or guarantee is degraded";
+        if (context.Degradation.UnsupportedConstructs.Any(diagnostic => diagnostic.Artifact == command.Id && diagnostic.Code != AxonRefusalCodes.ImplementationValidation)) return "verify a command whose implementation or guarantee is degraded";
         if (!specification.GivenEvents.IsEmpty && Emitters.Constraints.ConstraintCoverage.All(context).Any(item => command.Produces.Any(produced => Emitters.Constraints.ConstraintCoverage.Applies(item.Constraint, produced.EventContract))))
             return "seed append-time uniqueness from historical fixtures";
         if (HasReadModelFixtures(specification))

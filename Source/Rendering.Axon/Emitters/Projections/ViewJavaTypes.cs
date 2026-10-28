@@ -80,6 +80,17 @@ internal sealed class ViewJavaTypes(SemanticApplication application, string base
         _ => "null"
     };
 
+    internal bool IsEnumeration(SemanticTypeReference type) => _concepts.IsEnumeration(type);
+
+    internal string ColumnType(SemanticPrimitiveType primitive, JavaCodeBuilder code) => Primitive(primitive, code);
+
+    /// <summary>The first state of a projected row: a concept is never seeded with a zero wrapper, because its validation may refuse the zero.</summary>
+    internal string Seed(SemanticTypeReference type, JavaCodeBuilder code) => !type.IsCollection && type.Kind == SemanticTypeReferenceKind.Concept
+        ? "null" : Default(type, code);
+
+    internal string Seed(SemanticTypeReference type) => !type.IsCollection && type.Kind == SemanticTypeReferenceKind.Concept
+        ? "null" : Default(type);
+
     internal string Default(SemanticTypeReference type) => type.IsCollection ? "java.util.List.of()" : ScalarDefault(type);
 
     internal string EventType(SemanticId id)
