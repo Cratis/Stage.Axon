@@ -75,17 +75,16 @@ internal static class PersistentViewAdmission
 
     static IEnumerable<string> ProjectionReasons(AxonEmissionContext context, SemanticReadModel model, SemanticProjection projection)
     {
-        var transitions = ProjectionTransitions.From(projection).ToArray();
         if (projection.Scope is { } scope)
         {
             if (Stateful(scope))
                 yield return "its projection uses a stateful scope (every, children, nested scopes or joins)";
-            if (scope.From.Any(from => from.Key is not SemanticProjectionValueKey))
+            if (scope.From.Any(from => !ProjectionHandlerShape.RootKey(from.Key)))
                 yield return "its projection uses a composite root key";
-            if (scope.Removals.Length > 0 || scope.JoinRemovals.Length > 0)
+            if (scope.Removals.Any(removal => !ProjectionHandlerShape.PartKey(removal.Key)) || scope.JoinRemovals.Length > 0)
                 yield return "its projection removes rows";
         }
-        if (transitions.Length == 0) yield return "its projection has no event transitions";
+        if (!HasEvents(projection)) yield return "its projection has no event transitions";
         if (UnsupportedMappings(context, model, projection))
             yield return "its projection maps an unsupported event-context value, target or expression";
     }
@@ -93,10 +92,18 @@ internal static class PersistentViewAdmission
     static bool Flat(AxonEmissionContext context, SemanticReadModel model, SemanticProjection projection)
     {
         var transitions = ProjectionTransitions.From(projection).ToArray();
-        if (!ProjectionHandlerShape.RootOnly(projection) || transitions.Length == 0) return false;
+        if (!ProjectionHandlerShape.RootOnly(projection) || !HasEvents(projection)) return false;
         if (UnsupportedFactor(projection)) return false;
-        return transitions.All(from => From(context, model, from));
+        if (!transitions.All(from => From(context, model, from))) return false;
+        var values = new ProjectionValues(context, new(context.Request.Model.Application, context.BasePackage));
+        return projection.Scope is not { } scope || scope.Removals.All(removal =>
+        {
+            var contract = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).Single(candidate => candidate.Id == removal.EventContract);
+            return values.Key(removal.Key, contract) is not null;
+        });
     }
+
+    static bool HasEvents(SemanticProjection projection) => ProjectionTransitions.From(projection).Any() || projection.Scope?.Removals.Length > 0;
 
     static bool From(AxonEmissionContext context, SemanticReadModel model, SemanticProjectionFrom from)
     {

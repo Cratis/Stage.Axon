@@ -24,8 +24,25 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         }
     }
 
+    internal IEnumerable<string> PersistentProjectorImports()
+    {
+        foreach (var owner in ScopeSelection.Select(context.Request))
+        {
+            foreach (var model in owner.Slice.ReadModels.Where(model => PersistentViewAdmission.Supports(context, model.Id)))
+            {
+                var package = types.Package(owner);
+                var target = ProjectorInputs(owner, model);
+                yield return package + "." + JavaNames.Type(model.Name) + "StoreConfiguration.class";
+                yield return package + "." + target.Projector + ".class";
+                if (owner.Slice.Reducers.Any(reducer => reducer.ReadModel == model.Id))
+                    yield return package + "." + JavaNames.Type(model.Name) + "ReducerConfiguration.class";
+            }
+        }
+    }
+
     void EmitModel(LocatedSemanticSlice owner, SemanticReadModel model)
     {
+        new PersistentViewRemovalProof(context, types, persistence).Emit(owner, model);
         var target = ProjectorInputs(owner, model);
         var spec = Specification(owner, model, target.Observed);
         var query = Query(owner, model);
@@ -156,20 +173,4 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         AxonRuntimePackage.Type(types.BasePackage, "persistent.PersistentConfiguration") + ".class", persistence + ".PersistentViewConfiguration.class",
         package + "." + JavaNames.Type(query.Name) + "Handler.class", package + "." + JavaNames.Type(query.Name) + "Endpoint.class"
     }.Concat(PersistentProjectorImports()).Distinct(StringComparer.Ordinal));
-
-    IEnumerable<string> PersistentProjectorImports()
-    {
-        foreach (var owner in ScopeSelection.Select(context.Request))
-        {
-            foreach (var model in owner.Slice.ReadModels.Where(model => PersistentViewAdmission.Supports(context, model.Id)))
-            {
-                var package = types.Package(owner);
-                var target = ProjectorInputs(owner, model);
-                yield return package + "." + JavaNames.Type(model.Name) + "StoreConfiguration.class";
-                yield return package + "." + target.Projector + ".class";
-                if (owner.Slice.Reducers.Any(reducer => reducer.ReadModel == model.Id))
-                    yield return package + "." + JavaNames.Type(model.Name) + "ReducerConfiguration.class";
-            }
-        }
-    }
 }

@@ -11,26 +11,28 @@ internal sealed class ProjectionSequencing(AxonEmissionContext context, ViewJava
 {
     internal bool UsesModelSequence => ScopeSelection.Locate(context.Request.Model.Application)
         .SelectMany(owner => owner.Slice.Projections)
-        .Where(projection => projection.ReadModel == model.Id)
-        .SelectMany(projection => ProjectionTransitions.From(projection).GroupBy(transition => transition.EventContract))
-        .Any(NeedsFallback);
+        .Any(projection => projection.ReadModel == model.Id && NeedsFallback(projection));
 
     internal string Namespace => types.Package(ScopeSelection.Locate(context.Request.Model.Application)
         .Single(owner => owner.Slice.ReadModels.Any(candidate => candidate.Id == model.Id))) + "." + JavaNames.Type(model.Name);
 
     internal ProjectionHandlerBinding.ProjectionSequence Projection(IGrouping<SemanticId, SemanticProjectionFrom> group, JavaCodeBuilder code, ProjectionPolicyNames names)
     {
-        var contract = Contract(group.Key);
-        var key = UsesModelSequence || group.Count() != 1 ? null : new ProjectionValues(context, types, code).Key(group.Single().Key, contract);
-        return new(names.For(group.Key), types.EventType(group.Key, code), key);
+        return ForKeys(group.Key, [.. group.Select(from => from.Key)], code, names);
     }
+
+    internal ProjectionHandlerBinding.ProjectionSequence ForKeys(SemanticId contract, SemanticProjectionKey[] keys, JavaCodeBuilder code, ProjectionPolicyNames names) =>
+        new(names.For(contract), types.EventType(contract, code), UsesModelSequence || keys.Length != 1 ? null : new ProjectionValues(context, types, code).Key(keys[0], Contract(contract)));
 
     // Reducers write one source-keyed row, but inherit any other writer's model-wide fallback.
     internal ProjectionHandlerBinding.ProjectionSequence Reducer(SemanticEventContract contract, JavaCodeBuilder code, ProjectionPolicyNames names) =>
         new(names.For(contract.Id), types.EventType(contract.Id, code), UsesModelSequence ? null : new ProjectionValues(context, types, code).Source(contract));
 
-    bool NeedsFallback(IGrouping<SemanticId, SemanticProjectionFrom> group) =>
-        group.Count() != 1 || new ProjectionValues(context, types).Key(group.Single().Key, Contract(group.Key)) is null;
+    internal bool NeedsFallback(SemanticProjection projection) => ProjectionTransitions.From(projection)
+        .Select(from => (from.EventContract, from.Key))
+        .Concat((projection.Scope?.Removals ?? []).Select(removal => (removal.EventContract, removal.Key)))
+        .GroupBy(writer => writer.EventContract)
+        .Any(group => group.Count() != 1 || new ProjectionValues(context, types).Key(group.Single().Key, Contract(group.Key)) is null);
 
     SemanticEventContract Contract(SemanticId id) => ScopeSelection.Locate(context.Request.Model.Application)
         .SelectMany(owner => owner.Slice.Events).Single(contract => contract.Id == id);

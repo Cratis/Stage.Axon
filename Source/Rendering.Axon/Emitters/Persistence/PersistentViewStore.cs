@@ -100,7 +100,15 @@ internal static class PersistentViewStore
             }
             private String identity(Object key) {
                 Objects.requireNonNull(key);
-                return namespace + ":" + key.getClass().getName() + ":" + mapper.writeValueAsString(key);
+                Object value = key;
+                var kind = key.getClass().getName();
+                if (key instanceof java.util.Map<?, ?> map) {
+                    if (map.isEmpty() || map.entrySet().stream().anyMatch(entry -> !(entry.getKey() instanceof String) || !(entry.getValue() instanceof String)))
+                        throw new IllegalArgumentException("Persistent part keys require nonempty string keys and values");
+                    value = new java.util.TreeMap<>(map);
+                    kind = java.util.Map.class.getName();
+                }
+                return namespace + ":" + kind + ":" + mapper.writeValueAsString(value);
             }
             private String id(Object key) { return digest(identity(key)); }
             static String digest(String value) {
