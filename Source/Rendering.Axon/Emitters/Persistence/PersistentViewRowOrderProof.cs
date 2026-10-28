@@ -119,7 +119,14 @@ internal static class PersistentViewRowOrderProof
                 if (token == null) return false;
                 var lower = WrappedToken.unwrapLowerBound(token);
                 var upper = WrappedToken.unwrapUpperBound(token);
-                return lower != null && upper != null && lower.covers(head) && upper.covers(head);
+                return reachedPosition(lower, head) && reachedPosition(upper, head);
+            }
+            private static boolean reachedPosition(TrackingToken token, TrackingToken head) {
+                if (token == null) return false;
+                var position = token.position();
+                var headPosition = head.position();
+                // This owner-only committed-delivery barrier must not wait for cleanup of historical gaps.
+                return position.isPresent() && headPosition.isPresent() && position.getAsLong() >= headPosition.getAsLong();
             }
         }
         """;

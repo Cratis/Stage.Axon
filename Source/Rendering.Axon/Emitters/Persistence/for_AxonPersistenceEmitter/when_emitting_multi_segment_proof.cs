@@ -124,6 +124,18 @@ public class when_emitting_multi_segment_proof : Projections.for_AxonProjections
     [Fact] void should_not_wait_for_idle_segments_to_persist_the_terminal_head() => Code("TotalPersistentRowOrderTest").ShouldNotContain("coversHead(application, terminalHead, null)");
     [Fact] void should_use_exactly_four_synthetic_segments() => Code("TotalPersistentRowOrderTest").ShouldContain("Segment.splitBalanced(Segment.ROOT_SEGMENT, 3)");
     [Fact] void should_refuse_missing_owner_token_entries() => Code("TotalPersistentRowOrderTest").ShouldContain("if (entry == null) return false;");
+    [Fact] void should_require_both_committed_token_bounds_to_reach_the_head_position() => Code("TotalPersistentRowOrderTest").ShouldContain("return reachedPosition(lower, head) && reachedPosition(upper, head);");
+    [Fact] void should_refuse_missing_committed_token_bounds() => Code("TotalPersistentRowOrderTest").ShouldContain("if (token == null) return false;");
+    [Fact] void should_require_known_positions_at_or_after_the_head() => Code("TotalPersistentRowOrderTest").ShouldContain("return position.isPresent() && headPosition.isPresent() && position.getAsLong() >= headPosition.getAsLong();");
+    [Fact]
+    void should_not_wait_for_gap_cleanup_at_the_head_barrier()
+    {
+        var proof = Code("TotalPersistentRowOrderTest");
+        proof.ShouldContain("var position = token.position();");
+        proof.ShouldContain("var headPosition = head.position();");
+        proof.ShouldNotContain("lower.covers(head)");
+        proof.ShouldNotContain("upper.covers(head)");
+    }
 
     string Proof => Code("TotalPersistentMultiSegmentTest");
     string Support => Code("TotalPersistentSupport");
