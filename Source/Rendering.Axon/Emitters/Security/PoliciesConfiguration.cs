@@ -8,13 +8,10 @@ using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Security;
 
-internal static partial class PoliciesConfiguration
+internal static class PoliciesConfiguration
 {
-    [GeneratedRegex(@"""""""[\s\S]*?""""""|""(?:\\.|[^""\\\n])*""|'(?:\\.|[^'\\\n])*'|/\*[\s\S]*?\*/|//[^\n]*", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex CommentsAndLiterals { get; }
-
     // A body that declares a local or pattern variable named like an emitted parameter would not compile; the body stays as written and the parameter moves.
-    internal static bool Declares(string body, string name) => Regex.IsMatch(BlankCommentsAndLiterals(body), $@"(?:\bvar|\bfinal|[>\]]|\b(?!(?:return|new|throw|else|case|instanceof)\b)\w+)\s+{name}\b\s*(?:=(?!=)|;|:|\)|,|\?|&&)", RegexOptions.None, TimeSpan.FromSeconds(1));
+    internal static bool Declares(string body, string name) => Regex.IsMatch(JavaCodeMask.Blank(body), $@"(?:\bvar|\bfinal|[>\]]|\b(?!(?:return|new|throw|else|case|instanceof)\b)\w+)\s+{name}\b\s*(?:=(?!=)|;|:|\)|,|\?|&&)", RegexOptions.None, TimeSpan.FromSeconds(1));
 
     internal static void Emit(AxonEmissionContext context)
     {
@@ -122,7 +119,4 @@ internal static partial class PoliciesConfiguration
             """;
         context.AddJava(context.BasePackage + ".infrastructure", name, code + "\n", sources: [context.Request.Model.Application.Id]);
     }
-
-    // Declarations in comments or literals do not count; the blanked copy is only used for detection, never emitted.
-    static string BlankCommentsAndLiterals(string body) => CommentsAndLiterals.Replace(body, " ");
 }
