@@ -56,8 +56,8 @@ public class when_preserving_application_admission_and_identity : Specification
     ]).ShouldBeTrue();
 
     [Fact] void should_keep_native_report_application_names() => CorpusApplications.Find(given.the_repository.Root()).Select(application => application.Name).SequenceEqual(_applications.Select(application => application.Name)).ShouldBeTrue();
-    [Fact] void should_compile_every_application() => _models.Count.ShouldEqual(30);
-    [Fact] void should_plan_every_application_without_refusals() => (_plans.Count == 30 && _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty)).ShouldBeTrue();
+    [Fact] void should_compile_every_application() => _models.Count.ShouldEqual(31);
+    [Fact] void should_plan_every_application_without_refusals() => (_plans.Count == 31 && _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty)).ShouldBeTrue();
     [Fact] void should_use_the_composed_custom_package_root() => _applications.Single(application => application.Name == "sample-custom-packages").Root.ShouldEqual(_inputs.Root);
 
     [Fact] void should_bind_proof_facts_to_the_authenticated_caller() => ProofSource("RegisterAccountHandler").ShouldContain("Caller.current().identity()");
