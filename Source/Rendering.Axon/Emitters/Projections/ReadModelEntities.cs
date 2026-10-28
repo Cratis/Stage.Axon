@@ -90,7 +90,7 @@ internal static class ReadModelEntities
     {
         SemanticPrimitiveType.DecimalNumber => column + ", columnDefinition = \"DECFLOAT\")",
         SemanticPrimitiveType.Uuid or SemanticPrimitiveType.WholeNumber or SemanticPrimitiveType.Boolean or SemanticPrimitiveType.Date or SemanticPrimitiveType.DateTime => column + ")",
-        _ => column + ", length = 4096)"
+        _ => column + $", columnDefinition = \"VARCHAR({KeyLength})\")"
     };
 
     static string Snake(string value)

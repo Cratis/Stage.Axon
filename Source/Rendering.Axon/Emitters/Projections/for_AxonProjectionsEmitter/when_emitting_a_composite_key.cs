@@ -17,5 +17,6 @@ public class when_emitting_a_composite_key : given.a_view_request
     }
 
     [Fact] void should_not_limit_the_composite_key_length() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/MetricEntity.java", StringComparison.Ordinal))).ShouldContain("@Column(name = \"row_key\", columnDefinition = \"VARCHAR(1000000000)\")");
+    [Fact] void should_not_limit_a_text_column_length() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/MetricEntity.java", StringComparison.Ordinal))).ShouldContain("@Column(name = \"p_region\", columnDefinition = \"VARCHAR(1000000000)\")");
     [Fact] void should_not_limit_a_single_key_length() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/TotalEntity.java", StringComparison.Ordinal))).ShouldContain("@Column(name = \"row_key\", columnDefinition = \"VARCHAR(1000000000)\")");
 }
