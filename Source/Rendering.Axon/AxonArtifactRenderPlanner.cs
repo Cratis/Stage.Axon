@@ -1,7 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Text;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters;
@@ -38,6 +37,7 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
             Emit(context, _emitters);
             GuardPaths(context);
             AppendFallbackNotes(context);
+            UnsupportedSummary.Emit(context);
         }
 
         return ArtifactRenderPlan.Create(
@@ -53,7 +53,6 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
     {
         foreach (var emitter in emitters.Where(emitter => emitter.IsImplemented)) EmitSafely(context, emitter);
         InlineImplementationDiagnostics.Emit(context);
-        UnsupportedSummary.Emit(context);
         if (context.Artifacts.Count == 0)
         {
             context.Degradation.Unsupported(
@@ -65,7 +64,6 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
 
     static void EmitSafely(AxonEmissionContext context, IAxonEmitter emitter)
     {
-        var start = context.Artifacts.Count;
         var allocated = context.AllocatedTypes.Keys.ToHashSet(StringComparer.Ordinal);
         var consumed = context.ConsumedImplementations.ToArray();
         try
@@ -74,14 +72,14 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
         }
         catch (Exception exception) when (exception is not OutOfMemoryException and not OperationCanceledException)
         {
-            context.Artifacts.RemoveRange(start, context.Artifacts.Count - start);
             context.ConsumedImplementations.Clear();
             context.ConsumedImplementations.UnionWith(consumed);
-            foreach (var allocation in context.AllocatedTypes.Where(pair => !allocated.Contains(pair.Key)).Select(pair => pair.Value).ToArray())
+            var completed = context.Artifacts.Select(artifact => artifact.RelativePath).ToHashSet(StringComparer.Ordinal);
+            foreach (var allocation in context.AllocatedTypes.Where(pair => !allocated.Contains(pair.Key) && !completed.Contains(pair.Key)).Select(pair => pair.Value).ToArray())
             {
                 context.AddJava(allocation.Package, allocation.Name, allocation.Stub, allocation.Test, allocation.Sources);
             }
-            context.Degradation.Warn(AxonRefusalCodes.Generation, context.Request.Model.Application.Id, $"Emitter '{emitter.GetType().Name}' failed ({exception.GetType().Name}); allocated types are unsupported stubs.");
+            context.Degradation.Unsupported(AxonRefusalCodes.Generation, context.Request.Model.Application.Id, $"Emitter '{emitter.GetType().Name}' failed ({exception.GetType().Name}); completed artifacts are retained and incomplete allocations use explicit API-preserving stubs.");
         }
     }
 
@@ -97,7 +95,7 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
             }
             else
             {
-                context.Degradation.Warn(AxonRefusalCodes.Generation, context.Request.Model.Application.Id, $"Dropped duplicate or case-colliding artifact '{artifact.RelativePath}'; the first artifact is kept. References may not compile until name propagation is implemented.");
+                context.Degradation.Unsupported(AxonRefusalCodes.Generation, context.Request.Model.Application.Id, $"Dropped duplicate or case-colliding artifact '{artifact.RelativePath}'; the first artifact is kept. References may not compile until name propagation is implemented.");
             }
         }
         context.Artifacts.Clear();
@@ -121,18 +119,13 @@ public sealed class AxonArtifactRenderPlanner : IArtifactRenderPlanner
 
     static void AppendFallbackNotes(AxonEmissionContext context)
     {
-        var index = context.Artifacts.FindIndex(artifact => artifact.RelativePath == "UNSUPPORTED.md");
-        if (index < 0) return;
-        var text = new StringBuilder(Encoding.UTF8.GetString(context.Artifacts[index].Bytes.AsSpan()));
-        foreach (var diagnostic in context.Degradation.Warnings.Where(diagnostic => diagnostic.Code == AxonRefusalCodes.Generation || diagnostic.Code == AxonRefusalCodes.Names))
+        foreach (var diagnostic in context.Degradation.Warnings.Where(diagnostic => diagnostic.Code == AxonRefusalCodes.Names))
         {
-            var message = diagnostic.Message.Replace('|', '/').Replace('\r', ' ').Replace('\n', ' ');
-            text.AppendLine($"| {diagnostic.Code} | {diagnostic.Artifact} | Differs from Screenplay | {message} |");
+            context.Degradation.Note($"{diagnostic.Code}: {diagnostic.Message}");
         }
         if (context.Request.ImplementationContents.Count > 0)
         {
-            text.AppendLine("\n## Inline Java bodies\n\nInline Java bodies are emitted verbatim. Hard-coded package names may no longer match generated names after normalization or renaming; bodies are not rewritten.");
+            context.Degradation.Note("Inline Java bodies are emitted verbatim. Hard-coded package names may no longer match generated names after normalization or renaming; bodies are not rewritten.");
         }
-        context.Artifacts[index] = PlannedArtifact.CreateText("UNSUPPORTED.md", text.ToString());
     }
 }
