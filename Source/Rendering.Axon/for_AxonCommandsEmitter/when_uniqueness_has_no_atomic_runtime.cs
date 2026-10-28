@@ -26,7 +26,7 @@ public class when_uniqueness_has_no_atomic_runtime : for_AxonArtifactRenderPlann
         command = slices.SelectMany(slice => slice.Slice.Commands).Single(command => command.Name == "PlaceOrder");
         unrelated = slices.SelectMany(slice => slice.Slice.Commands).Single(command => command.Name == "MoveOrder");
         var contract = slices.SelectMany(slice => slice.Slice.Events).Single(contract => contract.Id == command.Produces[0].EventContract);
-        var constraint = new SemanticConstraint("CustomerUnique", SemanticConstraintKind.UniqueEventOccurrence, SemanticConstraintScope.EventSequence, [new(contract.Id, [])], [], false, null);
+        var constraint = given.UnsupportedEnumUniqueness.For(contract);
         SemanticFeature Feature(SemanticFeature feature) => feature with { Features = [.. feature.Features.Select(Feature)], Slices = [.. feature.Slices.Select(slice => slice.Commands.Any(candidate => candidate.Id == command.Id) ? slice with { Constraints = [constraint] } : slice)] };
         var app = loaded.Model.Application with { Modules = [.. loaded.Model.Application.Modules.Select(module => module with { Features = [.. module.Features.Select(Feature)] })] };
         var model = ExecutableSemanticModel.Create(loaded.Model.LanguageVersion, loaded.Model.SemanticVersion, app);
@@ -34,6 +34,7 @@ public class when_uniqueness_has_no_atomic_runtime : for_AxonArtifactRenderPlann
         context = new(request, new(request.Profile));
         new AxonCommandsEmitter().Emit(context);
         handler = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("PlaceOrderHandler.java", StringComparison.Ordinal)).Bytes.AsSpan());
+        UnsupportedSummary.Emit(context);
     }
 
     [Fact] void should_refuse_the_unprotected_append() => handler.ShouldContain("throw new UnsupportedOperationException(\"STAGE-AXON-0801");
@@ -43,4 +44,6 @@ public class when_uniqueness_has_no_atomic_runtime : for_AxonArtifactRenderPlann
     [Fact] void should_disable_dependent_native_specifications() => context.Specifications.Values.Any(specification => specification.DisabledCode == "STAGE-AXON-0112").ShouldBeTrue();
     [Fact] void should_detect_the_constrained_command() => ConstraintCoverage.CommandRequiresUnsupportedConstraint(context, command).ShouldBeTrue();
     [Fact] void should_not_block_unrelated_commands() => ConstraintCoverage.CommandRequiresUnsupportedConstraint(context, unrelated).ShouldBeFalse();
+    [Fact] void should_preserve_the_intent_comment() => handler.ShouldContain("// Screenplay wanted to");
+    [Fact] void should_summarize_the_unsupported_constraint() => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan()).ShouldContain("STAGE-AXON-0801");
 }

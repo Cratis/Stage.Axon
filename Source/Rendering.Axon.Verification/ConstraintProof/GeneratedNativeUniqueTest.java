@@ -6,7 +6,12 @@ import __APPLICATION__.accounts.aliases.quietclaim.ClaimAliasQuietly;
 import __APPLICATION__.accounts.aliases.quietrelease.ReleaseAliasQuietly;
 import __APPLICATION__.accounts.aliases.release.ReleaseAlias;
 import __APPLICATION__.accounts.events.AliasClaimed;
+import __APPLICATION__.accounts.events.AccountOpened;
 import __APPLICATION__.accounts.events.EventTags;
+import __APPLICATION__.accounts.openings.close.CloseAccount;
+import __APPLICATION__.accounts.openings.failingopen.OpenAccountThenFail;
+import __APPLICATION__.accounts.openings.modeledopen.OpenAccountModeled;
+import __APPLICATION__.accounts.openings.open_.OpenAccount;
 import __APPLICATION__.concepts.AccountId;
 import __RUNTIME_MODULE__.UniqueValueConflict;
 import java.util.ArrayList;
@@ -14,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -23,6 +29,7 @@ import org.axonframework.eventsourcing.eventstore.SourcingCondition;
 import org.axonframework.eventsourcing.eventstore.TerminalEventMessage;
 import org.axonframework.messaging.commandhandling.gateway.CommandGateway;
 import org.axonframework.messaging.eventhandling.EventMessage;
+import org.axonframework.messaging.eventhandling.conversion.EventConverter;
 import org.axonframework.messaging.eventstreaming.EventCriteria;
 import org.axonframework.messaging.eventstreaming.Tag;
 import org.junit.jupiter.api.AfterEach;
@@ -37,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class GeneratedNativeUniqueTest {
+__BASE_MODIFIER__class GeneratedNativeUniqueTest {
     private static final int CONTENDERS = 8;
     private static final int REPETITIONS = 25;
     private final ExecutorService workers = Executors.newFixedThreadPool(CONTENDERS);
@@ -57,6 +64,7 @@ class GeneratedNativeUniqueTest {
             var ready = new CountDownLatch(CONTENDERS);
             var start = new CountDownLatch(1);
             var owners = new ArrayList<AccountId>();
+            var failures = new ConcurrentLinkedQueue<String>();
             var calls = new ArrayList<CompletableFuture<Boolean>>();
             for (var index = 0; index < CONTENDERS; index++) {
                 var owner = new AccountId(unique());
@@ -65,22 +73,20 @@ class GeneratedNativeUniqueTest {
                     ready.countDown();
                     await(start);
                     try { claim(owner, alias); return true; }
-                    catch (Exception failure) {
-                        assertInstanceOf(UniqueValueConflict.class, root(failure));
-                        return false;
-                    }
+                    catch (Exception failure) { return lost(failure, failures); }
                 }, workers));
             }
             assertTrue(ready.await(5, TimeUnit.SECONDS), "All contenders must arrive");
             start.countDown();
             var winners = 0;
             for (var call : calls) if (call.get(10, TimeUnit.SECONDS)) winners++;
-            assertEquals(1, winners);
+            assertEquals(1, winners, () -> "Contender failures: " + failures);
             var events = 0L;
             for (var index = 0; index < owners.size(); index++) {
                 var facts = facts(owners.get(index));
                 assertEquals(calls.get(index).get(10, TimeUnit.SECONDS) ? 1 : 0, facts.size());
-                events += facts.stream().filter(event -> event.payload() instanceof AliasClaimed).count();
+                for (var event : facts) assertEquals(alias, payload(event, AliasClaimed.class).alias());
+                events += facts.size();
             }
             assertEquals(1, events);
         }
@@ -154,6 +160,71 @@ class GeneratedNativeUniqueTest {
         assertEquals(1, facts(other).size());
     }
 
+    @Test
+    void exactlyOneConcurrentOpeningWins() throws Exception {
+        for (var repetition = 0; repetition < REPETITIONS; repetition++) {
+            var owner = new AccountId(unique());
+            var ready = new CountDownLatch(CONTENDERS);
+            var start = new CountDownLatch(1);
+            var failures = new ConcurrentLinkedQueue<String>();
+            var calls = new ArrayList<CompletableFuture<Boolean>>();
+            for (var index = 0; index < CONTENDERS; index++) {
+                Object command = index % 2 == 0 ? new OpenAccount(owner) : new OpenAccountModeled(owner);
+                calls.add(CompletableFuture.supplyAsync(() -> {
+                    ready.countDown();
+                    await(start);
+                    try { send(command); return true; }
+                    catch (Exception failure) { return lost(failure, failures); }
+                }, workers));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS), "All contenders must arrive");
+            start.countDown();
+            var winners = 0;
+            for (var call : calls) if (call.get(10, TimeUnit.SECONDS)) winners++;
+            assertEquals(1, winners, () -> "Contender failures: " + failures);
+            var facts = facts(owner);
+            assertEquals(1, facts.size());
+            assertEquals(owner, payload(facts.getFirst(), AccountOpened.class).accountId());
+        }
+    }
+
+    @Test
+    void nativeOpeningBlocksModeledOpening() throws Exception {
+        var owner = new AccountId(unique());
+        send(new OpenAccount(owner));
+        conflict(new OpenAccountModeled(owner));
+        assertEquals(1, facts(owner).size());
+    }
+
+    @Test
+    void modeledOpeningBlocksNativeOpening() throws Exception {
+        var owner = new AccountId(unique());
+        send(new OpenAccountModeled(owner));
+        conflict(new OpenAccount(owner));
+        assertEquals(1, facts(owner).size());
+    }
+
+    @Test
+    void closingReleasesTheOpening() throws Exception {
+        var owner = new AccountId(unique());
+        send(new OpenAccount(owner));
+        send(new CloseAccount(owner));
+        send(new OpenAccountModeled(owner));
+        assertEquals(3, facts(owner).size());
+        conflict(new OpenAccount(owner));
+    }
+
+    @Test
+    void rolledBackOpeningKeepsNoReservation() throws Exception {
+        var owner = new AccountId(unique());
+        var failure = assertThrows(Exception.class, () -> send(new OpenAccountThenFail(owner)));
+        assertInstanceOf(IllegalStateException.class, root(failure));
+        assertEquals("forced rollback", root(failure).getMessage());
+        assertEquals(0, facts(owner).size());
+        send(new OpenAccountModeled(owner));
+        assertEquals(1, facts(owner).size());
+    }
+
     private void claim(AccountId owner, String alias) throws Exception {
         send(new ClaimAlias(owner, alias));
     }
@@ -174,6 +245,17 @@ class GeneratedNativeUniqueTest {
             return stream.filter(entry -> !(entry.message() instanceof TerminalEventMessage))
                     .collect(ArrayList<EventMessage>::new, (all, entry) -> all.add(entry)).get(10, TimeUnit.SECONDS);
         } finally { stream.close(); }
+    }
+
+    private <T> T payload(EventMessage event, Class<T> type) {
+        return event.payloadAs(type, configuration.getComponent(EventConverter.class));
+    }
+
+    private static boolean lost(Throwable failure, ConcurrentLinkedQueue<String> failures) {
+        var cause = root(failure);
+        failures.add(cause.getClass().getName() + ": " + cause.getMessage());
+        assertInstanceOf(UniqueValueConflict.class, cause, failure::toString);
+        return false;
     }
 
     private static void await(CountDownLatch latch) {
