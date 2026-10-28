@@ -47,7 +47,7 @@ public static class AxonRendering
     /// <param name="refusals">The requested artifact-refusal policy.</param>
     /// <param name="strict">Whether unsupported constructs produce errors and refusals instead of warnings.</param>
     /// <param name="fileHeader">Optional plain-text lines to prefix emitted Java files as comments; none by default.</param>
-    /// <remarks>Approximations, such as process-local schedules, are not rendered unless allowed with <see cref="AllowApproximations"/>.</remarks>
+    /// <remarks>Approximations, such as process-local schedules, render with a warning; in strict mode they refuse unless allowed with <see cref="AllowApproximations"/>.</remarks>
     /// <returns>The immutable Axon profile.</returns>
     public static ArtifactRenderProfile CreateProfile(
         ImplementationGapMode implementationGaps = ImplementationGapMode.Refuse,
@@ -66,7 +66,7 @@ public static class AxonRendering
             inputs);
     }
 
-    /// <summary>Returns the profile with the named approximations explicitly allowed; unlisted approximations stay unsupported.</summary>
+    /// <summary>Returns the profile with the named approximations explicitly allowed, so strict mode accepts them with a warning; unlisted approximations stay unsupported.</summary>
     /// <param name="profile">The Axon profile to extend.</param>
     /// <param name="codes">The approximation codes to allow, for example <c>STAGE-AXON-0507</c> for process-local schedules.</param>
     /// <returns>The profile carrying the opt-in.</returns>

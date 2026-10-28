@@ -14,6 +14,8 @@ public abstract class a_planned_screenplay : Specification
 
     private protected abstract string Model { get; }
 
+    private protected virtual ArtifactRenderProfile? Profile => null;
+
     async Task Establish()
     {
         var directory = Directory.CreateTempSubdirectory("reaction-plan");
@@ -21,7 +23,7 @@ public abstract class a_planned_screenplay : Specification
         {
             await File.WriteAllTextAsync(Path.Combine(directory.FullName, "model.play"), Model.ReplaceLineEndings("\n"));
             var loaded = await SemanticModelLoader.LoadFromPathAsync(directory.FullName, null, "ReactionPlan");
-            plan = AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id));
+            plan = AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: Profile);
         }
         finally
         {

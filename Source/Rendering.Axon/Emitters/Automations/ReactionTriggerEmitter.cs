@@ -67,7 +67,7 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
     {
         if (model.Kind is not (SemanticReactionTriggerKind.Interval or SemanticReactionTriggerKind.Schedule)) return;
         const string reason = "Schedules use UTC and process-local Spring scheduling, not a durable scheduler; interval boundaries start with this process.";
-        context.Degradation.Unsupported(AxonRefusalCodes.Schedule, reaction.Id, reason, $"run reaction {reaction.Name} trigger {index + 1} on its modeled clock", $"{reaction.Id}/triggers/{index}");
+        context.Degradation.Approximate(AxonRefusalCodes.Schedule, reaction.Id, reason, $"run reaction {reaction.Name} trigger {index + 1} on its modeled clock", $"{reaction.Id}/triggers/{index}");
         method.DiffersFromScreenplay(model.Kind == SemanticReactionTriggerKind.Interval
             ? "Spring fixed-rate intervals start when this process starts, not at epoch-aligned Screenplay clock boundaries; delivery remains at least once."
             : "Spring cron schedules run in UTC inside this process and are not durable; firings missed while the process is down are not replayed.");
