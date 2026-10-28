@@ -8,4 +8,6 @@ internal sealed record PreparedReactionTrigger(string Annotation, ReactionInput 
     internal ReactionProduction? Production { get; init; }
 
     internal string? NativeBody { get; init; }
+
+    internal bool UsesClock => NativeBody is not null || Invocation.Contains("clock.", StringComparison.Ordinal) || (Condition?.Contains("clock.", StringComparison.Ordinal) ?? false);
 }

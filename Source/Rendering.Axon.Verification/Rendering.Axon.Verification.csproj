@@ -15,6 +15,7 @@
         <EmbeddedResource Include="Templates/*.java" />
         <EmbeddedResource Include="ConstraintProof/*.java" LogicalName="ConstraintProof/%(Filename)%(Extension)" />
         <EmbeddedResource Include="ReactionConstraintProof/*.java" />
+        <EmbeddedResource Include="ReactionCommandProof/*.java" />
         <EmbeddedResource Include="ClientProof/**/*" Exclude="ClientProof/scene/**" LogicalName="ClientProof/%(RecursiveDir)%(Filename)%(Extension)" />
     </ItemGroup>
 </Project>

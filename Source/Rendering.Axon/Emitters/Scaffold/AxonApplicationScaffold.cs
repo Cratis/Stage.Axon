@@ -7,12 +7,17 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Scaffold;
 
 internal static class AxonApplicationScaffold
 {
-    internal static string Application(string package) => new JavaCodeBuilder(package).Declare("Application")
-        .Import("org.springframework.boot.SpringApplication")
-        .Import("org.springframework.boot.autoconfigure.SpringBootApplication")
-        .Line("@SpringBootApplication")
-        .Block("public class Application", body => body.Block("public static void main(String[] args)", method => method.Line("SpringApplication.run(Application.class, args);")))
-        .Build();
+    internal static string Application(string package, bool scheduling = false)
+    {
+        var code = new JavaCodeBuilder(package).Declare("Application")
+            .Import("org.springframework.boot.SpringApplication")
+            .Import("org.springframework.boot.autoconfigure.SpringBootApplication");
+        if (scheduling) code.Import("org.springframework.scheduling.annotation.EnableScheduling");
+        code.Line("@SpringBootApplication");
+        if (scheduling) code.Line("@EnableScheduling");
+        return code.Block("public class Application", body => body.Block("public static void main(String[] args)", method => method.Line("SpringApplication.run(Application.class, args);")))
+            .Build();
+    }
 
     internal static string Infrastructure(string package) => new JavaCodeBuilder(package + ".infrastructure").Declare("AxonConfiguration")
         .Import("java.time.Clock")

@@ -34,7 +34,7 @@ public sealed record AxonRenderOptions
     public bool Strict { get; init; }
 
     /// <summary>
-    /// Gets approximation codes explicitly allowed. Empty preserves rendering without approximations.
+    /// Gets approximation codes explicitly allowed. Approximations always render with a warning; listing a code also keeps strict mode from refusing it.
     /// </summary>
     public ImmutableArray<string> AllowedApproximations { get; init; } = [];
 

@@ -60,7 +60,7 @@ internal static class Degradations
         Unsupported(AxonRefusalCodes.TranslationCapture, "capture the modeled source data", "No source subscription or checkpoint is generated.", Omitted),
         Unsupported(AxonRefusalCodes.RefusalBranch, "execute the modeled refusal branch", "Command refusal branches are not represented by this reaction.", Omitted),
         Unsupported(AxonRefusalCodes.ConceptCompliance, "protect the modeled concept at rest", "Protection at rest is not configured.", ThrowingBody),
-        Unsupported(AxonRefusalCodes.Schedule, "invoke commands on the modeled schedule", "Process-local scheduling cannot provide durable deadline semantics.", Omitted) with { AxonDocs = Docs + "/migration/paths/deadlines/" },
+        Unsupported(AxonRefusalCodes.Schedule, "invoke commands on the modeled schedule", "Process-local scheduling cannot provide durable deadline semantics.", Comment) with { AxonDocs = Docs + "/migration/paths/deadlines/" },
         Unsupported(AxonRefusalCodes.Constraint, "enforce the modeled uniqueness constraint", "The constraint has no admitted atomic runtime shape.", ThrowingBody),
         Unsupported(AxonRefusalCodes.CommandMapping, "produce the modeled command result and events", "The command mapping cannot be represented.", ThrowingBody),
         Unsupported(AxonRefusalCodes.CommandSpecification, "verify the modeled command behavior", "The command fixture cannot establish this expectation.", Comment),
