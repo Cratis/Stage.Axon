@@ -70,6 +70,8 @@ internal static class NativeTestResults
     {
         ClientProofArtifacts.Application => ["ClientContractTest"],
         ReactionConstraintProofArtifacts.Application => ["GeneratedMemoryReactionConstraintTest", "GeneratedPersistentReactionConstraintTest"],
+        ConstraintProofArtifacts.Application => ["GeneratedNativeUniqueTest"],
+        ConstraintProofArtifacts.PersistentApplication => ["GeneratedPersistentNativeUniqueTest"],
         _ => []
     };
 
