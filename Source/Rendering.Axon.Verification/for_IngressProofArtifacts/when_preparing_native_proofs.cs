@@ -39,6 +39,9 @@ public partial class when_preparing_native_proofs : Specification
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("inlineFailureAndAnonymousNeverGrant");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("roleGrantOrLegitimatePolicyDenyGrants");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("failedOperandDeniesAndAndOr");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("scopeEscapeCannotPromoteSiblingFailure");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("financeWithoutWriterDeniesTheConjunction");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("inlinePoliciesProtectLiveQueries");
         sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain("stage.axon.demo.claims.department=Finance Operations");
     }
 

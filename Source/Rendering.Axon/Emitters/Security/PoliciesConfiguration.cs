@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Java;
 
@@ -15,18 +16,14 @@ internal static class PoliciesConfiguration
         foreach (var (policy, condition) in PolicyPredicates.Referenced(context).DistinctBy(item => JavaNames.Member(item.Policy.Name)))
         {
             if (PolicyPredicates.Resolve(context, policy, condition).Body is not { } body) continue;
-            var member = JavaNames.Member(policy.Name);
+            EmitPolicy(context, policy, body);
             methods.Add($$"""
                 private static Decision evaluate{{JavaNames.Type(policy.Name)}}(Authentication authentication, Map<String, Object> claims) {
                     try {
-                        return decision({{member}}(authentication, claims));
-                    } catch (Exception failure) {
+                        return decision({{PolicyPredicates.PolicyClass(policy)}}.evaluate(authentication, claims));
+                    } catch (Throwable failure) {
                         return Decision.FAILED;
                     }
-                }
-
-                private static boolean {{member}}(Authentication authentication, Map<String, Object> claims) throws Exception {
-            {{body}}
                 }
             """);
             context.ConsumedImplementations.Add(condition.RequirementId);
@@ -42,7 +39,7 @@ internal static class PoliciesConfiguration
                     try {
                         var claims = claims(authentication);
                         return {{expression}} == Decision.ALLOW;
-                    } catch (RuntimeException failure) {
+                    } catch (Throwable failure) {
                         return false;
                     }
                 }
@@ -96,5 +93,24 @@ internal static class PoliciesConfiguration
             }
             """;
         context.AddJava(context.BasePackage + ".infrastructure", "Policies", code + "\n", sources: [context.Request.Model.Application.Id]);
+    }
+
+    static void EmitPolicy(AxonEmissionContext context, SemanticPolicy policy, string body)
+    {
+        // Bodies are trusted Java, not sandboxed. A separate compilation unit isolates lexical scope from the evaluator and sibling bodies.
+        var name = PolicyPredicates.PolicyClass(policy);
+        var code = $$"""
+            package {{context.BasePackage}}.infrastructure;
+
+            import java.util.Map;
+            import org.springframework.security.core.Authentication;
+
+            public final class {{name}} {
+                public static boolean evaluate(Authentication authentication, Map<String, Object> claims) throws Exception {
+            {{body}}
+                }
+            }
+            """;
+        context.AddJava(context.BasePackage + ".infrastructure", name, code + "\n", sources: [context.Request.Model.Application.Id]);
     }
 }

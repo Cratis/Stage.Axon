@@ -4,6 +4,7 @@ import __APPLICATION__.accounts.registry.active.ActiveAccounts;
 import __APPLICATION__.accounts.registry.register.RegisterAccount;
 import __APPLICATION__.accounts.registry.register.RegisterAccountHandler;
 import __APPLICATION__.concepts.AccountId;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.axonframework.messaging.commandhandling.gateway.CommandGateway;
@@ -30,11 +31,14 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,6 +58,37 @@ class GeneratedInlinePolicyTest {
         http.perform(command()).andExpect(status().is4xxClientError());
         http.perform(query("account-snapshot").with(authentication(caller("Other")))).andExpect(status().is4xxClientError());
         assertFalse(environment.acceptsProfiles(Profiles.of("demo")), "Demo must not activate by default");
+    }
+
+    @Test
+    void financeWithoutWriterDeniesTheConjunction() throws Exception {
+        var caller = UsernamePasswordAuthenticationToken.authenticated("reader", null, List.of(new SimpleGrantedAuthority("ROLE_Reader")));
+        caller.setDetails(Map.of("department", "Finance Operations"));
+        http.perform(command().with(authentication(caller))).andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void scopeEscapeCannotPromoteSiblingFailure() throws Exception {
+        queryResult("escape-and-snapshot", caller("Other")).andExpect(status().is4xxClientError());
+        for (var department : List.of("throw", "error")) {
+            queryResult("escape-and-snapshot", caller(department)).andExpect(status().is4xxClientError());
+            queryResult("escape-or-snapshot", caller(department)).andExpect(status().is4xxClientError());
+        }
+    }
+
+    @Test
+    void inlinePoliciesProtectLiveQueries() throws Exception {
+        queryResult("live-accounts", caller("Finance Operations")).andExpect(status().is2xxSuccessful());
+        queryResult("live-accounts", caller("Other")).andExpect(status().is4xxClientError());
+        http.perform(query("live-accounts").with(authentication(caller("Other"))).accept("text/event-stream"))
+                .andExpect(status().is4xxClientError());
+        var stream = http.perform(query("live-accounts").with(authentication(caller("Finance Operations"))).accept("text/event-stream"))
+                .andExpect(status().is2xxSuccessful()).andExpect(request().asyncStarted()).andReturn();
+        try {
+            await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertTrue(stream.getResponse().getContentAsString().contains("proof")));
+        } finally {
+            stream.getRequest().getAsyncContext().complete();
+        }
     }
 
     @Test
@@ -131,7 +166,7 @@ class GeneratedInlinePolicyTest {
     }
 
     private ResultActions queryResult(String name, Authentication caller) throws Exception {
-        var result = http.perform(query(name).with(authentication(caller)));
+        var result = http.perform(query(name).with(authentication(caller)).accept("application/json"));
         return result.andReturn().getRequest().isAsyncStarted() ? http.perform(asyncDispatch(result.andReturn())) : result;
     }
 }

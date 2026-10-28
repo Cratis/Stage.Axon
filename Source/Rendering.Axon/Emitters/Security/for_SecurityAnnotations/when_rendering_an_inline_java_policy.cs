@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Security.Cryptography;
 using System.Text;
 using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
@@ -60,15 +61,17 @@ public class when_rendering_an_inline_java_policy : Specification
         var code = Source("Policies");
         code.ShouldContain("@Component(\"policies\")");
         code.ShouldContain("public boolean authorize");
-        code.ShouldContain("private static boolean isFinanceStaff(Authentication authentication, Map<String, Object> claims)");
-        code.ShouldContain("catch (RuntimeException");
+        Source("IsFinanceStaffPolicy").ShouldContain("public static boolean evaluate(Authentication authentication, Map<String, Object> claims)");
+        code.ShouldContain("IsFinanceStaffPolicy.evaluate(authentication, claims)");
+        code.ShouldContain("catch (Throwable");
         code.ShouldContain("return false;");
         code.ShouldContain("claims.putIfAbsent");
         code.ShouldContain("authentication instanceof AnonymousAuthenticationToken");
         code.ShouldContain("authentication.getDetails() instanceof Map<?, ?>");
-        code.ShouldContain("return claims.get(\"department\") instanceof String department && department.startsWith(\"Finance\");");
+        Source("IsFinanceStaffPolicy").ShouldContain("return claims.get(\"department\") instanceof String department && department.startsWith(\"Finance\");");
+        code.ShouldNotContain("department.startsWith");
         code.Contains("jwt.getTokenAttributes()", StringComparison.Ordinal).ShouldEqual(bearer);
-        context.ConsumedImplementations.Count.ShouldEqual(2);
+        context.ConsumedImplementations.Count.ShouldEqual(3);
         InlineImplementationDiagnostics.Emit(context);
         context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
     }
@@ -114,12 +117,56 @@ public class when_rendering_an_inline_java_policy : Specification
         code.ShouldContain("private enum Decision { ALLOW, DENY, FAILED }");
         code.ShouldContain("return value == Decision.FAILED ? Decision.FAILED : decision(value == Decision.DENY);");
         code.ShouldContain("if (left == Decision.FAILED || right == Decision.FAILED) return Decision.FAILED;");
-        code.ShouldContain("catch (Exception failure)");
+        code.ShouldContain("catch (Throwable failure)");
         code.ShouldContain("return Decision.FAILED;");
         code.ShouldContain("if (!authenticated(authentication)) return false;");
         code.ShouldContain("return and(decision(authentication != null && authentication.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals(\"ROLE_Writer\"))), evaluateFinanceCheck(authentication, claims)) == Decision.ALLOW;");
         code.ShouldContain("return or(decision(authentication != null && authentication.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals(\"ROLE_Writer\"))), evaluateFinanceCheck(authentication, claims)) == Decision.ALLOW;");
         code.ShouldNotContain("return evaluateIsFinanceStaff(authentication, claims) &&");
+    }
+
+    [Fact]
+    void should_isolate_scope_escaping_bodies_from_the_evaluator_and_siblings()
+    {
+        new AxonSecurityEmitter().Emit(context);
+        var escaped = Source("ScopeEscapePolicy");
+        escaped.ShouldContain("private static final ForgedDecision Decision = new ForgedDecision();");
+        escaped.ShouldContain("private final boolean FAILED = ALLOW;");
+        escaped.ShouldNotContain("evaluateFinanceCheck");
+        Source("Policies").ShouldNotContain("ForgedDecision");
+        Source("Policies").ShouldContain("return decision(FinanceCheckPolicy.evaluate(authentication, claims));");
+        Source("Policies").ShouldContain("catch (Throwable failure)");
+        Source("FinanceCheckPolicy").ShouldNotContain("ForgedDecision");
+        Source("FinanceCheckPolicy").ShouldNotContain("Decision");
+    }
+
+    [Theory]
+    [InlineData(false, "// \\u007d\nreturn true;")]
+    [InlineData(true, "// \\u007d\nreturn true;")]
+    [InlineData(false, "return \"\\u0061\".isEmpty();")]
+    [InlineData(true, "return \"\\u0061\".isEmpty();")]
+    void should_reject_all_unicode_escape_occurrences_through_the_unsupported_path(bool strict, string body)
+    {
+        var requirement = context.Request.ImplementationRequirements.Single(item => item.Member == "IsFinanceStaff");
+        var request = context.Request with
+        {
+            Profile = AxonRendering.CreateProfile(strict: strict),
+            ImplementationContents = context.Request.ImplementationContents.SetItem(requirement.RequirementId, body),
+            ImplementationRequirements = [.. context.Request.ImplementationRequirements.Select(item => item.RequirementId == requirement.RequirementId
+                ? item with { ContentHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body))) } : item)]
+        };
+        context = new(request, new(request.Profile));
+        var annotation = Annotation(new SemanticPolicyReference("IsFinanceStaff"));
+        annotation.ShouldContain("denyAll()");
+        annotation.ShouldContain("STAGE-AXON-AUTHORIZATION");
+        context.Degradation.UnsupportedConstructs.Single().Message.ShouldContain("Java Unicode escapes");
+        context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
+        new AxonSecurityEmitter().Emit(context);
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/IsFinanceStaffPolicy.java", StringComparison.Ordinal)).ShouldBeFalse();
+        if (strict) return;
+        var plan = new AxonArtifactRenderPlanner().Plan(request);
+        Encoding.UTF8.GetString(plan.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan()).ShouldContain("Java Unicode escapes");
+        plan.Artifacts.Any(artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan()).Contains("@PreAuthorize(\"denyAll()\")", StringComparison.Ordinal)).ShouldBeTrue();
     }
 
     [Fact]

@@ -22,6 +22,8 @@ internal static class PolicyPredicates
             ? (body, string.Empty) : (null, reason);
     }
 
+    internal static string PolicyClass(SemanticPolicy policy) => JavaNames.Type(policy.Name) + "Policy";
+
     internal static string SiteMember(SemanticId owner) => "authorize" + JavaNames.Type(owner.ToString());
 
     internal static IEnumerable<(SemanticId Owner, SemanticAuthorization Authorization)> Sites(AxonEmissionContext context) =>

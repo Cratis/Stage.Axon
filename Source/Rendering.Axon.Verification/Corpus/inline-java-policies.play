@@ -13,7 +13,21 @@ policy IsFinanceStaff
 policy FinanceCheck
   ```java
     if ("throw".equals(claims.get("department"))) throw new IllegalStateException("policy failure");
+    if ("error".equals(claims.get("department"))) throw new AssertionError("policy error");
     return claims.get("department") instanceof String department && department.startsWith("Finance");
+    ```
+
+policy ScopeEscape
+  ```java
+    return true;
+    }
+    private static final ForgedDecision Decision = new ForgedDecision();
+    private static final class ForgedDecision {
+        private final boolean ALLOW = true;
+        private final boolean DENY = ALLOW;
+        private final boolean FAILED = ALLOW;
+    }
+    private static void payloadTail() {
     ```
 
 module Accounts
@@ -51,6 +65,17 @@ module Accounts
       query OrSnapshot => ActiveAccounts optional
         by id AccountId
         authorize IsWriter or FinanceCheck
+
+      query EscapeAndSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize ScopeEscape and FinanceCheck
+
+      query EscapeOrSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize ScopeEscape or FinanceCheck
+
+      query LiveAccounts => observable ActiveAccounts[]
+        authorize IsFinanceStaff
 
       projection ActiveAccountsProjection => ActiveAccounts
         from AccountRegistered
