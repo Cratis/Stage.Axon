@@ -78,9 +78,9 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             });
     }
 
-    bool UsesSubject => command.Produces.Any(produced => produced.Mappings.Any(mapping => mapping.Source is SemanticEventContextExpression { Value: SemanticEventContextValueKind.CausedBySubject }));
+    bool UsesSubject() => command.Produces.Any(produced => produced.Mappings.Any(mapping => mapping.Source is SemanticEventContextExpression { Value: SemanticEventContextValueKind.CausedBySubject }));
 
-    string SubjectParameter(JavaCodeBuilder code) => !UsesSubject ? string.Empty : $", @{code.Reference("org.axonframework.messaging.core.annotation.MetadataValue")}(\"username\") {code.Reference("java.lang.String")} username";
+    string SubjectParameter(JavaCodeBuilder code) => !UsesSubject() ? string.Empty : $", @{code.Reference("org.axonframework.messaging.core.annotation.MetadataValue")}(\"username\") {code.Reference("java.lang.String")} username";
 
     string Parameters(string name, JavaCodeBuilder code, string package)
     {
