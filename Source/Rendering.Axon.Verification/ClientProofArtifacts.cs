@@ -19,7 +19,7 @@ internal static class ClientProofArtifacts
     internal static IReadOnlyDictionary<string, string> JavaSources() => Resources(name => name.EndsWith(".java", StringComparison.Ordinal) && name.IndexOf('/', Prefix.Length) < 0)
         .ToDictionary(
             source => source.Key,
-            source => source.Value.Replace("__APPLICATION__", ApplicationPackage, StringComparison.Ordinal).Replace("__RUNTIME__", RuntimePackage, StringComparison.Ordinal),
+            source => source.Value.Replace("__APPLICATION__", ApplicationPackage, StringComparison.Ordinal).Replace("__RUNTIME_MODULE__", IngressProofArtifacts.RuntimeModulePackage, StringComparison.Ordinal).Replace("__RUNTIME__", RuntimePackage, StringComparison.Ordinal),
             StringComparer.Ordinal);
 
     /// <summary>The Node scenarios and their shared files, relative to <c>client/test/e2e</c>.</summary>

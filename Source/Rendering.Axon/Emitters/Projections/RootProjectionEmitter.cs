@@ -27,7 +27,9 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
                 foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
                 {
                     var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(candidate => candidate.Id == group.Key);
-                    new ProjectionHandlerBinding(context, types, model, package).Emit(
+                    var values = new ProjectionValues(context, types, body);
+                    var keys = group.Count() < 2 ? [] : ProjectionHandlerBinding.PreReserved([.. group.Select(from => values.Key(from.Key, @event))]);
+                    new ProjectionHandlerBinding(context, types, model, package, keys: keys).Emit(
                     body,
                     types.EventType(group.Key, body),
                     method =>

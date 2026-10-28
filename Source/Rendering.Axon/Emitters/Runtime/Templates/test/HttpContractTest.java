@@ -1,5 +1,9 @@
 package __RUNTIME__;
 
+import io.cratis.stage.axon.runtime.CommandValidationException;
+import io.cratis.stage.axon.runtime.QueryResults;
+import io.cratis.stage.axon.runtime.UniqueValueConflict;
+import io.cratis.stage.axon.runtime.ValidationError;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.axonframework.messaging.commandhandling.annotation.Command;

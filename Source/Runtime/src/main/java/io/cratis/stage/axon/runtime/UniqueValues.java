@@ -1,0 +1,29 @@
+package io.cratis.stage.axon.runtime;
+
+import io.cratis.fundamentals.concepts.ConceptAs;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Locale;
+
+public final class UniqueValues {
+    private UniqueValues() {}
+
+    public static String key(List<?> values, boolean ignoreCasing) {
+        var result = new StringBuilder();
+        for (var value : values) {
+            if (value == null) continue;
+            var part = scalar(value, ignoreCasing);
+            result.append(part.length()).append(':').append(part);
+        }
+        return result.toString();
+    }
+
+    public static String owner(Object value) { return scalar(value, false); }
+
+    private static String scalar(Object value, boolean ignoreCasing) {
+        if (value instanceof ConceptAs<?> concept) return scalar(concept.value(), ignoreCasing);
+        if (value instanceof Number number) return "n" + new BigDecimal(number.toString()).stripTrailingZeros().toPlainString();
+        if (value instanceof CharSequence text) return "s" + (ignoreCasing ? text.toString().toLowerCase(Locale.ROOT) : text.toString());
+        return value.getClass().getName() + ":" + value;
+    }
+}

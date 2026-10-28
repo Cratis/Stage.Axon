@@ -23,8 +23,8 @@ public class when_context_models_claim_normalization_names : for_PersistentViewA
         }
     }
 
-    [Fact] void should_refuse_each_context_mapping() => _contexts.Values.ShouldEachConformTo(context => !PersistentViewAdmission.Supports(context, ReadModelId("ContextTotal")));
+    [Fact] void should_admit_each_context_mapping() => _contexts.Values.ShouldEachConformTo(context => PersistentViewAdmission.Supports(context, ReadModelId("ContextTotal")));
     [Fact] void should_warn_without_crashing() => _contexts.Keys.ShouldEachConformTo(name => Code(_contexts[name], name + "StoreConfiguration").Contains("STAGE-AXON-0308", StringComparison.Ordinal));
     [Fact] void should_keep_the_memory_store() => _contexts.Keys.ShouldEachConformTo(name => Code(_contexts[name], name + "StoreConfiguration").Contains("InMemoryReadModelStore", StringComparison.Ordinal));
-    [Fact] void should_not_emit_persistent_proofs() => _contexts.Keys.ShouldEachConformTo(name => !_contexts[name].Artifacts.Exists(artifact => artifact.RelativePath.Contains('/' + name + "Persistent", StringComparison.Ordinal)));
+    [Fact] void should_emit_persistent_proofs() => _contexts.Keys.ShouldEachConformTo(name => _contexts[name].Artifacts.Exists(artifact => artifact.RelativePath.Contains('/' + name + "Persistent", StringComparison.Ordinal)));
 }

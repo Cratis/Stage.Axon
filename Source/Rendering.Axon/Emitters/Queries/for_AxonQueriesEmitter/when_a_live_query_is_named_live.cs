@@ -19,7 +19,7 @@ public class when_a_live_query_is_named_live : a_query_collision
         _streams = Code("LiveStreams");
     }
 
-    [Fact] void should_qualify_the_runtime_streams() => _streams.ShouldContain("private final " + _context.BasePackage + ".runtime.LiveStreams.Group group;");
+    [Fact] void should_qualify_the_runtime_streams() => _streams.ShouldContain("private final io.cratis.stage.axon.runtime.LiveStreams.Group group;");
     [Fact] void should_keep_the_generated_class_short() => _streams.ShouldContain("public final class LiveStreams {");
-    [Fact] void should_not_import_the_runtime_streams() => _streams.ShouldNotContain("import " + _context.BasePackage + ".runtime.LiveStreams;");
+    [Fact] void should_not_import_the_runtime_streams() => _streams.ShouldNotContain("import io.cratis.stage.axon.runtime.LiveStreams;");
 }
