@@ -13,6 +13,7 @@ public class when_a_rejected_command_has_an_invalid_concept : for_AxonArtifactRe
 {
     string rejected;
     string accepted;
+    string clashing;
 
     void Because()
     {
@@ -21,6 +22,8 @@ public class when_a_rejected_command_has_an_invalid_concept : for_AxonArtifactRe
         var specification = located.Slice.Specifications.First(candidate => candidate.When?.Command == command.Id);
         rejected = Render(located, command, specification with { ThenErrors = [new(null, "Quantity must be positive.")], ThenEvents = [] });
         accepted = Render(located, command, specification with { ThenErrors = [] });
+        var named = command with { Name = "IllegalArgumentException" };
+        clashing = Render(located, named, specification with { ThenErrors = [new(null, "Quantity must be positive.")], ThenEvents = [] });
     }
 
     [Fact] void should_construct_the_command_inside_the_rejection_boundary() => rejected.ShouldContain("catch (IllegalArgumentException error)");
@@ -28,6 +31,9 @@ public class when_a_rejected_command_has_an_invalid_concept : for_AxonArtifactRe
     [Fact] void should_not_dispatch_when_construction_was_rejected() => rejected.ShouldContain("return;");
     [Fact] void should_still_dispatch_a_constructed_command() => rejected.ShouldContain("scenario.when().command(command");
     [Fact] void should_not_catch_construction_failures_of_accepted_commands() => accepted.ShouldNotContain("catch (IllegalArgumentException");
+
+    [Fact] void should_qualify_the_rejection_type_when_a_command_is_named_illegal_argument_exception() => clashing.ShouldContain("catch (java.lang.IllegalArgumentException error)");
+    [Fact] void should_not_use_the_unqualified_rejection_type_when_a_command_is_named_illegal_argument_exception() => clashing.ShouldNotContain("catch (IllegalArgumentException");
 
     string Render(LocatedSemanticSlice located, SemanticCommand command, SemanticSpecification specification)
     {

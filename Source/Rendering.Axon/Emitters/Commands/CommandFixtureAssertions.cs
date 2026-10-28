@@ -28,6 +28,9 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
         if (!specification.ThenErrors.IsEmpty)
         {
             code.Reference(ViolationException);
+            code.Reference("java.lang.IllegalArgumentException");
+            code.Reference("java.lang.Object");
+            code.Reference("java.lang.String");
             return;
         }
         ClaimResponse(code);
@@ -40,11 +43,11 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
     internal void EmitConstruction(JavaCodeBuilder method, string input)
     {
         _code = method;
-        method.Line("Object command;").Block("try", attempt => attempt.Line($"command = {input};"))
-            .Block("catch (IllegalArgumentException error)", rejection =>
+        method.Line($"{Reference("java.lang.Object")} command;").Block("try", attempt => attempt.Line($"command = {input};"))
+            .Block($"catch ({Reference("java.lang.IllegalArgumentException")} error)", rejection =>
             {
                 foreach (var error in specification.ThenErrors.Where(error => error.Message is not null))
-                    rejection.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat(String.valueOf(error.getMessage())).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
+                    rejection.Line($"{Reference("org.assertj.core.api.Assertions")}.assertThat({Reference("java.lang.String")}.valueOf(error.getMessage())).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
                 rejection.Line("return;");
             });
     }
@@ -87,10 +90,10 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
         var assertions = Reference("org.assertj.core.api.Assertions");
         method.Block("result.exceptionSatisfies(error ->", assertion =>
         {
-            assertion.Line($"{assertions}.assertThat(error).isInstanceOfAny({violation}.class, IllegalArgumentException.class);")
-                .Line($"var messages = error instanceof {violation} violations ? violations.getViolations().stream().map(violation -> violation.getMessage()).toList() : {Reference("java.util.List")}.of(String.valueOf(error.getMessage()));");
+            assertion.Line($"{assertions}.assertThat(error).isInstanceOfAny({violation}.class, {Reference("java.lang.IllegalArgumentException")}.class);")
+                .Line($"var messages = error instanceof {violation} violations ? violations.getViolations().stream().map(violation -> violation.getMessage()).toList() : {Reference("java.util.List")}.of({Reference("java.lang.String")}.valueOf(error.getMessage()));");
             foreach (var error in specification.ThenErrors.Where(error => error.Message is not null))
-                assertion.Line($"{assertions}.assertThat(String.join(\"; \", messages)).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
+                assertion.Line($"{assertions}.assertThat({Reference("java.lang.String")}.join(\"; \", messages)).contains({JavaCodeBuilder.StringLiteral(error.Message!)});");
         }).Line(");").Line("result.noEvents();");
     }
 
