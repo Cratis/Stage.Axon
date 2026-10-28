@@ -46,16 +46,8 @@ internal static class InlineJavaBodies
             reason = "The resolved implementation content is unavailable.";
             return false;
         }
-        if (content.Contains('\r'))
-        {
-            reason = "Native Java bodies must be LF-only: CR and CRLF cannot be transported verbatim by text artifacts.";
-            return false;
-        }
-        if (Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content))) != requirement.ContentHash)
-        {
-            reason = "The implementation content does not match its recorded SHA-256 revision.";
-            return false;
-        }
+        reason = ContentReason(content, requirement);
+        if (reason.Length > 0) return false;
         body = content;
         return true;
     }
@@ -67,12 +59,24 @@ internal static class InlineJavaBodies
         slot.Slice is { } slice && slot.MemberPrefix is { } prefix && requirement.Role == slot.Role && requirement.Source.SemanticId == slice &&
         requirement.Owner.Kind == SemanticKind.Slice && requirement.Member?.StartsWith(prefix, StringComparison.Ordinal) == true;
 
+    static string ContentReason(string content, SemanticImplementationRequirement requirement)
+    {
+        (bool Invalid, string Reason)[] checks =
+        [
+            (content.Contains('\r'), "Native Java bodies must be LF-only: CR and CRLF cannot be transported verbatim by text artifacts."),
+            (Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content))) != requirement.ContentHash, "The implementation content does not match its recorded SHA-256 revision."),
+            (requirement.Role == SemanticImplementationRole.PolicyPredicate && content.Contains("\\u", StringComparison.Ordinal), "Java Unicode escapes are not supported in inline policy bodies; access is denied.")
+        ];
+        return checks.FirstOrDefault(check => check.Invalid).Reason ?? string.Empty;
+    }
+
     static SemanticKind OwnerKind(SemanticImplementationRole role) => role switch
     {
         SemanticImplementationRole.CommandHandler => SemanticKind.Command,
         SemanticImplementationRole.ReactionEffect => SemanticKind.Reaction,
         SemanticImplementationRole.QueryPerformer => SemanticKind.Query,
         SemanticImplementationRole.ReducerTransition => SemanticKind.Slice,
+        SemanticImplementationRole.PolicyPredicate => SemanticKind.Application,
         _ => SemanticKind.Unknown
     };
 
@@ -91,7 +95,7 @@ internal static class InlineJavaBodies
             (requirement.ContextVersion != 1 || requirement.ResultVersion != 1, "The implementation context or result contract revision is unsupported."),
             (requirement.IsAmbiguous || requirement.IsProvisional, "Ambiguous or provisional implementation identities cannot be placed."),
             (requirement.AttachmentResolution != SemanticAttachmentResolution.Resolved, "The implementation attachment has not been resolved."),
-            (requirement.RequiredCapability != (role == SemanticImplementationRole.ReducerTransition ? "pure" : "provider-defined"), "The implementation capability is not supported by this native body slot.")
+            (requirement.RequiredCapability != (role is SemanticImplementationRole.ReducerTransition or SemanticImplementationRole.PolicyPredicate ? "pure" : "provider-defined"), "The implementation capability is not supported by this native body slot.")
         ];
         return checks.FirstOrDefault(check => check.Invalid).Reason ?? string.Empty;
     }

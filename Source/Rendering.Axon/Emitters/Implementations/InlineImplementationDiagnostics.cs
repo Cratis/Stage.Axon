@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
+using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -15,7 +16,7 @@ internal static class InlineImplementationDiagnostics
     {
         var selected = ScopeSelection.Select(context.Request);
         var pending = InlineJavaBodies.Requirements(context)
-            .Where(requirement => !context.ConsumedImplementations.Contains(requirement.RequirementId) && selected.Any(slice => Selected(requirement, slice)))
+            .Where(requirement => !context.ConsumedImplementations.Contains(requirement.RequirementId) && (selected.Any(slice => Selected(requirement, slice)) || PolicySelected(context, requirement)))
             .OrderBy(requirement => requirement.RequirementId, StringComparer.Ordinal).ToArray();
         if (pending.Length == 0) return;
         var code = new JavaCodeBuilder(AxonRuntimePackage.InlinePackage(context)).Declare("UnsupportedImplementations");
@@ -63,8 +64,12 @@ internal static class InlineImplementationDiagnostics
         SemanticImplementationRole.ReactionEffect => ReactionSelected(requirement, located),
         SemanticImplementationRole.QueryPerformer => QuerySelected(requirement, located),
         SemanticImplementationRole.ReducerTransition => ReducerSelected(requirement, located),
+        SemanticImplementationRole.PolicyPredicate => false,
         _ => false
     };
+
+    static bool PolicySelected(AxonEmissionContext context, SemanticImplementationRequirement requirement) =>
+        requirement.Role == SemanticImplementationRole.PolicyPredicate && PolicyPredicates.Referenced(context).Any(item => item.Condition.RequirementId == requirement.RequirementId);
 
     static bool ReducerSelected(SemanticImplementationRequirement requirement, LocatedSemanticSlice located) =>
         located.Slice.Reducers.Any(reducer => reducer.Transitions.Any(transition => transition.RequirementId == requirement.RequirementId));
