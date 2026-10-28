@@ -76,6 +76,9 @@ internal static class CorpusRenderer
             case ClientProofArtifacts.Application:
                 await ClientProofArtifacts.Write(destination);
                 break;
+            case ConstraintProofArtifacts.Application:
+                await ConstraintProofArtifacts.Write(destination);
+                break;
         }
     }
 
