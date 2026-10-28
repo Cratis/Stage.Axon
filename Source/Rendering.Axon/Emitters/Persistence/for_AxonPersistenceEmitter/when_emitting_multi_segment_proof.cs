@@ -117,7 +117,13 @@ public class when_emitting_multi_segment_proof : Projections.for_AxonProjections
     [Fact] void should_emit_a_source_independent_last_writer_proof() => Code("TotalPersistentRowOrderTest").ShouldContain("assertNotEquals(normalized(reference.all()), normalized(inverted.all())");
     [Fact] void should_pause_only_the_old_source_segment() => Code("TotalPersistentRowOrderTest").ShouldContain("releaseSegment(held.getSegmentId(), 1, TimeUnit.DAYS)");
     [Fact] void should_wait_for_a_committed_competing_token_before_reclaim() => Code("TotalPersistentRowOrderTest").ShouldContain("coversHead(application, terminalHead, rowSegment.getSegmentId())");
-    [Fact] void should_require_every_segment_to_cover_the_terminal_head() => Code("TotalPersistentRowOrderTest").ShouldContain("coversHead(application, terminalHead, null)");
+    [Fact] void should_wait_for_every_segment_to_be_claimed() => Code("TotalPersistentRowOrderTest").ShouldContain("processor.processingStatus().size() == 4");
+    [Fact] void should_wait_for_the_seed_owners_commit() => Code("TotalPersistentRowOrderTest").ShouldContain("coversHead(application, initialHead, seedOwner)");
+    [Fact] void should_capture_the_held_delivery_token_before_the_competing_append() => Code("TotalPersistentRowOrderTest").ShouldContain("var heldHead = head(application);\n            append(application, competing);");
+    [Fact] void should_wait_for_the_held_delivery_owners_commit() => Code("TotalPersistentRowOrderTest").ShouldContain("coversHead(application, heldHead, seedOwner)");
+    [Fact] void should_not_wait_for_idle_segments_to_persist_the_terminal_head() => Code("TotalPersistentRowOrderTest").ShouldNotContain("coversHead(application, terminalHead, null)");
+    [Fact] void should_use_exactly_four_synthetic_segments() => Code("TotalPersistentRowOrderTest").ShouldContain("Segment.splitBalanced(Segment.ROOT_SEGMENT, 3)");
+    [Fact] void should_refuse_missing_owner_token_entries() => Code("TotalPersistentRowOrderTest").ShouldContain("if (entry == null) return false;");
 
     string Proof => Code("TotalPersistentMultiSegmentTest");
     string Support => Code("TotalPersistentSupport");

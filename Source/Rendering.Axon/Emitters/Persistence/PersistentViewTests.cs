@@ -69,7 +69,11 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
             Add("RowOrderTest", PersistentViewRowOrderProof.Source
                 .Replace("__ROW_KEY__", rowOrder.Key, StringComparison.Ordinal)
                 .Replace("__ROW_FIRST__", AxonViewEvents.Expression(context, types, rowSpec.GivenEvents[0], source: "firstSource"), StringComparison.Ordinal)
-                .Replace("__ROW_COMPETING__", AxonViewEvents.Expression(context, types, rowSpec.GivenEvents[1], source: "competingSource"), StringComparison.Ordinal));
+                .Replace("__ROW_COMPETING__", AxonViewEvents.Expression(context, types, rowSpec.GivenEvents[1], source: "competingSource"), StringComparison.Ordinal)
+                .Replace("__ROW_LATER__", string.Join('\n', rowSpec.GivenEvents.Skip(2).Select((given, index) => $"var later{index} = {AxonViewEvents.Expression(context, types, given, source: "competingSource")};")), StringComparison.Ordinal)
+                .Replace("__ROW_REFERENCE_LATER__", string.Join('\n', rowSpec.GivenEvents.Skip(2).Select((_, index) => $"projector.on(later{index}__ARGUMENT__);")), StringComparison.Ordinal)
+                .Replace("__ROW_INVERTED_LATER__", string.Join('\n', rowSpec.GivenEvents.Skip(2).Select((_, index) => $"reversed.on(later{index}__ARGUMENT__);")), StringComparison.Ordinal)
+                .Replace("__ROW_APPEND_LATER__", string.Join('\n', rowSpec.GivenEvents.Skip(2).Select((_, index) => $"append(application, later{index});")), StringComparison.Ordinal));
         }
         var live = owner.Slice.Projections.Any(projection => projection.ReadModel == model.Id) ? LiveQuery(owner, model) : null;
         if (live is not null && spec.GivenEvents.Length == 1) Add("SubscriptionTest", PersistentViewSubscriptionProof.Source.Replace("__LIVE_QUERY__", package + "." + JavaNames.Type(live.Name), StringComparison.Ordinal));
@@ -101,7 +105,7 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         var values = new ProjectionValues(context, types);
         var contracts = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).ToArray();
         var transitions = owner.Slice.Projections.Where(projection => projection.ReadModel == model.Id).SelectMany(ProjectionTransitions.From).ToArray();
-        foreach (var spec in owner.Slice.Specifications.Where(spec => ViewSpecificationSupport.Legacy(spec, model, types) && spec.GivenEvents.Length == 2 &&
+        foreach (var spec in owner.Slice.Specifications.Where(spec => ViewSpecificationSupport.Legacy(spec, model, types) && spec.GivenEvents.Length >= 2 &&
             spec.ThenReadModels.Any(expected => expected.ReadModel == model.Id) && spec.GivenEvents.All(given => observed.Contains(given.EventContract))))
         {
             var keys = spec.GivenEvents.Select(given =>
