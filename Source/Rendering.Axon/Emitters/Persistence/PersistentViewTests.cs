@@ -54,7 +54,6 @@ internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaT
         var rowOrder = RowOrder(owner, model, target.Observed);
         string Render(string source) => source.Replace("__PACKAGE__", package, StringComparison.Ordinal)
             .Replace("__RUNTIME_MODULE__", AxonRuntimePackage.ModulePackage, StringComparison.Ordinal)
-            .Replace("__PERSISTENCE__", persistence, StringComparison.Ordinal)
             .Replace("__APPLICATION__", types.BasePackage, StringComparison.Ordinal)
             .Replace("__MODEL__", package + "." + modelName, StringComparison.Ordinal).Replace("__NAME__", name, StringComparison.Ordinal)
             .Replace("__QUALIFIER__", package + "." + modelName, StringComparison.Ordinal)

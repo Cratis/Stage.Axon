@@ -13,6 +13,9 @@ namespace Cratis.Stage.Rendering.Axon.for_AxonArtifactRenderPlanner;
 
 public partial class when_rendering_module_imports : Specification
 {
+    [GeneratedRegex(@"(?m)^import (?!io\.cratis\.stage\.axon\.runtime\.views\.)[\w.]+\.persistence\.(?:ViewRow|ViewGeneration|JpaReadModelStore|PersistentViewBootstrap|PersistentViewProcessorGuard);", RegexOptions.None, 1000)]
+    private static partial Regex InlineViewImport { get; }
+
     [GeneratedRegex(@"(?m)^import io\.cratis\.stage\.axon\.runtime\.(?<type>[\w.]+);", RegexOptions.None, 1000)]
     private static partial Regex ModuleImport { get; }
 
@@ -51,7 +54,14 @@ public partial class when_rendering_module_imports : Specification
     [Fact] void should_list_the_claim_in_every_explicit_entity_scan() => _java.Values.Where(code => code.Contains("@EntityScan", StringComparison.Ordinal)).All(code => EntityScan.Count(code) > 0 && EntityScan.Matches(code).All(match => ClaimClass.IsMatch(match.Groups["types"].Value))).ShouldBeTrue();
     [Fact] void should_exercise_an_explicit_entity_scan() => _java.Values.Any(EntityScan.IsMatch).ShouldBeTrue();
 
+    [Fact]
+    void should_not_import_inline_persistent_view_helpers()
+    {
+        _java.Values.Any(InlineViewImport.IsMatch).ShouldBeFalse();
+    }
+
     [Theory]
+    [InlineData("views.JpaReadModelStore")]
     [InlineData("ReadModelStore")]
     [InlineData("ReadModelTransaction")]
     [InlineData("persistent.UniqueClaim")]

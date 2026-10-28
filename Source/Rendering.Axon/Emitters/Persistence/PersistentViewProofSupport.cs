@@ -8,7 +8,7 @@ internal static class PersistentViewProofSupport
     internal const string Source = """
         package __PACKAGE__;
 
-        import __PERSISTENCE__.JpaReadModelStore;
+        import __RUNTIME_MODULE__.views.JpaReadModelStore;
         import __RUNTIME_MODULE__.ReadModelStore;
         import __RUNTIME_MODULE__.InMemoryReadModelStore;
         import jakarta.persistence.EntityManagerFactory;

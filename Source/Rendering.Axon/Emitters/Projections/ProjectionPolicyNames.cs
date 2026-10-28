@@ -37,6 +37,13 @@ internal sealed class ProjectionPolicyNames
         }
     }
 
+    /// <summary>Allocates the policies a root projector declares: every transition contract plus every removal contract.</summary>
+    internal static ProjectionPolicyNames ForProjector(SemanticApplication application, SemanticProjection projection) => new(application, ProjectorContracts(projection));
+
+    /// <summary>The contracts a root projector handles: every transition contract plus every removal contract.</summary>
+    internal static SemanticId[] ProjectorContracts(SemanticProjection projection) =>
+        [.. ProjectionTransitions.From(projection).Select(from => from.EventContract).Concat((projection.Scope?.Removals ?? []).Select(removal => removal.EventContract)).Distinct()];
+
     internal string For(SemanticId contract) => _names[contract];
 
     internal void Declare(JavaCodeBuilder code)

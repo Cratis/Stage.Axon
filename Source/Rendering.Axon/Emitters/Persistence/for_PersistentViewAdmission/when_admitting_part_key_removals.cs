@@ -18,8 +18,6 @@ public class when_admitting_part_key_removals : given.a_flat_view
     [Fact] void should_admit_metric() => PersistentViewAdmission.Supports(_context, ReadModelId("Metric")).ShouldBeTrue();
     [Fact] void should_emit_the_durable_store() => Code(_context, "MetricStoreConfiguration").ShouldContain("return new JpaReadModelStore<>");
     [Fact] void should_keep_stateful_scopes_refused() => PersistentViewAdmission.Supports(_context, ReadModelId("Board")).ShouldBeFalse();
-    [Fact] void should_canonicalize_map_keys() => Code(_context, "JpaReadModelStore").ShouldContain("new TreeMap<>(map)");
-    [Fact] void should_use_the_same_identity_for_removal() => Code(_context, "JpaReadModelStore").ShouldContain("identity(key)");
     [Fact] void should_emit_a_queryless_removal_proof() => Code(_context, "MetricPersistentRemovalTest").ShouldContain("class MetricPersistentRemovalTest");
 
     [Theory]

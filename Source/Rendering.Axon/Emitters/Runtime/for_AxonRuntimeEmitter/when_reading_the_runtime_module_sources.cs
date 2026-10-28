@@ -85,6 +85,43 @@ public class when_reading_the_runtime_module_sources
         return index >= 0 && index < text.IndexOf(second, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("ViewRow")]
+    [InlineData("ViewGeneration")]
+    [InlineData("JpaReadModelStore")]
+    [InlineData("PersistentViewBootstrap")]
+    [InlineData("PersistentViewProcessorGuard")]
+    void should_publish_fixed_view_helpers(string name)
+    {
+        var source = ViewsSource(name);
+        source.ShouldContain("package io.cratis.stage.axon.runtime.views;");
+        source.ShouldNotContain("__RUNTIME_MODULE__");
+        source.ShouldNotContain("__PACKAGE__");
+    }
+
+    [Fact] void should_keep_the_row_entity() => ViewsSource("ViewRow").ShouldContain("@Entity(name = \"StageViewRow\")");
+    [Fact] void should_keep_the_row_table() => ViewsSource("ViewRow").ShouldContain("@Table(name = \"stage_view_row\")");
+    [Fact] void should_keep_the_generation_entity() => ViewsSource("ViewGeneration").ShouldContain("@Entity(name = \"StageViewGeneration\")");
+    [Fact] void should_keep_the_generation_table() => ViewsSource("ViewGeneration").ShouldContain("@Table(name = \"stage_view_generation\")");
+    [Fact] void should_not_auto_register_view_entities() => PersistentSource("StageAxonPersistenceAutoConfiguration").ShouldNotContain("runtime.views");
+    [Fact] void should_refuse_async_writes() => ViewsSource("JpaReadModelStore").ShouldContain("Thread.currentThread() != handlerThread");
+    [Fact] void should_refuse_contextless_writes() => ViewsSource("JpaReadModelStore").ShouldContain("if (context == null) throw new IllegalStateException");
+    [Fact] void should_never_create_an_independent_write_executor() => ViewsSource("JpaReadModelStore").ShouldContain("findTransactionalExecutor(context)");
+    [Fact] void should_never_fall_back_to_an_executor() => ViewsSource("JpaReadModelStore").ShouldNotContain("getTransactionalExecutor(");
+    [Fact] void should_serialize_row_payloads() => ViewsSource("JpaReadModelStore").ShouldContain("mapper.writeValueAsString(next)");
+    [Fact] void should_guard_both_retained_events_and_checkpoints() => ViewsSource("PersistentViewBootstrap").ShouldContain("Stream.of(AggregateEventEntry.class, TokenEntry.class, ViewRow.class)");
+    [Fact] void should_refuse_generation_changes() => ViewsSource("PersistentViewBootstrap").ShouldContain("!existing.fingerprint().equals(fingerprint)");
+    [Fact] void should_refuse_swallowing_customizations() => ViewsSource("PersistentViewProcessorGuard").ShouldContain("processor.errorHandler() != PropagatingErrorHandler.INSTANCE");
+    [Fact] void should_reject_each_missing_persistent_processor() => ViewsSource("PersistentViewProcessorGuard").ShouldContain("if (!(processors.get(name) instanceof PooledStreamingEventProcessor)) throw refusal();");
+    [Fact] void should_reject_subscribing_persistent_processor_registrations() => ViewsSource("PersistentViewProcessorGuard").ShouldContain("otherProcessors.containsKey(name) && !(otherProcessors.get(name) instanceof PooledStreamingEventProcessor)");
+    [Fact] void should_import_stream_in_the_bootstrap() => ViewsSource("PersistentViewBootstrap").ShouldContain("import java.util.stream.Stream;");
+    [Fact] void should_use_the_short_stream_in_the_bootstrap() => ViewsSource("PersistentViewBootstrap").ShouldContain("return Stream.of(AggregateEventEntry.class");
+
+    [Fact] void should_canonicalize_map_keys() => ViewsSource("JpaReadModelStore").ShouldContain("new TreeMap<>(map)");
+    [Fact] void should_use_the_same_identity_for_removal() => ViewsSource("JpaReadModelStore").ShouldContain("identity(key)");
+
+    static string ViewsSource(string name) => File.ReadAllText(Path.Combine(ModuleRoot(), "main", "java", "io", "cratis", "stage", "axon", "runtime", "views", name + ".java"));
+
     static string ModuleRoot() => Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Source", "Runtime", "src");
 
     static string PersistentSource(string name) => File.ReadAllText(Path.Combine(ModuleRoot(), "main", "java", "io", "cratis", "stage", "axon", "runtime", "persistent", name + ".java"));

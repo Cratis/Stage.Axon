@@ -17,7 +17,7 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
         var name = JavaNames.Type(projection.Name) + "Projector";
         var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type);
         var removals = projection.Scope?.Removals ?? [];
-        var contracts = ProjectionTransitions.From(projection).Select(from => from.EventContract).Concat(removals.Select(removal => removal.EventContract)).Distinct().ToArray();
+        var contracts = ProjectionPolicyNames.ProjectorContracts(projection);
         var policies = new ProjectionPolicyNames(context.Request.Model.Application, contracts);
         policies.Declare(code);
         foreach (var property in model.Properties) types.ClaimProjectionType(property.Type, code);

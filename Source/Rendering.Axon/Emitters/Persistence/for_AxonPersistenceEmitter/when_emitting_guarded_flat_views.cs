@@ -40,21 +40,13 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
     [Fact] void should_pin_pooled_processing() => Code("PersistentViewConfiguration").ShouldContain("EventProcessorDefinition.pooledStreamingMatching(");
     [Fact] void should_pin_propagating_errors() => Code("PersistentViewConfiguration").ShouldContain("config.errorHandler(PropagatingErrorHandler.INSTANCE)");
     [Fact] void should_stage_memory_writes_until_commit() => Code("TotalProjectionProjector").ShouldContain("ReadModelTransaction.bind(store, context)");
-    [Fact] void should_refuse_async_writes() => Code("JpaReadModelStore").ShouldContain("Thread.currentThread() != handlerThread");
     [Fact] void should_test_async_refusal() => Code("TotalPersistentStoreTest").ShouldContain("CompletableFuture.runAsync(() -> bound.put(key, value))");
-    [Fact] void should_refuse_contextless_writes() => Code("JpaReadModelStore").ShouldContain("if (context == null) throw new IllegalStateException");
-    [Fact] void should_never_create_an_independent_write_executor() => Code("JpaReadModelStore").ShouldContain("findTransactionalExecutor(context)");
-    [Fact] void should_never_fall_back_to_an_executor() => Code("JpaReadModelStore").ShouldNotContain("getTransactionalExecutor(");
-    [Fact] void should_serialize_row_payloads() => Code("JpaReadModelStore").ShouldContain("mapper.writeValueAsString(next)");
-    [Fact] void should_guard_both_retained_events_and_checkpoints() => Code("PersistentViewBootstrap").ShouldContain("Stream.of(AggregateEventEntry.class, TokenEntry.class, ViewRow.class)");
-    [Fact] void should_refuse_generation_changes() => Code("PersistentViewBootstrap").ShouldContain("!existing.fingerprint().equals(fingerprint)");
     [Fact] void should_emit_a_default_native_two_boot_test() => Code("TotalPersistentTest").ShouldContain("void handlerThrowsAfterViewWriteAndReclaimAppliesExactlyOnce()");
     [Fact] void should_exercise_handler_failure_after_view_write() => Code("TotalPersistentSupport").ShouldContain("deliberate handler failure after view write");
     [Fact] void should_exercise_real_token_store_failure() => Code("TotalPersistentSupport").ShouldContain("create trigger stage_token_failure before update on token_entry");
     [Fact] void should_test_non_joined_handler_transaction() => Code("TotalPersistentSupport").ShouldContain("context.withResource(JpaTransactionalExecutorProvider.SUPPLIER_KEY");
     [Fact] void should_test_off_thread_handler_refusal() => Code("TotalPersistentTest").ShouldContain("void actualHandlerRefusesOffThreadWriteWithoutChangingRowsOrToken()");
     [Fact] void should_validate_customized_processors_before_start() => Code("PersistentViewConfiguration").ShouldContain("SmartInitializingSingleton persistentViewProcessorGuard");
-    [Fact] void should_refuse_swallowing_customizations() => Code("PersistentViewProcessorGuard").ShouldContain("processor.errorHandler() != PropagatingErrorHandler.INSTANCE");
     [Fact] void should_test_subscribing_replacement_refusal() => Code("TotalPersistentEnvelopeTest").ShouldContain("void refusesSubscribingReplacementBeforeReadiness()");
     [Fact] void should_reference_the_unexpected_context_in_the_unconditional_failure() => Code("TotalPersistentEnvelopeTest").ShouldContain("try (var application = start(database(), customization)) { fail(\"Unsafe processor reached readiness: active=\" + application.isActive()); }");
     [Fact] void should_keep_the_envelope_startup_exception_assertion() => Code("TotalPersistentEnvelopeTest").ShouldContain("var error = assertThrows(Exception.class, () -> {");
@@ -108,8 +100,6 @@ public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsE
         fixture.ShouldBeGreaterThan(0);
         fixture.ShouldBeLessThan(injection);
     }
-    [Fact] void should_reject_each_missing_persistent_processor() => Code("PersistentViewProcessorGuard").ShouldContain("if (!(processors.get(name) instanceof PooledStreamingEventProcessor)) throw refusal();");
-    [Fact] void should_reject_subscribing_persistent_processor_registrations() => Code("PersistentViewProcessorGuard").ShouldContain("otherProcessors.containsKey(name) && !(otherProcessors.get(name) instanceof PooledStreamingEventProcessor)");
     [Fact] void should_not_hide_native_proof_behind_a_property() => Code("TotalPersistentTest").ShouldNotContain("EnabledIfSystemProperty");
 
     string Code(string name) => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith('/' + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());

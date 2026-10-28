@@ -43,6 +43,11 @@ internal static class AxonRuntimePackage
         "UniqueValues",
         "ValidationContext",
         "ValidationError",
+        "views.ViewRow",
+        "views.ViewGeneration",
+        "views.JpaReadModelStore",
+        "views.PersistentViewBootstrap",
+        "views.PersistentViewProcessorGuard",
     };
 
     const string Segment = ".runtime";

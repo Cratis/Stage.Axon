@@ -1,6 +1,8 @@
 package io.cratis.stage.axon.scan;
 
 import io.cratis.stage.axon.runtime.persistent.UniqueClaim;
+import io.cratis.stage.axon.runtime.views.ViewRow;
+import io.cratis.stage.axon.runtime.views.ViewGeneration;
 import jakarta.persistence.EntityManagerFactory;
 import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;
 import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;
@@ -20,9 +22,13 @@ class ExplicitEntityScanTest {
             assertTrue(hasEntity(factory, UniqueClaim.class));
             assertTrue(hasEntity(factory, AggregateEventEntry.class));
             assertTrue(hasEntity(factory, TokenEntry.class));
+            assertTrue(hasEntity(factory, ViewRow.class));
+            assertTrue(hasEntity(factory, ViewGeneration.class));
             try (var manager = factory.createEntityManager()) {
                 assertEquals(0L, ((Number) manager.createNativeQuery("select count(*) from stage_unique_claim").getSingleResult()).longValue());
                 assertEquals(0L, ((Number) manager.createNativeQuery("select count(*) from fixture_entity").getSingleResult()).longValue());
+                assertEquals(0L, ((Number) manager.createNativeQuery("select count(*) from stage_view_row").getSingleResult()).longValue());
+                assertEquals(0L, ((Number) manager.createNativeQuery("select count(*) from stage_view_generation").getSingleResult()).longValue());
             }
         }
     }

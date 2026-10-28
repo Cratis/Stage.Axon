@@ -32,7 +32,8 @@ public class when_resolving_runtime_types : for_AxonArtifactRenderPlanner.given.
     void should_resolve_the_persistent_helpers_to_the_module_persistent_package(string name) => AxonRuntimePackage.Type("a.b", name).ShouldEqual("io.cratis.stage.axon.runtime." + name);
 
     [Fact] void should_pin_the_renderer_version() => AxonRuntimePackage.Version.ShouldEqual(AxonRendering.Version);
-    [Fact] void should_name_twenty_five_module_types() => AxonRuntimePackage.ModuleTypes.Count.ShouldEqual(25);
+    [Fact] void should_name_thirty_module_types() => AxonRuntimePackage.ModuleTypes.Count.ShouldEqual(30);
+    [Fact] void should_resolve_the_view_store_to_the_module() => AxonRuntimePackage.Type("a.b", "views.JpaReadModelStore").ShouldEqual("io.cratis.stage.axon.runtime.views.JpaReadModelStore");
     [Fact] void should_recognise_module_types_as_runtime_types() => AxonRuntimePackage.IsRuntimeType("a.b", "io.cratis.stage.axon.runtime.Caller").ShouldBeTrue();
     [Fact] void should_recognise_generated_runtime_types() => AxonRuntimePackage.IsRuntimeType("a.b", "a.b.runtime.UnsupportedImplementations").ShouldBeTrue();
     [Fact] void should_not_recognise_application_types_as_runtime_types() => AxonRuntimePackage.IsRuntimeType("a.b", "a.b.orders.X").ShouldBeFalse();
