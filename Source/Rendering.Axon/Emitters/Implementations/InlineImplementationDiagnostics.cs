@@ -36,9 +36,25 @@ internal static class InlineImplementationDiagnostics
 
     static string Reason(AxonEmissionContext context, SemanticImplementationRequirement requirement)
     {
-        return InlineJavaBodies.TryResolve(context, new(requirement.RequirementId, requirement.Role, requirement.Source.SemanticId), out _, out var reason)
+        var slot = ReactionSlot(context, requirement) ?? new(requirement.RequirementId, requirement.Role, requirement.Source.SemanticId);
+        return InlineJavaBodies.TryResolve(context, slot, out _, out var reason)
             ? "No supported native method-body slot consumed this implementation."
             : reason;
+    }
+
+    static InlineBodySlot? ReactionSlot(AxonEmissionContext context, SemanticImplementationRequirement requirement)
+    {
+        if (requirement.Role != SemanticImplementationRole.ReactionEffect) return null;
+        foreach (var located in ScopeSelection.Locate(context.Request.Model.Application))
+        {
+            foreach (var reaction in located.Slice.Reactions)
+            {
+                var slot = InlineBodySlot.ForReaction(requirement.RequirementId, reaction, located.Slice.Id);
+                if (reaction.Triggers.Any(trigger => trigger.RequirementId == requirement.RequirementId) && slot.Addresses(requirement)) return slot;
+            }
+        }
+
+        return null;
     }
 
     static bool Selected(SemanticImplementationRequirement requirement, LocatedSemanticSlice located) => requirement.Role switch
@@ -57,7 +73,8 @@ internal static class InlineImplementationDiagnostics
         located.Slice.Commands.Any(command => command.Id == requirement.Source.SemanticId && command.Handler?.RequirementId == requirement.RequirementId);
 
     static bool ReactionSelected(SemanticImplementationRequirement requirement, LocatedSemanticSlice located) =>
-        located.Slice.Reactions.Any(reaction => reaction.Id == requirement.Source.SemanticId && reaction.Triggers.Any(trigger => trigger.RequirementId == requirement.RequirementId));
+        located.Slice.Reactions.Any(reaction => reaction.Triggers.Any(trigger => trigger.RequirementId == requirement.RequirementId) &&
+            InlineBodySlot.ForReaction(requirement.RequirementId, reaction, located.Slice.Id).Addresses(requirement));
 
     static bool QuerySelected(SemanticImplementationRequirement requirement, LocatedSemanticSlice located) =>
         located.Slice.Queries.Any(query => query.Id == requirement.Source.SemanticId) || located.Slice.ReadModels.Any(model => model.Id == requirement.QueryShape?.ReadModel);
