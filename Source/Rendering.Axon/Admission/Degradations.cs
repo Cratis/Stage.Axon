@@ -19,7 +19,8 @@ internal enum DegradationStub
     ThrowingBody,
     NoOpHandler,
     EmptyResult,
-    Omitted
+    Omitted,
+    NoOpValidator
 }
 
 internal sealed record Degradation(string Code, DegradationKind Kind, string Construct, string Reason,
@@ -76,6 +77,7 @@ internal static class Degradations
         Informational(AxonRefusalCodes.ClientPrecision, "preserve modeled numeric precision in the client", "JSON numbers cannot carry every modeled value exactly."),
         Unsupported("STAGE-AXON-GENERATION-OPTIONS", "generate values using the declared options", "UUID value creation does not represent the declared generation options.", Comment),
         Unsupported("STAGE-AXON-TYPE", "represent the modeled property type", "The property type is not known to this target.", Comment),
+        Unsupported("STAGE-AXON-IMPL-VALIDATION", "validate the modeled value", "The validation rule has no Java implementation; the generated validator accepts every value.", NoOpValidator),
         Unsupported("STAGE-AXON-0504", "execute the modeled reaction", "The reaction requires an admitted stateless handler or implementation.", NoOpHandler) with { AxonDocs = Docs + "/migration/paths/sagas/" },
         Unsupported("STAGE-AXON-0505", "invoke commands from the modeled trigger", "The trigger cannot be represented by the generated handler.", Omitted),
         Unsupported("STAGE-AXON-SPEC-CLAIMS", "preserve all modeled caller claims", "The security fixture cannot represent every modeled caller claim.", Comment),

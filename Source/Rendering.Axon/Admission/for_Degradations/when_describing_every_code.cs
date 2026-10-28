@@ -32,11 +32,25 @@ public class when_describing_every_code
 
     [Fact] public void should_tolerate_unknown_codes() => Assert.Null(Degradations.Find("STAGE-AXON-UNKNOWN"));
 
+    [Fact]
+    public void should_describe_degraded_validation_implementations()
+    {
+        var row = Degradations.Find("STAGE-AXON-IMPL-VALIDATION");
+        Assert.NotNull(row);
+        Assert.Equal(DegradationKind.Unsupported, row.Kind);
+        Assert.Equal("validate the modeled value", row.Construct);
+        Assert.Equal("The validation rule has no Java implementation; the generated validator accepts every value.", row.Reason);
+        Assert.Equal(ArtifactRenderDiagnosticSeverity.Warning, row.Severity);
+        Assert.Equal(DegradationStub.NoOpValidator, row.Stub);
+        Assert.Null(row.AxonDocs);
+    }
+
     [Theory]
     [InlineData("STAGE-AXON-GENERATION")]
     [InlineData("STAGE-AXON-0307")]
     [InlineData("STAGE-AXON-NAMES")]
     [InlineData("STAGE-AXON-SUPPORT-PACKAGE")]
+    [InlineData("STAGE-AXON-IMPL-VALIDATION")]
     public void should_document_the_s1_warnings(string code) => Assert.Equal(ArtifactRenderDiagnosticSeverity.Warning, Degradations.Find(code).Severity);
 
     [Theory]
