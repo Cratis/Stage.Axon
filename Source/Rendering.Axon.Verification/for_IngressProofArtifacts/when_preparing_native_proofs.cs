@@ -28,7 +28,7 @@ public partial class when_preparing_native_proofs : Specification
     [Fact]
     void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
     [
-        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
+        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
         "GeneratedPersistentUniqueConcurrencyTest.java", "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
     [Fact]
@@ -43,6 +43,15 @@ public partial class when_preparing_native_proofs : Specification
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("financeWithoutWriterDeniesTheConjunction");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("inlinePoliciesProtectLiveQueries");
         sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain("stage.axon.demo.claims.department=Finance Operations");
+    }
+
+    [Fact]
+    void should_include_the_inline_policy_performed_query_proofs()
+    {
+        var sources = IngressProofArtifacts.Sources("inline-java-policy-performers");
+        sources.Count.ShouldEqual(1);
+        sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("inlinePoliciesProtectPerformedQueriesOverHttp");
+        sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("inlinePoliciesProtectPerformedQueriesOverSse");
     }
 
     [Fact]

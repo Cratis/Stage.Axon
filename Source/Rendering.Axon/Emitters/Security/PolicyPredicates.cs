@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
+using Cratis.Stage.Rendering.Axon.Emitters.Queries;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -29,7 +30,8 @@ internal static class PolicyPredicates
     internal static IEnumerable<(SemanticId Owner, SemanticAuthorization Authorization)> Sites(AxonEmissionContext context) =>
         ScopeSelection.Select(context.Request).SelectMany(located =>
             located.Slice.Commands.Select(command => (command.Id, command.Authorization))
-                .Concat(located.Slice.Queries.Select(query => (query.Id, query.Authorization))))
+                .Concat(located.Slice.Queries.Concat(QueryPerformer.Queries(context, located))
+                    .DistinctBy(query => query.Id).Select(query => (query.Id, query.Authorization))))
             .Where(site => site.Authorization is not null && HasInline(context, site.Authorization))
             .Select(site => (site.Id, site.Authorization!));
 
