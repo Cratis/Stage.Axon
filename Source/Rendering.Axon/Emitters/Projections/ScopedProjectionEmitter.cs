@@ -109,7 +109,8 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             eventType,
             body =>
             {
-                body.Line("restore(scope.get(\"scope\").orElse(null));");
+                // The fields are dirty until snapshot() completes, so a failure part-way through forces the next unit of work to restore.
+                body.Line("restore(scope.get(\"scope\").orElse(null));").Line("applied = null;");
                 foreach (var node in _root.All) methods.Caches(body, node, @event);
                 var deferred = _root.All.Any(node => node.Identity is not null && (node.Scope.From.Any(from => from.EventContract == @event.Id) || node.Scope.Removals.Any(removal => removal.EventContract == @event.Id)));
                 body.Line($"boolean modified = {method}(event, message, store);");
