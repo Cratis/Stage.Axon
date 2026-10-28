@@ -70,6 +70,7 @@ internal static class CorpusRenderer
             case IngressProofModel.Application:
             case IngressProofModel.PersistentApplication:
             case "inline-java-policies":
+            case "inline-java-policy-performers":
                 await IngressProofArtifacts.Write(destination, name);
                 break;
             case ClientProofArtifacts.Application:
@@ -80,7 +81,7 @@ internal static class CorpusRenderer
 
     static ArtifactRenderPlan Plan(string name, LoadedSemanticModel loaded) => name switch
     {
-        "inline-java-policies" => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: BearerProfile),
+        "inline-java-policies" or "inline-java-policy-performers" => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: BearerProfile),
         IngressProofModel.Application => IngressProofModel.Plan(loaded, BearerProfile),
         IngressProofModel.PersistentApplication => IngressProofModel.PersistentPlan(loaded, Profile),
         _ => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id), profile: Profile)

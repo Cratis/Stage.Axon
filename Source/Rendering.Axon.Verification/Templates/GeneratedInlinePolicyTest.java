@@ -4,6 +4,7 @@ import __APPLICATION__.accounts.registry.active.ActiveAccounts;
 import __APPLICATION__.accounts.registry.register.RegisterAccount;
 import __APPLICATION__.accounts.registry.register.RegisterAccountHandler;
 import __APPLICATION__.concepts.AccountId;
+import __RUNTIME_MODULE__.ReadModelStore;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
