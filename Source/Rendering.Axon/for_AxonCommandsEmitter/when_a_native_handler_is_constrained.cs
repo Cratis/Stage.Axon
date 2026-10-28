@@ -87,6 +87,7 @@ public abstract class when_a_native_handler_is_constrained : for_AxonArtifactRen
         code.ShouldContain("ModeledConstraints.enforcing(uniqueValues, unconstrainedAppender, context)");
         code.ShouldContain("EventAppender unconstrainedAppender");
         code.ShouldContain("private void handleBody(" + command.Name + " command, EventAppender appender");
+        code.ShouldNotContain(", Nullable ");
         var delegation = code.IndexOf("handleBody(command, ModeledConstraints.enforcing", StringComparison.Ordinal);
         (code.IndexOf("rules.validate(command);", StringComparison.Ordinal) < delegation).ShouldBeTrue();
         var privateMethod = code.IndexOf("private void handleBody(", StringComparison.Ordinal);

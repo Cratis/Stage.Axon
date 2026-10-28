@@ -14,13 +14,16 @@ internal static class ConstraintProofArtifacts
         var assembly = typeof(ConstraintProofArtifacts).Assembly;
         return assembly.GetManifestResourceNames()
             .Where(name => name.StartsWith(Prefix, StringComparison.Ordinal) && name.EndsWith(".java", StringComparison.Ordinal))
-            .ToDictionary(name => name[Prefix.Length..], name =>
-            {
-                using var reader = new StreamReader(assembly.GetManifestResourceStream(name)!);
-                return reader.ReadToEnd().Replace("__APPLICATION__", ApplicationPackage, StringComparison.Ordinal)
-                    .Replace("__RUNTIME_MODULE__", IngressProofArtifacts.RuntimeModulePackage, StringComparison.Ordinal)
-                    .Replace("__RUNTIME__", ApplicationPackage + ".runtime", StringComparison.Ordinal);
-            }, StringComparer.Ordinal);
+            .ToDictionary(
+                name => name[Prefix.Length..],
+                name =>
+                {
+                    using var reader = new StreamReader(assembly.GetManifestResourceStream(name)!);
+                    return reader.ReadToEnd().Replace("__APPLICATION__", ApplicationPackage, StringComparison.Ordinal)
+                        .Replace("__RUNTIME_MODULE__", IngressProofArtifacts.RuntimeModulePackage, StringComparison.Ordinal)
+                        .Replace("__RUNTIME__", ApplicationPackage + ".runtime", StringComparison.Ordinal);
+                },
+                StringComparer.Ordinal);
     }
 
     internal static async Task Write(string destination)

@@ -16,7 +16,7 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
 
 internal sealed class CommandHandlerEmitter(AxonEmissionContext context, LocatedSemanticSlice located, SemanticCommand command, CommandSource? source)
 {
-    static readonly string[] ForbiddenAppenderTokens = ["EventAppender", "EventSink", "EventGateway", "EventStore", "forContext"];
+    static readonly string[] _forbiddenAppenderTokens = ["EventAppender", "EventSink", "EventGateway", "EventStore", "forContext"];
     readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
 
     bool _usesClock;
@@ -129,7 +129,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation: " + reason);
             return;
         }
-        if (Constrained && ForbiddenAppenderTokens.Any(token => content.Contains(token, StringComparison.Ordinal)))
+        if (Constrained && _forbiddenAppenderTokens.Any(token => content.Contains(token, StringComparison.Ordinal)))
         {
             Unsupported(body, AxonRefusalCodes.Constraint, "enforce modeled uniqueness for every event a native command body appends");
             return;
@@ -155,7 +155,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     {
         var parameters = name + $" command, {body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender";
         if (source?.Generated == true) parameters += $", {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
-        else if (source is not null) parameters += $", {body.Reference("org.jspecify.annotations.Nullable")} {name}Stream state";
+        else if (source is not null) parameters += $", @{body.Reference("org.jspecify.annotations.Nullable")} {name}Stream state";
         body.Block($"private {response.ReturnTypeFor(body)} handleBody({parameters})", method => method.RawBody(_nativeBody!));
     }
 

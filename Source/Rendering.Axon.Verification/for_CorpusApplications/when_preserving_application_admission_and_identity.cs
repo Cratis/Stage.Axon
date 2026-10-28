@@ -49,15 +49,15 @@ public class when_preserving_application_admission_and_identity : Specification
     void Destroy() => _inputs?.Dispose();
 
     [Fact]
-    void should_keep_all_twenty_seven_application_names() => _applications.Select(application => application.Name).SequenceEqual<string>(
+    void should_keep_all_twenty_eight_application_names() => _applications.Select(application => application.Name).SequenceEqual<string>(
     [
         "administration", "approvals", "bookings", "catalog", "contracts", "crm", "customer-portal", "hr", "inventory", "invoicing", "orders", "projects", "ticketing", "vendors", "work-orders",
-        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views", "ingress-invariants", "ingress-persistent", "client-proof", "inline-java-bodies"
+        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views", "ingress-invariants", "ingress-persistent", "client-proof", "inline-java-bodies", "constrained-java-bodies"
     ]).ShouldBeTrue();
 
     [Fact] void should_keep_native_report_application_names() => CorpusApplications.Find(given.the_repository.Root()).Select(application => application.Name).SequenceEqual(_applications.Select(application => application.Name)).ShouldBeTrue();
-    [Fact] void should_compile_every_application() => _models.Count.ShouldEqual(27);
-    [Fact] void should_plan_every_application_without_refusals() => (_plans.Count == 27 && _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty)).ShouldBeTrue();
+    [Fact] void should_compile_every_application() => _models.Count.ShouldEqual(28);
+    [Fact] void should_plan_every_application_without_refusals() => (_plans.Count == 28 && _plans.Values.All(plan => plan.Success && plan.Refusals.IsEmpty)).ShouldBeTrue();
     [Fact] void should_use_the_composed_custom_package_root() => _applications.Single(application => application.Name == "sample-custom-packages").Root.ShouldEqual(_inputs.Root);
 
     [Fact] void should_bind_proof_facts_to_the_authenticated_caller() => ProofSource("RegisterAccountHandler").ShouldContain("Caller.current().identity()");

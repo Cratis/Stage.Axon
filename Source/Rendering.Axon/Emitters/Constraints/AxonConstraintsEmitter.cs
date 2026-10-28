@@ -55,31 +55,31 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
         var conflict = body.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueConflict"));
         var descriptor = body.Reference("org.axonframework.common.infra.ComponentDescriptor");
         body.Block($"public static {appender} enforcing({store} store, {appender} appender, {processing} context)", method => method.RawBody($$"""
-            return new {{appender}}() {
-                @Override
-                public void append({{list}}<?> events) {
-                    append(events, {{metadata}}.emptyInstance());
-                }
-
-                @Override
-                public void append({{list}}<?> events, {{metadata}} metadata) {
-                    try {
-                        for (var event : events) {
-                            var payload = event instanceof {{message}} message ? message.payload() : event;
-                            apply(store, payload, context);
+                    return new {{appender}}() {
+                        @Override
+                        public void append({{list}}<?> events) {
+                            append(events, {{metadata}}.emptyInstance());
                         }
-                    } catch ({{conflict}} conflict) {
-                        context.runOnPrepareCommit(ignored -> { throw conflict; });
-                        throw conflict;
-                    }
-                    appender.append(events, metadata);
-                }
 
-                @Override
-                public void describeTo({{descriptor}} descriptor) {
-                    appender.describeTo(descriptor);
-                }
-            };
+                        @Override
+                        public void append({{list}}<?> events, {{metadata}} metadata) {
+                            try {
+                                for (var event : events) {
+                                    var payload = event instanceof {{message}} message ? message.payload() : event;
+                                    apply(store, payload, context);
+                                }
+                            } catch ({{conflict}} conflict) {
+                                context.runOnPrepareCommit(ignored -> { throw conflict; });
+                                throw conflict;
+                            }
+                            appender.append(events, metadata);
+                        }
+
+                        @Override
+                        public void describeTo({{descriptor}} descriptor) {
+                            appender.describeTo(descriptor);
+                        }
+                    };
             """));
     }
 
