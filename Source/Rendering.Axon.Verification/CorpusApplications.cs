@@ -33,6 +33,7 @@ internal static class CorpusApplications
             (ClientProofArtifacts.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/client-proof.play")),
             ("inline-java-bodies", Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/inline-java-bodies.play")),
             (ConstraintProofArtifacts.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/constrained-java-bodies.play")),
+            (ConstraintProofArtifacts.PersistentApplication, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/constrained-java-bodies.play")),
             (ReactionConstraintProofArtifacts.Application, Path.Combine(repository, "Source/Rendering.Axon.Verification/Corpus/reaction-constraints.play"))
         ];
     }

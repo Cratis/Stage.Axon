@@ -8,7 +8,7 @@ namespace Cratis.Stage.Rendering.Axon.for_AxonCommandsEmitter;
 
 public class when_a_native_handler_has_an_unsupported_constraint : when_a_native_handler_is_constrained
 {
-    protected override SemanticConstraintKind Kind => SemanticConstraintKind.UniqueEventOccurrence;
+    protected override SemanticConstraint CreateConstraint(SemanticEventContract contract, SemanticEventContract producedContract) => given.UnsupportedEnumUniqueness.For(contract);
 
     [Theory]
     [InlineData(false)]
