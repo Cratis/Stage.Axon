@@ -39,6 +39,8 @@ public class when_a_reaction_invokes_a_command : given.a_planned_screenplay
     [Fact] void should_name_the_handler_after_the_event() => Source("ResetAfterRecordingReaction").ShouldContain("public void onCountRecorded(CountRecorded input");
     [Fact] void should_receive_the_processing_context() => Source("ResetAfterRecordingReaction").ShouldContain("ProcessingContext context");
     [Fact] void should_send_the_command_in_the_handler_context() => Source("ResetAfterRecordingReaction").ShouldContain("commands.sendAndWait(new ResetCount(input.id()), context);");
+    [Fact] void should_start_its_processor_at_the_latest_token() => Source("ResetAfterRecordingReaction").ShouldContain("EventProcessorDefinition.pooledStreamingMatching(\"reactionplan.counters.totals.reset.reactions\").customized(config -> config.initialToken(source -> source.latestToken(null)))");
+    [Fact] void should_name_the_processor_bean_after_the_namespace() => Source("ResetAfterRecordingReaction").ShouldContain("@Bean(\"reactionplan.counters.totals.reset.reactions\")");
     [Fact] void should_not_inject_a_clock() => Source("ResetAfterRecordingReaction").ShouldNotContain("Clock");
     [Fact] void should_not_emit_a_reaction_configuration() => Exists("ReactionConfiguration").ShouldBeFalse();
     [Fact] void should_not_emit_a_reaction_properties_file() => plan.Artifacts.Any(artifact => artifact.RelativePath.EndsWith("stage-reactions.properties", StringComparison.Ordinal)).ShouldBeFalse();

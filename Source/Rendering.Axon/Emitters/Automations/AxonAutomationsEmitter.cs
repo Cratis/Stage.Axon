@@ -55,11 +55,20 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
                     constructor.Line("this.commands = commands;");
                     if (usesClock) constructor.Line("this.clock = clock;");
                 });
+                if (registered && reaction.Triggers.Any(trigger => trigger.Kind == SemanticReactionTriggerKind.Event)) EmitProcessor(package, body);
                 EmitMethods(reaction, emitter, triggers, body);
             });
         if (!registered) context.Degradation.Unsupported("STAGE-AXON-0504", reaction.Id, $"Reaction '{reaction.Name}' is not registered: a trigger's effects, routing, guards or identity cannot be preserved.");
         context.AddJava(package, name, code.Build(), sources: [reaction.Id, .. reaction.Triggers.Where(trigger => trigger.Source != default).Select(trigger => trigger.Source)]);
         return registered ? new(reaction, emitter, triggers!) : null;
+    }
+
+    // A reaction sends commands, so its processor starts at the latest token and never reacts to history.
+    static void EmitProcessor(string package, JavaCodeBuilder body)
+    {
+        var definition = body.Reference("org.axonframework.extension.spring.config.EventProcessorDefinition");
+        body.Line("@" + body.Reference("org.springframework.context.annotation.Bean") + "(" + JavaCodeBuilder.StringLiteral(package + ".reactions") + ")")
+            .Block($"static {definition} processor()", method => method.Line($"return {definition}.pooledStreamingMatching(" + JavaCodeBuilder.StringLiteral(package + ".reactions") + ").customized(config -> config.initialToken(source -> source.latestToken(null)));"));
     }
 
     static void EmitMethods(SemanticReaction reaction, ReactionTriggerEmitter emitter, PreparedReactionTrigger?[] triggers, JavaCodeBuilder body)
