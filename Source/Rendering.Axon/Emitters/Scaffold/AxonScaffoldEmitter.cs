@@ -36,7 +36,7 @@ internal sealed class AxonScaffoldEmitter : IAxonEmitter
             "src/test/resources/spring.properties",
             "# Axon entity registration cannot be repeated when Spring restarts a paused test context.\nspring.test.context.cache.pause=NEVER\n"));
         context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/application.yml", "server:\n  address: 127.0.0.1\nspring:\n  application:\n    name: " + context.BasePackage + (bearer ? "\n  security:\n    oauth2:\n      resourceserver:\n        jwt:\n          authorities-claim-name: roles\n          authority-prefix: ROLE_" : string.Empty) + "\naxon:\n  axonserver:\n    enabled: false\n"));
-        context.Artifacts.Add(PlannedArtifact.CreateText("README.md", AxonApplicationReadme.Text(bearer, persistent)));
+        context.Artifacts.Add(PlannedArtifact.CreateText("README.md", AxonApplicationReadme.Text(bearer, persistent, ScopeSelection.Select(context.Request).Any(owner => !owner.Slice.ReadModels.IsEmpty))));
         if (persistent) EmitPersistentProfile(context);
         else ExplainMissingPersistentProfile(context);
     }

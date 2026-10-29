@@ -61,5 +61,6 @@ public class when_describing_every_code
     [InlineData("STAGE-AXON-REFUSAL-MODE")]
     [InlineData("STAGE-AXON-LOCAL-RUNTIME")]
     [InlineData("STAGE-AXON-PERSISTENT")]
+    [InlineData("STAGE-AXON-0311")]
     public void should_document_admission_and_mode_codes_as_informational(string code) => Assert.Equal(DegradationKind.Informational, Degradations.Find(code).Kind);
 }

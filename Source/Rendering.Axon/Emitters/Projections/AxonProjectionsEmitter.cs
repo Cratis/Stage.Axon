@@ -49,14 +49,22 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         var namespaces = ScopeSelection.Select(context.Request).Where(owner => !owner.Slice.ReadModels.IsEmpty).Select(types.Package).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         if (namespaces.Length == 0) return;
 
-        // Read models are written inside the publishing unit of work, so a query sees the event it follows.
-        context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/axon-views.properties", string.Join('\n', namespaces.Select(name => $"axon.eventhandling.processors[{name}].mode=subscribing")) + "\n", []));
+        // One pooled streaming processor with a sequential policy applies every view writer, so a read-modify-write of a shared row never interleaves.
         var package = types.BasePackage + ".infrastructure";
         var code = new JavaCodeBuilder(package).Declare("ViewProcessingConfiguration");
+        var set = code.Reference("java.util.Set");
+        var definition = code.Reference("org.axonframework.extension.spring.config.EventProcessorDefinition");
+        var packages = string.Join(", ", namespaces.Select(JavaCodeBuilder.StringLiteral));
         code.Line($"@{code.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + ".ViewProcessingConfiguration")})")
-            .Line($"@{code.Reference("org.springframework.context.annotation.PropertySource")}(\"classpath:axon-views.properties\")")
-            .Block("public class ViewProcessingConfiguration", _ => { });
+            .Block("public class ViewProcessingConfiguration", body => body
+                .Line($"private static final {set}<String> VIEW_PACKAGES = {set}.of({packages});")
+                .Line($"@{code.Reference("org.springframework.context.annotation.Bean")}")
+                .Block($"{definition} views()", method => method
+                    .Line($"return {definition}.pooledStreaming(\"views\")")
+                    .Line("    .assigningHandlers(handler -> VIEW_PACKAGES.contains(handler.beanType().getPackageName()))")
+                    .Line($"    .customized(configuration -> configuration.sequencingPolicy({code.Reference("org.axonframework.messaging.core.sequencing.SequentialPolicy")}.INSTANCE));")));
         context.AddJava(package, "ViewProcessingConfiguration", code.Build());
+        context.Degradation.Note($"{AxonRefusalCodes.EventuallyConsistentViews}: Views are processed by a pooled streaming processor with a sequential policy, so reads are eventually consistent: a query may not yet reflect an event that was just appended. Tests that append and then read a view wait for the result.");
     }
 
     static void EmitReducers(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located)
