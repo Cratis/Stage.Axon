@@ -44,6 +44,7 @@ public class when_rendering_every_verification_model : Specification
     [Fact] void should_offer_the_profile_to_some_model() => (_persistent.Count > 0).ShouldBeTrue();
     [Fact] void should_not_emit_multi_tag_events_where_the_profile_is_offered() => Java(_persistent).Where(source => Count(source.Text, "@EventTag") > 1).Select(source => source.Path).ShouldBeEmpty();
     [Fact] void should_not_inject_several_entities_into_one_handler_where_the_profile_is_offered() => Java(_persistent).Where(source => source.Text.Split('\n').Any(line => Count(line, "@InjectEntity") > 1)).Select(source => source.Path).ShouldBeEmpty();
+    [Fact] void should_not_build_event_criteria_in_main_code_where_the_profile_is_offered() => Java(_persistent).Where(source => source.Path.Contains("/src/main/", StringComparison.Ordinal) && new[] { "havingAnyTag", "EventCriteria", "SourcingCondition" }.Any(token => source.Text.Contains(token, StringComparison.Ordinal))).Select(source => source.Path).ShouldBeEmpty();
     [Fact] void should_generate_the_profile_only_with_its_test_and_wiring() => _persistent.TrueForAll(item => Has(item.Plan, "/PersistentProfileTest.java") && Has(item.Plan, "src/main/resources/application-persistent.yml")).ShouldBeTrue();
 
     static int Count(string text, string token) => text.Split(token).Length - 1;

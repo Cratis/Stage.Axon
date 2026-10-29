@@ -45,6 +45,7 @@ public class when_emitting_a_persistent_profile : for_PersistentProfile.given.a_
     }
 
     [Fact] void should_explain_the_profile_in_the_readme() => Content(context, "README.md").ShouldContain("spring-boot.run.profiles=persistent");
+    [Fact] void should_say_whole_store_specification_tests_use_the_default_profile() => Content(context, "README.md").ShouldContain("read the whole event store run under the default profile only");
     [Fact] void should_not_warn_about_the_profile() => context.Degradation.Warnings.Any(warning => warning.Code == "STAGE-AXON-PERSISTENT").ShouldBeFalse();
     [Fact] void should_not_change_the_pom() => Content(context, "pom.xml").ShouldEqual(constrainedPom);
 
