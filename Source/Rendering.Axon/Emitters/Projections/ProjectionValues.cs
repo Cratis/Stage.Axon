@@ -36,6 +36,20 @@ internal sealed class ProjectionValues(AxonEmissionContext context, ViewJavaType
         _ => null
     };
 
+    internal string? EntityKey(SemanticProjectionKey key, SemanticEventContract @event, SemanticReadModel model)
+    {
+        if (ReadModelKeys.Parts(_application, model) is not { } parts) return Key(key, @event);
+        var assigned = key switch
+        {
+            SemanticProjectionPartsKey named => named.Parts,
+            SemanticProjectionCompositeKey composite => composite.Parts,
+            _ => []
+        };
+        var arguments = parts.Select(part => assigned.FirstOrDefault(candidate => candidate.Property == part.Property.Id) is { } assignment && Value(assignment.Value, part.Property.Type, @event) is { } value
+            ? types.Unwrap(part.Property.Type, value) : null).ToArray();
+        return arguments.Any(argument => argument is null) ? null : $"new {Reference(ReadModelKeys.KeyName(model))}({string.Join(", ", arguments)})";
+    }
+
     internal string? Mapping(SemanticProjectionMapping mapping, SemanticProperty target, SemanticEventContract @event, string? previous = null)
     {
         var old = previous ?? $"state.{JavaNames.Member(target.Name)}()";

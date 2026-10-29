@@ -17,8 +17,8 @@ public class when_rendering_a_composite_key_with_imports : for_NativeViewSpecifi
     void Because()
     {
         var original = _located.Slice.ReadModels.Single();
-        var identifier = original.Properties.Single(property => property.IsIdentifier) with { IsIdentifier = false };
-        var label = original.Properties.Single(property => property.Name == "name");
+        var identifier = original.Properties.Single(property => property.IsIdentifier);
+        var label = original.Properties.Single(property => property.Name == "name") with { IsIdentifier = true };
         var model = original with { Properties = [identifier, label] };
         var key = new SemanticCompositeValue([
             new(identifier.Id, new SemanticTextValue("6f1f4a3e-0c0d-4c6a-9a41-3b6a1a0e0021")),
@@ -28,9 +28,9 @@ public class when_rendering_a_composite_key_with_imports : for_NativeViewSpecifi
         _java = code.Line(_expression).Build();
     }
 
-    [Fact] void should_use_short_collection_names() => _expression.ShouldContain("Map.ofEntries(Map.entry(");
-    [Fact] void should_use_short_concept_and_uuid_names() => _expression.ShouldContain("new CategoryId(UUID.fromString(");
-    [Fact] void should_import_the_collection() => _java.ShouldContain("import java.util.Map;");
+    [Fact] void should_construct_the_typed_key() => _expression.ShouldContain("new CategoriesKey(");
+    [Fact] void should_unwrap_the_concept_for_the_key() => _expression.ShouldContain("(new CategoryId(UUID.fromString(");
+    [Fact] void should_use_the_underlying_column_type() => _expression.ShouldContain(")).value(), \"Fittings\"");
     [Fact] void should_import_the_uuid() => _java.ShouldContain("import java.util.UUID;");
     [Fact] void should_import_the_concept() => _java.ShouldContain("import nativeviews.concepts.CategoryId;");
 }

@@ -46,7 +46,7 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
 
     void Remove(JavaCodeBuilder code, SemanticEventContract @event, SemanticProjectionRemoval removal)
     {
-        var key = new ProjectionValues(context, types, code).Key(removal.Key, @event);
+        var key = new ProjectionValues(context, types, code).EntityKey(removal.Key, @event, model);
         if (key is null)
         {
             context.Degradation.Unsupported(AxonRefusalCodes.CompositeKey, projection.Id, "This projection key cannot yet be emitted as a Java key.");
@@ -73,7 +73,7 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
     void From(JavaCodeBuilder code, SemanticEventContract @event, SemanticProjectionFrom from)
     {
         var values = new ProjectionValues(context, types, code);
-        var key = values.Key(from.Key, @event);
+        var key = values.EntityKey(from.Key, @event, model);
         if (key is null)
         {
             context.Degradation.Unsupported(AxonRefusalCodes.CompositeKey, projection.Id, "This projection key cannot yet be emitted as a Java key.");

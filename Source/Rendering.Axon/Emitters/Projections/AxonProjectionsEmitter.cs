@@ -84,7 +84,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
 
     static void EmitProjector(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticProjection projection, SemanticReadModel model)
     {
-        if (ProjectionHandlerShape.RootOnly(projection))
+        if (ProjectionHandlerShape.RootOnly(context.Request.Model.Application, projection, model))
         {
             new RootProjectionEmitter(context, types, package, projection, model).Emit();
             return;

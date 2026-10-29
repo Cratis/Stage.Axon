@@ -31,6 +31,8 @@ internal sealed class ViewJavaTypes(SemanticApplication application, string base
     internal static void Add(AxonEmissionContext context, string package, string name, string source, params SemanticId[] ids) =>
         context.Artifacts.Add(Contracts.Rendering.PlannedArtifact.CreateText($"src/main/java/{package.Replace('.', '/')}/{name}.java", source, [.. ids]));
 
+    internal IReadOnlyList<ReadModelKeys.KeyPart>? KeyParts(SemanticReadModel model) => ReadModelKeys.Parts(application, model);
+
     internal string Package(LocatedSemanticSlice located) => BasePackage + "." + string.Join('.', located.Path.Select(JavaNames.PackageSegment));
 
     internal ArtifactRenderDiagnostic? InspectPackage(string package, SemanticId item, string name) => ReservedSupportPackages.Contains(package)
