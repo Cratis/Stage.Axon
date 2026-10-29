@@ -9,6 +9,8 @@ import __APPLICATION__.accounts.registry.register.RegisterAccount;
 import __APPLICATION__.concepts.AccountId;
 import __RUNTIME_MODULE__.Caller;
 import __RUNTIME_MODULE__.UniqueValueStore;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
 import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -35,12 +37,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
-@SpringBootTest
+@SpringBootTest(properties = "stage.axon.cors.allowed-origins=https://client.example")
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Timeout(60)
@@ -53,6 +58,39 @@ class GeneratedSecurityIngressTest {
     @Autowired private Configuration configuration;
     @MockitoSpyBean private UniqueValueStore claims;
     @Autowired private ActiveAccountsRepository repository;
+
+    @Test
+    void anonymousMalformedTriggerBodiesAreRejectedBeforeBinding() throws Exception {
+        for (var body : List.of("", "{", "{}", "{\"id\":\"not-a-uuid\"}")) {
+            http.perform(post("/api/triggers/register-requested").contentType("application/json").content(body))
+                .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void anonymousHeadWithoutRequiredQueryParameterIsUnauthorized() throws Exception {
+        http.perform(head(QUERY)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anonymousNonCorsOptionsWithoutRequiredQueryParameterIsUnauthorized() throws Exception {
+        http.perform(options(QUERY)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void nativeCorsPreflightStillRunsBeforeAuthenticationAndQueryBinding() throws Exception {
+        http.perform(options(QUERY).header("Origin", "https://client.example")
+            .header("Access-Control-Request-Method", "GET").header("Access-Control-Request-Headers", "Content-Type"))
+            .andExpect(status().isOk()).andExpect(header().string("Access-Control-Allow-Origin", "https://client.example"));
+    }
+
+    @Test
+    void unregisteredApiRoutesRequireAuthenticationWhileNonApiAndErrorDispatchRemainPublic() throws Exception {
+        http.perform(get("/api/not-registered")).andExpect(status().isUnauthorized());
+        http.perform(get("/not-an-api-resource")).andExpect(status().isNotFound());
+        http.perform(get("/error").with(request -> { request.setDispatcherType(DispatcherType.ERROR); return request; })
+            .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 400)).andExpect(status().isBadRequest());
+    }
 
     @Test
     void httpRejectsUnauthenticatedAndWrongRoleCommandsBeforeSideEffects() throws Exception {

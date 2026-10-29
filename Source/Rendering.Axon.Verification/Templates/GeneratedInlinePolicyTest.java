@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -112,6 +113,13 @@ class GeneratedInlinePolicyTest {
                 .with(jwt().jwt(token -> token.claim("department", department)))).andExpect(status().isForbidden());
         }
         http.perform(get("/api/accounts/registry/checked-snapshot").param("id", id)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anonymousPolicyQueryStillAllowsAnonymousGetAndHead() throws Exception {
+        for (var request : List.of(get("/api/accounts/registry/public-accounts"), head("/api/accounts/registry/public-accounts"))) {
+            completed(http.perform(request)).andExpect(status().isOk());
+        }
     }
 
     @Test

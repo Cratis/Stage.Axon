@@ -5,6 +5,9 @@ concept AccountId : Uuid
 policy IsWriter
   require role "Writer"
 
+policy Anyone
+  require anonymous
+
 policy IsAuthenticated
   require authenticated
 
@@ -83,6 +86,9 @@ module Accounts
       query NamedSnapshot => ActiveAccounts optional
         by id AccountId
         authorize IsNamedCaller
+
+      query PublicAccounts => ActiveAccounts[]
+        authorize Anyone
 
       query AccountSnapshot => ActiveAccounts optional
         by id AccountId

@@ -27,6 +27,9 @@ public class when_emitting_basic_security_by_default : for_AxonArtifactRenderPla
     [Fact] void should_prevent_boot_generated_users_after_application_providers() => identity.ShouldContain("@AutoConfiguration(before = UserDetailsServiceAutoConfiguration.class)");
     [Fact] void should_register_identity_auto_configuration() => metadata.ShouldContain(".infrastructure.IdentityConfiguration");
     [Fact] void should_not_widen_cors_methods() => code.ShouldContain("configuration.setAllowedMethods(Arrays.asList(\"GET\", \"POST\", \"OPTIONS\"));");
+    [Fact] void should_authenticate_unregistered_api_routes() => code.ShouldContain(".requestMatchers(\"/api/**\").authenticated()");
+    [Fact] void should_preserve_error_dispatches() => code.ShouldContain(".dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()");
+    [Fact] void should_preserve_public_non_api_requests() => code.ShouldContain(".requestMatchers(\"/api/**\").authenticated()\n                .anyRequest().permitAll())");
     [Fact] void should_keep_basic() => code.ShouldContain(".httpBasic(Customizer.withDefaults()).build();");
     [Theory]
     [InlineData("oauth2")]
