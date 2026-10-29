@@ -45,16 +45,15 @@ public class when_rendering_an_inline_java_policy : Specification
     [InlineData("IsNamedCaller", "isNamedCallerPolicy")]
     [InlineData("IsFinanceStaff", "isFinanceStaffPolicy")]
     [InlineData("FinanceCheck", "financeCheckPolicy")]
-    void should_enforce_single_inline_and_jwt_claim_policies_at_the_endpoint_and_warn(string policy, string bean)
+    void should_enforce_single_inline_and_jwt_claim_policies_at_the_endpoint_and_handler(string policy, string bean)
     {
         var authorization = new SemanticPolicyReference(policy);
         Annotation(authorization).ShouldEqual("@PreAuthorize(\"isAuthenticated() and @" + bean + ".check(authentication)\")");
         var handler = SecurityAnnotations.ForHandler(context, authorization, context.Request.Model.Application.Id, new JavaCodeBuilder("example"));
         handler.ShouldNotContain("@Secured");
-        handler.ShouldContain("// Differs from Screenplay:");
+        handler.ShouldEqual(Annotation(authorization));
         context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
-        context.Degradation.Warnings.Single().Code.ShouldEqual("STAGE-AXON-AUTHORIZATION");
-        context.Degradation.Warnings.Single().Message.ShouldContain("dispatch outside HTTP is not guarded at the handler");
+        context.Degradation.Warnings.ShouldBeEmpty();
     }
 
     [Theory]

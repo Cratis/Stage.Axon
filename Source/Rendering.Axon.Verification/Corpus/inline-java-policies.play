@@ -17,6 +17,11 @@ policy IsNotBlocked
 policy IsWriterAndReviewer
   require role "Writer" and role "Reviewer"
 
+policy IsInlineWriter
+  ```java
+    return authentication.getAuthorities().stream().anyMatch(authority -> "ROLE_Writer".equals(authority.getAuthority()));
+    ```
+
 policy IsNamedCaller
   ```java
     return "writer".equals(authentication.getName());
@@ -67,6 +72,108 @@ module Accounts
           for id
           alias = alias
 
+      specification AuthenticatedCallerAllowed
+        given caller
+          authenticated
+        when AuthenticatedRegister
+          id = "00000000-0000-0000-0000-000000000001"
+          alias = "authenticated"
+        then AccountRegistered
+          for "00000000-0000-0000-0000-000000000001"
+          alias = "authenticated"
+
+      specification AnonymousCallerDenied
+        given caller
+        when AuthenticatedRegister
+          id = "00000000-0000-0000-0000-000000000001"
+          alias = "denied"
+        then denied
+
+      command ReviewedRegister
+        id AccountId identifier
+        alias String
+        authorize IsWriterAndReviewer
+        produces AccountRegistered
+          for id
+          alias = alias
+
+      specification BothRolesAllowed
+        given caller
+          authenticated
+          role "Writer"
+          role "Reviewer"
+        when ReviewedRegister
+          id = "00000000-0000-0000-0000-000000000002"
+          alias = "reviewed"
+        then AccountRegistered
+          for "00000000-0000-0000-0000-000000000002"
+          alias = "reviewed"
+
+      specification SingleRoleDenied
+        given caller
+          authenticated
+          role "Writer"
+        when ReviewedRegister
+          id = "00000000-0000-0000-0000-000000000002"
+          alias = "denied"
+        then denied
+
+      command NotBlockedRegister
+        id AccountId identifier
+        alias String
+        authorize IsNotBlocked
+        produces AccountRegistered
+          for id
+          alias = alias
+
+      specification UnblockedCallerAllowed
+        given caller
+          authenticated
+          role "Writer"
+        when NotBlockedRegister
+          id = "00000000-0000-0000-0000-000000000003"
+          alias = "unblocked"
+        then AccountRegistered
+          for "00000000-0000-0000-0000-000000000003"
+          alias = "unblocked"
+
+      specification BlockedCallerDenied
+        given caller
+          authenticated
+          role "Blocked"
+        when NotBlockedRegister
+          id = "00000000-0000-0000-0000-000000000003"
+          alias = "denied"
+        then denied
+
+      command InlineRegister
+        id AccountId identifier
+        alias String
+        authorize IsInlineWriter
+        produces AccountRegistered
+          for id
+          alias = alias
+
+      specification InlineCallerAllowed
+        given caller
+          authenticated
+          role "Writer"
+        when InlineRegister
+          id = "00000000-0000-0000-0000-000000000004"
+          alias = "inline"
+        then AccountRegistered
+          for "00000000-0000-0000-0000-000000000004"
+          alias = "inline"
+
+      specification InlineCallerDenied
+        given caller
+          authenticated
+          role "Reader"
+        when InlineRegister
+          id = "00000000-0000-0000-0000-000000000004"
+          alias = "denied"
+        then denied
+
       event AccountRegistered
         alias String
 
@@ -74,6 +181,10 @@ module Accounts
       readmodel ActiveAccounts
         id AccountId
         alias String
+
+      query AuthenticatedSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsAuthenticated
 
       query NotBlockedSnapshot => ActiveAccounts optional
         by id AccountId

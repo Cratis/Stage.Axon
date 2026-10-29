@@ -17,21 +17,34 @@ internal static class AxonHttpCardinalityTests
     internal static void Emit(AxonEmissionContext context)
     {
         var types = new ViewJavaTypes(context.Request.Model.Application, context.BasePackage);
-        var selected = ScopeSelection.Select(context.Request)
-            .SelectMany(owner => owner.Slice.Queries.Select(query => (Owner: owner, Query: query)))
-            .FirstOrDefault(item => Supported(context, item.Query));
-        if (selected.Query is null) return;
-        var modelOwner = ScopeSelection.Locate(context.Request.Model.Application).First(owner => owner.Slice.ReadModels.Any(model => model.Id == selected.Query.ReadModel));
-        var model = modelOwner.Slice.ReadModels.First(model => model.Id == selected.Query.ReadModel);
+        foreach (var (owner, query) in ScopeSelection.Select(context.Request).SelectMany(owner => owner.Slice.Queries.Where(query => Supported(context, query)).Select(query => (owner, query))))
+        {
+            var modelOwner = ScopeSelection.Locate(context.Request.Model.Application).First(item => item.Slice.ReadModels.Any(model => model.Id == query.ReadModel));
+            var model = modelOwner.Slice.ReadModels.First(model => model.Id == query.ReadModel);
+            var values = HttpModeledExamples.Row(context, model);
+            var shape = new QueryShape(query, model, types);
+            if (values is null || shape.Arguments.Any(argument => !model.Properties.Any(property => property.Id == argument.Property && values.GetValueOrDefault(JavaNames.Member(property.Name)) is string or decimal or bool)))
+            {
+                context.Degradation.Warn("STAGE-AXON-HTTP-SPEC", query.Id, "Skipped the optional-query HTTP cardinality proof: no complete modeled row with matching request arguments is available.");
+                continue;
+            }
+            Emit(context, owner, query, modelOwner, values);
+            return;
+        }
+    }
+
+    static void Emit(AxonEmissionContext context, LocatedSemanticSlice owner, SemanticKeyedQuery query, LocatedSemanticSlice modelOwner, Dictionary<string, object?> values)
+    {
+        var types = new ViewJavaTypes(context.Request.Model.Application, context.BasePackage);
+        var model = modelOwner.Slice.ReadModels.First(model => model.Id == query.ReadModel);
         var package = types.Package(modelOwner);
         const string name = "HttpOptionalQueryContractTest";
         var code = new JavaCodeBuilder(AxonRuntimePackage.JavaPackage(context)).Declare(name);
         var repository = code.Reference(package + "." + ReadModelEntities.RepositoryName(model));
         var entity = code.Reference(package + "." + ReadModelEntities.EntityName(model));
         var modelType = code.Reference(package + "." + JavaNames.Type(model.Name));
-        var values = model.Properties.ToDictionary(property => JavaNames.Member(property.Name), property => HttpSecurityExamples.Value(context, property.Type, 0));
         var json = JavaCodeBuilder.StringLiteral(JsonSerializer.Serialize(values));
-        var request = Request(context, selected.Owner, selected.Query, new(selected.Query, model, types));
+        var request = Request(context, owner, query, new(query, model, types), model, values);
         Imports(code);
         code.Line("@SpringBootTest").Line("@AutoConfigureMockMvc").Block("class " + name, body =>
         {
@@ -72,11 +85,15 @@ internal static class AxonHttpCardinalityTests
         _ => false
     };
 
-    static string Request(AxonEmissionContext context, LocatedSemanticSlice owner, SemanticKeyedQuery query, QueryShape shape)
+    static string Request(AxonEmissionContext context, LocatedSemanticSlice owner, SemanticKeyedQuery query, QueryShape shape, SemanticReadModel model, Dictionary<string, object?> values)
     {
         var request = "get(" + JavaCodeBuilder.StringLiteral(QueryEndpoint.Route(owner, query)) + ")";
         foreach (var argument in shape.Arguments)
-            request += ".param(" + JavaCodeBuilder.StringLiteral(argument.Name) + ", " + JavaCodeBuilder.StringLiteral(HttpSecurityExamples.Parameter(context, new(argument.Name, true, argument.Type))) + ")";
+        {
+            var property = model.Properties.First(property => property.Id == argument.Property);
+            var value = Convert.ToString(values[JavaNames.Member(property.Name)], System.Globalization.CultureInfo.InvariantCulture)!;
+            request += ".param(" + JavaCodeBuilder.StringLiteral(argument.Name) + ", " + JavaCodeBuilder.StringLiteral(value) + ")";
+        }
         return request + ".with(user(\"alice\").roles(" + string.Join(", ", DemoIdentityRoles.From(context).Select(JavaCodeBuilder.StringLiteral)) + "))";
     }
 

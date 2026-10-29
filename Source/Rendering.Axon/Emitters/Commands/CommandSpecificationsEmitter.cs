@@ -4,6 +4,7 @@
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
+using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -71,7 +72,11 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         body.Line($"private final {body.Reference("jakarta.validation.ValidatorFactory")} validators = {body.Reference("jakarta.validation.Validation")}.buildDefaultValidatorFactory();")
             .Line($"private {body.Reference("org.axonframework.test.fixture.AxonTestFixture")} fixture;").Line($"@{body.Reference("org.junit.jupiter.api.AfterEach")}").Block("void stop()", method => method.Line("if (fixture != null) fixture.stop();")
                 .Line("validators.close();").Line($"{method.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
-        CommandFixtureSecurity.ProxyReferences(body, name, usesClock);
+        var methodSecurity = HandlerPolicies.UsesMethodSecurity(context, command.Authorization);
+        var policies = context.Request.Model.Application.Policies
+            .Where(policy => command.Authorization is SemanticPolicyReference reference && reference.Name == policy.Name && PolicyPredicates.HasInline(context, command.Authorization))
+            .Select(policy => (PolicyPredicates.BeanName(policy), context.BasePackage + ".infrastructure." + PolicyPredicates.PolicyClass(policy)));
+        CommandFixtureSecurity.ProxyReferences(body, name, usesClock, methodSecurity, policies);
         body.Block($"private {body.Reference("org.axonframework.test.fixture.AxonTestFixture")} fixture({body.Reference("java.lang.String")} instant)", method =>
         {
             FixtureClock(method);
@@ -111,6 +116,7 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         }
         body.Block("void " + method + "()", test =>
         {
+            if (HandlerPolicies.UsesMethodSecurity(context, command.Authorization)) CommandFixtureSecurity.CallerReferences(test, specification.GivenCaller);
             CommandFixtureSecurity.CallerReferences(test, specification.GivenCaller, metadataOnly: true);
             var activity = given.Length == 0 ? ".noPriorActivity()" : $".events({string.Join(", ", given.Select(value => test.ReferenceExpression(value!)))})";
             test.Line($"var scenario = fixture({JavaCodeBuilder.StringLiteral(specification.GivenClock ?? "1970-01-01T00:00:00Z")}).given(){activity};")

@@ -52,21 +52,20 @@ public class when_rendering_inline_policy_performed_queries : Specification
         requirements.Length.ShouldEqual(2);
         foreach (var requirement in requirements)
         {
-            Source(requirement.Owner.Name + "Handler").ShouldContain("STAGE-AXON-AUTHORIZATION");
+            Source(requirement.Owner.Name + "Handler").ShouldContain("@PreAuthorize");
             Source(requirement.Owner.Name + "Endpoint").ShouldContain("@PreAuthorize");
         }
     }
 
     [Fact]
-    void should_warn_that_non_http_performed_query_dispatch_is_not_guarded_at_the_handler()
+    void should_guard_non_http_performed_query_dispatch_at_the_handler()
     {
         var context = new AxonEmissionContext(_request, new(_request.Profile));
         foreach (var query in ScopeSelection.Select(_request).SelectMany(slice => slice.Slice.Queries))
         {
             SecurityAnnotations.ForHandler(context, query.Authorization, query.Id, new JavaCodeBuilder("example")).ShouldNotContain("@Secured");
-            var warning = context.Degradation.Warnings.Single(warning => warning.Artifact == query.Id);
-            warning.Code.ShouldEqual("STAGE-AXON-AUTHORIZATION");
-            warning.Message.ShouldContain("dispatch outside HTTP is not guarded at the handler");
+            context.Degradation.Warnings.ShouldBeEmpty();
+            Source(query.Name + "Handler").ShouldContain("@PreAuthorize(\"isAuthenticated() and @performedFinancePolicy.check(authentication)\")");
             Source(query.Name + "Handler").ShouldNotContain("@Secured");
             Source(query.Name + "Endpoint").ShouldContain("@PreAuthorize(\"isAuthenticated() and @performedFinancePolicy.check(authentication)\")");
         }

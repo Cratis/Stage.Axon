@@ -16,11 +16,10 @@ internal static class HandlerPolicies
 
         // Axon authorizes subscriptions at opening; a denied initial result terminates before any updates.
         if (roles is not null) return "@" + code.Reference("org.springframework.security.access.annotation.Secured") + "({" + string.Join(", ", roles.Select(role => JavaCodeBuilder.StringLiteral("ROLE_" + role))) + "})";
-        if (SecurityAnnotations.EndpointExpression(context, authorization) is not null)
+        if (SecurityAnnotations.EndpointExpression(context, authorization) is { } expression)
         {
-            const string warning = "The HTTP endpoint's @PreAuthorize enforces this policy; dispatch outside HTTP is not guarded at the handler.";
-            context.Degradation.Warn("STAGE-AXON-AUTHORIZATION", owner, warning);
-            return "// Differs from Screenplay: " + warning + " (STAGE-AXON-AUTHORIZATION)";
+            // Residual policies evaluate the security context of the thread invoking the handler.
+            return "@" + code.Reference("org.springframework.security.access.prepost.PreAuthorize") + "(" + JavaCodeBuilder.StringLiteral(expression) + ")";
         }
         var annotation = "@" + code.Reference("org.springframework.security.access.annotation.Secured");
         const string intent = "authorize access with the modeled policy";
@@ -30,28 +29,49 @@ internal static class HandlerPolicies
         return "// Differs from Screenplay: " + reason + "\n" + JavaCodeBuilder.UnsupportedComment(intent, path, "STAGE-AXON-AUTHORIZATION") + "\n" + annotation + "({})";
     }
 
-    static string[]? Roles(AxonEmissionContext context, SemanticAuthorization authorization) => authorization switch
+    internal static bool UsesMethodSecurity(AxonEmissionContext context, SemanticAuthorization? authorization) =>
+        authorization is not null && Roles(context, authorization) is null && SecurityAnnotations.EndpointExpression(context, authorization) is not null;
+
+    static string[]? Roles(AxonEmissionContext context, SemanticAuthorization authorization)
+    {
+        var terms = Formula(context, authorization);
+        if (terms is null) return null;
+        if (terms.Any(term => term.Count == 0)) return [];
+        return terms.All(term => term.Count == 1) ? [.. terms.SelectMany(term => term).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)] : null;
+    }
+
+    static HashSet<string>[]? Formula(AxonEmissionContext context, SemanticAuthorization authorization) => authorization switch
     {
         SemanticPolicyReference reference => context.Request.Model.Application.Policies.FirstOrDefault(policy => policy.Name == reference.Name) is { } policy ? Condition(policy.Condition) : null,
-        SemanticLogicalAuthorization logical => Combine(Roles(context, logical.Left), logical.Operator, Roles(context, logical.Right)),
+        SemanticLogicalAuthorization logical => Combine(Formula(context, logical.Left), logical.Operator, Formula(context, logical.Right)),
         _ => null
     };
 
-    static string[]? Condition(SemanticPolicyCondition condition) => condition switch
+    static HashSet<string>[]? Condition(SemanticPolicyCondition condition) => condition switch
     {
-        SemanticRoleCondition role => [role.Role],
-        SemanticAnonymousCondition => [],
-        SemanticAuthenticatedCondition or SemanticNotPolicyCondition => null,
+        SemanticRoleCondition role => [new([role.Role], StringComparer.Ordinal)],
+        SemanticAnonymousCondition => [new(StringComparer.Ordinal)],
         SemanticLogicalPolicyCondition logical => Combine(Condition(logical.Left), logical.Operator, Condition(logical.Right)),
         _ => null
     };
 
-    static string[]? Combine(string[]? left, SemanticLogicalOperator operation, string[]? right)
+    static HashSet<string>[]? Combine(HashSet<string>[]? left, SemanticLogicalOperator operation, HashSet<string>[]? right)
     {
         if (left is null || right is null) return null;
-        if (left.SequenceEqual(right)) return left;
-
-        // Native @Secured matches any listed authority, not a conjunction of distinct role sets.
-        return operation == SemanticLogicalOperator.Or && left.Length > 0 && right.Length > 0 ? [.. left.Concat(right).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)] : null;
+        const int maximumTerms = 64;
+        if (operation == SemanticLogicalOperator.And && left.Length * right.Length > maximumTerms) return null;
+        var terms = operation == SemanticLogicalOperator.Or
+            ? left.Concat(right)
+            : left.SelectMany(first => right.Select(second => new HashSet<string>(first.Concat(second), StringComparer.Ordinal)));
+        var reduced = new List<HashSet<string>>();
+        foreach (var term in terms)
+        {
+            // Absorption removes supersets: (Rep or Mgr) and Mgr reduces to Mgr.
+            // Native @Secured can represent the result only when all remaining terms are single roles.
+            if (reduced.Exists(existing => existing.IsSubsetOf(term))) continue;
+            reduced.RemoveAll(term.IsSubsetOf);
+            reduced.Add(term);
+        }
+        return reduced.Count <= maximumTerms ? [.. reduced] : null;
     }
 }
