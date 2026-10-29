@@ -34,11 +34,16 @@ public class when_emitting_reducer_delegates : a_view_request
     [Fact] void should_expose_a_private_delete_transition() => _reducer.ShouldContain("private RebuiltTotal reduce(CounterDeleted event, @Nullable RebuiltTotal current, EventMessage message)");
     [Fact] void should_copy_the_native_body() => _reducer.ShouldContain("return new RebuiltTotal(event.id(), (current == null ? 0L : current.amount()) + event.amount());");
     [Fact] void should_copy_the_delete_body() => _reducer.ShouldContain("return null;");
-    [Fact] void should_handle_events() => _reducer.ShouldContain("@EventHandler");
+    [Fact] void should_handle_recorded_events() => _reducer.ShouldContain("public void handle(CountRecorded event, ProcessingContext context)");
+    [Fact] void should_handle_deleted_events() => _reducer.ShouldContain("public void handle(CounterDeleted event, ProcessingContext context)");
+    [Fact] void should_annotate_each_event_handler() => (_reducer.Split("@EventHandler", StringSplitOptions.None).Length - 1).ShouldEqual(2);
+    [Fact] void should_resolve_the_message_from_the_processing_context() => _reducer.ShouldContain("var message = (EventMessage) Message.fromContext(context);");
+    [Fact] void should_not_emit_a_replaceable_contract() => _reducer.ShouldNotContain("interface RebuiltTotalReducer");
     [Fact] void should_select_the_key() => _reducer.ShouldContain("var key = String.valueOf(event.counterId().value());");
     [Fact] void should_reduce_from_an_event_handler() => _reducer.ShouldContain("var next = reduce(event, repository.findById(key).map(RebuiltTotalEntity::toModel).orElse(null), message);");
     [Fact] void should_delete_only_when_the_body_returns_null() => _reducer.ShouldContain("if (next == null) repository.deleteById(key); else repository.save(new RebuiltTotalEntity(key, next));");
     [Fact] void should_not_emit_reducer_extension_artifacts() => _context.Artifacts.Exists(artifact => artifact.RelativePath.Contains("ReducerConfiguration", StringComparison.Ordinal) || artifact.RelativePath.Contains("ReducerProjector", StringComparison.Ordinal) || artifact.RelativePath.Contains("ReducerPlaceholderTest", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_construct_the_plain_handler_in_native_specs() => _specs.ShouldContain("var projector = new RebuiltTotalReducer(repository);");
     [Fact] void should_enable_dependent_specs() => _specs.ShouldNotContain("@Disabled");
     [Fact] void should_exercise_initialization() => _specs.ShouldContain("initializeFromFirstEvent");
     [Fact] void should_exercise_accumulation() => _specs.ShouldContain("accumulateThroughCurrent");
