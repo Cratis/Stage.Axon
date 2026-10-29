@@ -109,7 +109,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
     }
 
     static string Missing(SemanticReadModel model, ViewJavaTypes types, string? key) =>
-        types.KeyParts(model) is not null ? $"!repository.existsById({key})" : $"{ViewRepositories.Get(model, key)}.findAny().isEmpty()";
+        $"!repository.existsById({key})";
 
     static void EmitExpected(SemanticApplication application, ViewJavaTypes types, SemanticReadModel model, SemanticSpecificationReadModel expected, JavaCodeBuilder code)
     {
