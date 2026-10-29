@@ -73,7 +73,7 @@ class GeneratedSecurityIngressTest {
             var id = UUID.randomUUID();
             clearInvocations(claims);
             var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.as(name, "Reader", () -> commands.send(
-                    new RegisterAccount(new AccountId(id), UUID.randomUUID().toString(), "forged-body-principal"), Void.class).get(10, TimeUnit.SECONDS)));
+                    new RegisterAccount(new AccountId(id), UUID.randomUUID().toString(), "forged-body-principal"), Void.class, GeneratedIngressSupport.metadata(name, "Reader"), null).get(10, TimeUnit.SECONDS)));
             denied(failure);
             assertEquals(0, GeneratedIngressSupport.facts(configuration, id).size());
             verifyNoInteractions(claims);
@@ -89,7 +89,7 @@ class GeneratedSecurityIngressTest {
         System.out.println("Denied HTTP query statuses: anonymous=" + anonymous.getStatus() + ", wrong-role=" + wrongRole.getStatus());
         for (var name : new String[] { null, "mallory" }) {
             var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.as(name, "Reader", () -> queries.query(
-                    new AccountSnapshot(new AccountId(id)), AccountSnapshot.Result.class).get(10, TimeUnit.SECONDS)));
+                    new AccountSnapshot(new AccountId(id)), AccountSnapshot.Result.class, GeneratedIngressSupport.metadata(name, "Reader"), null).get(10, TimeUnit.SECONDS)));
             denied(failure);
         }
         assertEquals(0, GeneratedIngressSupport.facts(configuration, id).size());
@@ -106,7 +106,7 @@ class GeneratedSecurityIngressTest {
         http.perform(asyncDispatch(response))
                 .andExpect(status().is2xxSuccessful()).andExpect(jsonPath("$.alias").value("seeded"));
         var result = GeneratedIngressSupport.as("alice", "Writer", () -> queries.query(
-                new AccountSnapshot(new AccountId(id)), AccountSnapshot.Result.class).get(10, TimeUnit.SECONDS));
+                new AccountSnapshot(new AccountId(id)), AccountSnapshot.Result.class, GeneratedIngressSupport.metadata("alice", "Writer"), null).get(10, TimeUnit.SECONDS));
         assertEquals(List.of(expected), result.rows());
     }
 
@@ -120,6 +120,15 @@ class GeneratedSecurityIngressTest {
         var gatewayId = UUID.randomUUID();
         GeneratedIngressSupport.register(commands, gatewayId, UUID.randomUUID().toString()).get(10, TimeUnit.SECONDS);
         recordedCaller(gatewayId);
+    }
+
+    @Test
+    void gatewayWithoutMetadataDoesNotInheritTheAmbientCaller() throws Exception {
+        var id = UUID.randomUUID();
+        var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.as("alice", "Writer", () -> commands.send(
+                new RegisterAccount(new AccountId(id), UUID.randomUUID().toString(), "forged-body-principal"), Void.class).get(10, TimeUnit.SECONDS)));
+        denied(failure);
+        assertEquals(0, GeneratedIngressSupport.facts(configuration, id).size());
     }
 
     private void recordedCaller(UUID id) throws Exception {

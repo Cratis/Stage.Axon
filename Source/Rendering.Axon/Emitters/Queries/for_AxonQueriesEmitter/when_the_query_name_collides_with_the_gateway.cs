@@ -24,7 +24,7 @@ public class when_the_query_name_collides_with_the_gateway : a_view_request
         _endpoint = Text(context.Artifacts.Single());
     }
 
-    [Fact] void should_keep_the_application_query_short() => _endpoint.ShouldContain("gateway.query(new QueryGateway(name), QueryGateway.Result.class)");
+    [Fact] void should_keep_the_application_query_short() => _endpoint.ShouldContain("gateway.query(new QueryGateway(name), QueryGateway.Result.class, metadata, null)");
     [Fact] void should_qualify_the_framework_gateway() => _endpoint.ShouldContain("private final org.axonframework.messaging.queryhandling.gateway.QueryGateway gateway;");
     [Fact] void should_not_import_the_conflicting_gateway() => _endpoint.ShouldNotContain("import org.axonframework.messaging.queryhandling.gateway.QueryGateway;");
     [Fact] void should_still_shorten_unrelated_types() => _endpoint.ShouldContain("CompletableFuture<ResponseEntity<Total>>");

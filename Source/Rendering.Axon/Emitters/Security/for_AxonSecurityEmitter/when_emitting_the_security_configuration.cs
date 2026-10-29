@@ -29,5 +29,8 @@ public class when_emitting_the_security_configuration : for_AxonArtifactRenderPl
     [Fact] void should_not_enable_cookie_sessions_or_csrf_tokens() => _code.ShouldContain("csrf.disable()");
     [Fact] void should_not_read_credentials_from_the_url() => _code.ShouldNotContain("getParameter");
     [Fact] void should_not_override_native_identity_providers() => _code.ShouldNotContain("UserDetailsService");
+    [Fact] void should_not_serialize_the_principal_at_dispatch() => _code.ShouldNotContain("MessageAuthorizationDispatchInterceptor");
+    [Fact] void should_keep_native_command_authorization() => _code.ShouldContain("MessageAuthorizationHandlerInterceptor<CommandMessage> authorizeCommandHandling()");
+    [Fact] void should_keep_native_query_authorization() => _code.ShouldContain("MessageAuthorizationHandlerInterceptor<QueryMessage> authorizeQueryHandling()");
     [Fact] void should_not_qualify_types_inline() => _code.ShouldNotContain("java.util.Arrays.stream");
 }

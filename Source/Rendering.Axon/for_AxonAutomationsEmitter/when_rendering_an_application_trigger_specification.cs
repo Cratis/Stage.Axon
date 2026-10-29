@@ -21,6 +21,7 @@ public class when_rendering_an_application_trigger_specification : given.a_react
     [Fact] void should_use_the_native_application() => code.ShouldContain("@SpringBootTest");
     [Fact] void should_inject_the_endpoint() => code.ShouldContain("@Autowired private SubmitOrderEndpoint endpoint;");
     [Fact] void should_fire_the_typed_application_trigger() => code.ShouldContain("endpoint.execute(new SubmitOrder(");
+    [Fact] void should_pass_the_explicit_specification_caller() => code.ShouldContain("SecurityContextHolder.getContext().getAuthentication());");
     [Fact] void should_pin_the_injected_clock() => code.ShouldContain("Mockito.when(clock.instant())");
     [Fact] void should_assert_the_complete_native_append_set() => code.ShouldContain("Assertions.assertThat(actual).containsExactly(new OrderPlaced(");
     [Fact] void should_exclude_storage_consistency_markers_from_facts() => code.ShouldContain("instanceof TerminalEventMessage");

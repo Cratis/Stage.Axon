@@ -36,9 +36,14 @@ internal static partial class CommandEndpointEmitter
                 .Line("@" + body.Reference("org.springframework.web.bind.annotation.PostMapping") + "(" + JavaCodeBuilder.StringLiteral(Route(located, command)) + ")");
             var expression = AxonHttpTestsEndpoints.Expression(Authorize(context, command, body));
             AxonHttpTestsEndpoints.Register(context, new("command", "POST", Route(located, command), null, expression, [], null, command.Id));
-            body.Block($"public {body.Reference("java.util.concurrent.CompletableFuture")}<{returnType}> execute(@{body.Reference("org.springframework.web.bind.annotation.RequestBody")} {name} request)", method =>
+            body.Block($"public {body.Reference("java.util.concurrent.CompletableFuture")}<{returnType}> execute(@{body.Reference("org.springframework.web.bind.annotation.RequestBody")} {name} request, {body.Reference("org.springframework.security.core.Authentication")} authentication)", method =>
+            {
                 method.Line("var command = " + (command.Properties.Any(property => property.IsGenerated) || source?.Allocated == true ? "request.forRequest();" : "request;"))
-                    .Line($"return commandGateway.send(command, {returnType}.class);"));
+                    .Line($"var metadata = {method.Reference("org.axonframework.messaging.core.Metadata")}.emptyInstance();")
+                    .Block("if (authentication != null && authentication.isAuthenticated())", authenticated => authenticated
+                        .Line($"metadata = metadata.and(\"username\", authentication.getName()).and(\"authorities\", authentication.getAuthorities().stream().map({authenticated.Reference("org.springframework.security.core.GrantedAuthority")}::getAuthority).collect({authenticated.Reference("java.util.stream.Collectors")}.joining(\",\")));"))
+                    .Line($"return commandGateway.send(command, {returnType}.class, metadata, null);");
+            });
         });
         context.AddJava(package, name + "Endpoint", code.Build(), sources: [command.Id]);
     }

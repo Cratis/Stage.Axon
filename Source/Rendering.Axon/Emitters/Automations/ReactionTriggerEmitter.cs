@@ -45,10 +45,10 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
 
     internal void EmitApplicationEffect(SemanticReactionTrigger model, PreparedReactionTrigger trigger, string name, string inputType, JavaCodeBuilder body)
     {
-        body.Block($"private void {name}({inputType} input)", method =>
+        body.Block($"private void {name}({inputType} input, {body.Reference("org.axonframework.messaging.core.Metadata")} metadata)", method =>
         {
             Guard(method, trigger);
-            Effect(method, trigger, false);
+            Effect(method, trigger, false, true);
         });
         if (trigger.NativeBody is not null) context.ConsumedImplementations.Add(model.RequirementId!);
     }
@@ -90,16 +90,17 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
         return WithGuard(trigger, new(annotation, input, string.Empty, null) { NativeBody = content });
     }
 
-    void Effect(JavaCodeBuilder method, PreparedReactionTrigger trigger, bool handler)
+    void Effect(JavaCodeBuilder method, PreparedReactionTrigger trigger, bool handler, bool http = false)
     {
         if (trigger.NativeBody is { } content)
         {
-            ReactionInvocation.Dispatch(method, reaction, body => body.RawBody(content));
+            ReactionInvocation.Dispatch(method, reaction, body => body.RawBody(content), http);
             return;
         }
 
-        var invocation = ReactionJavaReferences.Expression(method, trigger.Invocation);
-        ReactionInvocation.Dispatch(method, reaction, trigger.Production is null ? ReactionInvocation.Statement(invocation, handler) : invocation);
+        var withMetadata = http || reaction.RunsAs is not null;
+        var invocation = ReactionJavaReferences.Expression(method, withMetadata && trigger.Production is { } production ? production.InvocationWithMetadata : trigger.Invocation);
+        ReactionInvocation.Dispatch(method, reaction, ReactionJavaReferences.Expression(method, trigger.Production is null ? ReactionInvocation.Statement(invocation, handler, withMetadata) : invocation), http);
     }
 
     PreparedReactionTrigger? WithGuard(SemanticReactionTrigger trigger, PreparedReactionTrigger prepared)

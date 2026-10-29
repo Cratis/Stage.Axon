@@ -39,12 +39,12 @@ public class when_emitting_live_queries : a_view_request
     [Fact] void should_map_the_stream_to_the_same_route() => _endpoint.ShouldContain("@GetMapping(value = \"/api/views/counters/live-totals\", produces = MediaType.TEXT_EVENT_STREAM_VALUE)");
     [Fact] void should_offer_a_plain_json_get() => _endpoint.ShouldContain("@GetMapping(\"/api/views/counters/live-totals\")");
     [Fact] void should_return_a_typed_list_snapshot() => _endpoint.ShouldContain("CompletableFuture<ResponseEntity<List<Total>>>");
-    [Fact] void should_dispatch_the_snapshot_over_the_query_gateway() => _endpoint.ShouldContain("gateway.query(new LiveTotals(), LiveTotals.Result.class)");
+    [Fact] void should_dispatch_the_snapshot_over_the_query_gateway() => _endpoint.ShouldContain("gateway.query(new LiveTotals(), LiveTotals.Result.class, metadata, null)");
     [Fact] void should_return_the_raw_snapshot_rows() => _endpoint.ShouldContain("ResponseEntity.ok(result.rows())");
     [Fact] void should_probe_a_plain_get_without_an_accept_header() => Source("LiveTotalsSseTest.java").ShouldContain("HttpRequest.newBuilder(request.uri()).GET().build()");
-    [Fact] void should_return_an_sse_stream() => _endpoint.ShouldContain("streams.open(LiveTotalsSubscription.values(gateway, query))");
-    [Fact] void should_use_an_axon_subscription_query() => _subscription.ShouldContain("gateway.subscriptionQuery(query, LiveTotals.Result.class)");
-    [Fact] void should_delegate_to_latest_snapshot_delivery() => _subscription.ShouldContain("LiveSnapshots.of(() -> observe.apply(gateway.subscriptionQuery(query, LiveTotals.Result.class)), LiveTotals.Result::invalidated, () -> gateway.query(query, LiveTotals.Result.class))");
+    [Fact] void should_return_an_sse_stream() => _endpoint.ShouldContain("streams.open(LiveTotalsSubscription.values(gateway, query, metadata))");
+    [Fact] void should_use_an_axon_subscription_query() => _subscription.ShouldContain("gateway.subscriptionQuery(query, LiveTotals.Result.class, metadata, null, Queues.SMALL_BUFFER_SIZE)");
+    [Fact] void should_delegate_to_latest_snapshot_delivery() => _subscription.ShouldContain("LiveSnapshots.of(() -> observe.apply(gateway.subscriptionQuery(query, LiveTotals.Result.class, metadata, null, Queues.SMALL_BUFFER_SIZE)), LiveTotals.Result::invalidated, () -> gateway.query(query, LiveTotals.Result.class, metadata, null))");
     [Fact] void should_not_carry_its_own_bridge() => _subscription.ShouldNotContain("class Bridge");
     [Fact] void should_delegate_streams_to_the_runtime_group() => Source("LiveTotalsStreams.java").ShouldContain("public LiveTotalsStreams(LiveStreams live)");
     [Fact] void should_open_sessions_through_the_group() => Source("LiveTotalsStreams.java").ShouldContain("group.open(publisher)");

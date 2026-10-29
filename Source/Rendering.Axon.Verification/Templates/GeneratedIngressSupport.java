@@ -15,6 +15,7 @@ import org.axonframework.eventsourcing.eventstore.EventStorageEngine;
 import org.axonframework.eventsourcing.eventstore.SourcingCondition;
 import org.axonframework.eventsourcing.eventstore.TerminalEventMessage;
 import org.axonframework.messaging.commandhandling.gateway.CommandGateway;
+import org.axonframework.messaging.core.Metadata;
 import org.axonframework.messaging.eventhandling.EventMessage;
 import org.axonframework.messaging.eventstreaming.EventCriteria;
 import org.axonframework.messaging.eventstreaming.Tag;
@@ -34,9 +35,13 @@ final class GeneratedIngressSupport {
         finally { SecurityContextHolder.setContext(previous); }
     }
 
+    static Metadata metadata(String name, String role) {
+        return name == null ? Metadata.emptyInstance() : Metadata.with("username", name).and("authorities", "ROLE_" + role);
+    }
+
     static CompletableFuture<Void> send(CommandGateway gateway, Object command) {
         try {
-            as("alice", "Writer", () -> gateway.send(command, Void.class).get(10, TimeUnit.SECONDS));
+            as("alice", "Writer", () -> gateway.send(command, Void.class, metadata("alice", "Writer"), null).get(10, TimeUnit.SECONDS));
             return CompletableFuture.completedFuture(null);
         } catch (Exception failure) { return CompletableFuture.failedFuture(root(failure)); }
     }

@@ -13,6 +13,8 @@ public class when_using_a_trusted_identity : given.a_reaction_model
 
     void Because() => Render();
 
+    [Fact] void should_forward_the_declared_identity_instead_of_the_http_caller() => Code("SubmitOrderEndpoint").ShouldContain("metadata = Metadata.with(\"username\", \"system\").and(\"authorities\", \"ROLE_Sales\");");
+    [Fact] void should_forward_native_metadata_on_the_gateway_call() => Code("SubmitOrderEndpoint").ShouldContain("Object.class, metadata, null);");
     [Fact] void should_use_only_the_declared_roles() => Code("SubmitOrderEndpoint").ShouldContain("List.of(new SimpleGrantedAuthority(\"ROLE_Sales\"))");
     [Fact] void should_not_grant_a_system_role_implicitly() => Code("SubmitOrderEndpoint").ShouldNotContain("ROLE_SYSTEM");
     [Fact] void should_install_a_fresh_context() => Code("SubmitOrderEndpoint").ShouldContain("SecurityContextHolder.createEmptyContext()");

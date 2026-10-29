@@ -110,10 +110,9 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
     static void Interceptors(JavaCodeBuilder body, string name, string messageType)
     {
         var message = body.Reference(messageType);
-        var dispatch = body.Reference("org.axonframework.extension.spring.authorization.MessageAuthorizationDispatchInterceptor");
+
+        // AF's dispatch authorization interceptor serializes the whole principal; controllers supply name-only metadata instead.
         var handler = body.Reference("org.axonframework.extension.spring.authorization.MessageAuthorizationHandlerInterceptor");
-        var converter = body.Reference("org.axonframework.conversion.Converter");
-        body.Line("@Bean").Block($"{dispatch}<{message}> authorize{name}Dispatch({converter} converter)", method => method.Line($"return new {dispatch}<>(converter);"))
-            .Line("@Bean").Block($"{handler}<{message}> authorize{name}Handling()", method => method.Line($"return new {handler}<>();"));
+        body.Line("@Bean").Block($"{handler}<{message}> authorize{name}Handling()", method => method.Line($"return new {handler}<>();"));
     }
 }

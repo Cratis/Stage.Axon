@@ -38,7 +38,7 @@ public class when_rendering_command_fixtures : for_AxonArtifactRenderPlanner.giv
 
     [Fact] void should_check_denial_without_events() => denial.ShouldContain("result.exception(UnauthorizedMessageException.class).noEvents();");
     [Fact] void should_enforce_the_policy_during_denial_tests() => denial.ShouldContain("HandlerEnhancerDefinitionUtils.registerToComponentRegistry(registry, components -> new SecuredMessageHandlerDefinition())");
-    [Fact] void should_register_native_dispatch_authorization() => denial.ShouldContain("registerCommandDispatchInterceptor(components -> new MessageAuthorizationDispatchInterceptor<>(components.getComponent(MessageConverter.class)))");
+    [Fact] void should_not_serialize_the_principal_at_dispatch() => denial.ShouldNotContain("MessageAuthorizationDispatchInterceptor");
     [Fact] void should_register_native_handler_authorization() => denial.ShouldContain("registerCommandHandlerInterceptor(components -> new MessageAuthorizationHandlerInterceptor<>())");
     [Fact] void should_dispatch_denied_role_metadata() => denial.ShouldContain(".and(\"authorities\", \"ROLE_Viewer\")");
     [Fact] void should_not_set_command_thread_context() => denial.ShouldNotContain("SecurityContextHolder.setContext");
