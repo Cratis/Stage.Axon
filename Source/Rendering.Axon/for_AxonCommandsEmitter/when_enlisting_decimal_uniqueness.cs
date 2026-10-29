@@ -42,15 +42,16 @@ public class when_enlisting_decimal_uniqueness : for_AxonArtifactRenderPlanner.g
 
     [Theory]
     [InlineData(false, "customer.value().stripTrailingZeros().toPlainString()")]
-    public void should_tag_the_canonical_decimal_on_claim_and_release(bool primitive, string expression)
+    public void should_tag_the_canonical_decimal_on_claim_and_guard_the_optional_release(bool primitive, string expression)
     {
         var plan = Plan(primitive);
-        foreach (var name in new[] { "OrderPlaced.java", "OrderMoved.java" })
-        {
-            var code = Source(plan, name);
-            code.ShouldContain("public String customerUniqueKey()");
-            code.ShouldContain("return " + expression + ";");
-        }
+        var claimed = Source(plan, "OrderPlaced.java");
+        claimed.ShouldContain("public String customerUniqueKey()");
+        claimed.ShouldContain("return " + expression + ";");
+        claimed.ShouldNotContain("customer == null ? null");
+        var released = Source(plan, "OrderMoved.java");
+        released.ShouldContain("public String customerUniqueKey()");
+        released.ShouldContain("return customer == null ? null : " + expression + ";");
     }
 
     [Theory]

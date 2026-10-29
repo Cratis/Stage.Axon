@@ -56,7 +56,8 @@ internal sealed class EventTagsEmitter : IAxonEmitter
             var name = JavaNames.Member(property.Name) + "UniqueKey";
             while (!names.Add(name)) name += "_";
             var tag = Reference(Reference(context, contract, constraint.Name), code, package);
-            members.Add($"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {tag}) public {code.Reference("java.lang.String")} {name}() {{ return {code.ReferenceExpression(ConstraintCoverage.Normalized(context, constraint, property.Type, JavaNames.Member(property.Name))!)}; }}");
+            var guard = property.Type.IsOptional ? $"{JavaNames.Member(property.Name)} == null ? null : " : string.Empty;
+            members.Add($"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {tag}) public {code.Reference("java.lang.String")} {name}() {{ return {guard}{code.ReferenceExpression(ConstraintCoverage.Normalized(context, constraint, property.Type, JavaNames.Member(property.Name))!)}; }}");
         }
         return members;
     }

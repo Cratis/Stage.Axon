@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Commands;
 using Cratis.Stage.Rendering.Axon.Emitters.Constraints;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
@@ -34,7 +35,12 @@ internal sealed class ReactionProductionPreparation(AxonEmissionContext context,
         return !Constrained();
     }
 
-    bool Constrained() => ConstraintCoverage.EventRequiresUnsupportedConstraint(context, produced.EventContract);
+    bool Constrained()
+    {
+        if (!ConstraintCoverage.EventRequiresUnsupportedConstraint(context, produced.EventContract)) return false;
+        context.Degradation.Unsupported(AxonRefusalCodes.Constraint, produced.EventContract, "A reaction cannot produce an event whose uniqueness constraint cannot be enforced natively; the reaction is not registered instead of appending without the check.", "enforce a modeled uniqueness constraint", produced.EventContract.ToString());
+        return true;
+    }
 
     bool MatchesPrimary(string javaType) => produced.DestinationType is not { } destination || destination.Equals(CommandSource.TypeFor(context, javaType));
 
