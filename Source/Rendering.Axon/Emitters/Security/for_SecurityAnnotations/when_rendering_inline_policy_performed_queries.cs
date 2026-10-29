@@ -46,13 +46,20 @@ public class when_rendering_inline_policy_performed_queries : Specification
     [Fact]
     void should_use_the_performed_query_id_for_both_handler_and_endpoint_sites()
     {
-        var requirements = _request.ImplementationRequirements.Where(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer).ToArray();
+        var requirements = _request.ImplementationRequirements.Where(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer && requirement.QueryShape?.Authorization is not null).ToArray();
         requirements.Length.ShouldEqual(2);
         foreach (var requirement in requirements)
         {
             Source(requirement.Owner.Name + "Handler").ShouldContain("STAGE-AXON-AUTHORIZATION");
             Source(requirement.Owner.Name + "Endpoint").ShouldContain("@PreAuthorize");
         }
+    }
+
+    [Fact]
+    void should_leave_the_public_performer_without_authorization_annotations()
+    {
+        Source("PublicLivePerformedAccountsHandler").ShouldNotContain("STAGE-AXON-AUTHORIZATION");
+        Source("PublicLivePerformedAccountsEndpoint").ShouldNotContain("@PreAuthorize");
     }
 
     [Fact]

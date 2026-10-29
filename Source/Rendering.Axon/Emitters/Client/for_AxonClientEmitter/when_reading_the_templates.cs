@@ -23,5 +23,14 @@ public class when_reading_the_templates : given.a_client_request
     [Fact] void should_keep_the_transport_seam_neutral() => new[] { "fetch", "Response", "URL", "Authorization" }.All(word => !Source("transport").Contains(word, StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_not_carry_a_license_header() => templates.All(name => !Source(name).Contains("Licensed under", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_omit_credentials_on_every_request() => (Source("http-transport").Split("credentials: \"omit\"").Length - 1).ShouldEqual(3);
-    [Fact] void should_send_the_problem_urns() => Source("problems").ShouldContain("\"urn:cratis:stage-axon:problem:live-capacity\"");
+    [Theory]
+    [InlineData("query-result-missing")]
+    [InlineData("query-cardinality")]
+    [InlineData("validation")]
+    [InlineData("conflict")]
+    [InlineData("invalid-argument")]
+    [InlineData("unsupported")]
+    void should_send_the_supported_problem_urns(string name) => Source("problems").ShouldContain($"\"urn:cratis:stage-axon:problem:{name}\"");
+
+    [Fact] void should_not_advertise_live_capacity_as_a_problem() => Source("problems").ShouldNotContain("live-capacity");
 }

@@ -96,26 +96,34 @@ class ClientContractTest {
         var cancelled = new AtomicBoolean();
         when(gateway.subscriptionQuery(new AllWorkItems(), AllWorkItems.Result.class, Metadata.emptyInstance(), null, Queues.SMALL_BUFFER_SIZE))
             .thenReturn(source.asFlux().doOnCancel(() -> cancelled.set(true)));
-        var endpoint = new AllWorkItemsEndpoint(gateway, Duration.ofHours(1), Duration.ofSeconds(30));
+        var endpoint = new AllWorkItemsEndpoint(gateway, Duration.ofMillis(10), Duration.ofSeconds(30));
+        var discardHeartbeats = new AtomicBoolean();
         var frames = new LinkedBlockingQueue<ServerSentEvent<Object>>();
         var subscriber = new BaseSubscriber<ServerSentEvent<Object>>() {
             @Override protected void hookOnSubscribe(Subscription subscription) { request(1); }
             @Override protected void hookOnNext(ServerSentEvent<Object> frame) { frames.add(frame); }
         };
-        endpoint.stream(null).subscribe(subscriber);
+        endpoint.stream(null).filter(frame -> !discardHeartbeats.get() || frame.data() != null).subscribe(subscriber);
         try {
             assertTrue(source.tryEmitNext(new AllWorkItems.Result(List.of(new WorkItems(null, null, "0", null, null)))).isSuccess());
             var initial = frames.poll(5, TimeUnit.SECONDS);
             assertNotNull(initial);
             assertEquals("0", ((WorkItems) ((List<?>) initial.data()).getFirst()).title());
+            subscriber.request(1);
+            var heartbeat = frames.poll(5, TimeUnit.SECONDS);
+            assertNotNull(heartbeat);
+            assertEquals("heartbeat", heartbeat.comment());
+            discardHeartbeats.set(true);
             for (int value = 1; value <= 1024; value++) {
                 assertTrue(source.tryEmitNext(new AllWorkItems.Result(List.of(new WorkItems(null, null, Integer.toString(value), null, null)))).isSuccess());
             }
             assertTrue(frames.isEmpty(), "No further data may be delivered without downstream demand");
+            // One data slot each: merge, publish, active concatMap, concatMap prefetch, publishOn, latest.
+            int dataDemand = 6;
+            subscriber.request(dataDemand);
             String title = "0";
             int delivered = 0;
-            while (!title.equals("1024") && delivered < 16) {
-                subscriber.request(1);
+            while (!title.equals("1024") && delivered < dataDemand) {
                 var frame = frames.poll(5, TimeUnit.SECONDS);
                 assertNotNull(frame);
                 title = ((WorkItems) ((List<?>) frame.data()).getFirst()).title();
@@ -139,7 +147,9 @@ class ClientContractTest {
             assertEquals(200, response.statusCode());
             try (var reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
                 assertEquals("data:null", reader.readLine());
+                assertEquals(1, ClientProofSupport.ACTIVE.get());
             }
+            actions.perform("active:0"); // Closing the HTTP body must release the native Axon subscription via doFinally.
         }
     }
 

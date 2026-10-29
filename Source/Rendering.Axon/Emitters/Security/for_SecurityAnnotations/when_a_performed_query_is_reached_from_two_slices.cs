@@ -36,7 +36,8 @@ public class when_a_performed_query_is_reached_from_two_slices : Specification
             Id = SemanticId.Create(SemanticKind.Slice, "Accounts.Registry.OtherActive"),
             Name = "OtherActive",
             ReadModels = [otherModel],
-            Projections = []
+            Projections = [],
+            Specifications = []
         };
         application = application with { Modules = [module with { Features = [feature with { Slices = [.. feature.Slices, other] }] }] };
         var model = ExecutableSemanticModel.Create(loaded.Model.LanguageVersion, loaded.Model.SemanticVersion, application);
@@ -47,7 +48,7 @@ public class when_a_performed_query_is_reached_from_two_slices : Specification
             ImplementationContents = loaded.ImplementationContents
         };
         _context = new(request, new(request.Profile));
-        _queries.Length.ShouldEqual(2);
+        _queries.Select(query => query.Owner.Name).Order(StringComparer.Ordinal).ShouldEqual(["LivePerformedAccounts", "PerformedAccounts", "PublicLivePerformedAccounts"]);
         foreach (var query in _queries)
         {
             ScopeSelection.Select(request).Count(slice => QueryPerformer.Queries(_context, slice).Any(candidate => candidate.Id == query.Source.SemanticId)).ShouldEqual(2);
