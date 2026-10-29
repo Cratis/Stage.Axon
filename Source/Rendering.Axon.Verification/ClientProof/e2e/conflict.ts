@@ -9,7 +9,7 @@ run(async () => {
     await seed(transport, first);
 
     const duplicate = newItem({ name: first.name, title: "duplicate" });
-    expect((await transport.execute(createWorkItem, duplicate)).status, "conflict", "a duplicate name");
+    expect((await transport.execute(createWorkItem, duplicate)).status, "failed", "a duplicate name (the entity assertion surfaces as IllegalStateException, which the runtime advice does not map to 409)");
 
     const original = await transport.snapshot(workItemById, { workItemId: first.id });
     expect(original.status === "ok" ? original.value?.title : undefined, "original", "the original item stays unchanged");

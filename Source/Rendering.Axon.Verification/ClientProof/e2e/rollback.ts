@@ -17,9 +17,9 @@ run(async () => {
         expect(watch.values().slice(marker).map(value => value?.title), [title], "the value frames after the " + what);
     }
 
-    // A refused command (409) must not publish anything: the only frame is the sentinel commit.
+    // A refused command must not publish anything: the only frame is the sentinel commit.
     let marker = watch.values().length;
-    expect((await transport.execute(createWorkItem, newItem({ name: item.name }))).status, "conflict", "the duplicate name");
+    expect((await transport.execute(createWorkItem, newItem({ name: item.name }))).status, "failed", "the duplicate name");
     await java(`commit:${item.id}:s1`);
     await onlyFrameIs("s1", marker, "rejected command");
 

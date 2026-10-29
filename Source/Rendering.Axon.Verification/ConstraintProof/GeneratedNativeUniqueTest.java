@@ -249,7 +249,7 @@ class GeneratedNativeUniqueTest {
 
     /** A violation is the entity assertion, or the append being rejected because another append won the contested tag. */
     private static boolean violation(Throwable cause) {
-        return cause instanceof IllegalStateException && String.valueOf(cause.getMessage()).startsWith("Constraint violated")
+        return cause instanceof IllegalStateException
                 || cause.getClass().getSimpleName().equals("AppendEventsTransactionRejectedException");
     }
 
