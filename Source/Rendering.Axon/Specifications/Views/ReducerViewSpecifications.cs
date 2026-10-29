@@ -50,8 +50,11 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
         var modelName = JavaNames.Type(model.Name);
         var name = modelName + "ViewSpecificationsTest";
         var code = new JavaCodeBuilder(package).Declare(name).Declare(modelName).Declare(modelName + "Reducer").Declare(modelName + "ReducerProjector");
+        ViewRepositories.Declare(code, model);
+        ViewRepositories.Annotate(code);
         code.Block($"class {name}", body =>
         {
+            ViewRepositories.Field(body, model);
             for (var index = 0; index < specs.Length; index++)
             {
                 var spec = specs[index];
@@ -151,8 +154,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
             CommandFixtureSecurity.CallerReferences(body, spec.GivenCaller);
             var modelName = JavaNames.Type(model.Name);
             var updates = new ProjectionUpdates(context, types, model.Id);
-            body.Line($"{body.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{body.Reference("java.lang.Object")}, {modelName}> store = new {body.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
-                .Line($"var projector = new {modelName}ReducerProjector(store, new {modelName}Reducer() {{}});");
+            body.Line($"var projector = new {modelName}ReducerProjector(repository, new {modelName}Reducer() {{}});");
             foreach (var given in plan.Events)
             {
                 body.Block(string.Empty, block => block
@@ -164,7 +166,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
             var native = new NativeViewSpecifications(context, types, located, model);
             foreach (var expected in spec.ThenReadModels) body.Line(native.Assertion(expected, plan.SourceKey, body));
             foreach (var absent in spec.ThenAbsentReadModels)
-                body.Line($"{body.Reference("org.junit.jupiter.api.Assertions")}.assertTrue(store.get({ViewExpectedKeys.Expression(absent.Key, model, types, body) ?? plan.SourceKey}).isEmpty(), \"Expected the modeled instance to be removed\");");
+                body.Line($"{body.Reference("org.junit.jupiter.api.Assertions")}.assertTrue({ViewRepositories.Get(model, ViewExpectedKeys.Expression(absent.Key, model, types, body) ?? plan.SourceKey)}.findAny().isEmpty(), \"Expected the modeled instance to be removed\");");
         }).Block("finally", body => body.Line($"{body.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
     }
 

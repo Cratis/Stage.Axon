@@ -34,13 +34,13 @@ public class when_registering_modeled_http_queries : Emitters.Projections.for_Ax
     [Fact] void should_arrange_the_modeled_given_events_on_the_real_projector() => code.ShouldContain("projector.on(new Increased(");
     [Fact] void should_assert_the_modeled_expected_values_from_http_json() => code.ShouldContain("Objects.equals(row.amount(), 8L)");
     [Fact] void should_use_the_application_concept_aware_json_mapper() => code.ShouldContain("application.getBean(JsonMapper.class)");
-    [Fact] void should_clear_the_store_by_its_verbatim_bean_name() => code.ShouldContain("application.getBean(\"axonviews.views.counters.totals.Total\", ReadModelStore.class).clear();");
+    [Fact] void should_clear_the_repository_by_its_type() => code.ShouldContain("application.getBean(TotalRepository.class).deleteAll();");
     [Fact] void should_resolve_the_projector_in_the_destination_class() => code.ShouldContain("application.getBean(TotalProjectionProjector.class)");
     [Fact] void should_read_the_short_model_type() => code.ShouldContain("new TypeReference<List<Total>>() {}");
     [Fact] void should_resolve_the_assertions_in_the_destination_class() => code.ShouldContain("Assertions.assertTrue(rows.stream()");
 
     [Theory]
-    [InlineData("io.cratis.stage.axon.runtime.ReadModelStore")]
+    [InlineData("axonviews.views.counters.totals.TotalRepository")]
     [InlineData("axonviews.views.counters.totals.TotalProjectionProjector")]
     [InlineData("org.junit.jupiter.api.Assertions")]
     [InlineData("tools.jackson.databind.json.JsonMapper")]
