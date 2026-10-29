@@ -2,6 +2,14 @@ domain Stage.ClientProof
 
 concept WorkItemId : Uuid
 
+concept WorkItemEmail : String
+
+concept WorkItemShortTitle : String
+
+type WorkItemContact
+  email WorkItemEmail
+  title WorkItemShortTitle
+
 concept WorkItemState : Enum
   open
   inProgress
@@ -151,3 +159,35 @@ module Work
           priority = priority
         from WorkItemRenamed
           title = title
+
+    slice StateView Contacts
+      event ContactRecorded
+        email WorkItemEmail
+        details WorkItemContact
+        state WorkItemState
+
+      readmodel WorkItemContacts
+        email WorkItemEmail
+        details WorkItemContact
+        state WorkItemState
+
+      query ContactByEmail => WorkItemContacts optional
+        by email WorkItemEmail
+        authorize IsEditor
+
+      projection ContactsProjection => WorkItemContacts
+        from ContactRecorded
+          key email
+          email = email
+          details = details
+          state = state
+
+      specification RichContactExample
+        given ContactRecorded
+          email = "writer@example.test"
+          details = {"email":"writer@example.test","title":"Valid"}
+          state = "open"
+        then readmodel WorkItemContacts
+          email = "writer@example.test"
+          details = {"email":"writer@example.test","title":"Valid"}
+          state = "open"

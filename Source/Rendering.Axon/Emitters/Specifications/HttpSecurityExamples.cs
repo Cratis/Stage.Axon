@@ -22,10 +22,30 @@ internal static class HttpSecurityExamples
 
     internal static object? Value(AxonEmissionContext context, SemanticTypeReference type, int depth)
     {
+        if (HttpModeledExamples.Value(context, type, out var example)) return example;
         if (type.IsCollection) return Array.Empty<object>();
         if (type.Kind == SemanticTypeReferenceKind.CompositeType) return CompositeValue(context, type, depth);
         if (type.Kind == SemanticTypeReferenceKind.Concept) return ConceptValue(context, type);
         return PrimitiveValue(context, type);
+    }
+
+    internal static bool CanSupply(AxonEmissionContext context, HttpEndpoint endpoint)
+    {
+        var command = ScopeSelection.Select(context.Request).SelectMany(owner => owner.Slice.Commands).FirstOrDefault(command => command.Id == endpoint.Source);
+        var properties = command?.Properties.Select(property => property.Type) ?? [];
+        if (properties.Concat(endpoint.Parameters.Where(parameter => parameter.Type is not null).Select(parameter => parameter.Type!)).All(type => Safe(context, type, 0))) return true;
+        context.Degradation.Warn("STAGE-AXON-HTTP-SPEC", endpoint.Source ?? context.Request.Model.Application.Id, $"Skipped HTTP security assertions for {endpoint.Method} {endpoint.Path}: no valid modeled request example is available.");
+        return false;
+    }
+
+    static bool Safe(AxonEmissionContext context, SemanticTypeReference type, int depth)
+    {
+        if (depth > 8) return false;
+        if (HttpModeledExamples.Value(context, type, out _)) return true;
+        if (type.IsCollection || type.Kind == SemanticTypeReferenceKind.Primitive) return true;
+        if (type.Kind == SemanticTypeReferenceKind.Concept)
+            return !context.Request.Model.Application.Concepts.First(item => item.Id == type.Target).Values.IsDefaultOrEmpty;
+        return context.Request.Model.Application.Types.First(item => item.Id == type.Target).Properties.All(property => Safe(context, property.Type, depth + 1));
     }
 
     static Dictionary<string, object?>? CompositeValue(AxonEmissionContext context, SemanticTypeReference type, int depth)

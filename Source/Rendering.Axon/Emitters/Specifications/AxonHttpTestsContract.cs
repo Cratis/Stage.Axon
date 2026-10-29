@@ -32,8 +32,9 @@ internal static class AxonHttpTestsContract
                     .Line($"@{body.Reference("org.springframework.beans.factory.annotation.Autowired")}").Line($"private {body.Reference("org.springframework.context.ApplicationContext")} application;")
                     .Line();
                 EmitRoutes(body, endpoints, list, exception);
-                EmitDenials(context, body, endpoints, exception);
-                EmitPublic(context, body, endpoints, exception);
+                var examples = endpoints.Where(endpoint => endpoint.Authorization is not null && HttpSecurityExamples.CanSupply(context, endpoint)).ToArray();
+                EmitDenials(context, body, examples, exception);
+                EmitPublic(context, body, examples, exception);
                 EmitLive(body, list, TriggerEndpoints(context));
             });
         context.AddJava(package, Name, code.Build(), test: true);

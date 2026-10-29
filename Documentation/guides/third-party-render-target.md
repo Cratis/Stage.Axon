@@ -286,6 +286,8 @@ Routes. Commands are `POST /api/<module>/<feature>/…/<command-name>`; module a
 
 Failures raised asynchronously by the command or query handler map to the same responses as synchronous ones. Cardinality problems carry `cardinality` and `count` but never row data.
 
+Generated HTTP proofs prefer specification examples, then modeled read-model seed rows, and keep query parameters consistent with those rows. When no complete valid example is available, the affected proof is omitted with a `STAGE-AXON-HTTP-SPEC` diagnostic; status and cardinality assertions are not relaxed.
+
 Identity and denial. The caller is the authenticated principal; identities in bodies or headers are ignored. Without credentials, protected endpoints answer 401, with the wrong role 403, and `denyAll()` endpoints 403 for everyone authenticated. Authentication challenges use Spring Security's native HTTP Basic or bearer handling; there is no generated browser-specific plain-401 rule.
 
 No users, passwords, demo identity configuration or demo claims attachment are generated. Supply an identity provider before exposing protected endpoints.
