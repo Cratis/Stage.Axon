@@ -83,7 +83,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
     {
         var events = spec.GivenEvents.ToList();
         if (spec.WhenAppended is { } append) events.Add(new(append.EventContract, append.Values) { EventSource = append.EventSource, Route = append.Route });
-        if (BodyFailure(events) is { } reason) return new(AxonRefusalCodes.Reduction, "Reducer implementation required: " + reason, [], string.Empty);
+        if (BodyFailure(events) is { } failure) return new(failure.Code, "Reducer implementation required: " + failure.Reason, [], string.Empty);
         if (!Shape(spec) || !SourcesSupported(events)) return Unsupported();
         var fallback = SourceKey(events);
         if (!spec.ThenReadModels.All(expected => RowSupported(expected, fallback))) return Unsupported();
@@ -94,14 +94,14 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
     bool AbsentSupported(SemanticSpecificationAbsentReadModel expected, string? fallback) =>
         expected.ReadModel == model.Id && KeySupported(expected.Key, fallback);
 
-    string? BodyFailure(List<SemanticSpecificationEvent> events)
+    (string Code, string Reason)? BodyFailure(List<SemanticSpecificationEvent> events)
     {
         var reducer = located.Slice.Reducers.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
-        if (reducer is null) return "The reducer is unavailable.";
+        if (reducer is null) return (AxonRefusalCodes.Reduction, "The reducer is unavailable.");
         var admission = ReducerBodies.Admission(context, located, reducer);
-        if (admission.Blocked is { } blocked) return blocked;
+        if (admission.Blocked is { } blocked) return (admission.BlockedCode, blocked);
         return events.Exists(given => !reducer.Transitions.Any(transition => transition.EventContract == given.EventContract && admission.Transitions[transition.RequirementId].Placed))
-            ? "An observed event has no placed reducer transition." : null;
+            ? (AxonRefusalCodes.Reduction, "An observed event has no placed reducer transition.") : null;
     }
 
     bool RowSupported(SemanticSpecificationReadModel expected, string? fallback) =>

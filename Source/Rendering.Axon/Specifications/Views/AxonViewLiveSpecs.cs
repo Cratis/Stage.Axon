@@ -17,7 +17,7 @@ internal static class AxonViewLiveSpecs
     {
         if (query.Argument is not null || query.KeyParts.Length > 0 || query.Filters.Length > 0 || query.Cardinality != SemanticQueryCardinality.Many || query.Authorization is not null) return;
         var projection = owner.Slice.Projections.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
-        if (projection is null || !ProjectionHandlerShape.RootOnly(projection)) return;
+        if (projection is null || !ProjectionHandlerShape.RootOnly(context.Request.Model.Application, projection, model)) return;
         var given = owner.Slice.Specifications.SelectMany(specification => specification.GivenEvents)
             .FirstOrDefault(fact => ProjectionTransitions.From(projection).Any(from => from.EventContract == fact.EventContract));
         if (given is null) return;

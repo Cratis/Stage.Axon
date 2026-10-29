@@ -65,9 +65,9 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
         {
             var model = located.Slice.ReadModels.FirstOrDefault(candidate => candidate.Id == reducer.ReadModel);
             var admission = ReducerBodies.Admission(context, located, reducer);
-            if (model is null || admission.Blocked is not null)
+            if (model is null)
             {
-                context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model?.Id ?? located.Slice.Id, admission.Blocked ?? "The reducer read model is outside its slice.");
+                context.Degradation.Unsupported(AxonRefusalCodes.Reduction, located.Slice.Id, admission.Blocked ?? "The reducer read model is outside its slice.");
                 continue;
             }
             new ReducerProjection(context, types).Emit(located, model, reducer, admission);
@@ -84,7 +84,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
 
     static void EmitProjector(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticProjection projection, SemanticReadModel model)
     {
-        if (ProjectionHandlerShape.RootOnly(projection))
+        if (ProjectionHandlerShape.RootOnly(context.Request.Model.Application, projection, model))
         {
             new RootProjectionEmitter(context, types, package, projection, model).Emit();
             return;

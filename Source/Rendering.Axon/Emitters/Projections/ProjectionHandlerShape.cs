@@ -15,6 +15,12 @@ internal static class ProjectionHandlerShape
         (scope.Every is null && new[] { scope.Children.Length, scope.Nested.Length, scope.Joins.Length, scope.JoinRemovals.Length, scope.Removals.Count(removal => removal.ParentKey is not null) }.All(count => count == 0) &&
         scope.From.All(from => from.Key is SemanticProjectionValueKey));
 
+    internal static bool RootOnly(SemanticApplication application, SemanticProjection projection, SemanticReadModel model) => RootOnly(projection) ||
+        (ReadModelKeys.IsComposite(application, model) && projection.Scope is { } scope && scope.Every is null &&
+        new[] { scope.Children.Length, scope.Nested.Length, scope.Joins.Length, scope.JoinRemovals.Length, scope.Removals.Count(removal => removal.ParentKey is not null) }.All(count => count == 0) &&
+        scope.From.All(from => from.Key is SemanticProjectionValueKey or SemanticProjectionPartsKey or SemanticProjectionCompositeKey) &&
+        scope.Removals.All(removal => removal.Key is SemanticProjectionValueKey or SemanticProjectionPartsKey or SemanticProjectionCompositeKey));
+
     internal static string Arguments(SemanticProjection projection, ProjectionUpdates updates, string emitter = "null") =>
         (Scoped(projection) ? ", null" : string.Empty) + (updates.Enabled ? ", " + emitter : string.Empty);
 }

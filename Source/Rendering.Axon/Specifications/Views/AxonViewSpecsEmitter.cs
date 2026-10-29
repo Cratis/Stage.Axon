@@ -53,7 +53,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
         var plans = specs.Select(spec =>
         {
             var native = new NativeViewSpecifications(context, types, located, model).Plan(spec);
-            return (Spec: spec, Native: native, Supported: (ViewSpecificationSupport.Legacy(spec, model, types) || native is not null) && ProjectionHandlerShape.RootOnly(projection));
+            return (Spec: spec, Native: native, Supported: (ViewSpecificationSupport.Legacy(spec, model, types) || native is not null) && ProjectionHandlerShape.RootOnly(context.Request.Model.Application, projection, model));
         }).ToArray();
         var claims = new ViewSpecificationClaims(context, types);
         foreach (var plan in plans.Where(plan => plan.Supported)) claims.Specification(plan.Spec, model, code);
@@ -89,7 +89,11 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                     foreach (var expected in spec.ThenReadModels.Where(expected => expected.ReadModel == model.Id))
                         EmitExpected(context.Request.Model.Application, types, model, expected, method);
                     foreach (var absent in spec.ThenAbsentReadModels.Where(expected => expected.ReadModel == model.Id))
-                        method.Line($"{method.Reference("org.junit.jupiter.api.Assertions")}.assertTrue({ViewRepositories.Get(model, ViewExpectedKeys.Expression(absent.Key, model, types, method))}.findAny().isEmpty(), \"Expected the modeled instance to be removed\");");
+                    {
+                        var key = ViewExpectedKeys.Expression(absent.Key, model, types, method);
+                        var missing = Missing(model, types, key);
+                        method.Line($"{method.Reference("org.junit.jupiter.api.Assertions")}.assertTrue({missing}, \"Expected the modeled instance to be removed\");");
+                    }
                 }));
             }
         });
@@ -100,6 +104,9 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
     {
         foreach (var model in located.Slice.ReadModels) code.Declare(JavaNames.Type(model.Name));
     }
+
+    static string Missing(SemanticReadModel model, ViewJavaTypes types, string? key) =>
+        types.KeyParts(model) is not null ? $"!repository.existsById({key})" : $"{ViewRepositories.Get(model, key)}.findAny().isEmpty()";
 
     static void EmitExpected(SemanticApplication application, ViewJavaTypes types, SemanticReadModel model, SemanticSpecificationReadModel expected, JavaCodeBuilder code)
     {

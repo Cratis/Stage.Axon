@@ -19,8 +19,9 @@ internal static class ViewExpectedKeys
         _ => null
     };
 
-    static string Composite(SemanticCompositeValue key, SemanticReadModel model, ViewJavaTypes types, JavaCodeBuilder? code)
+    static string? Composite(SemanticCompositeValue key, SemanticReadModel model, ViewJavaTypes types, JavaCodeBuilder? code)
     {
+        if (types.KeyParts(model) is not null) return Embedded(key, model, types, code);
         var identifiers = model.Properties.Where(property => property.IsIdentifier).ToArray();
         if (identifiers is [{ Type.Kind: SemanticTypeReferenceKind.CompositeType } identifier])
             return $"String.valueOf({(code is null ? types.Literal(key, identifier.Type) : types.Literal(key, identifier.Type, code))})";
@@ -32,5 +33,17 @@ internal static class ViewExpectedKeys
         });
         var tree = code?.Reference("java.util.TreeMap") ?? "java.util.TreeMap";
         return $"String.valueOf(new {tree}<>({map}.ofEntries({string.Join(", ", entries)})))";
+    }
+
+    static string? Embedded(SemanticCompositeValue key, SemanticReadModel model, ViewJavaTypes types, JavaCodeBuilder? code)
+    {
+        var arguments = types.KeyParts(model)!.Select(part =>
+        {
+            var value = key.Properties.FirstOrDefault(entry => entry.TargetProperty == part.Property.Id)?.Value;
+            return value is null ? null : types.Unwrap(part.Property.Type, code is null ? types.Literal(value, part.Property.Type) : types.Literal(value, part.Property.Type, code));
+        }).ToArray();
+        if (arguments.Any(argument => argument is null)) return null;
+        var name = code?.Reference(ReadModelKeys.KeyName(model)) ?? ReadModelKeys.KeyName(model);
+        return $"new {name}({string.Join(", ", arguments)})";
     }
 }
