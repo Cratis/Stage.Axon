@@ -66,7 +66,7 @@ final class ClientProofSupport {
             return new BeanPostProcessor() {
                 @Override
                 public Object postProcessAfterInitialization(Object bean, String name) {
-                    return VIEW.equals(name) ? gated((WorkItemsRepository) bean) : bean;
+                    return VIEW.equals(name) && bean instanceof WorkItemsRepository repository ? gated(repository) : bean;
                 }
             };
         }
