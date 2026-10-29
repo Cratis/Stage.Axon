@@ -18,26 +18,45 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
         var code = new JavaCodeBuilder(package).Declare(name).Declare(modelName).Declare(entity).Declare(ReadModelEntities.RepositoryName(model));
         foreach (var property in model.Properties) types.ClaimProjectionType(property.Type, code);
         new ProjectionUpdates(context, types, model.Id).Claim(code, package);
-        foreach (var from in ProjectionTransitions.From(projection)) types.EventType(from.EventContract, code);
+        foreach (var contract in Events()) types.EventType(contract, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
             .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
             .Block($"public class {name}", body =>
             {
                 Fields(body, name);
-                foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
+                foreach (var contract in Events())
                 {
-                    var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(candidate => candidate.Id == group.Key);
+                    var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(candidate => candidate.Id == contract);
                     new ProjectionHandlerBinding(context, types, model, package).Emit(
                         body,
-                        types.EventType(group.Key, body),
+                        types.EventType(contract, body),
                         method =>
                         {
-                            foreach (var from in group) From(method, @event, from);
+                            foreach (var from in ProjectionTransitions.From(projection).Where(from => from.EventContract == contract)) From(method, @event, from);
+                            foreach (var removal in projection.Scope?.Removals.Where(removal => removal.EventContract == contract) ?? []) Remove(method, @event, removal);
                         },
                         message: ProjectionHandlerShape.Scoped(projection));
                 }
             });
         ViewJavaTypes.Add(context, package, name, code.Build(), projection.Id);
+    }
+
+    IEnumerable<SemanticId> Events() => ProjectionTransitions.From(projection).Select(from => from.EventContract)
+        .Concat(projection.Scope?.Removals.Select(removal => removal.EventContract) ?? []).Distinct();
+
+    void Remove(JavaCodeBuilder code, SemanticEventContract @event, SemanticProjectionRemoval removal)
+    {
+        var key = new ProjectionValues(context, types, code).Key(removal.Key, @event);
+        if (key is null)
+        {
+            context.Degradation.Unsupported(AxonRefusalCodes.CompositeKey, projection.Id, "This projection key cannot yet be emitted as a Java key.");
+            code.UnsupportedIntent("identify the projected instance", projection.Id.ToString(), AxonRefusalCodes.CompositeKey);
+            return;
+        }
+
+        // A bulk delete by id never fails on an absent or concurrently deleted row, so a removal event is idempotent.
+        var list = code.Reference("java.util.List");
+        code.Line($"repository.deleteAllByIdInBatch({list}.of({key}));");
     }
 
     void Fields(JavaCodeBuilder code, string name)

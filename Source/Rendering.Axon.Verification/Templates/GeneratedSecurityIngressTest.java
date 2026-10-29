@@ -3,9 +3,10 @@ package __RUNTIME__;
 import __APPLICATION__.accounts.events.AccountRegistered;
 import __APPLICATION__.accounts.registry.active.AccountSnapshot;
 import __APPLICATION__.accounts.registry.active.ActiveAccounts;
+import __APPLICATION__.accounts.registry.active.ActiveAccountsEntity;
+import __APPLICATION__.accounts.registry.active.ActiveAccountsRepository;
 import __APPLICATION__.accounts.registry.register.RegisterAccount;
 import __APPLICATION__.concepts.AccountId;
-import __RUNTIME_MODULE__.ReadModelStore;
 import __RUNTIME_MODULE__.UniqueValueStore;
 import java.util.UUID;
 import java.util.List;
@@ -17,7 +18,6 @@ import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.access.AccessDeniedException;
@@ -50,7 +50,7 @@ class GeneratedSecurityIngressTest {
     @Autowired private QueryGateway queries;
     @Autowired private Configuration configuration;
     @MockitoSpyBean private UniqueValueStore claims;
-    @Autowired @Qualifier("__APPLICATION__.accounts.registry.active.ActiveAccounts") private ReadModelStore<Object, ActiveAccounts> store;
+    @Autowired private ActiveAccountsRepository repository;
 
     @Test
     void httpRejectsUnauthenticatedAndWrongRoleCommandsBeforeSideEffects() throws Exception {
@@ -98,7 +98,7 @@ class GeneratedSecurityIngressTest {
     void allowedCallersCanQueryThroughBothIngressPaths() throws Exception {
         var id = UUID.randomUUID();
         var expected = new ActiveAccounts(new AccountId(id), "seeded", "alice");
-        store.put(expected.id(), expected);
+        repository.save(new ActiveAccountsEntity(id.toString(), expected));
         var response = http.perform(get(QUERY).param("id", id.toString()).with(user("alice").roles("Writer")))
                 .andExpect(request().asyncStarted()).andReturn();
         response.getAsyncResult(10000);
