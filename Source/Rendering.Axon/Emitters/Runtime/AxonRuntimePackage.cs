@@ -26,9 +26,6 @@ internal static class AxonRuntimePackage
         "LiveCapacityException",
         "LiveSnapshots",
         "LiveStreams",
-        "persistent.JpaUniqueValueStore",
-        "persistent.PersistentConfiguration",
-        "persistent.UniqueClaim",
         "ProblemDetailsAdvice",
         "QueryCardinalityException",
         "QueryResults",
@@ -52,10 +49,10 @@ internal static class AxonRuntimePackage
     /// <summary>The Java package of the runtime helpers that are still generated into the application.</summary>
     internal static string JavaPackage(string basePackage) => basePackage + Segment;
 
-    /// <summary>The fully qualified name of a runtime helper, optionally below a sub-package such as <c>persistent.Name</c>.</summary>
+    /// <summary>The fully qualified name of a runtime helper, optionally below a sub-package such as <c>sub.Name</c>.</summary>
     internal static string Type(AxonEmissionContext context, string name) => Type(context.BasePackage, name);
 
-    /// <summary>The fully qualified name of a runtime helper, optionally below a sub-package such as <c>persistent.Name</c>.</summary>
+    /// <summary>The fully qualified name of a runtime helper, optionally below a sub-package such as <c>sub.Name</c>.</summary>
     internal static string Type(string basePackage, string name) => ModuleTypes.Contains(name) ? ModulePackage + "." + name : JavaPackage(basePackage) + "." + name;
 
     /// <summary>Whether a Java type belongs to the runtime artifact or to the generated runtime package.</summary>

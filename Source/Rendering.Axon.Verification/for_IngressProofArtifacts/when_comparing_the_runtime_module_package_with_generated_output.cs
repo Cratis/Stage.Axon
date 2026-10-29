@@ -22,7 +22,7 @@ public partial class when_comparing_the_runtime_module_package_with_generated_ou
     {
         var repository = for_CorpusApplications.given.the_repository.Root();
         _inputs = CanonicalCorpusInputs.Create(repository);
-        var (name, root) = CorpusApplications.Find(repository, _inputs.Root).First(application => application.Name != IngressProofModel.Application && application.Name != IngressProofModel.PersistentApplication);
+        var (name, root) = CorpusApplications.Find(repository, _inputs.Root).First(application => application.Name != IngressProofModel.Application);
         var applicationName = "Corpus" + string.Concat(name.Split('-').Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
         var compilation = File.Exists(root)
             ? await SemanticModelLoader.LoadAsync(Path.GetDirectoryName(root)!, [Path.GetFileName(root)], null, applicationName)

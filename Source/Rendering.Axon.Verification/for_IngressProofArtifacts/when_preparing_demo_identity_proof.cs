@@ -18,5 +18,4 @@ public class when_preparing_demo_identity_proof : Specification
     [Fact] void should_use_the_modeled_query() => source.ShouldContain("/api/accounts/registry/account-snapshot?id=");
     [Fact] void should_verify_the_projected_identity() => source.ShouldContain("assertEquals(\"demo\", JsonPath.read(result.body(), \"$.actor\"))");
     [Fact] void should_not_supply_credentials() => source.ShouldNotContain("Authorization");
-    [Fact] void should_not_add_the_memory_proof_to_persistent_apps() => IngressProofArtifacts.Sources(IngressProofModel.PersistentApplication).ContainsKey("GeneratedDemoIdentityTest.java").ShouldBeFalse();
 }
