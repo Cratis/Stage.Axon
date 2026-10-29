@@ -21,7 +21,7 @@ public class when_a_command_is_named_command_gateway : for_AxonArtifactRenderPla
         code = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/CommandGatewayEndpoint.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 
-    [Fact] void should_keep_the_command_parameter_short() => code.ShouldContain("execute(@RequestBody CommandGateway request)");
+    [Fact] void should_keep_the_command_parameter_short() => code.ShouldContain("execute(@RequestBody CommandGateway request, Authentication authentication)");
     [Fact] void should_qualify_the_colliding_axon_gateway() => code.ShouldContain("private final org.axonframework.messaging.commandhandling.gateway.CommandGateway commandGateway;");
     [Fact] void should_not_import_the_colliding_axon_gateway() => code.ShouldNotContain("import org.axonframework.messaging.commandhandling.gateway.CommandGateway;");
     [Fact] void should_import_future_responses() => code.ShouldContain("import java.util.concurrent.CompletableFuture;");

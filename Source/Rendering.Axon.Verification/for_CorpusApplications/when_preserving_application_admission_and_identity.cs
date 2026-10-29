@@ -40,8 +40,6 @@ public class when_preserving_application_admission_and_identity : Specification
             _plans.Add(name, name switch
             {
                 IngressProofModel.Application => IngressProofModel.Plan(loaded),
-                IngressProofModel.PersistentApplication => IngressProofModel.PersistentPlan(loaded),
-                ConstraintProofArtifacts.PersistentApplication => ConstraintProofArtifacts.PersistentPlan(loaded, CorpusRenderer.Profile),
                 _ => AxonRendering.PlanFrom(loaded, new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id))
             });
         }
@@ -53,7 +51,7 @@ public class when_preserving_application_admission_and_identity : Specification
     void should_keep_all_thirty_two_application_names() => _applications.Select(application => application.Name).SequenceEqual<string>(
     [
         "administration", "approvals", "bookings", "catalog", "contracts", "crm", "customer-portal", "hr", "inventory", "invoicing", "orders", "projects", "ticketing", "vendors", "work-orders",
-        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views", "ingress-invariants", "ingress-persistent", "inline-java-policies", "inline-java-policy-performers", "client-proof", "inline-java-bodies", "constrained-java-bodies", "constrained-java-bodies-persistent", "reaction-constraints"
+        "sample-navigation", "sample-templates", "sample-custom-packages", "views-combined", "view-composite-keys", "view-reducers", "view-scopes", "view-views", "ingress-invariants", "inline-java-policies", "inline-java-policy-performers", "client-proof", "inline-java-bodies", "constrained-java-bodies", "reaction-constraints", "policy-locals", "decimal-arithmetic"
     ]).ShouldBeTrue();
 
     [Fact] void should_keep_native_report_application_names() => CorpusApplications.Find(given.the_repository.Root()).Select(application => application.Name).SequenceEqual(_applications.Select(application => application.Name)).ShouldBeTrue();
@@ -64,22 +62,15 @@ public class when_preserving_application_admission_and_identity : Specification
     [Fact] void should_bind_proof_facts_to_the_authenticated_caller() => ProofSource("RegisterAccountHandler").ShouldContain("Caller.current().identity()");
     [Fact] void should_enlist_proof_uniqueness_in_the_append_context() => ProofSource("ModeledConstraints").ShouldContain("store.assign(context,");
     [Fact] void should_release_proof_claims_with_the_generated_close_command() => ProofSource("ModeledConstraints").ShouldContain("store.releaseOwner(context,");
-    [Fact] void should_protect_the_proof_command_handler() => ProofSource("RegisterAccountHandler").ShouldContain("@PreAuthorize(\"hasRole('Writer')\")");
+    [Fact] void should_protect_the_proof_command_handler() => ProofSource("RegisterAccountHandler").ShouldContain("@Secured({\"ROLE_Writer\"})");
     [Fact] void should_enroll_the_proof_decision_before_validation() => ProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new CommandValidationException");
     [Fact] void should_refuse_the_unsupported_cross_stream_proof() => ProofSource("CloseOtherAccountHandler").ShouldContain("throw new UnsupportedOperationException(\"STAGE-AXON-0106:");
     [Fact] void should_not_append_in_the_unsupported_proof() => ProofSource("CloseOtherAccountHandler").ShouldNotContain("appender.append(");
-    [Fact] void should_emit_the_persistent_gateway_race_base() => ProofSource("PersistentUniqueConcurrencyTest").ShouldContain("abstract CompletableFuture<Void> register(UUID owner, String value)");
-    [Fact] void should_preserve_the_scoped_memory_proof_view() => ProofSource("ActiveAccountsStoreConfiguration").ShouldContain("new PersistentReadModelSafety(");
-    [Fact] void should_not_render_views_for_the_persistent_proofs() => _plans[IngressProofModel.PersistentApplication].Artifacts.Any(artifact => artifact.RelativePath.Contains("/accounts/registry/active/", StringComparison.Ordinal)).ShouldBeFalse();
-    [Fact] void should_not_warn_about_persistent_proof_views() => _plans[IngressProofModel.PersistentApplication].Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0308").ShouldBeFalse();
-    [Fact] void should_enforce_persistent_protected_reads() => PersistentProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new CommandValidationException");
-    [Fact] void should_preserve_persistent_read_removals() => PersistentProofSource("ConsumeAccountStream").ShouldContain("decisionRead0 = false;");
-    [Fact] void should_preserve_persistent_read_creation() => PersistentProofSource("ConsumeAccountStream").ShouldContain("decisionRead0 = true;");
-    [Fact] void should_enlist_persistent_uniqueness() => PersistentProofSource("ModeledConstraints").ShouldContain("store.assign(context,");
-    [Fact] void should_release_persistent_claims() => PersistentProofSource("ModeledConstraints").ShouldContain("store.releaseOwner(context,");
+    [Fact] void should_render_the_proof_view_over_a_typed_repository() => ProofSource("ActiveAccountsRepository").ShouldContain("extends JpaRepository<ActiveAccountsEntity, String>");
+    [Fact] void should_preserve_proof_read_removals() => ProofSource("ConsumeAccountStream").ShouldContain("decisionRead0 = false;");
+    [Fact] void should_preserve_proof_read_creation() => ProofSource("ConsumeAccountStream").ShouldContain("decisionRead0 = true;");
 
     string ProofSource(string name) => Source(IngressProofModel.Application, name);
-    string PersistentProofSource(string name) => Source(IngressProofModel.PersistentApplication, name);
     string Source(string application, string name) => Encoding.UTF8.GetString(_plans[application].Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());
 
     [Fact]

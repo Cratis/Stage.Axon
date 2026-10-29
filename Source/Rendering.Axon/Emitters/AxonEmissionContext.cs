@@ -30,12 +30,32 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
 
     internal IReadOnlyDictionary<string, SemanticSurfaceDisposition> SemanticSurface => SemanticSurfaceLedger.Entries;
 
+    internal Dictionary<string, JavaAllocation> AllocatedTypes { get; } = new(StringComparer.Ordinal);
+
+    // Incomplete allocations must supply their downstream API; it cannot be reconstructed from a type name.
+    internal void AllocateJava(string package, string name, string stub) =>
+        AllocateJava(new(package, name, stub, false, []));
+
     internal void AddJava(string package, string name, string code, bool test = false, params SemanticId[] sources) =>
-        Artifacts.Add(PlannedArtifact.CreateText($"src/{(test ? "test" : "main")}/java/{package.Replace('.', '/')}/{name}.java", code, [.. sources]));
+        AddJava(new(package, name, code, test, sources), code);
 
     internal string UnsupportedBody(string code, SemanticId owner, string reason)
     {
         Degradation.Unsupported(code, owner, reason);
         return JavaStubs.ThrowingBody(code, reason);
     }
+
+    void AddJava(JavaAllocation allocation, string code)
+    {
+        AllocateJava(allocation);
+        Artifacts.Add(PlannedArtifact.CreateText($"src/{(allocation.Test ? "test" : "main")}/java/{allocation.Package.Replace('.', '/')}/{allocation.Name}.java", code, [.. allocation.Sources]));
+    }
+
+    void AllocateJava(JavaAllocation allocation)
+    {
+        var path = $"src/{(allocation.Test ? "test" : "main")}/java/{allocation.Package.Replace('.', '/')}/{allocation.Name}.java";
+        AllocatedTypes.TryAdd(path, allocation);
+    }
+
+    internal sealed record JavaAllocation(string Package, string Name, string Stub, bool Test, SemanticId[] Sources);
 }

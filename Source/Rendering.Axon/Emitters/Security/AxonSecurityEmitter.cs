@@ -1,7 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -19,120 +21,110 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             foreach (var query in slice.Slice.Queries) SecurityAnnotations.For(context, query.Authorization, query.Id);
         }
         var bearer = HttpAuthenticationInput.Bearer(context.Request.Profile);
+        if (bearer)
+        {
+            context.Degradation.Warn("STAGE-AXON-JWT-PROVIDER", context.Request.Model.Application.Id, "Credentials are rejected unless a native JWT decoder and nonempty spring.security.oauth2.resourceserver.jwt.audiences are configured.");
+        }
         EmitConfiguration(context, bearer);
-        DemoIdentityConfiguration.Emit(context);
+        EmitUsers(context);
         PoliciesConfiguration.Emit(context);
-        if (bearer) EmitAudienceGuard(context);
     }
 
     static void EmitConfiguration(AxonEmissionContext context, bool bearer)
     {
-        var builder = new JavaCodeBuilder(context.BasePackage + ".infrastructure").Declare("SecurityConfiguration")
-            .Import("org.springframework.context.annotation.Bean")
-            .Import("org.springframework.context.annotation.Configuration")
-            .Import("org.springframework.context.annotation.Profile")
+        var code = new JavaCodeBuilder(context.BasePackage + ".infrastructure")
+            .Import("java.util.Arrays")
             .Import("org.springframework.beans.factory.annotation.Value")
-            .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")
+            .Import("org.springframework.context.annotation.Bean")
             .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication")
+            .Import("org.springframework.context.annotation.Configuration")
             .Import("org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity")
             .Import("org.springframework.security.config.annotation.web.builders.HttpSecurity")
-            .Import("org.springframework.security.core.userdetails.UserDetailsService")
-            .Import("org.springframework.security.core.userdetails.UsernameNotFoundException")
-            .Import("org.springframework.security.web.AuthenticationEntryPoint")
             .Import("org.springframework.security.web.SecurityFilterChain")
-            .Import(bearer ? "org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint" : "org.springframework.security.web.authentication.www.BasicAuthenticationEntryPoint")
             .Import("org.springframework.web.cors.CorsConfiguration")
             .Import("org.springframework.web.cors.CorsConfigurationSource")
             .Import("org.springframework.web.cors.UrlBasedCorsConfigurationSource");
         if (bearer)
         {
-            builder.Import("org.springframework.beans.factory.ObjectProvider")
-                .Import("org.springframework.security.config.http.SessionCreationPolicy")
-                .Import("org.springframework.security.oauth2.jwt.JwtDecoder")
-                .Import("org.springframework.security.oauth2.jwt.BadJwtException");
+            code.Import("org.springframework.beans.factory.ObjectProvider").Import("org.springframework.core.env.Environment")
+                .Import("org.springframework.boot.context.properties.bind.Binder").Import("org.springframework.security.oauth2.jwt.JwtDecoder")
+                .Import("org.springframework.security.oauth2.jwt.BadJwtException").Import("org.springframework.security.config.http.SessionCreationPolicy");
         }
-        var code = builder.Line("@Configuration")
-            .Line("@EnableMethodSecurity")
-            .Block("public class SecurityConfiguration", body =>
+        else
+        {
+            code.Import("org.springframework.security.config.Customizer");
+        }
+        code.Line("@Configuration").Line("@EnableMethodSecurity").Block("public class SecurityConfiguration", body =>
+        {
+            body.Line("@Bean").Line("@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)").Block("SecurityFilterChain chain(HttpSecurity http, @Value(\"${stage.axon.cors.allowed-origins:}\") String allowedOrigins" + (bearer ? ", Environment environment, ObjectProvider<JwtDecoder> decoders" : string.Empty) + ") throws Exception", method =>
             {
-                body.Line("@Bean")
-                .Line("@Profile(\"!demo\")")
-                .Line("@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)")
-                .Block("SecurityFilterChain security(HttpSecurity http, @Value(\"${stage.axon.cors.allowed-origins:}\") String allowedOrigins" + (bearer ? ", ObjectProvider<JwtDecoder> decoders" : string.Empty) + ") throws Exception", method => Chain(method, bearer))
-                .Line()
-                .Line("// Cross-origin access is denied unless origins are listed in stage.axon.cors.allowed-origins (comma separated).")
-                .Block("private static CorsConfigurationSource cors(String allowedOrigins)", method => method
-                    .Line("var configuration = new CorsConfiguration();")
-                    .Line($"configuration.setAllowedOrigins({method.Reference("java.util.Arrays")}.stream(allowedOrigins.split(\",\")).map(String::trim).filter(origin -> !origin.isEmpty()).toList());")
-                    .Line($"configuration.setAllowedMethods({method.Reference("java.util.List")}.of(\"GET\", \"POST\", \"OPTIONS\"));")
-                    .Line($"configuration.setAllowedHeaders({method.Reference("java.util.List")}.of(\"Authorization\", \"Content-Type\", \"Accept\", \"X-Requested-With\"));")
-                    .Line("configuration.setAllowCredentials(false);")
-                    .Line("var source = new UrlBasedCorsConfigurationSource();")
-                    .Line("source.registerCorsConfiguration(\"/**\", configuration);")
-                    .Line("return source;"))
-                .Line()
-                .Line("// Browsers (fetch, XHR, navigation) send Sec-Fetch-Mode or X-Requested-With; they get a plain 401 so no credential prompt appears.")
-                .Block("private static AuthenticationEntryPoint entryPoint()", method => Challenge(method, bearer))
-                .Line("@Bean")
-                .Line("@ConditionalOnMissingBean(UserDetailsService.class)")
+                method.Line("return http.csrf(csrf -> csrf.disable())").Line("    .cors(cors -> cors.configurationSource(cors(allowedOrigins)))");
+                if (bearer) method.Line("    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))");
+                method.Line("    .authorizeHttpRequests(requests -> requests")
+                    .Line($"        .dispatcherTypeMatchers({method.Reference("jakarta.servlet.DispatcherType")}.ERROR).permitAll()");
+                foreach (var endpoint in AxonHttpTestsEndpoints.For(context)
+                    .Where(endpoint => endpoint.Authorization is null || string.Equals(endpoint.Authorization, "permitAll()", StringComparison.Ordinal))
+                    .DistinctBy(endpoint => (endpoint.Method, endpoint.Path)))
+                {
+                    method.Line($"        .requestMatchers({method.Reference("org.springframework.http.HttpMethod")}.{endpoint.Method}, {JavaCodeBuilder.StringLiteral(endpoint.Path)}).permitAll()");
+                    if (string.Equals(endpoint.Method, "GET", StringComparison.Ordinal))
+                        method.Line($"        .requestMatchers({method.Reference("org.springframework.http.HttpMethod")}.HEAD, {JavaCodeBuilder.StringLiteral(endpoint.Path)}).permitAll()");
+                }
+                method.Line("        .requestMatchers(\"/api/**\").authenticated()")
+                    .Line("        .anyRequest().permitAll())")
+                    .Line(bearer ? "    .oauth2ResourceServer(server -> server.jwt(jwt -> jwt.decoder(decoder(environment, decoders)))).build();" : "    .httpBasic(Customizer.withDefaults()).build();");
+            }).Block("private static CorsConfigurationSource cors(String allowedOrigins)", method => method
+                .Line("var configuration = new CorsConfiguration();")
+                .Line("configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(\",\")).map(String::trim).filter(origin -> !origin.isEmpty()).toList());")
+                .Line("configuration.setAllowedMethods(Arrays.asList(\"GET\", \"POST\", \"OPTIONS\"));")
+                .Line("configuration.setAllowedHeaders(Arrays.asList(\"Authorization\", \"Content-Type\"));")
+                .Line("configuration.setAllowCredentials(false);")
+                .Line("var source = new UrlBasedCorsConfigurationSource();")
+                .Line("source.registerCorsConfiguration(\"/**\", configuration);")
+                .Line("return source;"));
+            if (bearer) Decoder(body);
+            Interceptors(body, "Command", "org.axonframework.messaging.commandhandling.CommandMessage");
+            Interceptors(body, "Query", "org.axonframework.messaging.queryhandling.QueryMessage");
+        });
+        context.AddJava(context.BasePackage + ".infrastructure", "SecurityConfiguration", code.Build());
+    }
+
+    static void EmitUsers(AxonEmissionContext context)
+    {
+        var package = context.BasePackage + ".infrastructure";
+        var code = new JavaCodeBuilder(package)
+            .Import("org.springframework.boot.autoconfigure.AutoConfiguration")
+            .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")
+            .Import("org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration")
+            .Import("org.springframework.context.annotation.Bean")
+            .Import("org.springframework.security.core.userdetails.UserDetailsService")
+            .Import("org.springframework.security.core.userdetails.UsernameNotFoundException");
+        code.Line("@AutoConfiguration(before = UserDetailsServiceAutoConfiguration.class)")
+            .Block("public class IdentityConfiguration", body => body.Line("@Bean").Line("@ConditionalOnMissingBean(UserDetailsService.class)")
                 .Block("UserDetailsService users()", method => method
                     .Line("// Fail closed until an application-owned identity provider is supplied.")
-                    .Line("return username -> { throw new UsernameNotFoundException(\"Configure an identity provider\"); };"));
-                if (bearer)
-                {
-                    body.Line("// Every bearer token is rejected until JWT properties or an application JwtDecoder names the identity provider.")
-                        .Block("private static JwtDecoder unconfigured()", method => method
-                            .Line("return token -> { throw new BadJwtException(\"Configure an identity provider\"); };"));
-                }
-            })
-            .Build();
-        context.AddJava(context.BasePackage + ".infrastructure", "SecurityConfiguration", code);
+                    .Line("return username -> { throw new UsernameNotFoundException(\"Configure an identity provider\"); };")));
+        context.AddJava(package, "IdentityConfiguration", code.Build());
+        context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports", package + ".IdentityConfiguration\n"));
     }
 
-    static void EmitAudienceGuard(AxonEmissionContext context)
+    static void Decoder(JavaCodeBuilder body)
     {
-        var code = new JavaCodeBuilder(context.BasePackage + ".infrastructure")
-            .Import("java.util.Arrays")
-            .Import("org.springframework.beans.factory.config.BeanFactoryPostProcessor")
-            .Import("org.springframework.boot.context.properties.bind.Binder")
-            .Import("org.springframework.context.annotation.Bean")
-            .Import("org.springframework.context.annotation.Configuration")
-            .Import("org.springframework.core.env.Environment")
-            .Line("@Configuration")
-            .Block("public class JwtAudienceConfiguration", AudienceGuard)
-            .Build();
-        context.AddJava(context.BasePackage + ".infrastructure", "JwtAudienceConfiguration", code);
+        body.Line("// STAGE-AXON-JWT-PROVIDER: configure a JWT decoder and nonempty audiences before accepting tokens.")
+            .Block("private static JwtDecoder decoder(Environment environment, ObjectProvider<JwtDecoder> decoders)", method => method
+                .Line("var audiences = Binder.get(environment).bind(\"spring.security.oauth2.resourceserver.jwt.audiences\", String[].class).orElse(new String[0]);")
+                .Line("if (Arrays.stream(audiences).noneMatch(audience -> !audience.isBlank())) return unconfigured();")
+                .Line("return decoders.getIfAvailable(SecurityConfiguration::unconfigured);"))
+            .Block("private static JwtDecoder unconfigured()", method => method
+                .Line("return token -> { throw new BadJwtException(\"Configure a JWT provider and spring.security.oauth2.resourceserver.jwt.audiences\"); };"));
     }
 
-    static void AudienceGuard(JavaCodeBuilder body)
+    static void Interceptors(JavaCodeBuilder body, string name, string messageType)
     {
-        body.Line("@Bean")
-            .Block("static BeanFactoryPostProcessor jwtAudienceGuard(Environment environment)", method => method
-                .Line("return beanFactory -> requireJwtAudience(environment);"))
-            .Block("private static void requireJwtAudience(Environment environment)", method => method
-                .Line("var prefix = \"spring.security.oauth2.resourceserver.jwt.\";")
-                .Line("var configured = Arrays.stream(new String[] { \"issuer-uri\", \"jwk-set-uri\", \"public-key-location\" })")
-                .Line("    .anyMatch(name -> !environment.getProperty(prefix + name, \"\").isBlank());")
-                .Line("var audiences = Binder.get(environment).bind(prefix + \"audiences\", String[].class).orElse(new String[0]);")
-                .Line("if (configured && Arrays.stream(audiences).noneMatch(audience -> !audience.isBlank()))")
-                .Line("    throw new IllegalStateException(\"Configure spring.security.oauth2.resourceserver.jwt.audiences when a JWT decoder source is configured\");"));
-    }
+        var message = body.Reference(messageType);
 
-    static void Chain(JavaCodeBuilder method, bool bearer)
-    {
-        method.Line("return http.csrf(csrf -> csrf.disable())")
-            .Line("    .cors(cors -> cors.configurationSource(cors(allowedOrigins)))");
-        if (bearer) method.Line("    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))");
-        method.Line("    .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())")
-            .Line(bearer
-                ? "    .oauth2ResourceServer(server -> server.authenticationEntryPoint(entryPoint()).jwt(jwt -> jwt.decoder(decoders.getIfAvailable(SecurityConfiguration::unconfigured)))).build();"
-                : "    .httpBasic(basic -> basic.authenticationEntryPoint(entryPoint())).build();");
-    }
-
-    static void Challenge(JavaCodeBuilder method, bool bearer)
-    {
-        if (bearer) method.Line("var bearer = new BearerTokenAuthenticationEntryPoint();");
-        else method.Line("var basic = new BasicAuthenticationEntryPoint();").Line("basic.setRealmName(\"Realm\");");
-        method.Line("return (request, response, exception) -> { if (request.getHeader(\"Sec-Fetch-Mode\") != null || request.getHeader(\"X-Requested-With\") != null) response.setStatus(401); else " + (bearer ? "bearer" : "basic") + ".commence(request, response, exception); };");
+        // AF's dispatch authorization interceptor serializes the whole principal; controllers supply name-only metadata instead.
+        var handler = body.Reference("org.axonframework.extension.spring.authorization.MessageAuthorizationHandlerInterceptor");
+        body.Line("@Bean").Block($"{handler}<{message}> authorize{name}Handling()", method => method.Line($"return new {handler}<>();"));
     }
 }

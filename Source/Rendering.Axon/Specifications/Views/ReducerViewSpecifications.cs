@@ -49,9 +49,12 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
         var package = types.Package(located);
         var modelName = JavaNames.Type(model.Name);
         var name = modelName + "ViewSpecificationsTest";
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(modelName).Declare(modelName + "Reducer").Declare(modelName + "ReducerProjector");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(modelName).Declare(modelName + "Reducer");
+        ViewRepositories.Declare(code, model);
+        ViewRepositories.Annotate(code);
         code.Block($"class {name}", body =>
         {
+            ViewRepositories.Field(body, model);
             for (var index = 0; index < specs.Length; index++)
             {
                 var spec = specs[index];
@@ -80,7 +83,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
     {
         var events = spec.GivenEvents.ToList();
         if (spec.WhenAppended is { } append) events.Add(new(append.EventContract, append.Values) { EventSource = append.EventSource, Route = append.Route });
-        if (BodyFailure(events) is { } reason) return new(AxonRefusalCodes.Reduction, "Reducer implementation required: " + reason, [], string.Empty);
+        if (BodyFailure(events) is { } failure) return new(failure.Code, "Reducer implementation required: " + failure.Reason, [], string.Empty);
         if (!Shape(spec) || !SourcesSupported(events)) return Unsupported();
         var fallback = SourceKey(events);
         if (!spec.ThenReadModels.All(expected => RowSupported(expected, fallback))) return Unsupported();
@@ -91,14 +94,14 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
     bool AbsentSupported(SemanticSpecificationAbsentReadModel expected, string? fallback) =>
         expected.ReadModel == model.Id && KeySupported(expected.Key, fallback);
 
-    string? BodyFailure(List<SemanticSpecificationEvent> events)
+    (string Code, string Reason)? BodyFailure(List<SemanticSpecificationEvent> events)
     {
         var reducer = located.Slice.Reducers.FirstOrDefault(candidate => candidate.ReadModel == model.Id);
-        if (reducer is null) return "The reducer is unavailable.";
+        if (reducer is null) return (AxonRefusalCodes.Reduction, "The reducer is unavailable.");
         var admission = ReducerBodies.Admission(context, located, reducer);
-        if (admission.Blocked is { } blocked) return blocked;
+        if (admission.Blocked is { } blocked) return (admission.BlockedCode, blocked);
         return events.Exists(given => !reducer.Transitions.Any(transition => transition.EventContract == given.EventContract && admission.Transitions[transition.RequirementId].Placed))
-            ? "An observed event has no placed reducer transition." : null;
+            ? (AxonRefusalCodes.Reduction, "An observed event has no placed reducer transition.") : null;
     }
 
     bool RowSupported(SemanticSpecificationReadModel expected, string? fallback) =>
@@ -151,8 +154,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
             CommandFixtureSecurity.CallerReferences(body, spec.GivenCaller);
             var modelName = JavaNames.Type(model.Name);
             var updates = new ProjectionUpdates(context, types, model.Id);
-            body.Line($"{body.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{body.Reference("java.lang.Object")}, {modelName}> store = new {body.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
-                .Line($"var projector = new {modelName}ReducerProjector(store, new {modelName}Reducer() {{}});");
+            body.Line($"var projector = new {modelName}Reducer(repository);");
             foreach (var given in plan.Events)
             {
                 body.Block(string.Empty, block => block
@@ -164,7 +166,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
             var native = new NativeViewSpecifications(context, types, located, model);
             foreach (var expected in spec.ThenReadModels) body.Line(native.Assertion(expected, plan.SourceKey, body));
             foreach (var absent in spec.ThenAbsentReadModels)
-                body.Line($"{body.Reference("org.junit.jupiter.api.Assertions")}.assertTrue(store.get({ViewExpectedKeys.Expression(absent.Key, model, types, body) ?? plan.SourceKey}).isEmpty(), \"Expected the modeled instance to be removed\");");
+                body.Line($"{body.Reference("org.junit.jupiter.api.Assertions")}.assertTrue({ViewRepositories.Get(model, ViewExpectedKeys.Expression(absent.Key, model, types, body) ?? plan.SourceKey)}.findAny().isEmpty(), \"Expected the modeled instance to be removed\");");
         }).Block("finally", body => body.Line($"{body.Reference("org.springframework.security.core.context.SecurityContextHolder")}.clearContext();"));
     }
 

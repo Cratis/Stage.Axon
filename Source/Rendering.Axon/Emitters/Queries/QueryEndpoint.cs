@@ -12,6 +12,26 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
 
 internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticKeyedQuery query, string modelType, QueryShape shape)
 {
+    string Caller
+    {
+        get
+        {
+            var name = "authentication";
+            while (shape.Arguments.Any(argument => JavaNames.Member(argument.Name) == name)) name = "_" + name;
+            return name;
+        }
+    }
+
+    string MetadataName
+    {
+        get
+        {
+            var name = "metadata";
+            while (shape.Arguments.Any(argument => JavaNames.Member(argument.Name) == name)) name = "_" + name;
+            return name;
+        }
+    }
+
     internal static string Route(LocatedSemanticSlice owner, SemanticKeyedQuery definition) =>
         $"/api/{RouteSegment(owner.Module.Name)}/{string.Join('/', owner.Features.Select(feature => RouteSegment(feature.Name)))}/{RouteSegment(definition.Name)}";
 
@@ -61,25 +81,31 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}({JavaCodeBuilder.StringLiteral(route)})");
         var response = code.Reference("org.springframework.http.ResponseEntity");
         var result = query.Cardinality == SemanticQueryCardinality.Many ? $"{code.Reference("java.util.List")}<{modelName}>" : modelName;
-        code.Block($"public {code.Reference("java.util.concurrent.CompletableFuture")}<{response}<{result}>> get({shape.Parameters(code)})", method =>
+        code.Block($"public {code.Reference("java.util.concurrent.CompletableFuture")}<{response}<{result}>> get({shape.Parameters(code)}{(shape.Arguments.Any() ? ", " : string.Empty)}{code.Reference("org.springframework.security.core.Authentication")} {Caller})", method =>
         {
+            method.Line($"var {MetadataName} = {method.Reference("org.axonframework.messaging.core.Metadata")}.emptyInstance();")
+                .Block($"if ({Caller} != null && {Caller}.isAuthenticated())", authenticated => authenticated
+                    .Line($"{MetadataName} = {MetadataName}.and(\"username\", {Caller}.getName()).and(\"authorities\", {Caller}.getAuthorities().stream().map({authenticated.Reference("org.springframework.security.core.GrantedAuthority")}::getAuthority).collect({authenticated.Reference("java.util.stream.Collectors")}.joining(\",\")));"));
             var mapped = query.Cardinality switch
             {
                 SemanticQueryCardinality.Many => $"{response}.ok(result.rows())",
                 SemanticQueryCardinality.One => $"{response}.ok(result.rows().getFirst())",
                 _ => $"result.rows().isEmpty() ? {response}.notFound().build() : {response}.ok(result.rows().getFirst())"
             };
-            method.Line($"return gateway.query(new {name}({shape.Parsed(method)}), {name}.Result.class).thenApply(result -> {mapped});");
+            method.Line($"return gateway.query(new {name}({shape.Parsed(method)}), {name}.Result.class, {MetadataName}, null).thenApply(result -> {mapped});");
         });
     }
 
     void Live(JavaCodeBuilder code, string name, string route)
     {
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}(value = {JavaCodeBuilder.StringLiteral(route)}, produces = {code.Reference("org.springframework.http.MediaType")}.TEXT_EVENT_STREAM_VALUE)")
-            .Block($"public {code.Reference("org.springframework.web.servlet.mvc.method.annotation.SseEmitter")} stream({shape.Parameters(code)})", method =>
+            .Block($"public {code.Reference("org.springframework.web.servlet.mvc.method.annotation.SseEmitter")} stream({shape.Parameters(code)}{(shape.Arguments.Any() ? ", " : string.Empty)}{code.Reference("org.springframework.security.core.Authentication")} {Caller})", method =>
             {
-                method.Line($"var query = new {name}({shape.Parsed(method)});")
-                    .Line($"return streams.open({name}Subscription.values(gateway, query));");
+                method.Line($"var {MetadataName} = {method.Reference("org.axonframework.messaging.core.Metadata")}.emptyInstance();")
+                    .Block($"if ({Caller} != null && {Caller}.isAuthenticated())", authenticated => authenticated
+                        .Line($"{MetadataName} = {MetadataName}.and(\"username\", {Caller}.getName()).and(\"authorities\", {Caller}.getAuthorities().stream().map({authenticated.Reference("org.springframework.security.core.GrantedAuthority")}::getAuthority).collect({authenticated.Reference("java.util.stream.Collectors")}.joining(\",\")));"))
+                    .Line($"var query = new {name}({shape.Parsed(method)});")
+                    .Line($"return streams.open({name}Subscription.values(gateway, query, {MetadataName}));");
             });
     }
 

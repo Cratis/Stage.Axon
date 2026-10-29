@@ -21,7 +21,7 @@ public class a_view_request : Specification
 
     protected static string Text(PlannedArtifact artifact) => Encoding.UTF8.GetString(artifact.Bytes.AsSpan());
 
-    static string Root([CallerFilePath] string path = "")
+    protected static string Root([CallerFilePath] string path = "")
     {
         var directory = Directory.GetParent(path);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Stage.Axon.slnx"))) directory = directory.Parent;

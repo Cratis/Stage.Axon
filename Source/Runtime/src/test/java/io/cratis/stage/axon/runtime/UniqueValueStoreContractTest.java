@@ -41,6 +41,16 @@ abstract class UniqueValueStoreContractTest {
     }
 
     @Test
+    void foldsCasingOnlyWhenTheConstraintIgnoresIt() {
+        var folded = unique();
+        run(context -> store().assign(context, folded, List.of("Claim"), "owner", true, "once"));
+        conflict(() -> run(context -> store().assign(context, folded, List.of("CLAIM"), "other", true, "once")));
+        var exact = unique();
+        run(context -> store().assign(context, exact, List.of("Claim"), "owner", false, "once"));
+        run(context -> store().assign(context, exact, List.of("CLAIM"), "other", false, "once"));
+    }
+
+    @Test
     void rejectsASecondOccurrenceInTheSameUnitOfWorkAndRollsBack() {
         var constraint = unique();
         conflict(() -> run(context -> {

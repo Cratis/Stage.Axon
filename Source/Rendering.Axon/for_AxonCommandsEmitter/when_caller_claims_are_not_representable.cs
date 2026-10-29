@@ -44,7 +44,7 @@ public class when_caller_claims_are_not_representable : for_AxonArtifactRenderPl
         Assert.DoesNotContain("throw new UnsupportedOperationException", java, StringComparison.Ordinal);
         UnsupportedSummary.Emit(context);
         var summary = Text(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md"));
-        Assert.Contains($"| {Code} | {specification.Id}/givenCaller/claims | preserve all modeled caller claims", summary, StringComparison.Ordinal);
+        Assert.Matches($@"\| {Code} \| [^\n]*\(givenCaller/claims\) \| [^\n]*\| preserve all modeled caller claims", summary);
         Assert.Equal(strict, context.Degradation.Refusals.Any(refusal => refusal.Codes.Contains(Code)));
     }
 
@@ -55,7 +55,7 @@ public class when_caller_claims_are_not_representable : for_AxonArtifactRenderPl
     {
         var (context, java, _) = Render(new(true, [], []) { Claims = [new(type, "fixture-user")] }, false);
         Assert.DoesNotContain(context.Degradation.UnsupportedConstructs, diagnostic => diagnostic.Code == Code);
-        Assert.Contains("UsernamePasswordAuthenticationToken.authenticated(\"fixture-user\", null, List.of(", java, StringComparison.Ordinal);
+        Assert.Contains("Metadata.with(\"username\", \"fixture-user\")", java, StringComparison.Ordinal);
     }
 
     (AxonEmissionContext Context, string Java, SemanticSpecification Specification) Render(SemanticCaller caller, bool strict)

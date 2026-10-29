@@ -67,6 +67,6 @@ public class when_fragments_contain_concepts_and_type_like_literals : for_AxonVi
     [Fact] void should_shorten_the_concept_in_the_expected_predicate() => code.ShouldContain("Objects.equals(row.status(), new List(\"" + Literal + "\"))");
     [Fact] void should_keep_the_colliding_collection_qualified() => code.ShouldContain("new TypeReference<java.util.List<Categories>>() {}");
     [Fact] void should_not_import_the_colliding_collection() => code.ShouldNotContain("import java.util.List;");
-    [Fact] void should_preserve_the_qualified_model_bean_name() => code.ShouldContain("application.getBean(\"nativeviews.catalog.categories.categorieslist.Categories\", ReadModelStore.class)");
+    [Fact] void should_resolve_the_repository_of_the_model() => code.ShouldContain("application.getBean(CategoriesRepository.class)");
     [Fact] void should_not_import_types_mentioned_only_by_a_literal() => code.ShouldNotContain("import example.events.Increased;");
 }

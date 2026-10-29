@@ -49,7 +49,7 @@ public class when_emitting_declared_generation : for_AxonArtifactRenderPlanner.g
         diagnostic.Artifact.ShouldEqual(concept.Id);
         UnsupportedSummary.Emit(context);
         var summary = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan());
-        summary.ShouldContain($"| STAGE-AXON-GENERATION-OPTIONS | {concept.Id}/generation | generate GeneratedId values using declared UUID options | Generation options are not represented by UUID value creation. |");
+        Assert.Matches($@"\| STAGE-AXON-GENERATION-OPTIONS \| [^\n]*{template.Name} concept \(generation\) \| [^\n]*\| generate GeneratedId values using declared UUID options \| Generation options are not represented by UUID value creation\. \|", summary);
         if (strict) Assert.Single(context.Degradation.Refusals).Codes.ShouldEqual("STAGE-AXON-GENERATION-OPTIONS");
         else context.Degradation.Refusals.ShouldBeEmpty();
     }

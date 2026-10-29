@@ -18,22 +18,36 @@ internal static class LiveQuerySubscription
         QueryModelReference.ReserveLocal(code, package, modelType, name, name + "Subscription");
         var flow = code.Reference("java.util.concurrent.Flow");
         var gateway = code.Reference("org.axonframework.messaging.queryhandling.gateway.QueryGateway");
+        var metadata = code.Reference("org.axonframework.messaging.core.Metadata");
         var live = code.Reference(AxonRuntimePackage.Type(context.BasePackage, "LiveSnapshots"));
         var source = code.Line($$"""
             public final class {{name}}Subscription {
                 private {{name}}Subscription() {}
 
                 public static {{flow}}.Publisher<{{name}}.Result> results({{gateway}} gateway, {{name}} query) {
-                    return results(gateway, query, source -> source);
+                    return results(gateway, query, {{metadata}}.emptyInstance());
+                }
+
+                public static {{flow}}.Publisher<{{name}}.Result> results({{gateway}} gateway, {{name}} query, {{metadata}} metadata) {
+                    return results(gateway, query, metadata, source -> source);
                 }
 
                 static {{flow}}.Publisher<{{name}}.Result> results({{gateway}} gateway, {{name}} query,
                         {{code.Reference("java.util.function.UnaryOperator")}}<{{code.Reference("org.reactivestreams.Publisher")}}<{{name}}.Result>> observe) {
-                    return {{live}}.of(() -> observe.apply(gateway.subscriptionQuery(query, {{name}}.Result.class)), {{name}}.Result::invalidated, () -> gateway.query(query, {{name}}.Result.class));
+                    return results(gateway, query, {{metadata}}.emptyInstance(), observe);
+                }
+
+                static {{flow}}.Publisher<{{name}}.Result> results({{gateway}} gateway, {{name}} query, {{metadata}} metadata,
+                        {{code.Reference("java.util.function.UnaryOperator")}}<{{code.Reference("org.reactivestreams.Publisher")}}<{{name}}.Result>> observe) {
+                    return {{live}}.of(() -> observe.apply(gateway.subscriptionQuery(query, {{name}}.Result.class, metadata, null, {{code.Reference("reactor.util.concurrent.Queues")}}.SMALL_BUFFER_SIZE)), {{name}}.Result::invalidated, () -> gateway.query(query, {{name}}.Result.class, metadata, null));
                 }
 
                 public static {{flow}}.Publisher<{{code.Reference("java.lang.Object")}}> values({{gateway}} gateway, {{name}} query) {
-                    return subscriber -> results(gateway, query).subscribe(new {{flow}}.Subscriber<{{name}}.Result>() {
+                    return values(gateway, query, {{metadata}}.emptyInstance());
+                }
+
+                public static {{flow}}.Publisher<{{code.Reference("java.lang.Object")}}> values({{gateway}} gateway, {{name}} query, {{metadata}} metadata) {
+                    return subscriber -> results(gateway, query, metadata).subscribe(new {{flow}}.Subscriber<{{name}}.Result>() {
                         @{{code.Reference("java.lang.Override")}} public void onSubscribe({{flow}}.Subscription subscription) { subscriber.onSubscribe(subscription); }
                         @{{code.Reference("java.lang.Override")}} public void onNext({{name}}.Result result) { subscriber.onNext({{payload}}); }
                         @{{code.Reference("java.lang.Override")}} public void onError({{code.Reference("java.lang.Throwable")}} failure) { subscriber.onError(failure); }

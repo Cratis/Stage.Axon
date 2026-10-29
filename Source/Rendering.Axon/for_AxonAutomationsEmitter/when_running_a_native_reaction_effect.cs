@@ -35,7 +35,7 @@ public class when_running_a_native_reaction_effect : given.a_reaction_model
             Triggers = [reaction.Triggers[0] with { Invokes = [], RequirementId = requirementId }]
         };
         Render();
-        code = Code("SubmitOrderReaction");
+        code = Code("SubmitOrderEndpoint");
     }
 
     [Fact] void should_copy_the_body_verbatim() => code.ShouldContain(Body);

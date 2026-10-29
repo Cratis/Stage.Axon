@@ -11,9 +11,10 @@ public class when_producing_an_event : given.a_reaction_model
     void Establish() => Produce();
     void Because() => Render();
 
-    [Fact] void should_register_the_reaction() => Code("SubmitOrderReaction").ShouldContain("@Component");
-    [Fact] void should_dispatch_an_append_command() => Code("SubmitOrderReaction").ShouldContain("commands.sendAndWait(new SubmitOrderOn0Append(input.orderId(), new ");
-    [Fact] void should_map_event_properties() => Code("SubmitOrderReaction").ShouldContain("input.customer()");
+    [Fact] void should_register_the_endpoint() => Code("SubmitOrderEndpoint").ShouldContain("@RestController");
+    [Fact] void should_dispatch_an_append_command() => Code("SubmitOrderEndpoint").ShouldContain("commands.sendAndWait(new SubmitOrderOn0Append(input.orderId(), new ");
+    [Fact] void should_dispatch_the_append_with_the_http_metadata() => Code("SubmitOrderEndpoint").ShouldContain("Object.class, metadata, null);");
+    [Fact] void should_map_event_properties() => Code("SubmitOrderEndpoint").ShouldContain("input.customer()");
     [Fact] void should_identify_the_append_boundary() => Code("SubmitOrderOn0Append").ShouldContain("@TargetEntityId");
     [Fact] void should_load_the_current_stream_position() => Code("SubmitOrderOn0AppendHandler").ShouldContain("@InjectEntity @Nullable SubmitOrderOn0AppendStream stream");
     [Fact] void should_append_the_produced_event() => Code("SubmitOrderOn0AppendHandler").ShouldContain("appender.append(command.event());");

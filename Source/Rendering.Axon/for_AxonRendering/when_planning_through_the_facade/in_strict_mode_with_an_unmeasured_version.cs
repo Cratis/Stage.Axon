@@ -13,7 +13,7 @@ public class in_strict_mode_with_an_unmeasured_version : given.an_unmeasured_mod
 
     void Because() => _plan = AxonRendering.Plan(Request(true));
 
-    [Fact] void should_not_succeed() => _plan.Success.ShouldBeFalse();
-    [Fact] void should_refuse() => _plan.Refusals.ShouldNotBeEmpty();
-    [Fact] void should_report_the_version_as_an_error() => _plan.Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-VERSION" && diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Error).ShouldBeTrue();
+    [Fact] void should_succeed() => _plan.Success.ShouldBeTrue();
+    [Fact] void should_not_refuse() => _plan.Refusals.ShouldBeEmpty();
+    [Fact] void should_report_the_version_as_a_warning() => _plan.Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-VERSION" && diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Warning).ShouldBeTrue();
 }

@@ -3,22 +3,25 @@ package __RUNTIME__;
 import __APPLICATION__.accounts.events.AccountRegistered;
 import __APPLICATION__.accounts.registry.active.AccountSnapshot;
 import __APPLICATION__.accounts.registry.active.ActiveAccounts;
+import __APPLICATION__.accounts.registry.active.ActiveAccountsEntity;
+import __APPLICATION__.accounts.registry.active.ActiveAccountsRepository;
 import __APPLICATION__.accounts.registry.register.RegisterAccount;
 import __APPLICATION__.concepts.AccountId;
 import __RUNTIME_MODULE__.Caller;
-import __RUNTIME_MODULE__.ReadModelStore;
 import __RUNTIME_MODULE__.UniqueValueStore;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
 import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.axonframework.common.configuration.Configuration;
+import org.axonframework.extension.spring.authorization.UnauthorizedMessageException;
 import org.axonframework.messaging.commandhandling.gateway.CommandGateway;
 import org.axonframework.messaging.eventhandling.conversion.EventConverter;
 import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.access.AccessDeniedException;
@@ -34,12 +37,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
-@SpringBootTest
+@SpringBootTest(properties = "stage.axon.cors.allowed-origins=https://client.example")
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Timeout(60)
@@ -51,7 +57,40 @@ class GeneratedSecurityIngressTest {
     @Autowired private QueryGateway queries;
     @Autowired private Configuration configuration;
     @MockitoSpyBean private UniqueValueStore claims;
-    @Autowired @Qualifier("__APPLICATION__.accounts.registry.active.ActiveAccounts") private ReadModelStore<Object, ActiveAccounts> store;
+    @Autowired private ActiveAccountsRepository repository;
+
+    @Test
+    void anonymousMalformedTriggerBodiesAreRejectedBeforeBinding() throws Exception {
+        for (var body : List.of("", "{", "{}", "{\"id\":\"not-a-uuid\"}")) {
+            http.perform(post("/api/triggers/register-requested").contentType("application/json").content(body))
+                .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void anonymousHeadWithoutRequiredQueryParameterIsUnauthorized() throws Exception {
+        http.perform(head(QUERY)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anonymousNonCorsOptionsWithoutRequiredQueryParameterIsUnauthorized() throws Exception {
+        http.perform(options(QUERY)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void nativeCorsPreflightStillRunsBeforeAuthenticationAndQueryBinding() throws Exception {
+        http.perform(options(QUERY).header("Origin", "https://client.example")
+            .header("Access-Control-Request-Method", "GET").header("Access-Control-Request-Headers", "Content-Type"))
+            .andExpect(status().isOk()).andExpect(header().string("Access-Control-Allow-Origin", "https://client.example"));
+    }
+
+    @Test
+    void unregisteredApiRoutesRequireAuthenticationWhileNonApiAndErrorDispatchRemainPublic() throws Exception {
+        http.perform(get("/api/not-registered")).andExpect(status().isUnauthorized());
+        http.perform(get("/not-an-api-resource")).andExpect(status().isNotFound());
+        http.perform(get("/error").with(request -> { request.setDispatcherType(DispatcherType.ERROR); return request; })
+            .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 400)).andExpect(status().isBadRequest());
+    }
 
     @Test
     void httpRejectsUnauthenticatedAndWrongRoleCommandsBeforeSideEffects() throws Exception {
@@ -73,7 +112,7 @@ class GeneratedSecurityIngressTest {
             var id = UUID.randomUUID();
             clearInvocations(claims);
             var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.as(name, "Reader", () -> commands.send(
-                    new RegisterAccount(new AccountId(id), UUID.randomUUID().toString(), "forged-body-principal"), Void.class).get(10, TimeUnit.SECONDS)));
+                    new RegisterAccount(new AccountId(id), UUID.randomUUID().toString(), "forged-body-principal"), Void.class, GeneratedIngressSupport.metadata(name, "Reader"), null).get(10, TimeUnit.SECONDS)));
             denied(failure);
             assertEquals(0, GeneratedIngressSupport.facts(configuration, id).size());
             verifyNoInteractions(claims);
@@ -89,7 +128,7 @@ class GeneratedSecurityIngressTest {
         System.out.println("Denied HTTP query statuses: anonymous=" + anonymous.getStatus() + ", wrong-role=" + wrongRole.getStatus());
         for (var name : new String[] { null, "mallory" }) {
             var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.as(name, "Reader", () -> queries.query(
-                    new AccountSnapshot(new AccountId(id)), AccountSnapshot.Result.class).get(10, TimeUnit.SECONDS)));
+                    new AccountSnapshot(new AccountId(id)), AccountSnapshot.Result.class, GeneratedIngressSupport.metadata(name, "Reader"), null).get(10, TimeUnit.SECONDS)));
             denied(failure);
         }
         assertEquals(0, GeneratedIngressSupport.facts(configuration, id).size());
@@ -99,14 +138,14 @@ class GeneratedSecurityIngressTest {
     void allowedCallersCanQueryThroughBothIngressPaths() throws Exception {
         var id = UUID.randomUUID();
         var expected = new ActiveAccounts(new AccountId(id), "seeded", "alice");
-        store.put(expected.id(), expected);
+        repository.save(new ActiveAccountsEntity(id.toString(), expected));
         var response = http.perform(get(QUERY).param("id", id.toString()).with(user("alice").roles("Writer")))
                 .andExpect(request().asyncStarted()).andReturn();
         response.getAsyncResult(10000);
         http.perform(asyncDispatch(response))
                 .andExpect(status().is2xxSuccessful()).andExpect(jsonPath("$.alias").value("seeded"));
         var result = GeneratedIngressSupport.as("alice", "Writer", () -> queries.query(
-                new AccountSnapshot(new AccountId(id)), AccountSnapshot.Result.class).get(10, TimeUnit.SECONDS));
+                new AccountSnapshot(new AccountId(id)), AccountSnapshot.Result.class, GeneratedIngressSupport.metadata("alice", "Writer"), null).get(10, TimeUnit.SECONDS));
         assertEquals(List.of(expected), result.rows());
     }
 
@@ -120,6 +159,15 @@ class GeneratedSecurityIngressTest {
         var gatewayId = UUID.randomUUID();
         GeneratedIngressSupport.register(commands, gatewayId, UUID.randomUUID().toString()).get(10, TimeUnit.SECONDS);
         recordedCaller(gatewayId);
+    }
+
+    @Test
+    void gatewayWithoutMetadataDoesNotInheritTheAmbientCaller() throws Exception {
+        var id = UUID.randomUUID();
+        var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.as("alice", "Writer", () -> commands.send(
+                new RegisterAccount(new AccountId(id), UUID.randomUUID().toString(), "forged-body-principal"), Void.class).get(10, TimeUnit.SECONDS)));
+        denied(failure);
+        assertEquals(0, GeneratedIngressSupport.facts(configuration, id).size());
     }
 
     private void recordedCaller(UUID id) throws Exception {
@@ -136,7 +184,7 @@ class GeneratedSecurityIngressTest {
 
     private static void denied(Exception failure) {
         var actual = GeneratedIngressSupport.root(failure);
-        assertTrue(actual instanceof AccessDeniedException || actual instanceof AuthenticationCredentialsNotFoundException,
-                () -> "Expected method-security denial, got " + actual);
+        assertTrue(actual instanceof UnauthorizedMessageException || actual instanceof AccessDeniedException || actual instanceof AuthenticationCredentialsNotFoundException,
+                () -> "Expected native authorization denial, got " + actual);
     }
 }

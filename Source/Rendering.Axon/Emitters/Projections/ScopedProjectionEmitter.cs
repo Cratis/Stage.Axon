@@ -2,150 +2,139 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Screenplay.Semantics;
-using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
-using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
+/// <summary>
+/// Emits a projection with scoped state (every, nested scopes, children, joins, join removals and parented removals) as pure record transforms
+/// over the typed repository of the read model: the row of an affected key is read, mapped to its next record and saved or deleted.
+/// Nested scopes and children live in JSON columns of the row; joins hydrate from a projection-owned lookup table.
+/// </summary>
 internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticProjection projection, SemanticReadModel model)
 {
-    readonly ProjectionUpdates _updates = new(context, types, model.Id);
     readonly ProjectionScopeNode _root = ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, JavaNames.Type(model.Name));
 
-    internal static string Cache(ProjectionScopeNode node, int index) => "join" + node.Name + index;
+    /// <summary>
+    /// Whether the scoped projection can be emitted: the read model has a single string key, every scope resolves to a composite property and every key is renderable.
+    /// </summary>
+    /// <param name="context">The emission context.</param>
+    /// <param name="types">The Java type resolver.</param>
+    /// <param name="projection">The projection.</param>
+    /// <param name="model">The projected read model.</param>
+    /// <returns>True when the projection is renderable.</returns>
+    internal static bool Supports(AxonEmissionContext context, ViewJavaTypes types, SemanticProjection projection, SemanticReadModel model)
+    {
+        var application = context.Request.Model.Application;
+        if (ReadModelKeys.IsComposite(application, model) || !ProjectionScopeNode.Resolvable(application, projection, model)) return false;
+        var root = ProjectionScopeNode.Create(application, types, projection, model, JavaNames.Type(model.Name));
+        var values = new ProjectionValues(context, types);
+        var events = ScopeSelection.Locate(application).SelectMany(slice => slice.Slice.Events).ToDictionary(@event => @event.Id);
+        bool Renders(SemanticId contract, params SemanticProjectionKey?[] keys) => events.TryGetValue(contract, out var @event) && keys.All(key => key is null || values.Key(key, @event) is not null);
+        return root.All.All(node => node.Scope.From.All(from => Renders(from.EventContract, from.Key, from.ParentKey))
+            && node.Scope.Removals.All(removal => Renders(removal.EventContract, removal.Key, removal.ParentKey))
+            && node.Scope.JoinRemovals.All(removal => Renders(removal.EventContract, removal.Key))
+            && node.Scope.Joins.All(join => Renders(join.EventContract, join.Key ?? SemanticProjectionKey.EventSourceIdentity)));
+    }
 
-    internal static string ChangeType(ProjectionScopeNode root) => root.Type == "ScopeChange" ? "ScopeChangeResult" : "ScopeChange";
+    internal static IEnumerable<ProjectionScopeNode> RootAndNested(ProjectionScopeNode node) => new[] { node }.Concat(node.Nested.SelectMany(RootAndNested));
 
-    internal static string StateType(ProjectionScopeNode root) => root.Type == "ScopeState" ? "ScopeStateSnapshot" : "ScopeState";
+    internal static bool Observes(SemanticProjectionScope scope, SemanticEventContract @event) => scope.From.Any(from => from.EventContract == @event.Id) || scope.Removals.Any(removal => removal.EventContract == @event.Id);
 
     internal void Emit()
     {
-        if (ProjectionHandlerShape.RootOnly(projection) && PersistentViewAdmission.Supports(context, model.Id))
-        {
-            new RootProjectionEmitter(context, types, package, projection, model).Emit();
-            return;
-        }
         var name = JavaNames.Type(projection.Name) + "Projector";
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare(ChangeType(_root)).Declare(StateType(_root));
+        var slots = ProjectionJoinSlot.All(_root);
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(_root.Type).Declare(ReadModelEntities.EntityName(model)).Declare(ReadModelEntities.RepositoryName(model)).Declare(ProjectionScopeMethods.ChangeType(_root));
+        if (slots.Count > 0) code.Declare(ProjectionJoinEntities.EntityName(projection)).Declare(ProjectionJoinEntities.RepositoryName(projection));
         foreach (var property in _root.All.SelectMany(node => node.Properties)) types.ClaimProjectionType(property.Type, code);
-        _updates.Claim(code, package);
+        new ProjectionUpdates(context, types, model.Id).Claim(code, package);
         foreach (var @event in Events()) types.EventType(@event.Id, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
-            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
+            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(AxonProjectionsEmitter.ViewNamespace)})")
             .Block($"public class {name}", body =>
-        {
-            Fields(body, name);
-            var methods = new ProjectionScopeMethods(context, types, _root, projection.Id).WithReferences(body);
-            foreach (var @event in Events())
             {
-                Handler(body, @event, methods);
-                foreach (var node in _root.All) methods.Emit(body, node, @event);
-            }
-        });
+                Fields(body, name, slots);
+                var methods = new ProjectionScopeMethods(context, types, _root, projection.Id, slots).WithReferences(body);
+                foreach (var @event in Events())
+                {
+                    new ProjectionHandlerBinding(context, types, model, package).Emit(body, types.EventType(@event.Id, body), method => Transitions(method, @event, slots, methods), message: true);
+                    foreach (var node in _root.All) methods.Emit(body, node, @event);
+                }
+                foreach (var slot in slots) methods.EmitJoin(body, slot);
+            });
         ViewJavaTypes.Add(context, package, name, code.Build(), projection.Id);
-        var owner = ScopeSelection.Select(context.Request).First(candidate => candidate.Slice.Projections.Any(candidateProjection => candidateProjection.Id == projection.Id));
-        new ProjectorRollbackTests(context, types).Emit(owner, model, name, $"new {name}(store)", [.. Events().Select(@event => @event.Id)]);
+        if (slots.Count > 0) ProjectionJoinEntities.Emit(context, types, package, projection, slots);
     }
 
-    static IEnumerable<ProjectionScopeNode> RootAndNested(ProjectionScopeNode node) => new[] { node }.Concat(node.Nested.SelectMany(RootAndNested));
-
-    void Fields(JavaCodeBuilder code, string name)
+    void Fields(JavaCodeBuilder code, string name, IReadOnlyList<ProjectionJoinSlot> slots)
     {
-        var state = StateType(_root);
-        var predicate = $"{code.Reference("java.util.function.Predicate")}<{code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}>>";
-        code.Line($"private final {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}> store;")
-            .Line($"private final {code.Reference("java.time.Clock")} clock;")
-            .Line($"private final {code.Reference("java.util.Set")}<{code.Reference("java.lang.Object")}> keys = new {code.Reference("java.util.LinkedHashSet")}<>();")
-            .Line($"private final {code.Reference("java.util.List")}<{predicate}> pending = new {code.Reference("java.util.ArrayList")}<>();")
-            .Line($"private record {ChangeType(_root)}<T>(T value, boolean touched, boolean ancestors) {{}}")
-            .DiffersFromScreenplay("projection join indexes are replay-built; restore them by replaying events after restarting a persistent store.");
-        var caches = new List<(string Name, string Type)>();
-        foreach (var node in _root.All)
-        {
-            for (var index = 0; index < node.Scope.Joins.Length; index++)
+        var repository = ReadModelEntities.RepositoryName(model);
+        var joins = slots.Count > 0 ? ProjectionJoinEntities.RepositoryName(projection) : null;
+        var clock = code.Reference("java.time.Clock");
+        var parameters = $"{repository} repository" + (joins is null ? string.Empty : $", {joins} joins");
+        var arguments = "repository" + (joins is null ? string.Empty : ", joins");
+        code.Line($"private final {repository} repository;");
+        if (joins is not null) code.Line($"private final {joins} joins;");
+        code.Line($"private final {clock} clock;")
+            .Line($"private record {ProjectionScopeMethods.ChangeType(_root)}<T>(T value, boolean touched, boolean ancestors) {{}}")
+            .Line($"@{code.Reference("org.springframework.beans.factory.annotation.Autowired")}")
+            .Block($"public {name}({parameters}, {clock} clock)", constructor =>
             {
-                var type = $"{code.Reference("java.util.Map")}<{code.Reference("java.lang.String")}, {code.Reference("java.util.function.UnaryOperator")}<{code.Reference(node.Type)}>>";
-                caches.Add((Cache(node, index), type));
-                code.Line($"private final {type} {Cache(node, index)} = new {code.Reference("java.util.HashMap")}<>();");
+                constructor.Line("this.repository = repository;");
+                if (joins is not null) constructor.Line("this.joins = joins;");
+                constructor.Line("this.clock = clock;");
+            })
+            .Block($"public {name}({parameters})", constructor => constructor.Line($"this({arguments}, {constructor.Reference("java.time.Clock")}.systemUTC());"));
+    }
+
+    void Transitions(JavaCodeBuilder body, SemanticEventContract @event, IReadOnlyList<ProjectionJoinSlot> slots, ProjectionScopeMethods methods)
+    {
+        var values = new ProjectionValues(context, types, body);
+        var text = body.Reference("java.lang.String");
+        var modelName = JavaNames.Type(model.Name);
+        var entity = ReadModelEntities.EntityName(model);
+        foreach (var slot in slots.Where(slot => slot.Join.EventContract == @event.Id))
+        {
+            var key = values.Key(slot.Join.Key ?? SemanticProjectionKey.EventSourceIdentity, @event);
+            body.Line($"joins.save(new {ProjectionJoinEntities.EntityName(projection)}({JavaCodeBuilder.StringLiteral(slot.Prefix)} + {text}.valueOf({key})).{slot.Member}(event));");
+        }
+
+        body.Line($"var keys = new {body.Reference("java.util.LinkedHashSet")}<{text}>();");
+        foreach (var key in Keys(values, @event).Distinct()) body.Line($"keys.add({key});");
+        var scan = Scans(@event) ? "for (var row : repository.findAll()) states.put(row.rowKey(), row.toModel());" : string.Empty;
+        body.Line($"var states = new {body.Reference("java.util.LinkedHashMap")}<{text}, {modelName}>();")
+            .Line(scan)
+            .Line($"keys.forEach(candidate -> states.putIfAbsent(candidate, repository.findById(candidate).map({entity}::toModel).orElse(null)));")
+            .Block("for (var entry : states.entrySet())", loop => loop
+            .Line("var key = entry.getKey();")
+            .Line($"var change = {methods.Method(_root, @event)}(event, message, key, key, entry.getValue());")
+            .Line("if (!change.touched()) continue;")
+            .Line($"if (change.value() == null) repository.deleteAllByIdInBatch({body.Reference("java.util.List")}.of(key));")
+            .Line($"else repository.save(new {entity}(key, change.value()));"));
+    }
+
+    /// <summary>The row keys an event can create or reach through a key: root and nested keys, the parent keys of children and removals.</summary>
+    IEnumerable<string> Keys(ProjectionValues values, SemanticEventContract @event)
+    {
+        foreach (var node in RootAndNested(_root))
+        {
+            foreach (var from in node.Scope.From.Where(from => from.EventContract == @event.Id)) yield return values.Key(from.Key, @event)!;
+            foreach (var removal in node.Scope.Removals.Where(removal => removal.EventContract == @event.Id)) yield return values.Key(removal.Key, @event)!;
+            foreach (var child in node.Children)
+            {
+                foreach (var from in child.Scope.From.Where(from => from.EventContract == @event.Id)) yield return values.Key(from.ParentKey ?? SemanticProjectionKey.EventSourceIdentity, @event)!;
+                foreach (var removal in child.Scope.Removals.Where(removal => removal.EventContract == @event.Id)) yield return values.Key(removal.ParentKey ?? SemanticProjectionKey.EventSourceIdentity, @event)!;
             }
         }
-        StateMembers(code, state, predicate, caches);
-        code.Line($"@{code.Reference("org.springframework.beans.factory.annotation.Autowired")}")
-            .Block($"public {name}(@{code.Reference("org.springframework.beans.factory.annotation.Qualifier")}({JavaCodeBuilder.StringLiteral(package + "." + _root.Type)}) {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}> store, {code.Reference("java.time.Clock")} clock)", constructor => constructor.Line("this.store = store;").Line("this.clock = clock;"))
-            .Block($"public {name}({code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}> store)", constructor => constructor.Line($"this(store, {constructor.Reference("java.time.Clock")}.systemUTC());"));
+        if (_root.Scope.Every is { SubscribesToAllEvents: true }) yield return values.Source(@event);
     }
 
-    void StateMembers(JavaCodeBuilder code, string state, string predicate, List<(string Name, string Type)> caches)
-    {
-        var list = code.Reference("java.util.List");
-        var components = string.Join(", ", new[] { $"{list}<{code.Reference("java.lang.Object")}> keys", $"{list}<{predicate}> pending" }.Concat(caches.Select(cache => $"{cache.Type} {cache.Name}")));
-
-        // The scope state is one immutable snapshot, staged through its own store so a rolled back unit of work leaves none of it behind.
-        code.Line($"private final {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {state}> scope = new {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
-            .Line($"private {state} applied;")
-            .Line("private boolean clean;")
-            .Line($"private record {state}({components}) {{}}")
-            .Block($"private void restore({state} state)", method =>
-            {
-                method.Line("if (clean && state == applied) return;").Line("keys.clear();").Line("pending.clear();");
-                foreach (var cache in caches) method.Line($"{cache.Name}.clear();");
-                method.Block("if (state != null)", restored =>
-                {
-                    restored.Line("keys.addAll(state.keys());").Line("pending.addAll(state.pending());");
-                    foreach (var cache in caches) restored.Line($"{cache.Name}.putAll(state.{cache.Name}());");
-                }).Line("applied = state;");
-            })
-            .Block($"private {state} snapshot()", method => method.Line("clean = true;").Line($"return applied = new {state}({string.Join(", ", new[] { $"{list}.copyOf(keys)", $"{list}.copyOf(pending)" }.Concat(caches.Select(cache => $"{code.Reference("java.util.Map")}.copyOf({cache.Name})")))});"));
-    }
-
-    void Handler(JavaCodeBuilder code, SemanticEventContract @event, ProjectionScopeMethods methods)
-    {
-        var eventType = types.EventType(@event.Id, code);
-        var method = "project" + JavaNames.Type(@event.Name);
-        var messageType = code.Reference("org.axonframework.messaging.eventhandling.EventMessage");
-        var storeType = $"{code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<{code.Reference("java.lang.Object")}, {_root.Type}>";
-        new ProjectionHandlerBinding(context, types, model, package, synchronized: true, scopeState: StateType(_root)).Emit(
-            code,
-            eventType,
-            body =>
-            {
-                // The fields are dirty until snapshot() completes, so a failure part-way through forces the next unit of work to restore.
-                body.Line("restore(scope.get(\"scope\").orElse(null));").Line("clean = false;");
-                foreach (var node in _root.All) methods.Caches(body, node, @event);
-                var deferred = _root.All.Any(node => node.Identity is not null && (node.Scope.From.Any(from => from.EventContract == @event.Id) || node.Scope.Removals.Any(removal => removal.EventContract == @event.Id)));
-                body.Line($"boolean modified = {method}(event, message, store);");
-                if (deferred) body.Line($"if (!modified) pending.add(writes -> {method}(event, message, writes));");
-                body.Line("boolean progressed;").Block("do", loop => loop
-                    .Line("progressed = false;").Line("var iterator = pending.iterator();")
-                    .Block("while (iterator.hasNext())", iteration => iteration.Block("if (iterator.next().test(store))", found => found.Line("iterator.remove();").Line("progressed = true;").Line("modified = true;"))))
-                    .Line("while (progressed);").Line("scope.put(\"scope\", snapshot());");
-                if (_updates.Enabled) body.Block("if (modified)", updates => _updates.Notify(updates, package));
-            },
-            message: true);
-        code.Block($"private boolean {method}({eventType} event, {messageType} message, {storeType} store)", body =>
-        {
-            var values = new ProjectionValues(context, types, body);
-            body.Line($"var candidates = new {body.Reference("java.util.LinkedHashSet")}<>(keys);");
-            foreach (var node in RootAndNested(_root))
-            {
-                foreach (var from in node.Scope.From.Where(from => from.EventContract == @event.Id))
-                    if (values.Key(from.Key, @event) is { } key) body.Line($"candidates.add({key});");
-            }
-            if (_root.Scope.Every is { SubscribesToAllEvents: true }) body.Line($"candidates.add({values.Source(@event)});");
-            body.Line("boolean modified = false;").Block("for (var key : candidates)", loop =>
-            {
-                loop.Line($"var touched = new {loop.Reference("java.util.concurrent.atomic.AtomicBoolean")}();")
-                    .Line("var updated = store.update(key, current -> {")
-                    .Line($"    var change = {methods.Method(_root, @event)}(event, message, key, key, current);")
-                    .Line("    touched.set(change.touched());")
-                    .Line("    return change.touched() ? change.value() : current;")
-                    .Line("});")
-                    .Block("if (touched.get())", changed => changed.Line("modified = true;").Line("if (updated == null) keys.remove(key); else keys.add(key);"));
-            }).Line("return modified;");
-        });
-    }
+    /// <summary>Whether the event reaches rows it cannot address by a key: joins, join removals, scopes below a child and the every scope of all events.</summary>
+    bool Scans(SemanticEventContract @event) => _root.Scope.Every is { SubscribesToAllEvents: true } ||
+        _root.All.Any(node => node.Scope.Joins.Any(join => join.EventContract == @event.Id) || node.Scope.JoinRemovals.Any(removal => removal.EventContract == @event.Id)) ||
+        RootAndNested(_root).SelectMany(node => node.Children).SelectMany(child => child.All.Skip(1)).Any(node => Observes(node.Scope, @event));
 
     IEnumerable<SemanticEventContract> Events()
     {

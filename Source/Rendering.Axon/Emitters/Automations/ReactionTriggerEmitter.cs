@@ -17,36 +17,61 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
         var annotation = ReactionScheduling.Annotation(trigger);
         var input = ReactionInput.Create(context, trigger);
         if (annotation is null || input is null) return null;
-        var prepared = trigger.RequirementId is not null ? PrepareNative(trigger, annotation, input) : PrepareDeclarative(trigger, index, annotation, input);
-        if (prepared is null || trigger.Kind is not (SemanticReactionTriggerKind.Interval or SemanticReactionTriggerKind.Schedule)) return prepared;
-        return context.Degradation.Approximate(
-            AxonRefusalCodes.Schedule,
-            reaction.Id,
-            "Schedules use UTC and process-local Spring scheduling, not a durable scheduler; interval boundaries start with this process.",
-            $"run reaction {reaction.Name} trigger {index + 1} on its modeled clock",
-            $"{reaction.Id}/triggers/{index}") ? prepared : null;
+        return trigger.RequirementId is not null ? PrepareNative(trigger, annotation, input) : PrepareDeclarative(trigger, index, annotation, input);
     }
 
-    internal void Emit(SemanticReactionTrigger model, PreparedReactionTrigger trigger, int index, JavaCodeBuilder body)
+    internal string MethodName(SemanticReactionTrigger model, PreparedReactionTrigger trigger, int index) => model.Kind switch
+    {
+        SemanticReactionTriggerKind.Event => "on" + trigger.Input.JavaType[(trigger.Input.JavaType.LastIndexOf('.') + 1)..],
+        SemanticReactionTriggerKind.Startup => "onStartup",
+        SemanticReactionTriggerKind.Shutdown => "onShutdown",
+        _ => "onSchedule" + (index + 1)
+    };
+
+    internal void Emit(SemanticReactionTrigger model, PreparedReactionTrigger trigger, int index, string name, JavaCodeBuilder body)
     {
         if (trigger.Annotation.Length > 0) body.Line(ReactionJavaReferences.Expression(body, trigger.Annotation));
         var parameters = trigger.Input.JavaType.Length == 0 ? string.Empty : ReactionJavaReferences.Expression(body, trigger.Input.JavaType) + " input";
-        if (trigger.Input.Event is not null) parameters += $", @{body.Reference("org.axonframework.messaging.eventhandling.annotation.Timestamp")} {body.Reference("java.time.Instant")} occurred";
-        body.Block($"public void on{index}({parameters})", method =>
+        var handler = trigger.Input.Event is not null;
+        if (handler) parameters += $", @{body.Reference("org.axonframework.messaging.eventhandling.annotation.Timestamp")} {body.Reference("java.time.Instant")} occurred, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
+        body.Block($"public void {name}({parameters})", method =>
         {
-            ReactionScheduling.CalendarGuard(method, model);
-            if (trigger.Condition is { } condition) method.Line($"if (!({ReactionJavaReferences.Expression(method, condition)})) return;");
-            if (model.Kind == SemanticReactionTriggerKind.Interval)
-                method.DiffersFromScreenplay("Spring fixed-rate intervals start when this process starts, not at epoch-aligned Screenplay clock boundaries; delivery remains at least once.");
-            Effect(method, trigger);
+            DescribeSchedule(model, index, method);
+            Guard(method, trigger);
+            Effect(method, trigger, handler);
         });
         if (trigger.NativeBody is not null) context.ConsumedImplementations.Add(model.RequirementId!);
+    }
+
+    internal void EmitApplicationEffect(SemanticReactionTrigger model, PreparedReactionTrigger trigger, string name, string inputType, JavaCodeBuilder body)
+    {
+        body.Block($"private void {name}({inputType} input, {body.Reference("org.axonframework.messaging.core.Metadata")} metadata)", method =>
+        {
+            Guard(method, trigger);
+            Effect(method, trigger, false, true);
+        });
+        if (trigger.NativeBody is not null) context.ConsumedImplementations.Add(model.RequirementId!);
+    }
+
+    static void Guard(JavaCodeBuilder method, PreparedReactionTrigger trigger)
+    {
+        if (trigger.Condition is { } condition) method.Line($"if (!({ReactionJavaReferences.Expression(method, condition)})) return;");
     }
 
     static bool StandaloneNativeEffect(SemanticReactionTrigger trigger) => trigger.Produces.IsEmpty && trigger.Invokes.IsEmpty;
 
     static bool StandaloneDeclarativeEffect(SemanticReactionTrigger trigger) =>
         (trigger.Produces.IsEmpty && trigger.Invokes.Length == 1) || (trigger.Invokes.IsEmpty && trigger.Produces.Length == 1);
+
+    void DescribeSchedule(SemanticReactionTrigger model, int index, JavaCodeBuilder method)
+    {
+        if (model.Kind is not (SemanticReactionTriggerKind.Interval or SemanticReactionTriggerKind.Schedule)) return;
+        const string reason = "Schedules use UTC and process-local Spring scheduling, not a durable scheduler; interval boundaries start with this process.";
+        context.Degradation.Approximate(AxonRefusalCodes.Schedule, reaction.Id, reason, $"run reaction {reaction.Name} trigger {index + 1} on its modeled clock", $"{reaction.Id}/triggers/{index}");
+        method.DiffersFromScreenplay(model.Kind == SemanticReactionTriggerKind.Interval
+            ? "Spring fixed-rate intervals start when this process starts, not at epoch-aligned Screenplay clock boundaries; delivery remains at least once."
+            : "Spring cron schedules run in UTC inside this process and are not durable; firings missed while the process is down are not replayed.");
+    }
 
     PreparedReactionTrigger? PrepareDeclarative(SemanticReactionTrigger trigger, int index, string annotation, ReactionInput input)
     {
@@ -65,10 +90,17 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
         return WithGuard(trigger, new(annotation, input, string.Empty, null) { NativeBody = content });
     }
 
-    void Effect(JavaCodeBuilder method, PreparedReactionTrigger trigger)
+    void Effect(JavaCodeBuilder method, PreparedReactionTrigger trigger, bool handler, bool http = false)
     {
-        if (trigger.NativeBody is { } content) ReactionInvocation.Dispatch(method, reaction, body => body.RawBody(content));
-        else ReactionInvocation.Dispatch(method, reaction, ReactionJavaReferences.Expression(method, trigger.Invocation));
+        if (trigger.NativeBody is { } content)
+        {
+            ReactionInvocation.Dispatch(method, reaction, body => body.RawBody(content), http);
+            return;
+        }
+
+        var withMetadata = http || reaction.RunsAs is not null;
+        var invocation = ReactionJavaReferences.Expression(method, withMetadata && trigger.Production is { } production ? production.InvocationWithMetadata : trigger.Invocation);
+        ReactionInvocation.Dispatch(method, reaction, ReactionJavaReferences.Expression(method, trigger.Production is null ? ReactionInvocation.Statement(invocation, handler, withMetadata) : invocation), http);
     }
 
     PreparedReactionTrigger? WithGuard(SemanticReactionTrigger trigger, PreparedReactionTrigger prepared)

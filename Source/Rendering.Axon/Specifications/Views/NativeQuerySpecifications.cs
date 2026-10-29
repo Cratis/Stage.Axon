@@ -57,7 +57,7 @@ internal sealed class NativeQuerySpecifications(AxonEmissionContext context, Vie
         var model = located.Slice.ReadModels.SingleOrDefault(candidate => candidate.Id == query.ReadModel);
         var projection = located.Slice.Projections.SingleOrDefault(candidate => candidate.ReadModel == query.ReadModel);
         if (model is null || projection is null) return null;
-        if (ProjectionHandlerShape.Scoped(projection)) return null;
+        if (!ProjectionHandlerShape.RootOnly(projection) || ProjectionHandlerShape.Scoped(projection)) return null;
         return new(model, projection, ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, JavaNames.Type(model.Name)));
     }
 
@@ -81,10 +81,12 @@ internal sealed class NativeQuerySpecifications(AxonEmissionContext context, Vie
         var queryName = JavaNames.Type(plan.Query.Name);
         var projectionName = JavaNames.Type(plan.Projection.Projection.Name);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(modelName).Declare(queryName).Declare(queryName + "Handler").Declare(projectionName + "Projector");
+        ViewRepositories.Declare(code, plan.Projection.Model);
         var claims = new ViewSpecificationClaims(context, types);
         foreach (var given in plan.Events) claims.Event(given, code, true);
         new QueryShape(plan.Query, plan.Projection.Model, types).Claim(code);
-        code.Block("class " + name, body => body.Line("@" + body.Reference("org.junit.jupiter.api.Test"))
+        ViewRepositories.Annotate(code);
+        code.Block("class " + name, body => ViewRepositories.Field(body, plan.Projection.Model).Line("@" + body.Reference("org.junit.jupiter.api.Test"))
             .Line("@" + body.Reference("org.junit.jupiter.api.DisplayName") + "(" + JavaCodeBuilder.StringLiteral(plan.Spec.Id.ToString()) + ")")
             .Block("void specification()", method => Scenario(method, plan)));
         AxonSpecificationsEmitter.Register(context, plan.Spec.Id, package + "." + name, "specification", null);
@@ -95,12 +97,11 @@ internal sealed class NativeQuerySpecifications(AxonEmissionContext context, Vie
     {
         var model = plan.Projection.Model;
         var projection = plan.Projection.Projection;
-        code.Line($"{code.Reference(AxonRuntimePackage.Type(types.BasePackage, "ReadModelStore"))}<Object, {JavaNames.Type(model.Name)}> store = new {code.Reference(AxonRuntimePackage.Type(types.BasePackage, "InMemoryReadModelStore"))}<>();")
-            .Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(store);");
+        code.Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(repository);");
         var arguments = ProjectionHandlerShape.Arguments(projection, new(context, types, model.Id));
         foreach (var given in plan.Events) code.Line($"projector.on({AxonViewEvents.Expression(context, types, given, code)}{arguments});");
         var key = types.Literal(plan.Spec.ThenQueries[0].Key, plan.Query.Argument!.Type, code);
-        code.Line($"var actual = new {JavaNames.Type(plan.Query.Name)}Handler(store).handle(new {JavaNames.Type(plan.Query.Name)}({key})).rows();");
+        code.Line($"var actual = new {JavaNames.Type(plan.Query.Name)}Handler(repository).handle(new {JavaNames.Type(plan.Query.Name)}({key})).rows();");
         foreach (var result in plan.Spec.ThenQueries[0].Results) Assert(code, result, model);
     }
 

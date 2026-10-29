@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Globalization;
-using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Specifications;
@@ -22,7 +21,6 @@ internal static class AxonHttpTests
 
     internal static void Emit(AxonEmissionContext context)
     {
-        EmitRuntimeEcho(context);
         AxonHttpTestsContract.Emit(context);
         AxonHttpContractJson.Emit(context);
         if (context.HttpScenarios.Count == 0) return;
@@ -32,20 +30,6 @@ internal static class AxonHttpTests
         var fragments = scenarios.SelectMany(scenario => scenario.ArrangeFragments.Concat(scenario.Exchanges.SelectMany(exchange => exchange.Response.AssertionFragments)));
         var code = TestClass(Imports(package, name, fragments), name, scenarios);
         context.AddJava(package, name, code.Build(), test: true, sources: [.. context.HttpScenarios.Keys]);
-    }
-
-    static void EmitRuntimeEcho(AxonEmissionContext context)
-    {
-        var package = AxonRuntimePackage.InlinePackage(context);
-        const string name = "RuntimeHttpExchangeTest";
-        const string payload = "{\"id\":\"00000000-0000-0000-0000-000000000001\"}";
-        var scenario = new AxonHttpScenario(
-            context.Request.Model.Application.Id,
-            [new(new("POST", "/_runtime/echo", payload), new(200, payload)), new(new("GET", "/_runtime/echo-async"), new(200, payload))],
-            new(string.Empty, [], false));
-        var code = Imports(package, name).Declare("RuntimeHttpRoundTripTest");
-        code.Line($"@{code.Reference("org.springframework.context.annotation.Import")}(RuntimeHttpRoundTripTest.EchoEndpoint.class)");
-        context.AddJava(package, name, TestClass(code, name, [scenario]).Build(), test: true);
     }
 
     static JavaCodeBuilder TestClass(JavaCodeBuilder code, string name, IEnumerable<AxonHttpScenario> scenarios) => code

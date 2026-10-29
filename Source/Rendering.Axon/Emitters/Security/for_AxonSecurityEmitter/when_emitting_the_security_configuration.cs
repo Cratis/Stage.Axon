@@ -23,11 +23,14 @@ public class when_emitting_the_security_configuration : for_AxonArtifactRenderPl
     [Fact] void should_apply_the_allowlist_to_the_filter_chain() => _code.ShouldContain(".cors(cors -> cors.configurationSource(cors(allowedOrigins)))");
     [Fact] void should_not_allow_ambient_credentials() => _code.ShouldContain("configuration.setAllowCredentials(false);");
     [Fact] void should_allow_the_authorization_header() => _code.ShouldContain("\"Authorization\"");
-    [Fact] void should_not_challenge_browser_requests() => _code.ShouldContain("request.getHeader(\"Sec-Fetch-Mode\") != null || request.getHeader(\"X-Requested-With\") != null) response.setStatus(401)");
-    [Fact] void should_keep_the_challenge_for_other_clients() => _code.ShouldContain("else basic.commence(request, response, exception);");
-    [Fact] void should_use_the_custom_entry_point() => _code.ShouldContain(".httpBasic(basic -> basic.authenticationEntryPoint(entryPoint())).build();");
+    [Fact] void should_not_special_case_browser_requests() => _code.ShouldNotContain("Sec-Fetch-Mode");
+    [Fact] void should_use_native_challenges() => _code.ShouldContain(".httpBasic(Customizer.withDefaults()).build();");
+    [Fact] void should_not_emit_a_custom_entry_point() => _code.ShouldNotContain("entryPoint()");
     [Fact] void should_not_enable_cookie_sessions_or_csrf_tokens() => _code.ShouldContain("csrf.disable()");
     [Fact] void should_not_read_credentials_from_the_url() => _code.ShouldNotContain("getParameter");
-    [Fact] void should_keep_the_fail_closed_identity_provider() => _code.ShouldContain("Configure an identity provider");
+    [Fact] void should_not_override_native_identity_providers() => _code.ShouldNotContain("UserDetailsService");
+    [Fact] void should_not_serialize_the_principal_at_dispatch() => _code.ShouldNotContain("MessageAuthorizationDispatchInterceptor");
+    [Fact] void should_keep_native_command_authorization() => _code.ShouldContain("MessageAuthorizationHandlerInterceptor<CommandMessage> authorizeCommandHandling()");
+    [Fact] void should_keep_native_query_authorization() => _code.ShouldContain("MessageAuthorizationHandlerInterceptor<QueryMessage> authorizeQueryHandling()");
     [Fact] void should_not_qualify_types_inline() => _code.ShouldNotContain("java.util.Arrays.stream");
 }

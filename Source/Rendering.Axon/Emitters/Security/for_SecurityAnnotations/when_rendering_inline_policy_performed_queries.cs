@@ -2,22 +2,20 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Text;
-using System.Text.RegularExpressions;
 using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Contracts.Semantics;
+using Cratis.Stage.Rendering.Axon.Java;
+using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Security.for_SecurityAnnotations;
 
-public partial class when_rendering_inline_policy_performed_queries : Specification
+public class when_rendering_inline_policy_performed_queries : Specification
 {
     ArtifactRenderRequest _request;
     IReadOnlyDictionary<string, string> _sources;
-
-    [GeneratedRegex(@"@policies\.(?<site>[A-Za-z0-9_]+)\(", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture, 1000)]
-    private static partial Regex PolicyReference { get; }
 
     async Task Establish()
     {
@@ -25,7 +23,7 @@ public partial class when_rendering_inline_policy_performed_queries : Specificat
         var compilation = await SemanticModelLoader.LoadAsync(root, ["inline-java-policy-performers.play"], null, "InlinePolicies");
         compilation.Success.ShouldBeTrue();
         var loaded = compilation.Loaded!;
-        _request = new(loaded.Model, loaded.Plan, AxonRendering.CreateProfile(), new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id))
+        _request = new(loaded.Model, loaded.Plan, AxonRendering.WithBearerTokens(AxonRendering.CreateProfile()), new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id))
         {
             ImplementationRequirements = loaded.ImplementationRequirements,
             ImplementationContents = loaded.ImplementationContents
@@ -43,13 +41,8 @@ public partial class when_rendering_inline_policy_performed_queries : Specificat
     [Fact]
     void should_generate_a_method_for_every_policy_reference_in_every_rendered_java_source()
     {
-        var policies = Source("Policies");
-        var references = _sources.Values.SelectMany(source => PolicyReference.Matches(source).Select(match => match.Groups["site"].Value)).ToArray();
-        references.ShouldNotBeEmpty();
-        foreach (var reference in references.Distinct(StringComparer.Ordinal))
-        {
-            policies.ShouldContain("public boolean " + reference + "(Authentication authentication)");
-        }
+        Source("PerformedFinancePolicy").ShouldContain("public boolean check(Authentication authentication)");
+        _sources.Keys.Any(path => path.EndsWith("/Policies.java", StringComparison.Ordinal)).ShouldBeFalse();
     }
 
     [Fact]
@@ -59,9 +52,22 @@ public partial class when_rendering_inline_policy_performed_queries : Specificat
         requirements.Length.ShouldEqual(2);
         foreach (var requirement in requirements)
         {
-            var reference = "@policies." + PolicyPredicates.SiteMember(requirement.Source.SemanticId) + "(authentication)";
-            Source(requirement.Owner.Name + "Handler").ShouldContain(reference);
-            Source(requirement.Owner.Name + "Endpoint").ShouldContain(reference);
+            Source(requirement.Owner.Name + "Handler").ShouldContain("@PreAuthorize");
+            Source(requirement.Owner.Name + "Endpoint").ShouldContain("@PreAuthorize");
+        }
+    }
+
+    [Fact]
+    void should_guard_non_http_performed_query_dispatch_at_the_handler()
+    {
+        var context = new AxonEmissionContext(_request, new(_request.Profile));
+        foreach (var query in ScopeSelection.Select(_request).SelectMany(slice => slice.Slice.Queries))
+        {
+            SecurityAnnotations.ForHandler(context, query.Authorization, query.Id, new JavaCodeBuilder("example")).ShouldNotContain("@Secured");
+            context.Degradation.Warnings.ShouldBeEmpty();
+            Source(query.Name + "Handler").ShouldContain("@PreAuthorize(\"isAuthenticated() and @performedFinancePolicy.check(authentication)\")");
+            Source(query.Name + "Handler").ShouldNotContain("@Secured");
+            Source(query.Name + "Endpoint").ShouldContain("@PreAuthorize(\"isAuthenticated() and @performedFinancePolicy.check(authentication)\")");
         }
     }
 

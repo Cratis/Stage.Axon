@@ -20,16 +20,14 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 
 final class HttpBearerTokens {
-    static final String ISSUER = "https://issuer.example";
-    static final String AUDIENCE = "stage-axon-contract";
+    private static final String ISSUER = "https://issuer.example";
+    private static final String AUDIENCE = "stage-axon-contract";
     private static final RSAKey KEY = key();
     private static final RSAKey FOREIGN = key();
-
     private HttpBearerTokens() {}
 
     private static final class Jwks {
         private static final HttpServer SERVER = start();
-
         private static HttpServer start() {
             try {
                 var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -65,9 +63,7 @@ final class HttpBearerTokens {
         return sign(KEY, claims.build());
     }
 
-    static String foreign(String subject, String... roles) {
-        return sign(FOREIGN, claims().subject(subject).claim("roles", List.of(roles)).build());
-    }
+    static String foreign() { return sign(FOREIGN, claims().build()); }
 
     private static JwtClaimsSet.Builder claims() {
         var now = Instant.now();

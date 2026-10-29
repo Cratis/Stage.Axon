@@ -2,6 +2,18 @@ domain Stage.ClientProof
 
 concept WorkItemId : Uuid
 
+concept WorkItemEmail : String
+  validate
+    matches "[a-z]+@[a-z]+[.][a-z]{2,}"
+
+concept WorkItemShortTitle : String
+  validate
+    min 3
+
+type WorkItemContact
+  email WorkItemEmail
+  title WorkItemShortTitle
+
 concept WorkItemState : Enum
   open
   inProgress
@@ -14,6 +26,12 @@ concept WorkItemPriority : Enum
 
 policy IsEditor
   require role "Editor"
+
+policy IsManager
+  require role "Manager"
+
+policy CanWork
+  require role "Editor" or role "Manager"
 
 module Work
   feature Items
@@ -59,6 +77,56 @@ module Work
       event WorkItemRenamed
         title String
 
+      specification NativeFixtureAllowsEditor
+        given caller
+          authenticated
+          role "Editor"
+        when RenameWorkItem
+          id = "00000000-0000-0000-0000-000000000001"
+          title = "Allowed"
+        then WorkItemRenamed
+          for "00000000-0000-0000-0000-000000000001"
+          title = "Allowed"
+
+      specification NativeFixtureDeniesViewer
+        given caller
+          authenticated
+          role "Viewer"
+        when RenameWorkItem
+          id = "00000000-0000-0000-0000-000000000002"
+          title = "Denied"
+        then denied
+
+    slice StateChange ManagerRename
+      command ManagerRenameWorkItem
+        id WorkItemId identifier
+        title String
+        authorize CanWork and IsManager
+
+        produces WorkItemRenamed
+          for id
+          title = title
+
+      specification NativeFixtureAllowsManager
+        given caller
+          authenticated
+          role "Manager"
+        when ManagerRenameWorkItem
+          id = "00000000-0000-0000-0000-000000000003"
+          title = "Manager allowed"
+        then WorkItemRenamed
+          for "00000000-0000-0000-0000-000000000003"
+          title = "Manager allowed"
+
+      specification NativeFixtureDeniesEditor
+        given caller
+          authenticated
+          role "Editor"
+        when ManagerRenameWorkItem
+          id = "00000000-0000-0000-0000-000000000004"
+          title = "Editor denied"
+        then denied
+
     slice StateChange RequestWireNames
       command EchoClass
         class String
@@ -95,3 +163,50 @@ module Work
           priority = priority
         from WorkItemRenamed
           title = title
+
+    slice StateChange RegisterContact
+      command RecordContact
+        id WorkItemEmail identifier
+        email WorkItemEmail
+        details WorkItemContact
+        state WorkItemState
+        authorize IsEditor
+
+        produces ContactRecorded
+          for email
+          email = email
+          details = details
+          state = state
+
+    slice StateView Contacts
+      event ContactRecorded
+        email WorkItemEmail
+        details WorkItemContact
+        state WorkItemState
+
+      readmodel WorkItemContacts
+        email WorkItemEmail
+        details WorkItemContact
+        state WorkItemState
+
+      query ContactByEmail => WorkItemContacts optional
+        by email WorkItemEmail
+        authorize IsEditor
+
+      projection ContactsProjection => WorkItemContacts
+        from ContactRecorded
+          key email
+          email = email
+          details = details
+          state = state
+
+      specification RichContactExample
+        given ContactRecorded
+          for "writer@example.test"
+          email = "writer@example.test"
+          details = {"email":"writer@example.test","title":"Valid"}
+          state = "open"
+        then readmodel WorkItemContacts
+          email = "writer@example.test"
+          details = {"email":"writer@example.test","title":"Valid"}
+          state = "open"

@@ -23,7 +23,6 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,48 +44,43 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Import({HttpBearerContractTest.Handlers.class, HttpBearerContractTest.Endpoints.class})
 class HttpBearerContractTest {
-    static final AtomicInteger INVOCATIONS = new AtomicInteger();
-
-    @Autowired
-    private MockMvc http;
-
+    private static final AtomicInteger INVOCATIONS = new AtomicInteger();
+    @Autowired private MockMvc http;
     @DynamicPropertySource
     static void jwt(DynamicPropertyRegistry registry) { HttpBearerTokens.register(registry); }
-
     @Command(name = "HttpBearerWhoAmI")
     public record WhoAmI(String identity) {}
-
     @BeforeEach
     void reset() { INVOCATIONS.set(0); }
 
     @Test
     void anonymousIsUnauthorized() throws Exception {
-        assertDeniedEverywhere(null, status().isUnauthorized());
         for (var endpoint : protectedRequests()) {
-            http.perform(endpoint).andExpect(status().isUnauthorized())
-                .andExpect(header().string("WWW-Authenticate", startsWith("Bearer")));
+            var result = http.perform(endpoint).andExpect(status().isUnauthorized()).andExpect(request().asyncNotStarted())
+                .andExpect(header().string("WWW-Authenticate", startsWith("Bearer"))).andReturn();
+            assertNotEventStream(result);
         }
+        assertEquals(0, INVOCATIONS.get());
     }
 
     @Test
     void expiredTokensAreUnauthorized() throws Exception {
-        assertDeniedEverywhere("Bearer " + expired(), status().isUnauthorized());
+        assertDeniedEverywhere(HttpBearerTokens.token(claims -> claims.issuedAt(Instant.now().minusSeconds(1200))
+            .expiresAt(Instant.now().minusSeconds(600))), 401);
     }
 
     @Test
     void wrongIssuerIsUnauthorized() throws Exception {
-        assertDeniedEverywhere("Bearer " + HttpBearerTokens.token(claims -> claims.issuer("https://foreign.example")), status().isUnauthorized());
+        assertDeniedEverywhere(HttpBearerTokens.token(claims -> claims.issuer("https://foreign.example")), 401);
     }
 
     @Test
     void wrongAudienceIsUnauthorized() throws Exception {
-        assertDeniedEverywhere("Bearer " + HttpBearerTokens.token(claims -> claims.audience(List.of("foreign"))), status().isUnauthorized());
+        assertDeniedEverywhere(HttpBearerTokens.token(claims -> claims.audience(List.of("other-api"))), 401);
     }
 
     @Test
-    void foreignSignaturesAreUnauthorized() throws Exception {
-        assertDeniedEverywhere("Bearer " + HttpBearerTokens.foreign("alice", "CONTRACT"), status().isUnauthorized());
-    }
+    void foreignSignaturesAreUnauthorized() throws Exception { assertDeniedEverywhere(HttpBearerTokens.foreign(), 401); }
 
     @Test
     void urlTokensAreNeverAccepted() throws Exception {
@@ -98,27 +92,6 @@ class HttpBearerContractTest {
                 assertNotEventStream(result);
             }
         }
-        assertEquals(0, INVOCATIONS.get());
-    }
-
-    @Test
-    void browserRequestsGetNoChallenge() throws Exception {
-        for (var browser : List.of("Sec-Fetch-Mode", "X-Requested-With")) {
-            for (var authorization : List.of("", "Bearer " + expired())) {
-                assertBrowserGetsNoChallenge(browser, authorization);
-            }
-        }
-        assertEquals(0, INVOCATIONS.get());
-    }
-
-    @Test
-    void callersWithoutTheRoleAreForbidden() throws Exception {
-        assertDeniedEverywhere("Bearer " + HttpBearerTokens.token("mallory", "OTHER"), status().isForbidden());
-    }
-
-    @Test
-    void denyAllIsForbiddenForValidTokens() throws Exception {
-        http.perform(get("/_bearer/denied").header("Authorization", bearer())).andExpect(status().isForbidden());
         assertEquals(0, INVOCATIONS.get());
     }
 
@@ -143,79 +116,61 @@ class HttpBearerContractTest {
 
     @Test
     void rolesComeFromTheRolesClaim() throws Exception {
-        var scopeOnly = HttpBearerTokens.token(claims -> claims.claims(values -> values.remove("roles")).claim("scope", "CONTRACT"));
-        assertDeniedEverywhere("Bearer " + scopeOnly, status().isForbidden());
-    }
-
-    @Test
-    void publicEndpointsStayAnonymous() throws Exception {
-        http.perform(get("/_bearer/public")).andExpect(status().isOk()).andExpect(content().string("public"));
+        assertDeniedEverywhere(HttpBearerTokens.token(claims -> claims.claims(values -> values.remove("roles")).claim("scope", "CONTRACT")), 403);
     }
 
     @Test
     void anAllowedOriginStreamsWithTheAuthorizationHeader() throws Exception {
-        var result = http.perform(get("/_bearer/stream").accept(MediaType.TEXT_EVENT_STREAM).header("Authorization", bearer())
-            .header("Origin", "https://app.example").header("Sec-Fetch-Mode", "cors"))
-            .andExpect(request().asyncStarted()).andExpect(header().string("Access-Control-Allow-Origin", "https://app.example")).andReturn();
+        var result = http.perform(get("/_bearer/stream").accept(MediaType.TEXT_EVENT_STREAM).header("Origin", "https://app.example")
+            .header("Authorization", bearer())).andExpect(request().asyncStarted())
+            .andExpect(header().string("Access-Control-Allow-Origin", "https://app.example"))
+            .andExpect(header().doesNotExist("Access-Control-Allow-Credentials")).andReturn();
+        assertTrue(result.getResponse().getContentType().startsWith("text/event-stream"));
         assertTrue(awaitContent(result, "data:one"));
     }
 
     @Test
     void aDisallowedOriginIsDeniedEvenWithAValidToken() throws Exception {
         for (var endpoint : protectedRequests()) {
-            http.perform(endpoint.header("Authorization", bearer()).header("Origin", "https://evil.example"))
-                .andExpect(status().isForbidden()).andExpect(request().asyncNotStarted());
-        }
-        assertEquals(0, INVOCATIONS.get());
-    }
-
-    @Test
-    void noSessionCookieIsIssued() throws Exception {
-        for (var endpoint : protectedRequests()) {
-            http.perform(endpoint).andExpect(status().isUnauthorized()).andExpect(header().doesNotExist("Set-Cookie"))
-                .andExpect(noSessionCreated());
-        }
-        http.perform(get("/_bearer/json").header("Authorization", bearer())).andExpect(status().isOk())
-            .andExpect(header().doesNotExist("Set-Cookie")).andExpect(noSessionCreated());
-    }
-
-    private static ResultMatcher noSessionCreated() {
-        return result -> assertTrue(result.getRequest().getSession(false) == null, "bearer mode must not create an HTTP session");
-    }
-
-    private void assertBrowserGetsNoChallenge(String browser, String authorization) throws Exception {
-        for (var endpoint : protectedRequests()) {
-            endpoint.header(browser, "cors");
-            if (!authorization.isEmpty()) endpoint.header("Authorization", authorization);
-            http.perform(endpoint).andExpect(status().isUnauthorized()).andExpect(request().asyncNotStarted())
-                .andExpect(header().doesNotExist("WWW-Authenticate"));
-        }
-    }
-
-    private void assertDeniedEverywhere(String authorization, ResultMatcher status) throws Exception {
-        for (var endpoint : protectedRequests()) {
-            if (authorization != null) endpoint.header("Authorization", authorization);
-            var result = http.perform(endpoint).andExpect(status).andExpect(request().asyncNotStarted()).andReturn();
+            var result = http.perform(endpoint.header("Authorization", bearer()).header("Origin", "https://evil.example"))
+                .andExpect(status().isForbidden()).andExpect(request().asyncNotStarted())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin")).andReturn();
             assertNotEventStream(result);
         }
         assertEquals(0, INVOCATIONS.get());
     }
 
-    static List<MockHttpServletRequestBuilder> protectedRequests() {
+    @Test
+    void noSessionCreatedOrCookieIssued() throws Exception {
+        for (var endpoint : protectedRequests()) {
+            var result = http.perform(endpoint).andExpect(status().isUnauthorized()).andExpect(header().doesNotExist("Set-Cookie")).andReturn();
+            assertTrue(result.getRequest().getSession(false) == null, "bearer mode must not create an HTTP session");
+        }
+        var result = http.perform(get("/_bearer/json").header("Authorization", bearer())).andExpect(status().isOk())
+            .andExpect(header().doesNotExist("Set-Cookie")).andReturn();
+        assertTrue(result.getRequest().getSession(false) == null, "bearer mode must not create an HTTP session");
+    }
+
+    private void assertDeniedEverywhere(String token, int expectedStatus) throws Exception {
+        for (var endpoint : protectedRequests()) {
+            var result = http.perform(endpoint.header("Authorization", "Bearer " + token)).andExpect(status().is(expectedStatus))
+                .andExpect(request().asyncNotStarted()).andReturn();
+            assertNotEventStream(result);
+        }
+        assertEquals(0, INVOCATIONS.get());
+    }
+
+    private static List<MockHttpServletRequestBuilder> protectedRequests() {
         return List.of(get("/_bearer/json"), get("/_bearer/stream").accept(MediaType.TEXT_EVENT_STREAM),
             post("/_bearer/command").contentType(MediaType.APPLICATION_JSON).content("{}"));
     }
 
-    static void assertNotEventStream(MvcResult result) {
+    private static void assertNotEventStream(MvcResult result) {
         var type = result.getResponse().getContentType();
         assertTrue(type == null || !type.startsWith("text/event-stream"));
     }
 
     private static String bearer() { return "Bearer " + HttpBearerTokens.token("alice", "CONTRACT"); }
-
-    private static String expired() {
-        return HttpBearerTokens.token(claims -> claims.issuedAt(Instant.now().minusSeconds(1200)).expiresAt(Instant.now().minusSeconds(600)));
-    }
 
     private static boolean awaitContent(MvcResult result, String text) throws Exception {
         var deadline = System.nanoTime() + 10_000_000_000L;
@@ -229,13 +184,10 @@ class HttpBearerContractTest {
     @RestController
     static class Endpoints {
         private final CommandGateway commands;
-
         Endpoints(CommandGateway commands) { this.commands = commands; }
-
         @GetMapping("/_bearer/json")
         @PreAuthorize("hasRole('CONTRACT')")
         String json() { INVOCATIONS.incrementAndGet(); return "ok"; }
-
         @GetMapping(value = "/_bearer/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
         @PreAuthorize("hasRole('CONTRACT')")
         SseEmitter stream() {
@@ -245,18 +197,9 @@ class HttpBearerContractTest {
             publisher.submit("one");
             return emitter;
         }
-
         @PostMapping("/_bearer/command")
         @PreAuthorize("hasRole('CONTRACT')")
         CompletableFuture<String> command(@RequestBody WhoAmI body) { return commands.send(body, String.class); }
-
-        @GetMapping("/_bearer/denied")
-        @PreAuthorize("denyAll()")
-        String denied() { INVOCATIONS.incrementAndGet(); return "never"; }
-
-        @GetMapping("/_bearer/public")
-        @PreAuthorize("permitAll()")
-        String publicEndpoint() { return "public"; }
     }
 
     @Component

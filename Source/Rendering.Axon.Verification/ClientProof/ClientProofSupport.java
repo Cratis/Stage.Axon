@@ -2,8 +2,9 @@ package __RUNTIME__;
 
 import __APPLICATION__.work.items.overview.WorkItemById;
 import __APPLICATION__.work.items.overview.WorkItems;
+import __APPLICATION__.work.items.overview.WorkItemsEntity;
+import __APPLICATION__.work.items.overview.WorkItemsRepository;
 import __RUNTIME_MODULE__.LiveStreams;
-import __RUNTIME_MODULE__.ReadModelStore;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,11 +13,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -24,7 +27,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.UnaryOperator;
 import org.axonframework.common.configuration.Configuration;
 import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
 import org.axonframework.messaging.queryhandling.QueryUpdateEmitter;
@@ -45,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * the scenario prints {@code await:<label>} and waits for {@code go:<label> [payload]}.
  */
 final class ClientProofSupport {
-    static final String VIEW = "__APPLICATION__.work.items.overview.WorkItems";
+    static final String VIEW = "__APPLICATION__.work.items.overview.WorkItemsRepository";
     static final AtomicReference<Gate> GATE = new AtomicReference<>();
     static final AtomicInteger READS = new AtomicInteger();
     static final List<String> CALLERS = new CopyOnWriteArrayList<>();
@@ -56,16 +58,15 @@ final class ClientProofSupport {
     /** Holds one read of the work item view: before it reads, or after it has read (so the stale rows are delivered late). */
     record Gate(boolean afterRead, CountDownLatch entered, CountDownLatch release) {}
 
-    /** Wraps the work item view so a test can hold and count its reads; every other behaviour is the real store. */
+    /** Wraps the work item repository so a test can hold and count its reads; every other behaviour is the real repository. */
     @TestConfiguration(proxyBeanMethods = false)
     static class Probes {
         @Bean
         static BeanPostProcessor gatedWorkItems() {
             return new BeanPostProcessor() {
                 @Override
-                @SuppressWarnings("unchecked")
                 public Object postProcessAfterInitialization(Object bean, String name) {
-                    return VIEW.equals(name) ? new GatedStore((ReadModelStore<Object, WorkItems>) bean) : bean;
+                    return VIEW.equals(name) && bean instanceof WorkItemsRepository repository ? gated(repository) : bean;
                 }
             };
         }
@@ -90,48 +91,44 @@ final class ClientProofSupport {
         }
     }
 
-    static final class GatedStore implements ReadModelStore<Object, WorkItems> {
-        private final ReadModelStore<Object, WorkItems> inner;
-
-        GatedStore(ReadModelStore<Object, WorkItems> inner) { this.inner = inner; }
-
-        @Override public Optional<WorkItems> get(Object key) { return inner.get(key); }
-        @Override public void put(Object key, WorkItems value) { inner.put(key, value); }
-        @Override public void remove(Object key) { inner.remove(key); }
-        @Override public void clear() { inner.clear(); }
-        @Override public WorkItems update(Object key, UnaryOperator<WorkItems> update) { return inner.update(key, update); }
-
-        @Override
-        public List<WorkItems> all() {
+    static WorkItemsRepository gated(WorkItemsRepository inner) {
+        return (WorkItemsRepository) Proxy.newProxyInstance(WorkItemsRepository.class.getClassLoader(), new Class<?>[] { WorkItemsRepository.class }, (proxy, method, arguments) -> {
+            if (!method.getName().equals("findAll")) return invoke(inner, method, arguments);
             READS.incrementAndGet();
             var gate = GATE.getAndSet(null);
-            if (gate == null) return inner.all();
+            if (gate == null) return invoke(inner, method, arguments);
             if (!gate.afterRead()) hold(gate);
-            var rows = inner.all();
+            var rows = invoke(inner, method, arguments);
             if (gate.afterRead()) hold(gate);
             return rows;
-        }
+        });
+    }
 
-        private static void hold(Gate gate) {
-            gate.entered().countDown();
-            try {
-                if (!gate.release().await(30, TimeUnit.SECONDS)) throw new IllegalStateException("The gate was never released");
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException(interrupted);
-            }
+    private static Object invoke(WorkItemsRepository inner, Method method, Object[] arguments) throws Throwable {
+        try {
+            return method.invoke(inner, arguments);
+        } catch (InvocationTargetException failure) { throw failure.getCause(); }
+    }
+
+    private static void hold(Gate gate) {
+        gate.entered().countDown();
+        try {
+            if (!gate.release().await(30, TimeUnit.SECONDS)) throw new IllegalStateException("The gate was never released");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(interrupted);
         }
     }
 
     /** What the Java side does when a scenario asks. */
     static final class Actions {
         private final Configuration configuration;
-        private final ReadModelStore<Object, WorkItems> store;
+        private final WorkItemsRepository store;
         private final LiveStreams live;
         private volatile Gate armed;
         private volatile CompletableFuture<Void> burst = CompletableFuture.completedFuture(null);
 
-        Actions(Configuration configuration, ReadModelStore<Object, WorkItems> store, LiveStreams live) {
+        Actions(Configuration configuration, WorkItemsRepository store, LiveStreams live) {
             this.configuration = configuration;
             this.store = store;
             this.live = live;
@@ -141,7 +138,7 @@ final class ClientProofSupport {
             GATE.set(null);
             READS.set(0);
             CALLERS.clear();
-            store.clear();
+            store.deleteAll();
             awaitActive(0);
         }
 
@@ -159,7 +156,7 @@ final class ClientProofSupport {
                 }
                 case "commit" -> { commit(parts[1], parts[2]); yield ""; }
                 case "rollback" -> { rollBack(parts[1], parts[2]); yield ""; }
-                case "duplicate" -> { store.put("copy", store.get(parts[1]).orElseThrow()); yield ""; }
+                case "duplicate" -> { put("copy", get(parts[1])); yield ""; }
                 case "active" -> { awaitActive(Integer.parseInt(parts[1])); yield ""; }
                 case "reads" -> String.valueOf(READS.get());
                 case "callers" -> String.join(",", CALLERS);
@@ -180,7 +177,7 @@ final class ClientProofSupport {
         /** Commits a new title and announces the change, the way the generated projector does, in one unit of work. */
         private void commit(String id, String title) throws Exception {
             configuration.getComponent(UnitOfWorkFactory.class).create().executeWithResult(processing -> {
-                processing.runOnCommit(ignored -> store.update(id, row -> row.withTitle(title)));
+                processing.runOnCommit(ignored -> update(id, title));
                 QueryUpdateEmitter.forContext(processing).emit(WorkItemById.class, query -> true, WorkItemById.Result::invalidation);
                 return CompletableFuture.completedFuture(null);
             }).get(WAIT, TimeUnit.SECONDS);
@@ -192,16 +189,22 @@ final class ClientProofSupport {
          * rolled-back value. The original row is put back after a window long enough for such a leak to reach a watcher.
          */
         private void rollBack(String id, String title) throws Exception {
-            var original = store.get(id).orElseThrow();
+            var original = get(id);
             var failed = configuration.getComponent(UnitOfWorkFactory.class).create().executeWithResult(processing -> {
-                store.update(id, row -> row.withTitle(title));
+                update(id, title);
                 QueryUpdateEmitter.forContext(processing).emit(WorkItemById.class, query -> true, WorkItemById.Result::invalidation);
                 return CompletableFuture.<Object>failedFuture(new IllegalStateException("rollback"));
             });
             assertThrows(ExecutionException.class, () -> failed.get(WAIT, TimeUnit.SECONDS));
             Thread.sleep(500);
-            store.put(id, original);
+            put(id, original);
         }
+
+        private WorkItems get(String id) { return store.findById(id).map(WorkItemsEntity::toModel).orElseThrow(); }
+
+        private void put(String id, WorkItems row) { store.save(new WorkItemsEntity(id, row)); }
+
+        private void update(String id, String title) { put(id, get(id).withTitle(title)); }
 
         private void awaitActive(int expected) throws InterruptedException {
             var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);

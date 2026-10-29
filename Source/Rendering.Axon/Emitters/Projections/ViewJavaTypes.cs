@@ -21,7 +21,7 @@ internal sealed class ViewJavaTypes(SemanticApplication application, string base
         [SemanticPrimitiveType.DateTime] = ("java.time.OffsetDateTime", "parse")
     };
 
-    static readonly string[] _supportPackageSuffixes = ["constraints", "infrastructure", "persistence", "runtime", "runtime.persistent", "specifications"];
+    static readonly string[] _supportPackageSuffixes = ["constraints", "infrastructure", "persistence", "runtime", "specifications"];
 
     readonly ViewConceptValues _concepts = new(application);
     internal string BasePackage { get; } = basePackage;
@@ -30,6 +30,8 @@ internal sealed class ViewJavaTypes(SemanticApplication application, string base
 
     internal static void Add(AxonEmissionContext context, string package, string name, string source, params SemanticId[] ids) =>
         context.Artifacts.Add(Contracts.Rendering.PlannedArtifact.CreateText($"src/main/java/{package.Replace('.', '/')}/{name}.java", source, [.. ids]));
+
+    internal IReadOnlyList<ReadModelKeys.KeyPart>? KeyParts(SemanticReadModel model) => ReadModelKeys.Parts(application, model);
 
     internal string Package(LocatedSemanticSlice located) => BasePackage + "." + string.Join('.', located.Path.Select(JavaNames.PackageSegment));
 
@@ -79,6 +81,17 @@ internal sealed class ViewJavaTypes(SemanticApplication application, string base
         SemanticBooleanValue boolean => Wrap(type, boolean.Value ? "true" : "false"),
         _ => "null"
     };
+
+    internal bool IsEnumeration(SemanticTypeReference type) => _concepts.IsEnumeration(type);
+
+    internal string ColumnType(SemanticPrimitiveType primitive, JavaCodeBuilder code) => Primitive(primitive, code);
+
+    /// <summary>The first state of a projected row: a concept is never seeded with a zero wrapper, because its validation may refuse the zero.</summary>
+    internal string Seed(SemanticTypeReference type, JavaCodeBuilder code) => !type.IsCollection && type.Kind == SemanticTypeReferenceKind.Concept
+        ? "null" : Default(type, code);
+
+    internal string Seed(SemanticTypeReference type) => !type.IsCollection && type.Kind == SemanticTypeReferenceKind.Concept
+        ? "null" : Default(type);
 
     internal string Default(SemanticTypeReference type) => type.IsCollection ? "java.util.List.of()" : ScalarDefault(type);
 

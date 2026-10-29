@@ -13,7 +13,7 @@ public class with_renderer_owned_fragments : for_AxonArtifactRenderPlanner.given
     const string Arrange = "authored.NativeBody.arrange(\"org.junit.jupiter.api.Assertions\");";
     const string Assertion = "result -> authored.NativeBody.verify(result, \"java.util.List\")";
     string code;
-    string echo;
+    string unrelated;
 
     void Because()
     {
@@ -40,7 +40,10 @@ public class with_renderer_owned_fragments : for_AxonArtifactRenderPlanner.given
         });
         AxonHttpTests.Emit(context);
         code = Text(context, "ModeledHttpRoundTripTest");
-        echo = Text(context, "RuntimeHttpExchangeTest");
+        var empty = new AxonEmissionContext(request, new(request.Profile));
+        AxonHttpTests.Register(empty, new(ids[0], [new(new("GET", "/api/unrelated"), new(200))], new(string.Empty, [], false)));
+        AxonHttpTests.Emit(empty);
+        unrelated = Text(empty, "ModeledHttpRoundTripTest");
     }
 
     static string Text(AxonEmissionContext context, string name) => Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());
@@ -53,7 +56,7 @@ public class with_renderer_owned_fragments : for_AxonArtifactRenderPlanner.given
     [Fact] void should_shorten_the_modeled_type() => code.ShouldContain("application.getBean(QueryUpdateEmitter.class)");
     [Fact] void should_import_the_modeled_type() => code.ShouldContain("import example.events.QueryUpdateEmitter;");
     [Fact] void should_not_import_the_colliding_framework_type() => code.ShouldNotContain("import org.axonframework.messaging.queryhandling.QueryUpdateEmitter;");
-    [Fact] void should_not_add_fragment_imports_to_the_unrelated_runtime_test() => echo.ShouldNotContain("QueryUpdateEmitter");
+    [Fact] void should_not_add_fragment_imports_to_the_unrelated_runtime_test() => unrelated.ShouldNotContain("QueryUpdateEmitter");
     [Fact] void should_keep_the_modeled_exception_import() => code.ShouldContain("import example.views.Exception;");
     [Fact] void should_keep_the_modeled_exception_short() => code.ShouldContain("application.getBean(Exception.class)");
     [Fact] void should_qualify_the_scenario_exception() => code.ShouldContain("void scenario_0() throws java.lang.Exception");
@@ -61,6 +64,6 @@ public class with_renderer_owned_fragments : for_AxonArtifactRenderPlanner.given
     [Fact] void should_keep_the_modeled_list_import() => code.ShouldContain("import example.models.List;");
     [Fact] void should_qualify_only_the_colliding_java_list() => code.ShouldContain("var snapshots = java.util.List.of(List.class);");
     [Fact] void should_not_import_the_colliding_java_list() => code.ShouldNotContain("import java.util.List;");
-    [Fact] void should_leave_the_unrelated_scenario_exception_short() => echo.ShouldContain("void scenario_0() throws Exception");
-    [Fact] void should_leave_the_unrelated_perform_exception_short() => echo.ShouldContain("perform(MockHttpServletRequestBuilder request) throws Exception");
+    [Fact] void should_leave_the_unrelated_scenario_exception_short() => unrelated.ShouldContain("void scenario_0() throws Exception");
+    [Fact] void should_leave_the_unrelated_perform_exception_short() => unrelated.ShouldContain("perform(MockHttpServletRequestBuilder request) throws Exception");
 }

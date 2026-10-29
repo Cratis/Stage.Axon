@@ -3,6 +3,7 @@
 
 using System.Reflection;
 using Cratis.Screenplay.Semantics;
+using Cratis.Screenplay.Semantics.Execution;
 using Cratis.Screenplay.Semantics.Serialization;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
@@ -20,7 +21,17 @@ public class when_admitting_requests : given.an_axon_request
     void should_warn_about_unmeasured_pairs() => AssertUnmeasuredPairs(AxonRendering.CreateProfile(), AssertWarned);
 
     [Fact]
-    void should_refuse_unmeasured_pairs_in_strict_mode() => AssertUnmeasuredPairs(AxonRendering.CreateProfile(strict: true), AssertStrictlyRefused);
+    void should_warn_about_unmeasured_pairs_in_strict_mode()
+    {
+        // Admission is independent of the Orders role policy; use a policy-free fixture.
+        var application = loaded.Model.Application with
+        {
+            Policies = [],
+            Modules = [.. loaded.Model.Application.Modules.Select(module => module with { Features = [.. module.Features.Select(WithoutAuthorization)] })]
+        };
+        var fixture = ExecutableSemanticModel.Create(loaded.Model.LanguageVersion, loaded.Model.SemanticVersion, application);
+        AssertUnmeasuredPairs(AxonRendering.CreateProfile(strict: true), AssertWarned, fixture);
+    }
 
     [Theory]
     [InlineData(ImplementationGapMode.Stub, ArtifactRefusalMode.Refuse)]
@@ -66,8 +77,9 @@ public class when_admitting_requests : given.an_axon_request
     void should_not_refuse_the_supported_catalog_view_specification_in_strict_mode() =>
         Assert.DoesNotContain(AxonRendering.PlanFrom(loaded, request.Scope, profile: AxonRendering.CreateProfile(strict: true)).Diagnostics, diagnostic => diagnostic.Code == AxonRefusalCodes.ViewSpecification);
 
-    void AssertUnmeasuredPairs(ArtifactRenderProfile profile, Action<ArtifactRenderPlan, string> assert)
+    void AssertUnmeasuredPairs(ArtifactRenderProfile profile, Action<ArtifactRenderPlan, string> assert, ExecutableSemanticModel? fixture = null)
     {
+        var template = fixture is null ? request : new ArtifactRenderRequest(fixture, SemanticExecutionPlan.Compile(fixture).Plan, profile, request.Scope);
         (LanguageVersion Language, SemanticVersion Semantic)[] pairs =
         [
             (new(1, 0), new(1, 0)),
@@ -78,10 +90,10 @@ public class when_admitting_requests : given.an_axon_request
         ];
         foreach (var (language, semantic) in pairs)
         {
-            var model = SemanticModelSerializer.Deserialize(SemanticModelSerializer.Serialize(loaded.Model).AsSpan());
+            var model = SemanticModelSerializer.Deserialize(SemanticModelSerializer.Serialize(template.Model).AsSpan());
             typeof(ExecutableSemanticModel).GetField("<LanguageVersion>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(model, language);
             typeof(ExecutableSemanticModel).GetField("<SemanticVersion>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(model, semantic);
-            assert(new AxonArtifactRenderPlanner().Plan(request with { Model = model, Profile = profile }), AxonRefusalCodes.Version);
+            assert(new AxonArtifactRenderPlanner().Plan(template with { Model = model, Profile = profile }), AxonRefusalCodes.Version);
         }
     }
 
@@ -90,6 +102,16 @@ public class when_admitting_requests : given.an_axon_request
         Assert.Contains(AxonAdmission.Inspect(request, new AxonDegradation(request.Profile)), diagnostic => diagnostic.Code == AxonRefusalCodes.Scope && diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Error);
         Assert.Throws<InvalidArtifactRenderContract>(() => new AxonArtifactRenderPlanner().Plan(request));
     }
+
+    static SemanticFeature WithoutAuthorization(SemanticFeature feature) => feature with
+    {
+        Features = [.. feature.Features.Select(WithoutAuthorization)],
+        Slices = [.. feature.Slices.Select(slice => slice with
+        {
+            Commands = [.. slice.Commands.Select(command => command with { Authorization = null })],
+            Queries = [.. slice.Queries.Select(query => query with { Authorization = null })]
+        })]
+    };
 
     static void AssertScaffold(ArtifactRenderPlan plan)
     {

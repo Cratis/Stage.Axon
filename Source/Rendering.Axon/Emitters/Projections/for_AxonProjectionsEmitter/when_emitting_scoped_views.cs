@@ -1,86 +1,46 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections.Immutable;
-using System.Reflection;
-using Cratis.Screenplay.Semantics;
-using Cratis.Screenplay.Semantics.Execution;
 using Cratis.Specifications;
-using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Projections.for_AxonProjectionsEmitter;
 
 public class when_emitting_scoped_views : given.a_view_request
 {
-    AxonEmissionContext _context;
-    ImmutableHashSet<SemanticId> _unadmitted;
     string _projector;
+    string _entity;
+    string _joinEntity;
+    string _joinRepository;
 
     void Because()
     {
-        _unadmitted = (ImmutableHashSet<SemanticId>)typeof(SemanticExecutionPlan).GetProperty("UnadmittedArtifacts", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_request.ExecutionPlan)!;
-        _context = new(_request, new(_request.Profile));
-        new AxonProjectionsEmitter().Emit(_context);
-        _projector = Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("BoardProjectionProjector.java", StringComparison.Ordinal)));
+        var context = new AxonEmissionContext(_request, new(_request.Profile));
+        new AxonProjectionsEmitter().Emit(context);
+        string Artifact(string name) => Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)));
+        _projector = Artifact("BoardProjectionProjector");
+        _entity = Artifact("BoardEntity");
+        _joinEntity = Artifact("BoardProjectionJoinEntity");
+        _joinRepository = Artifact("BoardProjectionJoinRepository");
     }
 
-    [Fact] void should_expose_only_the_annotated_handler_signature() => _projector.ShouldNotContain("public void on(");
-    [Fact] void should_update_root_properties_fluently() => _projector.ShouldContain("state.with");
-    [Fact] void should_pass_explicit_message_arguments_in_specs() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("BoardViewSpecificationsTest.java", StringComparison.Ordinal))).ShouldContain(", null);");
-    [Fact] void should_copy_children_into_immutable_lists() => _projector.ShouldContain("List.copyOf(rootChild0)");
-    [Fact] void should_preserve_original_deferred_event_values() => _projector.ShouldContain("pending.add(writes -> projectCardAdded(event, message, writes))");
-    [Fact] void should_backfill_joins() => _projector.ShouldContain("joined.apply(state)");
-    [Fact] void should_remove_instances() => _projector.ShouldContain("return new ScopeChange<>(null, true, true)");
-    [Fact] void should_inject_java_time_clock() => _projector.ShouldContain("Clock clock");
-    [Fact] void should_import_list_helpers() => _projector.ShouldContain("import java.util.List;");
-    [Fact] void should_import_atomic_flags() => _projector.ShouldContain("import java.util.concurrent.atomic.AtomicBoolean;");
+    [Fact] void should_not_degrade_to_the_scoped_stub() => _projector.ShouldNotContain("STAGE-AXON-0310");
+    [Fact] void should_render_a_single_projector_component() => _projector.ShouldContain("@Component(\"axonviews.scopes.boards.boards.BoardProjectionProjector\")");
+    [Fact] void should_handle_the_child_event_through_an_event_handler() => _projector.ShouldContain("public void handle(CardAdded event, ProcessingContext context)");
+    [Fact] void should_not_keep_scope_state() => _projector.ShouldNotContain("pending");
 
-    [Fact]
-    void should_not_inline_axon_or_spring_types()
-    {
-        _projector.ShouldNotBeEmpty();
-        _projector.Split('\n').Any(line => !line.TrimStart().StartsWith("import ", StringComparison.Ordinal) &&
-            new[] { "org.axonframework.", "org.springframework.", "jakarta.", "io.cratis." }.Any(prefix => line.Contains(prefix, StringComparison.Ordinal))).ShouldBeFalse();
-    }
-    [Fact] void should_register_modeled_native_specs() => _context.Specifications.Count.ShouldEqual(ScopeSelection.Select(_request).Sum(slice => slice.Slice.Specifications.Length));
+    [Fact] void should_store_children_as_a_json_column() => _entity.ShouldContain("private List<Card> cards;");
+    [Fact] void should_map_the_children_column() => _entity.ShouldContain("@Column(name = \"p_cards\")");
+    [Fact] void should_upsert_the_parent_row_when_a_child_arrives_first() => _projector.ShouldContain("if (current == null && !(false || Objects.equals(key, String.valueOf(event.boardId().value())))) return");
+    [Fact] void should_read_the_parent_row_by_key() => _projector.ShouldContain("keys.forEach(candidate -> states.putIfAbsent(candidate, repository.findById(candidate).map(BoardEntity::toModel).orElse(null)));");
+    [Fact] void should_save_the_touched_row() => _projector.ShouldContain("else repository.save(new BoardEntity(key, change.value()));");
 
-    [Fact]
-    void should_match_the_reference_execution_for_every_projected_spec()
-    {
-        var runner = new SemanticSpecificationRunner();
-        var failures = ReferenceSpecifications().Where(specification => !ReferenceUnavailable(specification))
-            .Select(specification => runner.Run(_request.ExecutionPlan, specification.Id)).Where(result => !result.Passed)
-            .Select(result => string.Join('\n', result.Failures) + "\nActual: " + string.Join("; ", result.Execution.World.ReadModels.SelectMany(model => model.Values).Select(value => value.TargetProperty + "=" + Describe(value.Value))));
-        var messages = string.Join('\n', failures);
-        Assert.True(messages.Length == 0, messages);
-    }
+    [Fact] void should_remember_the_join_event_in_the_lookup_table() => _projector.ShouldContain("joins.save(new BoardProjectionJoinEntity(\"join0|\" + String.valueOf(String.valueOf(event.cardId().value()))).join0(event));");
+    [Fact] void should_hydrate_children_from_the_lookup_table() => _projector.ShouldContain("var joined = joins.findById(\"join0|\" + String.valueOf(");
+    [Fact] void should_keep_the_join_event_in_a_json_column() => _joinEntity.ShouldContain("private CardRenamed join0;");
+    [Fact] void should_declare_a_string_keyed_join_repository() => _joinRepository.ShouldContain("extends JpaRepository<BoardProjectionJoinEntity, String>");
+    [Fact] void should_scan_rows_for_join_events() => _projector.ShouldContain("for (var row : repository.findAll()) states.put(row.rowKey(), row.toModel());");
 
-    [Fact]
-    void should_exclude_only_the_context_total_spec_from_reference_execution()
-    {
-        var excluded = ReferenceSpecifications().Where(ReferenceUnavailable).ToArray();
-        Assert.Equal(["RetainingContextAndDetails"], excluded.Select(specification => specification.Name));
-        Assert.All(excluded, specification => Assert.All(specification.ThenReadModels, expected => Assert.Equal(ReadModelId("ContextTotal"), expected.ReadModel)));
-    }
-
-    [Fact]
-    void should_keep_a_spec_with_the_same_name_but_an_admitted_read_model_in_reference_execution()
-    {
-        var specification = ReferenceSpecifications().Single(candidate => candidate.Name == "RetainingContextAndDetails");
-        ReferenceUnavailable(specification with { ThenReadModels = [specification.ThenReadModels[0] with { ReadModel = ReadModelId("Total") }] }).ShouldBeFalse();
-    }
-
-    IEnumerable<SemanticSpecification> ReferenceSpecifications() => ScopeSelection.Select(_request)
-        .Where(slice => slice.Slice.Reducers.IsEmpty).SelectMany(slice => slice.Slice.Specifications);
-
-    bool ReferenceUnavailable(SemanticSpecification specification) => specification.ThenReadModels.Any(expected =>
-        _request.ExecutionPlan.Projections.Values.Any(projection => projection.ReadModel == expected.ReadModel && _unadmitted.Contains(projection.Id)));
-
-    static string Describe(SemanticValue value) => value switch
-    {
-        SemanticCompositeValue composite => "{" + string.Join(',', composite.Properties.Select(property => property.TargetProperty + "=" + Describe(property.Value))) + "}",
-        SemanticArrayValue array => "[" + string.Join(',', array.Values.Select(Describe)) + "]",
-        _ => value.ToString()
-    };
+    [Fact] void should_remove_rows_with_a_batch_delete_by_key() => _projector.ShouldContain("if (change.value() == null) repository.deleteAllByIdInBatch(List.of(key));");
+    [Fact] void should_not_remove_rows_by_finding_them_first() => _projector.ShouldNotContain("repository.deleteById(");
 }

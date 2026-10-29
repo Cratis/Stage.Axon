@@ -36,9 +36,6 @@ public class when_reading_the_runtime_module_sources
     [InlineData("LiveSnapshots")]
     [InlineData("LiveStreams")]
     [InlineData("LiveCapacityException")]
-    [InlineData("ReadModelStore")]
-    [InlineData("InMemoryReadModelStore")]
-    [InlineData("ReadModelTransaction")]
     void should_declare_the_runtime_module_package(string name) => Source(name).ShouldContain("package io.cratis.stage.axon.runtime;");
 
     [Theory]
@@ -47,29 +44,8 @@ public class when_reading_the_runtime_module_sources
     [InlineData("LiveStreams")]
     [InlineData("LiveCapacityException")]
     [InlineData("SseBridge")]
-    [InlineData("ReadModelStore")]
-    [InlineData("InMemoryReadModelStore")]
-    [InlineData("ReadModelTransaction")]
     void should_not_carry_a_license_header(string name) => Source(name).ShouldNotContain("Copyright");
 
-    [Theory]
-    [InlineData("UniqueClaim")]
-    [InlineData("JpaUniqueValueStore")]
-    [InlineData("PersistentConfiguration")]
-    [InlineData("PersistentReadModelSafety")]
-    [InlineData("StageAxonPersistenceAutoConfiguration")]
-    void should_declare_the_persistent_module_package(string name) => PersistentSource(name).ShouldContain("package io.cratis.stage.axon.runtime.persistent;");
-
-    [Theory]
-    [InlineData("UniqueClaim")]
-    [InlineData("JpaUniqueValueStore")]
-    [InlineData("PersistentConfiguration")]
-    [InlineData("PersistentReadModelSafety")]
-    void should_not_leave_the_runtime_placeholder_in_the_persistent_helpers(string name) => PersistentSource(name).ShouldNotContain("__RUNTIME__");
-
-    [Fact] void should_keep_the_claim_table_name() => PersistentSource("UniqueClaim").ShouldContain("@Table(name = \"stage_unique_claim\")");
-    [Fact] void should_keep_the_persistent_profile() => PersistentSource("PersistentConfiguration").ShouldContain("@Profile(\"persistent\")");
-    [Fact] void should_register_the_persistent_auto_configuration() => File.ReadAllText(Path.Combine(ModuleRoot(), "main", "resources", "META-INF", "spring", "org.springframework.boot.autoconfigure.AutoConfiguration.imports")).ShouldContain("io.cratis.stage.axon.runtime.persistent.StageAxonPersistenceAutoConfiguration");
 
     [Fact] void should_not_leave_the_runtime_placeholder() => Source("QueryResults").ShouldNotContain("__RUNTIME__");
     [Fact] void should_require_exactly_one() => Source("QueryResults").ShouldContain("public static <T> List<T> exactlyOne(List<T> rows)");
@@ -84,10 +60,6 @@ public class when_reading_the_runtime_module_sources
         var index = text.IndexOf(first, StringComparison.Ordinal);
         return index >= 0 && index < text.IndexOf(second, StringComparison.Ordinal);
     }
-
-    static string ModuleRoot() => Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Source", "Runtime", "src");
-
-    static string PersistentSource(string name) => File.ReadAllText(Path.Combine(ModuleRoot(), "main", "java", "io", "cratis", "stage", "axon", "runtime", "persistent", name + ".java"));
 
     static string Source(string name) => File.ReadAllText(Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Source", "Runtime", "src", "main", "java", "io", "cratis", "stage", "axon", "runtime", name + ".java"));
 }

@@ -22,8 +22,8 @@ public class with_the_cli_screen_composition_corpus : given.a_screen_composition
     [Fact] void should_succeed() => _plan.Success.ShouldBeTrue();
 
     [Fact]
-    void should_have_only_the_three_known_warnings() => _plan.Diagnostics.Where(diagnostic => diagnostic.Code != "STAGE-AXON-LOCAL-RUNTIME").Select(diagnostic => (diagnostic.Code, diagnostic.Severity))
-        .ShouldEqual(Enumerable.Repeat(("STAGE-AXON-0308", ArtifactRenderDiagnosticSeverity.Warning), 3));
+    void should_have_no_warnings_besides_the_local_runtime() => _plan.Diagnostics.Where(diagnostic => diagnostic.Code != "STAGE-AXON-LOCAL-RUNTIME").Select(diagnostic => (diagnostic.Code, diagnostic.Severity))
+        .ShouldBeEmpty();
 
     [Fact]
     void should_surface_the_local_runtime_warning_in_the_plan()

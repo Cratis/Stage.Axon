@@ -19,7 +19,7 @@ public class when_emitting_a_view_without_a_projection_with_a_query_performer : 
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public void should_keep_the_persistent_guard_for_performer_writes(bool sliceScoped, bool strict)
+    public void should_warn_that_only_performers_can_write_through_the_repository(bool sliceScoped, bool strict)
     {
         var model = ReadModelId("Total");
         SemanticFeature Feature(SemanticFeature feature) => feature with
@@ -40,17 +40,11 @@ public class when_emitting_a_view_without_a_projection_with_a_query_performer : 
         new AxonProjectionsEmitter().Emit(context);
         new AxonQueriesEmitter().Emit(context);
 
-        var configuration = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/TotalStoreConfiguration.java", StringComparison.Ordinal)));
-        configuration.ShouldContain("return new InMemoryReadModelStore<>();");
-        configuration.ShouldContain("persistentReadModelSafety()");
-        configuration.ShouldContain("@Profile(\"persistent\")");
-        configuration.ShouldContain("STAGE-AXON-0309");
-        configuration.ShouldContain("only query performers can change it, and their writes are volatile");
-        configuration.ShouldContain("Persistent startup refuses this read model because");
-        configuration.ShouldNotContain("always reads empty");
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("StoreConfiguration.java", StringComparison.Ordinal)).ShouldBeFalse();
         var diagnostic = context.Degradation.UnsupportedConstructs.Single(diagnostic => diagnostic.Artifact == model);
+        diagnostic.Message.ShouldContain("unless a query performer writes through its repository");
         diagnostic.Code.ShouldEqual("STAGE-AXON-0309");
         diagnostic.Severity.ShouldEqual(strict ? ArtifactRenderDiagnosticSeverity.Error : ArtifactRenderDiagnosticSeverity.Warning);
-        Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RankedTotalsPerformer.java", StringComparison.Ordinal))).ShouldContain("ReadModelStore<Object, Total> store");
+        Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RankedTotalsPerformer.java", StringComparison.Ordinal))).ShouldContain("perform(RankedTotals query, TotalRepository repository)");
     }
 }

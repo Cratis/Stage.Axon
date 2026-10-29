@@ -41,7 +41,7 @@ public class when_a_performed_query_is_reached_from_two_slices : Specification
         application = application with { Modules = [module with { Features = [feature with { Slices = [.. feature.Slices, other] }] }] };
         var model = ExecutableSemanticModel.Create(loaded.Model.LanguageVersion, loaded.Model.SemanticVersion, application);
         _queries = [.. loaded.ImplementationRequirements.Where(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer)];
-        var request = new ArtifactRenderRequest(model, loaded.Plan, AxonRendering.CreateProfile(), new(ArtifactRenderScopeKind.Application, application.Id))
+        var request = new ArtifactRenderRequest(model, loaded.Plan, AxonRendering.WithBearerTokens(AxonRendering.CreateProfile()), new(ArtifactRenderScopeKind.Application, application.Id))
         {
             ImplementationRequirements = [.. loaded.ImplementationRequirements, .. _queries.Select(query => query with { QueryShape = query.QueryShape! with { ReadModel = otherModel.Id } })],
             ImplementationContents = loaded.ImplementationContents
@@ -63,12 +63,8 @@ public class when_a_performed_query_is_reached_from_two_slices : Specification
     [Fact]
     void should_declare_each_authorization_method_exactly_once()
     {
-        var policies = Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/Policies.java", StringComparison.Ordinal)).Bytes.AsSpan());
-        foreach (var query in _queries)
-        {
-            var declaration = "public boolean " + PolicyPredicates.SiteMember(query.Source.SemanticId) + "(Authentication authentication)";
-            (policies.Split(declaration, StringSplitOptions.None).Length - 1).ShouldEqual(1);
-        }
+        var policy = Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PerformedFinancePolicy.java", StringComparison.Ordinal)).Bytes.AsSpan());
+        (policy.Split("public boolean check(", StringSplitOptions.None).Length - 1).ShouldEqual(1);
     }
 
     [Fact]
