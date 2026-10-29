@@ -7,16 +7,13 @@ import org.axonframework.messaging.eventhandling.processing.streaming.token.stor
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Profile;
 
 @SpringBootConfiguration
 @EnableAutoConfiguration
 class StarterFixtureApplication {
     @Bean
-    @Profile("!persistent")
     EventStorageEngine eventStorageEngine() { return new InMemoryEventStorageEngine(); }
 
     @Bean
-    @Profile("!persistent")
     TokenStore tokenStore() { return new InMemoryTokenStore(); }
 }

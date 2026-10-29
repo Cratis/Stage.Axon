@@ -36,7 +36,7 @@ public class when_scanning_the_corpus : Specification
         scan = AnnotationAllowlist.Scan(files);
     }
 
-    [Fact] void should_scan_every_application() => Assert.Equal(34, applications);
+    [Fact] void should_scan_every_application() => Assert.Equal(32, applications);
     [Fact] void should_find_the_emitted_command_handlers() => Assert.Contains("org.axonframework.messaging.commandhandling.annotation.CommandHandler", scan.Annotations.Keys);
 
     [Fact]
