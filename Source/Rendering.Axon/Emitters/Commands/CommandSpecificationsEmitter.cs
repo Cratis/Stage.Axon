@@ -75,7 +75,10 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         body.Block($"private {body.Reference("org.axonframework.test.fixture.AxonTestFixture")} fixture({body.Reference("java.lang.String")} instant)", method =>
         {
             FixtureClock(method);
-            method.Line($"var configuration = {method.Reference("org.axonframework.eventsourcing.configuration.EventSourcingConfigurer")}.create();");
+            method.Line($"var configuration = {method.Reference("org.axonframework.eventsourcing.configuration.EventSourcingConfigurer")}.create();")
+                .Line($"configuration.componentRegistry(registry -> {method.Reference("org.axonframework.messaging.core.configuration.reflection.HandlerEnhancerDefinitionUtils")}.registerToComponentRegistry(registry, components -> new {method.Reference("org.axonframework.extension.spring.authorization.SecuredMessageHandlerDefinition")}()));")
+                .Line($"configuration.messaging(messaging -> messaging.registerCommandDispatchInterceptor(components -> new {method.Reference("org.axonframework.extension.spring.authorization.MessageAuthorizationDispatchInterceptor")}<>(components.getComponent({method.Reference("org.axonframework.messaging.core.conversion.MessageConverter")}.class)))")
+                .Line($"    .registerCommandHandlerInterceptor(components -> new {method.Reference("org.axonframework.extension.spring.authorization.MessageAuthorizationHandlerInterceptor")}<>()));");
             if (source is not null) method.Line($"configuration.registerEntity({method.Reference("org.axonframework.eventsourcing.configuration.EventSourcedEntityModule")}.autodetected({new CommandJavaTypes(context.Request.Model.Application, context.BasePackage).Reference(source.JavaType, method)}.class, {name}Stream.class));");
             method.Line($"configuration.messaging(messaging -> messaging.registerCommandHandlingModule({method.Reference("org.axonframework.messaging.commandhandling.configuration.CommandHandlingModule")}.named({JavaCodeBuilder.StringLiteral(name)})")
                 .Line($"    .commandHandlers().autodetectedCommandHandlingComponent(components -> handler({(usesClock ? "clock" : string.Empty)})).build()));")
@@ -109,10 +112,10 @@ internal sealed class CommandSpecificationsEmitter(AxonEmissionContext context, 
         }
         body.Block("void " + method + "()", test =>
         {
-            CommandFixtureSecurity.CallerReferences(test, specification.GivenCaller);
+            CommandFixtureSecurity.CallerReferences(test, specification.GivenCaller, metadataOnly: true);
             var activity = given.Length == 0 ? ".noPriorActivity()" : $".events({string.Join(", ", given.Select(value => test.ReferenceExpression(value!)))})";
             test.Line($"var scenario = fixture({JavaCodeBuilder.StringLiteral(specification.GivenClock ?? "1970-01-01T00:00:00Z")}).given(){activity};")
-                .Line($"var result = scenario.when().command({test.ReferenceExpression(input!)}).then();");
+                .Line($"var result = scenario.when().command({test.ReferenceExpression(input!)}, metadata).then();");
             new CommandFixtureAssertions(context, command, specification).EmitReferences(test, [.. expected.Select(value => test.ReferenceExpression(value!))]);
         });
     }

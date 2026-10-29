@@ -101,16 +101,16 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     [Fact]
     void should_pin_the_application_mapper_wire_test()
     {
-        var tests = Template("RuntimeHttpRoundTripTest.java");
-        tests.ShouldContain("void exactConceptWireFormatSurvivesHttpRoundTrip()");
+        var tests = File.ReadAllText(Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Source/Rendering.Axon.Verification/Templates/GeneratedInlinePolicyTest.java"));
+        tests.ShouldContain("void exactConceptWireFormatUsesTheApplicationMapper()");
         tests.ShouldContain("\\\"amount\\\":100");
         tests.ShouldContain("\\\"byAmount\\\":{\\\"100\\\":\\\"x\\\"}");
         tests.ShouldContain("2026-10-24T12:00:00+00:00");
         tests.ShouldNotContain("1E+2");
-        tests.ShouldContain("content().string(json)");
-        tests.ShouldContain("void explicitEnumValuesSurviveHttpRoundTrip()");
+        tests.ShouldContain("assertEquals(json, mapper.writeValueAsString");
+        tests.ShouldContain("void explicitEnumValuesUseTheApplicationMapper()");
         tests.ShouldContain("List.of(10, 30)");
-        tests.ShouldContain("void invalidEnumNumbersFailHttpBinding()");
+        tests.ShouldContain("void invalidEnumNumbersFailBinding()");
         tests.ShouldContain("List.of(0, 1, 20, 31)");
     }
 

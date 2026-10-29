@@ -26,6 +26,6 @@ public class when_emitting_denial_checks : for_AxonArtifactRenderPlanner.given.a
     [Fact] void should_forbid_callers_without_the_role() => _test.ShouldContain("\"/api/a/do\").contentType(MediaType.APPLICATION_JSON).content(\"{}\").with(user(\"http-contract\").roles(\"HTTP_CONTRACT_NONE\"))).andExpect(status().isForbidden())");
     [Fact] void should_supply_every_key_before_authorization() => _test.ShouldContain("\"/api/a/get\").param(\"id\", \"x\").with(anonymous())");
     [Fact] void should_request_the_event_stream_for_streams() => _test.ShouldContain(".accept(MediaType.TEXT_EVENT_STREAM).with(anonymous())");
-    [Fact] void should_skip_other_expressions_with_a_comment() => _test.ShouldContain("// GET /api/a/other: authorization 'isAuthenticated()' is covered by the runtime contract test.");
-    [Fact] void should_not_exercise_the_skipped_endpoint() => _test.ShouldNotContain("\"/api/a/other\")");
+    [Fact] void should_deny_anonymous_callers_for_authenticated_expressions() => _test.ShouldContain("\"/api/a/other\").with(anonymous())).andExpect(status().isUnauthorized())");
+    [Fact] void should_not_claim_retired_runtime_coverage() => _test.ShouldNotContain("covered by the runtime contract test");
 }

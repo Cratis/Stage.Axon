@@ -30,7 +30,7 @@ internal static class IngressProofArtifacts
     {
         string[] selected = application switch
         {
-            "inline-java-policies" => ["GeneratedInlinePolicyTest.java", "GeneratedInlinePolicyDemoTest.java"],
+            "inline-java-policies" => ["GeneratedInlinePolicyTest.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedJwtAudienceTest.java"],
             "inline-java-policy-performers" => ["GeneratedInlinePolicyPerformerTest.java"],
             IngressProofModel.Application => ["GeneratedIngressSupport.java", "GeneratedProtectedReadTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedSecurityIngressTest.java", "GeneratedDemoIdentityTest.java"],
             _ => throw new NativeVerificationFailed("Unknown ingress proof application: " + application)

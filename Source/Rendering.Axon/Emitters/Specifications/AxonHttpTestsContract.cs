@@ -32,7 +32,7 @@ internal static class AxonHttpTestsContract
                     .Line($"@{body.Reference("org.springframework.beans.factory.annotation.Autowired")}").Line($"private {body.Reference("org.springframework.context.ApplicationContext")} application;")
                     .Line();
                 EmitRoutes(body, endpoints, list, exception);
-                EmitDenials(body, endpoints, exception);
+                EmitDenials(context, body, endpoints, exception);
                 EmitLive(body, list, TriggerEndpoints(context));
             });
         context.AddJava(package, Name, code.Build(), test: true);
@@ -60,30 +60,36 @@ internal static class AxonHttpTestsContract
             .Line();
     }
 
-    static void EmitDenials(JavaCodeBuilder body, IReadOnlyList<HttpEndpoint> endpoints, string exception)
+    static void EmitDenials(AxonEmissionContext context, JavaCodeBuilder body, IReadOnlyList<HttpEndpoint> endpoints, string exception)
     {
-        var checkable = endpoints.Where(endpoint => endpoint.Authorization is { } expression && (expression == "denyAll()" || (expression.StartsWith("hasRole('", StringComparison.Ordinal) && expression.EndsWith("')", StringComparison.Ordinal)))).ToArray();
-        foreach (var endpoint in endpoints.Where(endpoint => endpoint.Authorization is not null && !checkable.Contains(endpoint)))
-            body.Line($"// {endpoint.Method} {endpoint.Path}: authorization '{endpoint.Authorization}' is covered by the runtime contract test.");
+        var checkable = endpoints.Where(endpoint => endpoint.Authorization is { } expression && expression != "permitAll()" && !expression.Contains("not (", StringComparison.Ordinal)).ToArray();
         if (checkable.Length == 0) return;
         body.Line($"@{body.Reference("org.junit.jupiter.api.Test")}")
             .Block($"void protected_endpoints_deny_anonymous_and_unauthorized_callers() throws {exception}", method =>
             {
                 foreach (var endpoint in checkable)
                 {
-                    var call = Call(method, endpoint);
-                    method.Line($"http.perform({call}.with(anonymous())).andExpect(status().isUnauthorized());")
-                        .Line($"http.perform({call}.with(user(\"http-contract\").roles(\"HTTP_CONTRACT_NONE\"))).andExpect(status().isForbidden());");
+                    var call = Call(context, method, endpoint);
+                    method.Line($"http.perform({call}.with(anonymous())).andExpect(status().isUnauthorized());");
+                    if (DeniesWrongRole(endpoint.Authorization!))
+                        method.Line($"http.perform({call}.with(user(\"http-contract\").roles(\"HTTP_CONTRACT_NONE\"))).andExpect(status().isForbidden());");
                 }
             })
             .Line();
     }
 
-    static string Call(JavaCodeBuilder code, HttpEndpoint endpoint)
+    static bool DeniesWrongRole(string expression) => expression switch
+    {
+        "denyAll()" => true,
+        _ when expression.StartsWith("hasRole('", StringComparison.Ordinal) => true,
+        _ => expression.Contains(".check(authentication)", StringComparison.Ordinal)
+    };
+
+    static string Call(AxonEmissionContext context, JavaCodeBuilder code, HttpEndpoint endpoint)
     {
         var call = $"request({code.Reference("org.springframework.http.HttpMethod")}.valueOf({JavaCodeBuilder.StringLiteral(endpoint.Method)}), {JavaCodeBuilder.StringLiteral(endpoint.Path)})";
-        foreach (var parameter in endpoint.Parameters) call += $".param({JavaCodeBuilder.StringLiteral(parameter.Name)}, \"x\")";
-        if (endpoint.Kind == "command") call += $".contentType({code.Reference("org.springframework.http.MediaType")}.APPLICATION_JSON).content(\"{{}}\")";
+        foreach (var parameter in endpoint.Parameters) call += $".param({JavaCodeBuilder.StringLiteral(parameter.Name)}, {JavaCodeBuilder.StringLiteral(HttpSecurityExamples.Parameter(context, parameter))})";
+        if (endpoint.Kind == "command") call += $".contentType({code.Reference("org.springframework.http.MediaType")}.APPLICATION_JSON).content({JavaCodeBuilder.StringLiteral(HttpSecurityExamples.Body(context, endpoint))})";
         if (endpoint.Kind == "stream") call += $".accept({code.Reference("org.springframework.http.MediaType")}.TEXT_EVENT_STREAM)";
         return call;
     }

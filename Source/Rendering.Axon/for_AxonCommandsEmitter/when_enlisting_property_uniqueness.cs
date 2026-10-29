@@ -51,7 +51,7 @@ public class when_enlisting_property_uniqueness : for_AxonArtifactRenderPlanner.
             new[] { "java.", "org.axonframework.", "org.springframework.", "jakarta.", "io.cratis." }.Any(prefix => line.Contains(prefix, StringComparison.Ordinal))).ShouldBeFalse();
     [Fact] void should_release_by_owner_on_the_modeled_event() => constraints.ShouldContain("OrderMoved fact) store.releaseOwner");
     [Fact] void should_release_in_memory_reservations_after_errors_too() => ModuleSource("InMemoryUniqueValueStore").ShouldContain("context.doFinally(completed -> complete(changes, completed.isCommitted()))");
-    [Fact] void should_share_the_runtime_http_test_context() => Source("UniqueAppendTransactionTest.java").ShouldContain("@Import(RuntimeHttpRoundTripTest.EchoEndpoint.class)");
+    [Fact] void should_not_depend_on_an_echo_endpoint() => Source("UniqueAppendTransactionTest.java").ShouldNotContain("RuntimeHttpRoundTripTest");
     [Fact] void should_tag_the_native_proof_event_with_the_owner() => Source("UniqueAppendTransactionTest.java").ShouldContain("@EventTag(key = \"owner\")");
     [Fact] void should_map_conflicts_to_http_409() => ModuleSource("ProblemDetailsAdvice").ShouldContain("HttpStatus.CONFLICT");
     [Fact] void should_not_refuse_supported_uniqueness() => plan.Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0801").ShouldBeFalse();
