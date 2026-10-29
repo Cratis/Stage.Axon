@@ -16,7 +16,16 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
         admission ??= ReducerBodies.Admission(context, located, reducer);
         if (admission.Blocked is { } blocked)
         {
-            context.Degradation.Unsupported(AxonRefusalCodes.Reduction, model.Id, blocked);
+            context.Degradation.Unsupported(admission.BlockedCode, model.Id, blocked);
+            if (admission.BlockedCode == AxonRefusalCodes.CompositeKey)
+            {
+                var stubPackage = types.Package(located);
+                var name = JavaNames.Type(model.Name) + "Reducer";
+                var stub = new JavaCodeBuilder(stubPackage).Declare(name)
+                    .UnsupportedIntent("reduce events into the read model: " + blocked, model.Id.ToString(), admission.BlockedCode)
+                    .Block($"public class {name}", _ => { });
+                context.AddJava(stubPackage, name, stub.Build(), sources: model.Id);
+            }
             return;
         }
         var package = types.Package(located);

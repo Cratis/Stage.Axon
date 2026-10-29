@@ -24,76 +24,55 @@ internal static class ReadModelEntities
     internal static void Emit(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticReadModel model)
     {
         var application = context.Request.Model.Application;
+        ReadModelKeys.Emit(context, types, package, model);
+        var composite = ReadModelKeys.IsComposite(application, model);
         var name = JavaNames.Type(model.Name);
         var entity = EntityName(model);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(entity);
+        var keyType = composite ? code.Reference(package + "." + ReadModelKeys.KeyName(model)) : code.Reference("java.lang.String");
         foreach (var property in model.Properties) types.Claim(property.Type, code);
-        var columns = model.Properties.Select(property => (Property: property, Member: JavaNames.Member(property.Name), Column: Describe(application, types, property, code))).ToArray();
+        var mapping = new Columns(application, types, code);
+        var columns = model.Properties.Select(property => (Property: property, Member: JavaNames.Member(property.Name), Column: mapping.Describe(property))).ToArray();
         var table = "rm_" + Snake(package + "." + name);
         code.Line($"@{code.Reference("jakarta.persistence.Entity")}(name = {JavaCodeBuilder.StringLiteral(package + "." + entity)})")
             .Line($"@{code.Reference("jakarta.persistence.Table")}(name = {JavaCodeBuilder.StringLiteral(table)})")
             .Block($"public class {entity}", body =>
             {
-                body.Line($"@{body.Reference("jakarta.persistence.Id")}")
-                    .Line($"@{body.Reference("jakarta.persistence.Column")}(name = \"row_key\", columnDefinition = \"VARCHAR({KeyLength})\")")
-                    .Line($"private {body.Reference("java.lang.String")} rowKey;");
+                if (composite)
+                {
+                    body.Line($"@{body.Reference("jakarta.persistence.EmbeddedId")}");
+                }
+                else
+                {
+                    body.Line($"@{body.Reference("jakarta.persistence.Id")}")
+                        .Line($"@{body.Reference("jakarta.persistence.Column")}(name = \"row_key\", columnDefinition = \"VARCHAR({KeyLength})\")");
+                }
+                body.Line($"private {keyType} rowKey;");
                 foreach (var (_, member, column) in columns)
                 {
                     foreach (var annotation in column.Annotations) body.Line(annotation);
                     body.Line($"private {column.Type} {member};");
                 }
                 body.Line($"protected {entity}() {{}}")
-                    .Block($"public {entity}({code.Reference("java.lang.String")} rowKey, {name} model)", constructor =>
+                    .Block($"public {entity}({keyType} rowKey, {name} model)", constructor =>
                     {
                         constructor.Line("this.rowKey = rowKey;");
                         foreach (var (_, member, column) in columns) constructor.Line($"this.{member} = {column.Write($"model.{member}()")};");
                     })
+                    .Block($"public {keyType} rowKey()", method => method.Line("return rowKey;"))
                     .Block($"public {name} toModel()", method => method.Line($"return new {name}({string.Join(", ", columns.Select(entry => entry.Column.Read(entry.Member)))});"));
             });
         ViewJavaTypes.Add(context, package, entity, code.Build(), model.Id);
 
         var repository = RepositoryName(model);
         var contract = new JavaCodeBuilder(package).Declare(entity).Declare(repository);
+        var repositoryKey = composite ? contract.Reference(package + "." + ReadModelKeys.KeyName(model)) : contract.Reference("java.lang.String");
         contract.Line($"@{contract.Reference("org.springframework.stereotype.Repository")}({JavaCodeBuilder.StringLiteral(package + "." + repository)})")
-            .Line($"public interface {repository} extends {contract.Reference("org.springframework.data.jpa.repository.JpaRepository")}<{entity}, {contract.Reference("java.lang.String")}> {{}}");
+            .Line($"public interface {repository} extends {contract.Reference("org.springframework.data.jpa.repository.JpaRepository")}<{entity}, {repositoryKey}> {{}}");
         ViewJavaTypes.Add(context, package, repository, contract.Build(), model.Id);
     }
 
-    static Column Describe(SemanticApplication application, ViewJavaTypes types, SemanticProperty property, JavaCodeBuilder code)
-    {
-        var type = property.Type;
-        var name = "p_" + Snake(JavaNames.Member(property.Name));
-        var column = $"@{code.Reference("jakarta.persistence.Column")}(name = {JavaCodeBuilder.StringLiteral(name)}";
-        if (type.IsCollection || type.Kind == SemanticTypeReferenceKind.CompositeType)
-        {
-            return new(types.Type(type, code), [$"@{code.Reference("org.hibernate.annotations.JdbcTypeCode")}({code.Reference("org.hibernate.type.SqlTypes")}.JSON)", column + ")"], value => value, value => value);
-        }
-
-        if (type.Kind == SemanticTypeReferenceKind.Concept)
-        {
-            var concept = application.Concepts.Single(candidate => candidate.Id == type.Target);
-            var conceptType = types.Type(type, code);
-            if (types.IsEnumeration(type))
-            {
-                var primitive = code.Reference(ConceptEnums.IsNumeric(concept) ? "java.lang.Integer" : "java.lang.String");
-                return new(primitive, [column + ")"], value => $"{value} == null ? null : {value}.value()", value => $"{value} == null ? null : {conceptType}.fromValue({value})");
-            }
-
-            var scalar = types.ColumnType(types.PrimitiveOf(type), code);
-            return new(scalar, [Basic(column, types.PrimitiveOf(type))], value => $"{value} == null ? null : {value}.value()", value => $"{value} == null ? null : new {conceptType}({value})");
-        }
-
-        return new(types.Type(type, code), [Basic(column, type.Primitive)], value => value, value => value);
-    }
-
-    static string Basic(string column, SemanticPrimitiveType primitive) => primitive switch
-    {
-        SemanticPrimitiveType.DecimalNumber => column + ", columnDefinition = \"DECFLOAT\")",
-        SemanticPrimitiveType.Uuid or SemanticPrimitiveType.WholeNumber or SemanticPrimitiveType.Boolean or SemanticPrimitiveType.Date or SemanticPrimitiveType.DateTime => column + ")",
-        _ => column + $", columnDefinition = \"VARCHAR({KeyLength})\")"
-    };
-
-    static string Snake(string value)
+    internal static string Snake(string value)
     {
         var text = new StringBuilder();
         for (var index = 0; index < value.Length; index++)
@@ -106,5 +85,42 @@ internal static class ReadModelEntities
         return text.ToString();
     }
 
-    sealed record Column(string Type, string[] Annotations, Func<string, string> Write, Func<string, string> Read);
+    static string Basic(string column, SemanticPrimitiveType primitive) => primitive switch
+    {
+        SemanticPrimitiveType.DecimalNumber => column + ", columnDefinition = \"DECFLOAT\")",
+        SemanticPrimitiveType.Uuid or SemanticPrimitiveType.WholeNumber or SemanticPrimitiveType.Boolean or SemanticPrimitiveType.Date or SemanticPrimitiveType.DateTime => column + ")",
+        _ => column + $", columnDefinition = \"VARCHAR({KeyLength})\")"
+    };
+
+    internal sealed class Columns(SemanticApplication application, ViewJavaTypes types, JavaCodeBuilder code)
+    {
+        internal Column Describe(SemanticProperty property, string prefix = "p_")
+        {
+            var type = property.Type;
+            var name = prefix + Snake(JavaNames.Member(property.Name));
+            var column = $"@{code.Reference("jakarta.persistence.Column")}(name = {JavaCodeBuilder.StringLiteral(name)}";
+            if (type.IsCollection || type.Kind == SemanticTypeReferenceKind.CompositeType)
+            {
+                return new(types.Type(type, code), [$"@{code.Reference("org.hibernate.annotations.JdbcTypeCode")}({code.Reference("org.hibernate.type.SqlTypes")}.JSON)", column + ")"], value => value, value => value);
+            }
+
+            if (type.Kind == SemanticTypeReferenceKind.Concept)
+            {
+                var concept = application.Concepts.Single(candidate => candidate.Id == type.Target);
+                var conceptType = types.Type(type, code);
+                if (types.IsEnumeration(type))
+                {
+                    var primitive = code.Reference(ConceptEnums.IsNumeric(concept) ? "java.lang.Integer" : "java.lang.String");
+                    return new(primitive, [column + ")"], value => $"{value} == null ? null : {value}.value()", value => $"{value} == null ? null : {conceptType}.fromValue({value})");
+                }
+
+                var scalar = types.ColumnType(types.PrimitiveOf(type), code);
+                return new(scalar, [Basic(column, types.PrimitiveOf(type))], value => $"{value} == null ? null : {value}.value()", value => $"{value} == null ? null : new {conceptType}({value})");
+            }
+
+            return new(types.Type(type, code), [Basic(column, type.Primitive)], value => value, value => value);
+        }
+    }
+
+    internal sealed record Column(string Type, string[] Annotations, Func<string, string> Write, Func<string, string> Read);
 }

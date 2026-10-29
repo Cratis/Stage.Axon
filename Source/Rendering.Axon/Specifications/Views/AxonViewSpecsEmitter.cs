@@ -49,11 +49,13 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
         var code = new JavaCodeBuilder(package).Declare(name);
         DeclareModels(code, located);
         ViewRepositories.Declare(code, model);
+        var joined = ProjectionJoinEntities.Has(context, types, projection, model);
+        if (joined) ViewRepositories.DeclareJoins(code, projection);
         code.Declare(JavaNames.Type(projection.Name) + "Projector");
         var plans = specs.Select(spec =>
         {
             var native = new NativeViewSpecifications(context, types, located, model).Plan(spec);
-            return (Spec: spec, Native: native, Supported: (ViewSpecificationSupport.Legacy(spec, model, types) || native is not null) && ProjectionHandlerShape.RootOnly(projection));
+            return (Spec: spec, Native: native, Supported: (ViewSpecificationSupport.Legacy(spec, model, types) || native is not null) && ProjectionHandlerShape.Renderable(context, types, projection, model));
         }).ToArray();
         var claims = new ViewSpecificationClaims(context, types);
         foreach (var plan in plans.Where(plan => plan.Supported)) claims.Specification(plan.Spec, model, code);
@@ -61,6 +63,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
         code.Block($"class {name}", body =>
         {
             ViewRepositories.Field(body, model);
+            if (joined) ViewRepositories.JoinField(body, projection);
             foreach (var (spec, native, supported) in plans)
             {
                 var disabledCode = supported ? null : AxonRefusalCodes.ViewSpecification;
@@ -79,7 +82,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                             .Line("throw new UnsupportedOperationException(\"Unsupported modeled view specification\");");
                         return;
                     }
-                    method.Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(repository);");
+                    method.Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(repository{(joined ? ", joins" : string.Empty)});");
                     foreach (var given in spec.GivenEvents)
                     {
                         var root = ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, JavaNames.Type(model.Name));
@@ -89,7 +92,11 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                     foreach (var expected in spec.ThenReadModels.Where(expected => expected.ReadModel == model.Id))
                         EmitExpected(context.Request.Model.Application, types, model, expected, method);
                     foreach (var absent in spec.ThenAbsentReadModels.Where(expected => expected.ReadModel == model.Id))
-                        method.Line($"{method.Reference("org.junit.jupiter.api.Assertions")}.assertTrue({ViewRepositories.Get(model, ViewExpectedKeys.Expression(absent.Key, model, types, method))}.findAny().isEmpty(), \"Expected the modeled instance to be removed\");");
+                    {
+                        var key = ViewExpectedKeys.Expression(absent.Key, model, types, method);
+                        var missing = Missing(model, types, key);
+                        method.Line($"{method.Reference("org.junit.jupiter.api.Assertions")}.assertTrue({missing}, \"Expected the modeled instance to be removed\");");
+                    }
                 }));
             }
         });
@@ -100,6 +107,9 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
     {
         foreach (var model in located.Slice.ReadModels) code.Declare(JavaNames.Type(model.Name));
     }
+
+    static string Missing(SemanticReadModel model, ViewJavaTypes types, string? key) =>
+        $"!repository.existsById({key})";
 
     static void EmitExpected(SemanticApplication application, ViewJavaTypes types, SemanticReadModel model, SemanticSpecificationReadModel expected, JavaCodeBuilder code)
     {

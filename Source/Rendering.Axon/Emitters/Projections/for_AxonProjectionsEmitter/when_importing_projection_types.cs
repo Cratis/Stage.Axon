@@ -35,7 +35,8 @@ public class when_importing_projection_types : given.a_view_request
 
     [Fact] void should_shorten_persistence_and_query_update_parameters() => _flatProjector.ShouldContain("public synchronized void on(Increased event, QueryUpdateEmitter updates)");
     [Fact] void should_import_the_update_emitter_for_the_binding() => _flatProjector.ShouldContain("import org.axonframework.messaging.queryhandling.QueryUpdateEmitter;");
-    [Fact] void should_degrade_the_scoped_projection_to_an_empty_projector() => _projector.ShouldContain("STAGE-AXON-0310");
+    [Fact] void should_render_the_scoped_projection_over_the_repository() => _projector.ShouldContain("repository.save(");
+    [Fact] void should_not_degrade_a_resolvable_scoped_projection() => _projector.ShouldNotContain("STAGE-AXON-0310");
     [Fact] void should_not_construct_qualified_application_types() => _projector.ShouldNotContain("new axonviews.");
     [Fact] void should_import_reducer_component_annotations() => _reducer.ShouldContain("import org.springframework.stereotype.Component;");
     [Fact] void should_use_short_reducer_component_annotations() => _reducer.ShouldContain("@Component(\"axonviews.reduction.counters.rebuilt.RebuiltTotalReducer\")");
