@@ -41,7 +41,9 @@ public class when_rendering_state_changes : for_AxonArtifactRenderPlanner.given.
     [Fact] void should_not_return_an_untyped_result() => Code("PlaceOrderEndpoint").ShouldNotContain("<Object>");
     [Fact] void should_leave_request_validation_to_the_dispatch_interceptor() => Code("PlaceOrderEndpoint").ShouldNotContain("rules");
     [Fact] void should_emit_real_axon_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("AxonTestFixture.with(configuration)");
-    [Fact] void should_enforce_method_security_in_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("AuthorizationManagerBeforeMethodInterceptor.preAuthorize()");
+    [Fact] void should_enforce_method_security_in_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("HandlerEnhancerDefinitionUtils.registerToComponentRegistry(registry, components -> new SecuredMessageHandlerDefinition())");
+    [Fact] void should_dispatch_native_authorization_metadata() => Code("PlaceOrderSpecificationsTest").ShouldContain("Metadata.with(\"username\", \"stage-spec-caller\").and(\"authorities\", \"ROLE_Sales\")");
+    [Fact] void should_supply_metadata_to_the_fixture() => Code("PlaceOrderSpecificationsTest").ShouldContain(", metadata).then();");
     [Fact] void should_compare_the_expected_events() => Code("PlaceOrderSpecificationsTest").ShouldContain("result.events(new OrderPlaced(");
     [Fact] void should_import_the_expected_event_type() => Code("PlaceOrderSpecificationsTest").ShouldContain($"import {context.BasePackage}.orders.events.OrderPlaced;");
     [Fact] void should_supply_enum_constants() => Code("PlaceOrderSpecificationsTest").ShouldContain("OrderChannel.WEB");

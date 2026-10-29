@@ -10,7 +10,22 @@ internal static class CommandFixtureSecurity
 {
     internal static void Caller(JavaCodeBuilder method, SemanticCaller? caller) => CallerCore(method, caller, null);
 
-    internal static void CallerReferences(JavaCodeBuilder method, SemanticCaller? caller) => CallerCore(method, caller, method);
+    internal static void CallerReferences(JavaCodeBuilder method, SemanticCaller? caller, bool metadataOnly = false)
+    {
+        if (!metadataOnly)
+        {
+            CallerCore(method, caller, method);
+            return;
+        }
+        var metadata = method.Reference("org.axonframework.messaging.core.Metadata") + ".emptyInstance()";
+        if (caller is { Authenticated: true })
+        {
+            var identity = caller.Claims.Where(claim => claim.Type == "sub" || claim.Type.EndsWith("/nameidentifier", StringComparison.Ordinal)).Select(claim => claim.Value).FirstOrDefault("stage-spec-caller");
+            var authorities = string.Join(',', caller.Roles.Select(role => "ROLE_" + role));
+            metadata = method.Reference("org.axonframework.messaging.core.Metadata") + ".with(\"username\", " + JavaCodeBuilder.StringLiteral(identity) + ").and(\"authorities\", " + JavaCodeBuilder.StringLiteral(authorities) + ")";
+        }
+        method.Line($"var metadata = {metadata};");
+    }
 
     internal static void ReportUnsupportedClaims(AxonEmissionContext context, JavaCodeBuilder code, SemanticSpecification specification)
     {
@@ -60,9 +75,6 @@ internal static class CommandFixtureSecurity
         var parameter = usesClock ? $"{Reference(code, "java.time.Clock")} clock" : string.Empty;
         var argument = usesClock ? "clock" : string.Empty;
         body.Block($"private {name}Handler handler({parameter})", method => method
-            .Line($"var factory = new {Reference(code, "org.springframework.aop.framework.ProxyFactory")}(new {name}Handler({argument}));")
-            .Line("factory.setProxyTargetClass(true);")
-            .Line($"factory.addAdvisor({Reference(code, "org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor")}.preAuthorize());")
-            .Line($"return ({name}Handler) factory.getProxy();"));
+            .Line($"return new {name}Handler({argument});"));
     }
 }

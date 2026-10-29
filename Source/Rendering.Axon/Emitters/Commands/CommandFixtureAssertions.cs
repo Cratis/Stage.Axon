@@ -58,7 +58,7 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
     {
         if (specification.ThenDenied)
         {
-            method.Line($"result.exception({Reference("org.springframework.security.access.AccessDeniedException")}.class).noEvents();");
+            method.Line($"result.exception({Reference("org.axonframework.extension.spring.authorization.UnauthorizedMessageException")}.class).noEvents();");
             return;
         }
         if (!specification.ThenErrors.IsEmpty)

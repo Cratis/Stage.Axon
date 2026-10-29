@@ -37,7 +37,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}").Block($"public class {name}Handler", body =>
         {
             body.Line($"@{body.Reference("org.axonframework.messaging.commandhandling.annotation.CommandHandler")}");
-            var authorization = SecurityAnnotations.For(context, command.Authorization, command.Id);
+            var authorization = SecurityAnnotations.ForHandler(context, command.Authorization, command.Id, body);
             if (authorization.Length > 0) body.Line(authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal));
             body.Block($"public {response.ReturnTypeFor(body)} handle({Parameters(name, body, package)})", method => Handle(method, response, package));
             if (_nativeBody is not null) NativeBody(body, response, name);

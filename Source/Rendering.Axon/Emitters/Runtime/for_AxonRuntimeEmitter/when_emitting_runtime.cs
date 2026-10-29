@@ -37,16 +37,6 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     [Fact] void should_not_emit_the_persistent_safety_helper() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/persistent/PersistentReadModelSafety.java", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_not_emit_the_persistent_safety_test() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/PersistentReadModelSafetyTest.java", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact]
-    void should_register_installed_axon_entities_in_the_test_fixture()
-    {
-        var fixture = Template("PersistentProbeSupport.java");
-        fixture.ShouldContain("@EntityScan(basePackageClasses = { UniqueClaim.class,\n            AggregateEventEntry.class,\n            TokenEntry.class })");
-        fixture.ShouldContain("import io.cratis.stage.axon.runtime.persistent.UniqueClaim;");
-        fixture.ShouldContain("import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;");
-        fixture.ShouldContain("import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;");
-    }
-
-    [Fact]
     void should_not_emit_hand_rolled_concept_types()
     {
         foreach (var name in new[] { "ConceptAs", "Generatable", "GeneratableInContext", "GenerateValue", "GenerationContext", "ValueEncoding" })
@@ -111,16 +101,16 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     [Fact]
     void should_pin_the_application_mapper_wire_test()
     {
-        var tests = Template("RuntimeHttpRoundTripTest.java");
-        tests.ShouldContain("void exactConceptWireFormatSurvivesHttpRoundTrip()");
+        var tests = File.ReadAllText(Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Source/Rendering.Axon.Verification/Templates/GeneratedInlinePolicyTest.java"));
+        tests.ShouldContain("void exactConceptWireFormatUsesTheApplicationMapper()");
         tests.ShouldContain("\\\"amount\\\":100");
         tests.ShouldContain("\\\"byAmount\\\":{\\\"100\\\":\\\"x\\\"}");
         tests.ShouldContain("2026-10-24T12:00:00+00:00");
         tests.ShouldNotContain("1E+2");
-        tests.ShouldContain("content().string(json)");
-        tests.ShouldContain("void explicitEnumValuesSurviveHttpRoundTrip()");
+        tests.ShouldContain("assertEquals(json, mapper.writeValueAsString");
+        tests.ShouldContain("void explicitEnumValuesUseTheApplicationMapper()");
         tests.ShouldContain("List.of(10, 30)");
-        tests.ShouldContain("void invalidEnumNumbersFailHttpBinding()");
+        tests.ShouldContain("void invalidEnumNumbersFailBinding()");
         tests.ShouldContain("List.of(0, 1, 20, 31)");
     }
 

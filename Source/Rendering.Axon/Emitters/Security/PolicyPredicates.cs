@@ -19,13 +19,13 @@ internal static class PolicyPredicates
         {
             return (null, $"Policy '{policy.Name}' has a generated Java member collision with '{first.Name}'; access is denied.");
         }
-        return InlineJavaBodies.TryResolve(context, new(condition.RequirementId, SemanticImplementationRole.PolicyPredicate, context.Request.Model.Application.Id), out var body, out var reason)
-            ? (body, string.Empty) : (null, reason);
+        if (!InlineJavaBodies.TryResolve(context, new(condition.RequirementId, SemanticImplementationRole.PolicyPredicate, context.Request.Model.Application.Id), out var body, out var reason)) return (null, reason);
+        return PolicyBodies.Failure(context, body) is { } failure ? (null, failure) : (body, string.Empty);
     }
 
     internal static string PolicyClass(SemanticPolicy policy) => JavaNames.Type(policy.Name) + "Policy";
 
-    internal static string SiteMember(SemanticId owner) => "authorize" + JavaNames.Type(owner.ToString());
+    internal static string BeanName(SemanticPolicy policy) => JavaNames.Member(policy.Name) + "Policy";
 
     internal static IEnumerable<(SemanticId Owner, SemanticAuthorization Authorization)> Sites(AxonEmissionContext context) =>
         ScopeSelection.Select(context.Request).SelectMany(located =>
@@ -49,6 +49,8 @@ internal static class PolicyPredicates
 
     internal static string? Failure(AxonEmissionContext context, SemanticAuthorization authorization)
     {
+        if (authorization is not SemanticPolicyReference reference || context.Request.Model.Application.Policies.FirstOrDefault(policy => policy.Name == reference.Name)?.Condition is not SemanticOpaquePolicyCondition)
+            return "Inline policy composition cannot preserve eager failure-dominance with native Spring expressions; access is denied.";
         foreach (var policy in ReferencedPolicies(context, authorization))
         {
             foreach (var condition in Opaque(policy.Condition))
@@ -60,12 +62,9 @@ internal static class PolicyPredicates
         return null;
     }
 
-    internal static string? Expression(AxonEmissionContext context, SemanticAuthorization authorization) => authorization switch
-    {
-        SemanticPolicyReference reference => context.Request.Model.Application.Policies.FirstOrDefault(policy => policy.Name == reference.Name) is { } policy ? Condition(context, policy, policy.Condition) : null,
-        SemanticLogicalAuthorization logical => Combine(Expression(context, logical.Left), logical.Operator, Expression(context, logical.Right)),
-        _ => null
-    };
+    internal static string? Expression(AxonEmissionContext context, SemanticAuthorization authorization) =>
+        authorization is SemanticPolicyReference reference && context.Request.Model.Application.Policies.FirstOrDefault(policy => policy.Name == reference.Name) is { Condition: SemanticOpaquePolicyCondition } policy
+            ? "isAuthenticated() and @" + BeanName(policy) + ".check(authentication)" : null;
 
     static IEnumerable<SemanticPolicy> ReferencedPolicies(AxonEmissionContext context, SemanticAuthorization authorization)
     {
@@ -73,30 +72,6 @@ internal static class PolicyPredicates
         References(authorization, names);
         return context.Request.Model.Application.Policies.Where(policy => names.Contains(policy.Name));
     }
-
-    static string? Condition(AxonEmissionContext context, SemanticPolicy policy, SemanticPolicyCondition condition) => condition switch
-    {
-        SemanticOpaquePolicyCondition opaque => Resolve(context, policy, opaque).Body is not null ? "evaluate" + JavaNames.Type(policy.Name) + "(authentication, claims)" : null,
-        _ => DeclarativeCondition(context, policy, condition)
-    };
-
-    static string? DeclarativeCondition(AxonEmissionContext context, SemanticPolicy policy, SemanticPolicyCondition condition) => condition switch
-    {
-        SemanticRoleCondition role => "decision(authentication != null && authentication.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals(" + JavaCodeBuilder.StringLiteral("ROLE_" + role.Role) + ")))",
-        SemanticAuthenticatedCondition => "decision(authenticated(authentication))",
-        SemanticAnonymousCondition => "Decision.ALLOW",
-        SemanticNotPolicyCondition not => Condition(context, policy, not.Operand) is { } operand ? "not(" + operand + ")" : null,
-        SemanticLogicalPolicyCondition logical => Combine(Condition(context, policy, logical.Left), logical.Operator, Condition(context, policy, logical.Right)),
-        _ => null
-    };
-
-    static string? Combine(string? left, SemanticLogicalOperator operation, string? right) =>
-        left is null || right is null ? null : operation switch
-        {
-            SemanticLogicalOperator.And => "and(" + left + ", " + right + ")",
-            SemanticLogicalOperator.Or => "or(" + left + ", " + right + ")",
-            _ => null
-        };
 
     static void References(SemanticAuthorization? authorization, HashSet<string> names)
     {

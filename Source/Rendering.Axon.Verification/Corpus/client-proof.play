@@ -59,6 +59,26 @@ module Work
       event WorkItemRenamed
         title String
 
+      specification NativeFixtureAllowsEditor
+        given caller
+          authenticated
+          role "Editor"
+        when RenameWorkItem
+          id = "00000000-0000-0000-0000-000000000001"
+          title = "Allowed"
+        then WorkItemRenamed
+          for "00000000-0000-0000-0000-000000000001"
+          title = "Allowed"
+
+      specification NativeFixtureDeniesViewer
+        given caller
+          authenticated
+          role "Viewer"
+        when RenameWorkItem
+          id = "00000000-0000-0000-0000-000000000002"
+          title = "Denied"
+        then denied
+
     slice StateChange RequestWireNames
       command EchoClass
         class String

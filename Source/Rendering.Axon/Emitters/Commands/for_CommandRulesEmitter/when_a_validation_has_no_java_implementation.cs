@@ -46,7 +46,7 @@ public class when_a_validation_has_no_java_implementation : for_AxonArtifactRend
     [Fact] void should_disable_the_dependent_test() => rejection.ShouldContain("@Disabled(\"" + Reason + "\")");
     [Fact] void should_keep_the_success_test_enabled() => success.ShouldNotContain("@Disabled");
     [Fact] void should_keep_authorization_denial_enabled() => denial.ShouldNotContain("@Disabled");
-    [Fact] void should_still_assert_authorization_denial() => denial.ShouldContain("result.exception(AccessDeniedException.class).noEvents();");
+    [Fact] void should_still_assert_authorization_denial() => denial.ShouldContain("result.exception(UnauthorizedMessageException.class).noEvents();");
 
     string Render(LocatedSemanticSlice located, SemanticCommand command, SemanticSpecification specification)
     {

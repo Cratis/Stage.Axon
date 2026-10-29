@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.axonframework.common.configuration.Configuration;
+import org.axonframework.extension.spring.authorization.UnauthorizedMessageException;
 import org.axonframework.messaging.commandhandling.gateway.CommandGateway;
 import org.axonframework.messaging.eventhandling.conversion.EventConverter;
 import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
@@ -135,7 +136,7 @@ class GeneratedSecurityIngressTest {
 
     private static void denied(Exception failure) {
         var actual = GeneratedIngressSupport.root(failure);
-        assertTrue(actual instanceof AccessDeniedException || actual instanceof AuthenticationCredentialsNotFoundException,
-                () -> "Expected method-security denial, got " + actual);
+        assertTrue(actual instanceof UnauthorizedMessageException || actual instanceof AccessDeniedException || actual instanceof AuthenticationCredentialsNotFoundException,
+                () -> "Expected native authorization denial, got " + actual);
     }
 }
