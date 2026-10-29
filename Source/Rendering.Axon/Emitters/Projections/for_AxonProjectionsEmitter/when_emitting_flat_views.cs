@@ -29,9 +29,10 @@ public class when_emitting_flat_views : given.a_view_request
     [Fact] void should_update_the_model_fluently() => _projector.ShouldContain("state = new Total(state.name(), state.amount(), ((state.count() == null ? 0L : state.count()) + 1L), state.note());");
     [Fact] void should_emit_copy_methods() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/Total.java", StringComparison.Ordinal))).ShouldContain("public Total withCount(Long value)");
     [Fact] void should_not_emit_the_subscribing_properties() => _context.Artifacts.Exists(artifact => artifact.RelativePath == "src/main/resources/axon-views.properties").ShouldBeFalse();
-    [Fact] void should_assign_the_view_package_to_a_pooled_sequential_processor() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ViewProcessingConfiguration.java", StringComparison.Ordinal))).ShouldContain("EventProcessorDefinition.pooledStreaming(\"views\")");
+    [Fact] void should_match_view_writers_by_their_namespace() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ViewProcessingConfiguration.java", StringComparison.Ordinal))).ShouldContain("EventProcessorDefinition.pooledStreamingMatching(\"views\")");
     [Fact] void should_use_the_sequential_policy() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ViewProcessingConfiguration.java", StringComparison.Ordinal))).ShouldContain("configuration.sequencingPolicy(SequentialPolicy.INSTANCE)");
-    [Fact] void should_select_the_view_package() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ViewProcessingConfiguration.java", StringComparison.Ordinal))).ShouldContain("VIEW_PACKAGES = Set.of(\"axonviews.");
+    [Fact] void should_not_select_by_package() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ViewProcessingConfiguration.java", StringComparison.Ordinal))).ShouldNotContain("getPackageName");
+    [Fact] void should_carry_the_view_namespace_on_the_projector() => _projector.ShouldContain("@Namespace(\"views\")");
     [Fact] void should_note_eventual_consistency() => _context.Degradation.Notes.Any(note => note.Contains("STAGE-AXON-0311", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_emit_the_repository() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/TotalRepository.java", StringComparison.Ordinal))).ShouldContain("extends JpaRepository<TotalEntity, String>");
 }

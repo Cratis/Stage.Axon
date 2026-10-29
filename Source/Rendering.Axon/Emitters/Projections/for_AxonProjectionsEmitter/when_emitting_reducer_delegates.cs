@@ -27,7 +27,7 @@ public class when_emitting_reducer_delegates : a_view_request
     }
 
     [Fact] void should_emit_a_component_class() => _reducer.ShouldContain("@Component(\"axonviews.reduction.counters.rebuilt.RebuiltTotalReducer\")");
-    [Fact] void should_bind_the_namespace() => _reducer.ShouldContain("@Namespace(\"axonviews.reduction.counters.rebuilt\")");
+    [Fact] void should_bind_the_namespace() => _reducer.ShouldContain("@Namespace(\"views\")");
     [Fact] void should_be_a_plain_class() => _reducer.ShouldContain("public class RebuiltTotalReducer");
     [Fact] void should_take_only_the_repository() => _reducer.ShouldContain("public RebuiltTotalReducer(RebuiltTotalRepository repository)");
     [Fact] void should_expose_a_private_nullable_transition() => _reducer.ShouldContain("private RebuiltTotal reduce(CountRecorded event, @Nullable RebuiltTotal current, EventMessage message)");

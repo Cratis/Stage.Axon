@@ -28,12 +28,25 @@ internal static class ApplicationTriggersEmitter
         }
     }
 
+    // Names that occur once are reserved first, then every repeated name takes its ordinal and moves on until the result is unused, so no assigned name can equal another.
+    internal static string[] Disambiguate(string[] names)
+    {
+        var used = names.Where(name => names.Count(other => other == name) == 1).ToHashSet(StringComparer.Ordinal);
+        return [.. names.Select((name, index) =>
+        {
+            if (names.Count(other => other == name) == 1) return name;
+            var ordinal = index + 1;
+            while (!used.Add(name + ordinal)) ordinal++;
+            return name + ordinal;
+        })];
+    }
+
     static string[] RunnerNames((RegisteredReaction Registered, int Index)[] handlers)
     {
         // Reaction names are unique per slice only, so a name shared across slices is qualified with its slice, and any remaining clash falls back to the handler ordinal.
         var plain = handlers.Select(handler => JavaNames.Type(handler.Registered.Reaction.Name) + (handlers.Count(other => other.Registered == handler.Registered) > 1 ? handler.Index + 1 : string.Empty)).ToArray();
         var qualified = plain.Select((name, index) => "run" + (plain.Count(other => other == name) > 1 ? JavaNames.Type(handlers[index].Registered.Slice) : string.Empty) + name).ToArray();
-        return [.. qualified.Select((name, index) => qualified.Count(other => other == name) > 1 ? name + (index + 1) : name)];
+        return Disambiguate(qualified);
     }
 
     static string Endpoint(string package, string triggerName, (RegisteredReaction Registered, int Index)[] handlers)

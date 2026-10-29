@@ -12,6 +12,9 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
 
 internal sealed class AxonProjectionsEmitter : IAxonEmitter
 {
+    /// <summary>The Axon namespace carried by every view writer, and the name of the processor that applies them.</summary>
+    internal const string ViewNamespace = "views";
+
     public bool IsImplemented => true;
 
     public void Emit(AxonEmissionContext context)
@@ -46,22 +49,17 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
 
     static void EmitProcessing(AxonEmissionContext context, ViewJavaTypes types)
     {
-        var namespaces = ScopeSelection.Select(context.Request).Where(owner => !owner.Slice.ReadModels.IsEmpty).Select(types.Package).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
-        if (namespaces.Length == 0) return;
+        if (ScopeSelection.Select(context.Request).All(owner => owner.Slice.ReadModels.IsEmpty)) return;
 
-        // One pooled streaming processor with a sequential policy applies every view writer, so a read-modify-write of a shared row never interleaves.
+        // One pooled streaming processor with a sequential policy applies every view writer, so a read-modify-write of a shared row never interleaves. Writers are matched by their @Namespace, which nothing else carries.
         var package = types.BasePackage + ".infrastructure";
         var code = new JavaCodeBuilder(package).Declare("ViewProcessingConfiguration");
-        var set = code.Reference("java.util.Set");
         var definition = code.Reference("org.axonframework.extension.spring.config.EventProcessorDefinition");
-        var packages = string.Join(", ", namespaces.Select(JavaCodeBuilder.StringLiteral));
         code.Line($"@{code.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + ".ViewProcessingConfiguration")})")
             .Block("public class ViewProcessingConfiguration", body => body
-                .Line($"private static final {set}<String> VIEW_PACKAGES = {set}.of({packages});")
                 .Line($"@{code.Reference("org.springframework.context.annotation.Bean")}")
                 .Block($"{definition} views()", method => method
-                    .Line($"return {definition}.pooledStreaming(\"views\")")
-                    .Line("    .assigningHandlers(handler -> VIEW_PACKAGES.contains(handler.beanType().getPackageName()))")
+                    .Line($"return {definition}.pooledStreamingMatching({JavaCodeBuilder.StringLiteral(ViewNamespace)})")
                     .Line($"    .customized(configuration -> configuration.sequencingPolicy({code.Reference("org.axonframework.messaging.core.sequencing.SequentialPolicy")}.INSTANCE));")));
         context.AddJava(package, "ViewProcessingConfiguration", code.Build());
         context.Degradation.Note($"{AxonRefusalCodes.EventuallyConsistentViews}: Views are processed by a pooled streaming processor with a sequential policy, so reads are eventually consistent: a query may not yet reflect an event that was just appended. Generated tests fill views by calling the projector directly or by seeding the repository, so they do not depend on the processor; tests you write that append an event and then read a view must wait for the result.");

@@ -35,6 +35,14 @@ module Bodies
           // inline-java-bodies: reaction effect
           if (input.amount() < 0) throw new IllegalStateException("A negative count was recorded at " + occurred);
           ```
+      readmodel ProbeTotal
+        id CounterId key
+        amount Int
+      reducer ProbeTotals => ProbeTotal
+        on CountRecorded
+          ```java
+          return new ProbeTotal(event.id(), event.amount());
+          ```
 
     slice StateChange Acknowledgement
       command AcknowledgeCount
