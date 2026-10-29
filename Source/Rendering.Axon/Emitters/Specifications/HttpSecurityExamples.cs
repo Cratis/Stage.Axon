@@ -20,7 +20,7 @@ internal static class HttpSecurityExamples
     internal static string Parameter(AxonEmissionContext context, HttpParameter parameter) => parameter.Type is { } type
         ? Convert.ToString(Value(context, type with { IsCollection = false }, 0), System.Globalization.CultureInfo.InvariantCulture) ?? "x" : "x";
 
-    static object? Value(AxonEmissionContext context, SemanticTypeReference type, int depth)
+    internal static object? Value(AxonEmissionContext context, SemanticTypeReference type, int depth)
     {
         if (type.IsCollection) return Array.Empty<object>();
         if (type.Kind == SemanticTypeReferenceKind.CompositeType) return CompositeValue(context, type, depth);

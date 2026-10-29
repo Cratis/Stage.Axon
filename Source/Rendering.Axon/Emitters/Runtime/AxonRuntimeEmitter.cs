@@ -36,6 +36,7 @@ internal sealed class AxonRuntimeEmitter : IAxonEmitter
                 .Replace("__DEMO_ROLE_POLICY__", JavaCodeBuilder.StringLiteral(rolePolicy), StringComparison.Ordinal);
             context.AddJava(package, name, SortImports(source), test);
         }
+        AxonHttpCardinalityTests.Emit(context);
     }
 
     static string SortImports(string source)
