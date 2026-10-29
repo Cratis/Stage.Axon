@@ -22,7 +22,8 @@ public class when_planning_the_client_proof_application : Specification
     }
 
     [Fact] void should_plan_without_refusals() => (_plan.Success && _plan.Refusals.IsEmpty).ShouldBeTrue();
-    [Fact] void should_allow_at_most_one_row_for_the_optional_query() => Source("WorkItemByIdHandler").ShouldContain("QueryResults.atMostOne(rows)");
+    [Fact] void should_return_rows_from_the_optional_query_handler() => Source("WorkItemByIdHandler").ShouldContain("return new WorkItemById.Result(rows);");
+    [Fact] void should_check_optional_cardinality_at_the_http_boundary() => Source("WorkItemByIdEndpoint").ShouldContain("cardinalityProblem(HttpStatus.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"at most one\", result.rows().size())");
     [Fact] void should_stream_the_optional_query() => Source("WorkItemByIdEndpoint").ShouldContain("TEXT_EVENT_STREAM_VALUE");
     [Fact] void should_not_stream_the_by_name_query() => Source("WorkItemByNameEndpoint").ShouldNotContain("TEXT_EVENT_STREAM_VALUE");
     [Fact] void should_serve_the_live_list_as_json() => Source("AllWorkItemsEndpoint").ShouldContain("@GetMapping(\"/api/work/items/all-work-items\")");

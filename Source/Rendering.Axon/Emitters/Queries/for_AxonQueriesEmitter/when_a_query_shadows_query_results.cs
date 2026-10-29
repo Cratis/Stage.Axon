@@ -16,6 +16,8 @@ public class when_a_query_shadows_query_results : given.a_query_collision
         Render();
     }
 
-    [Fact] void should_qualify_the_runtime_helper() => Code("FindTotalHandler").ShouldContain("io.cratis.stage.axon.runtime.QueryResults.exactlyOne(rows);");
+    [Fact] void should_keep_the_modeled_result_type() => Code("FindTotal").ShouldContain("public record Result(List<QueryResults> rows)");
+    [Fact] void should_return_the_modeled_rows() => Code("FindTotalHandler").ShouldContain("return new FindTotal.Result(rows);");
     [Fact] void should_not_import_the_runtime_helper() => Code("FindTotalHandler").ShouldNotContain("import io.cratis.stage.axon.runtime.QueryResults;");
+    [Fact] void should_not_reference_the_runtime_helper_in_the_endpoint() => Code("FindTotalEndpoint").ShouldNotContain("io.cratis.stage.axon.runtime.QueryResults");
 }

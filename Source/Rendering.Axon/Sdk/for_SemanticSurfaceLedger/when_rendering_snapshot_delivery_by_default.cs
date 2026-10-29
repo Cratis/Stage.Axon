@@ -33,7 +33,9 @@ public class when_rendering_snapshot_delivery_by_default : a_view_request
         Assert.Contains("gateway.query(new FindTotal(name), FindTotal.Result.class, metadata, null)", _endpoint, StringComparison.Ordinal);
         Assert.Contains("ResponseEntity.notFound().build()", _endpoint, StringComparison.Ordinal);
         Assert.Contains("Objects.equals(row.name(), query.name())", _handler, StringComparison.Ordinal);
-        Assert.Contains("QueryResults.atMostOne(rows);", _handler, StringComparison.Ordinal);
+        Assert.Contains("return new FindTotal.Result(rows);", _handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("QueryResults", _handler, StringComparison.Ordinal);
+        Assert.Contains("cardinalityProblem(HttpStatus.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"at most one\", result.rows().size())", _endpoint, StringComparison.Ordinal);
         Assert.DoesNotContain(_context.Artifacts, artifact => artifact.RelativePath.EndsWith("/FindTotalStreams.java", StringComparison.Ordinal));
         Assert.DoesNotContain(_context.Artifacts, artifact => artifact.RelativePath.EndsWith("/FindTotalSubscription.java", StringComparison.Ordinal));
     }

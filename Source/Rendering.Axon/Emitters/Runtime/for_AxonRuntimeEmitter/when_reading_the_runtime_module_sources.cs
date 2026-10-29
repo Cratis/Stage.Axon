@@ -13,13 +13,13 @@ public class when_reading_the_runtime_module_sources
     [InlineData("conflict")]
     [InlineData("invalid-argument")]
     [InlineData("unsupported")]
-    [InlineData("query-result-missing")]
-    [InlineData("query-cardinality")]
     void should_use_a_stable_problem_type(string type) => Source("ProblemDetailsAdvice").ShouldContain($"\"{type}\"");
 
     [Fact] void should_use_the_urn_prefix() => Source("ProblemDetailsAdvice").ShouldContain("urn:cratis:stage-axon:problem:");
     [Fact] void should_render_framework_errors_as_problem_details() => Source("ProblemDetailsAdvice").ShouldContain("extends ResponseEntityExceptionHandler");
-    [Fact] void should_map_cardinality_failures() => Source("ProblemDetailsAdvice").ShouldContain("@ExceptionHandler(QueryCardinalityException.class)");
+    [Fact] void should_not_map_cardinality_failures() => Source("ProblemDetailsAdvice").ShouldNotContain("QueryCardinalityException");
+    [Fact] void should_not_publish_query_results() => AxonRuntimePackage.ModuleTypes.Contains("QueryResults").ShouldBeFalse();
+    [Fact] void should_not_publish_a_cardinality_exception() => AxonRuntimePackage.ModuleTypes.Contains("QueryCardinalityException").ShouldBeFalse();
     [Fact] void should_answer_a_full_server_with_a_problem() => Source("ProblemDetailsAdvice").ShouldContain("live-capacity");
 
     [Theory]
@@ -29,8 +29,6 @@ public class when_reading_the_runtime_module_sources
     void should_not_swallow_security_exceptions_with_a_catch_all(string type) => Source("ProblemDetailsAdvice").ShouldNotContain($"@ExceptionHandler({type}.class)");
 
     [Theory]
-    [InlineData("QueryResults")]
-    [InlineData("QueryCardinalityException")]
     [InlineData("ProblemDetailsAdvice")]
     [InlineData("SseBridge")]
     [InlineData("LiveSnapshots")]
@@ -39,7 +37,6 @@ public class when_reading_the_runtime_module_sources
     void should_declare_the_runtime_module_package(string name) => Source(name).ShouldContain("package io.cratis.stage.axon.runtime;");
 
     [Theory]
-    [InlineData("QueryResults")]
     [InlineData("LiveSnapshots")]
     [InlineData("LiveStreams")]
     [InlineData("LiveCapacityException")]
@@ -47,10 +44,6 @@ public class when_reading_the_runtime_module_sources
     void should_not_carry_a_license_header(string name) => Source(name).ShouldNotContain("Copyright");
 
 
-    [Fact] void should_not_leave_the_runtime_placeholder() => Source("QueryResults").ShouldNotContain("__RUNTIME__");
-    [Fact] void should_require_exactly_one() => Source("QueryResults").ShouldContain("public static <T> List<T> exactlyOne(List<T> rows)");
-    [Fact] void should_allow_at_most_one() => Source("QueryResults").ShouldContain("public static <T> List<T> atMostOne(List<T> rows)");
-    [Fact] void should_not_put_row_data_in_the_exception_message() => Source("QueryCardinalityException").ShouldContain("super(\"Expected \" + cardinality + \" query result\");");
     [Fact] void should_keep_the_publisher_overload() => Source("SseBridge").ShouldContain("public static <T> SseEmitter stream(Flow.Publisher<T> publisher)");
     [Fact] void should_queue_a_comment_so_initialisation_commits_the_response() => Source("SseBridge").ShouldContain("emitter.send(SseEmitter.event().comment(\"open\"));");
     [Fact] void should_queue_the_comment_before_delivery_starts() => Precedes(Source("SseBridge"), "commitOnInitialise(emitter);", "publisher.subscribe(subscriber);").ShouldBeTrue();

@@ -18,4 +18,6 @@ public class when_a_many_query_endpoint_is_emitted : a_query_collision
 
     [Fact] void should_return_the_rows() => Code("FindTotalEndpoint").ShouldContain("ResponseEntity.ok(result.rows())");
     [Fact] void should_not_map_to_not_found() => Code("FindTotalEndpoint").ShouldNotContain("notFound()");
+    [Fact] void should_not_emit_a_cardinality_problem_helper() => Code("FindTotalEndpoint").ShouldNotContain("cardinalityProblem");
+    [Fact] void should_not_reference_problem_detail() => Code("FindTotalEndpoint").ShouldNotContain("ProblemDetail");
 }

@@ -23,7 +23,8 @@ public class when_emitting_snapshot_queries : a_view_request
 
     [Fact] void should_register_an_axon_query_handler() => _handler.ShouldContain("@QueryHandler");
     [Fact] void should_match_the_key() => _handler.ShouldContain("Objects.equals(row.name(), query.name())");
-    [Fact] void should_reject_non_unique_optional_results() => _handler.ShouldContain("QueryResults.atMostOne(rows);");
+    [Fact] void should_return_all_matching_rows_from_the_handler() => _handler.ShouldContain("return new FindTotal.Result(rows);");
+    [Fact] void should_reject_non_unique_optional_results_in_the_endpoint() => _endpoint.ShouldContain("ResponseEntity.of(cardinalityProblem(HttpStatus.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"at most one\", result.rows().size())).build()");
     [Fact] void should_dispatch_over_the_query_gateway() => _endpoint.ShouldContain("gateway.query(new FindTotal(name), FindTotal.Result.class, metadata, null)");
     [Fact] void should_take_the_http_authentication() => _endpoint.ShouldContain("Authentication authentication");
     [Fact] void should_forward_only_the_name() => _endpoint.ShouldContain(".and(\"username\", authentication.getName())");

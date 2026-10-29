@@ -27,8 +27,6 @@ internal static class AxonRuntimePackage
         "LiveSnapshots",
         "LiveStreams",
         "ProblemDetailsAdvice",
-        "QueryCardinalityException",
-        "QueryResults",
         "SecuritySupport",
         "SseBridge",
         "UniqueValueConflict",

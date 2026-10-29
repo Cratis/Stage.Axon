@@ -15,6 +15,8 @@ public class when_a_zero_or_one_query_has_many_rows : given.a_query_collision
         Render();
     }
 
-    [Fact] void should_allow_at_most_one_row_through_the_runtime() => Code("FindTotalHandler").ShouldContain("QueryResults.atMostOne(rows);");
+    [Fact] void should_return_the_rows_from_the_handler() => Code("FindTotalHandler").ShouldContain("return new FindTotal.Result(rows);");
+    [Fact] void should_not_reference_the_runtime_query_helper() => Code("FindTotalHandler").ShouldNotContain("QueryResults");
+    [Fact] void should_report_excess_rows_in_the_endpoint() => Code("FindTotalEndpoint").ShouldContain("if (result.rows().size() > 1) return ResponseEntity.of(cardinalityProblem(HttpStatus.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"at most one\", result.rows().size())).build();");
     [Fact] void should_not_throw_an_unmapped_illegal_state() => Code("FindTotalHandler").ShouldNotContain("IllegalStateException");
 }

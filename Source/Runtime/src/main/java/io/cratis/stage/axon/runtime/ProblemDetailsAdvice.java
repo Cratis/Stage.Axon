@@ -35,15 +35,6 @@ public class ProblemDetailsAdvice extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.NOT_IMPLEMENTED, "unsupported", exception.getMessage());
     }
 
-    @ExceptionHandler(QueryCardinalityException.class)
-    public ProblemDetail cardinality(QueryCardinalityException exception) {
-        var missing = exception.count() == 0;
-        var problem = problem(missing ? HttpStatus.NOT_FOUND : HttpStatus.INTERNAL_SERVER_ERROR, missing ? "query-result-missing" : "query-cardinality", exception.getMessage());
-        problem.setProperty("cardinality", exception.cardinality());
-        problem.setProperty("count", exception.count());
-        return problem;
-    }
-
     @ExceptionHandler(LiveCapacityException.class)
     public ResponseEntity<ProblemDetail> liveCapacity(LiveCapacityException exception) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)

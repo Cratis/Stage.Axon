@@ -76,6 +76,21 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
     static string RouteSegment(string name) => string.Concat(name.Select((character, index) =>
         char.IsUpper(character) && index > 0 && char.IsLower(name[index - 1]) ? "-" + char.ToLowerInvariant(character) : char.ToLowerInvariant(character).ToString())).Replace('_', '-');
 
+    static void CardinalityProblem(JavaCodeBuilder code)
+    {
+        var problem = code.Reference("org.springframework.http.ProblemDetail");
+        var status = code.Reference("org.springframework.http.HttpStatus");
+        var text = code.Reference("java.lang.String");
+        code.Line().Block($"private static {problem} cardinalityProblem({status} status, {text} type, {text} cardinality, int count)", method =>
+        {
+            method.Line($"var problem = {problem}.forStatusAndDetail(status, \"Expected \" + cardinality + \" query result\");")
+                .Line($"problem.setType({method.Reference("java.net.URI")}.create(\"urn:cratis:stage-axon:problem:\" + type));")
+                .Line("problem.setProperty(\"cardinality\", cardinality);")
+                .Line("problem.setProperty(\"count\", count);")
+                .Line("return problem;");
+        });
+    }
+
     void Snapshot(JavaCodeBuilder code, string name, string route, string modelName)
     {
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}({JavaCodeBuilder.StringLiteral(route)})");
@@ -86,14 +101,25 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
             method.Line($"var {MetadataName} = {method.Reference("org.axonframework.messaging.core.Metadata")}.emptyInstance();")
                 .Block($"if ({Caller} != null && {Caller}.isAuthenticated())", authenticated => authenticated
                     .Line($"{MetadataName} = {MetadataName}.and(\"username\", {Caller}.getName()).and(\"authorities\", {Caller}.getAuthorities().stream().map({authenticated.Reference("org.springframework.security.core.GrantedAuthority")}::getAuthority).collect({authenticated.Reference("java.util.stream.Collectors")}.joining(\",\")));"));
-            var mapped = query.Cardinality switch
+            var request = $"gateway.query(new {name}({shape.Parsed(method)}), {name}.Result.class, {MetadataName}, null)";
+            if (query.Cardinality == SemanticQueryCardinality.Many)
             {
-                SemanticQueryCardinality.Many => $"{response}.ok(result.rows())",
-                SemanticQueryCardinality.One => $"{response}.ok(result.rows().getFirst())",
-                _ => $"result.rows().isEmpty() ? {response}.notFound().build() : {response}.ok(result.rows().getFirst())"
-            };
-            method.Line($"return gateway.query(new {name}({shape.Parsed(method)}), {name}.Result.class, {MetadataName}, null).thenApply(result -> {mapped});");
+                method.Line($"return {request}.thenApply(result -> {response}.ok(result.rows()));");
+                return;
+            }
+            method.Block($"return {request}.thenApply(result ->", mapping =>
+            {
+                var status = mapping.Reference("org.springframework.http.HttpStatus");
+                var cardinality = query.Cardinality == SemanticQueryCardinality.ZeroOrOne ? "at most one" : "exactly one";
+                var missing = query.Cardinality == SemanticQueryCardinality.One
+                    ? $"{response}.of(cardinalityProblem({status}.NOT_FOUND, \"query-result-missing\", \"exactly one\", 0)).build()"
+                    : $"{response}.notFound().build()";
+                mapping.Line($"if (result.rows().isEmpty()) return {missing};")
+                    .Line($"if (result.rows().size() > 1) return {response}.of(cardinalityProblem({status}.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"{cardinality}\", result.rows().size())).build();")
+                    .Line($"return {response}.ok(result.rows().getFirst());");
+            }).Line(");");
         });
+        if (query.Cardinality != SemanticQueryCardinality.Many) CardinalityProblem(code);
     }
 
     void Live(JavaCodeBuilder code, string name, string route)
