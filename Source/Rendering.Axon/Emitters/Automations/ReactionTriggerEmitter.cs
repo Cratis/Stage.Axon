@@ -94,12 +94,13 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
     {
         if (trigger.NativeBody is { } content)
         {
-            ReactionInvocation.Dispatch(method, reaction, body => body.RawBody(content));
+            ReactionInvocation.Dispatch(method, reaction, body => body.RawBody(content), http);
             return;
         }
 
-        var invocation = ReactionJavaReferences.Expression(method, http && trigger.Production is { } production ? production.InvocationWithMetadata : trigger.Invocation);
-        ReactionInvocation.Dispatch(method, reaction, ReactionJavaReferences.Expression(method, trigger.Production is null ? ReactionInvocation.Statement(invocation, handler, http) : invocation));
+        var withMetadata = http || reaction.RunsAs is not null;
+        var invocation = ReactionJavaReferences.Expression(method, withMetadata && trigger.Production is { } production ? production.InvocationWithMetadata : trigger.Invocation);
+        ReactionInvocation.Dispatch(method, reaction, ReactionJavaReferences.Expression(method, trigger.Production is null ? ReactionInvocation.Statement(invocation, handler, withMetadata) : invocation), http);
     }
 
     PreparedReactionTrigger? WithGuard(SemanticReactionTrigger trigger, PreparedReactionTrigger prepared)

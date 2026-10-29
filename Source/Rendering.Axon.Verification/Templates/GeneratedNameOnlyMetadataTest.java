@@ -45,7 +45,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -218,7 +217,7 @@ class GeneratedNameOnlyMetadataTest {
     }
 
     @Test
-    void systemTriggerForwardsTheRealCallerThroughNativeAuthorizationAndDeniesOtherCallers() throws Exception {
+    void systemTriggerUsesTheDeclaredRunsAsInsteadOfTheHttpCaller() throws Exception {
         for (var name : List.of("operator", "alice", "system-only")) {
             clearInvocations(commands);
             var id = UUID.randomUUID();
@@ -229,16 +228,17 @@ class GeneratedNameOnlyMetadataTest {
             var response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
             assertNoLeak(response.body());
             var facts = GeneratedIngressSupport.facts(configuration, id);
-            if (name.equals("operator")) {
+            if (!name.equals("alice")) {
                 assertEquals(200, response.statusCode(), response.body());
                 var metadata = fixture.handled;
-                assertSafe(metadata, name);
+                assertSafe(metadata, "system");
                 assertEquals(Set.of("username", "authorities"), metadata.keySet());
-                var authorities = Set.copyOf(fixture.caller.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList());
+                var authorities = Set.of("ROLE_Writer");
                 assertEquals(authorities, Set.of(metadata.get("authorities").split(",")));
                 assertEquals(1, facts.size());
                 var fact = facts.getFirst();
-                assertSafe(fact.metadata(), name);
+                assertSafe(fact.metadata(), "system");
+                assertEquals("system", ((AccountRegistered) fact.payload()).actor());
                 assertFalse(fact.metadata().containsKey("authorities"));
             } else {
                 assertTrue(response.statusCode() >= 400, response.body());
