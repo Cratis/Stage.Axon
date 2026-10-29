@@ -1,9 +1,8 @@
 package __RUNTIME__;
 
-import __APPLICATION__.accounts.registry.active.ActiveAccounts;
+import __APPLICATION__.accounts.registry.active.ActiveAccountsRepository;
 import __APPLICATION__.accounts.registry.active.LivePerformedAccounts;
 import __APPLICATION__.accounts.registry.active.PerformedAccounts;
-import __RUNTIME_MODULE__.ReadModelStore;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -11,7 +10,6 @@ import org.axonframework.messaging.core.Metadata;
 import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -29,23 +27,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class GeneratedInlinePolicyPerformerTest {
     @Autowired private MockMvc http;
     @Autowired private QueryGateway queries;
-    @MockitoSpyBean @Qualifier("__APPLICATION__.accounts.registry.active.ActiveAccounts") private ReadModelStore<Object, ActiveAccounts> store;
+    @MockitoSpyBean private ActiveAccountsRepository repository;
 
     @Test
     void inlinePoliciesProtectPerformedQueriesOverHttp() throws Exception {
-        clearInvocations((Object) store);
+        clearInvocations((Object) repository);
         http.perform(get("/api/accounts/registry/performed-accounts").with(jwt().jwt(token -> token.claim("department", "Other"))))
             .andExpect(status().isForbidden());
-        verifyNoInteractions(store);
+        verifyNoInteractions(repository);
     }
 
     @Test
     void inlinePoliciesProtectPerformedQueriesOverSse() {
-        clearInvocations((Object) store);
+        clearInvocations((Object) repository);
         for (var metadata : List.of(Metadata.emptyInstance(), Metadata.with("username", "writer").and("authorities", "ROLE_Writer"))) {
             assertThrows(Exception.class, () -> queries.query(new PerformedAccounts(), PerformedAccounts.Result.class, metadata, null).get(10, TimeUnit.SECONDS));
             assertThrows(Exception.class, () -> Flux.from(queries.subscriptionQuery(new LivePerformedAccounts(), LivePerformedAccounts.Result.class, metadata, null, 8)).blockFirst(Duration.ofSeconds(10)));
         }
-        verifyNoInteractions(store);
+        verifyNoInteractions(repository);
     }
 }

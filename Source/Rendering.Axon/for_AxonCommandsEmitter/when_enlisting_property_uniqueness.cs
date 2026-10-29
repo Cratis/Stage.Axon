@@ -58,10 +58,8 @@ public class when_enlisting_property_uniqueness : for_AxonArtifactRenderPlanner.
     [Fact] void should_not_depend_on_an_echo_endpoint() => Source("UniqueAppendTransactionTest.java").ShouldNotContain("RuntimeHttpRoundTripTest");
     [Fact] void should_make_the_restart_proof_opt_in() => Source("PersistentRestartProbe.java").ShouldContain("@EnabledIfSystemProperty(named = \"stage.restart\", matches = \"true\")");
     [Fact] void should_exclude_the_restart_probe_from_default_surefire_discovery() => plan.Artifacts.Any(artifact => artifact.RelativePath.EndsWith("/PersistentRestartTest.java", StringComparison.Ordinal)).ShouldBeFalse();
-    [Fact] void should_boot_viewless_persistence_twice_on_the_same_database() => Source("PersistentRestartProbe.java").ShouldContain("try (var second = boot(database, main))");
-    [Fact] void should_execute_the_viewless_fixture_proof() => Source("PersistentRestartProbe.java").ShouldContain("survivesTwoBoots(false);");
-    [Fact] void should_require_real_persistent_view_startup_refusal() => Source("PersistentRestartProbe.java").ShouldContain("PersistentProbeSupport.refuses(database);");
-    [Fact] void should_require_unchanged_persisted_state_after_each_refusal() => Source("PersistentRestartProbe.java").ShouldContain("assertEquals(before, PersistentDatabaseSnapshot.read(database)");
+    [Fact] void should_boot_viewless_persistence_twice_on_the_same_database() => Source("PersistentRestartProbe.java").ShouldContain("try (var second = boot(database))");
+    [Fact] void should_execute_the_viewless_fixture_proof() => Source("PersistentRestartProbe.java").ShouldContain("survivesTwoBoots();");
     [Fact] void should_construct_the_aggregate_jpa_engine() => PersistentModuleSource("PersistentConfiguration").ShouldContain("new AggregateBasedJpaEventStorageEngine(");
     [Fact] void should_use_the_configured_event_converter() => PersistentModuleSource("PersistentConfiguration").ShouldContain("configuration.getComponent(EventConverter.class)");
     [Fact] void should_tag_the_native_proof_event_with_the_owner() => Source("UniqueAppendTransactionTest.java").ShouldContain("@EventTag(key = \"owner\")");
