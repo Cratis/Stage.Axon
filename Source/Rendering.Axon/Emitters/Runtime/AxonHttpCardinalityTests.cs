@@ -51,9 +51,26 @@ internal static class AxonHttpCardinalityTests
 
     static bool Supported(AxonEmissionContext context, SemanticKeyedQuery query) =>
         query.Cardinality == SemanticQueryCardinality.ZeroOrOne && !QueryPerformer.Required(context, query) &&
-        (query.Authorization is null || !PolicyPredicates.HasInline(context, query.Authorization)) &&
+        RoleCallerSupported(context, query.Authorization) &&
         ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.ReadModels)
             .Any(model => model.Id == query.ReadModel && !ReadModelKeys.IsComposite(context.Request.Model.Application, model));
+
+    // The generic caller holds every modeled role, so it cannot satisfy negated roles or custom claims.
+    static bool RoleCallerSupported(AxonEmissionContext context, SemanticAuthorization? authorization) => authorization switch
+    {
+        null => true,
+        SemanticPolicyReference reference => context.Request.Model.Application.Policies
+            .Any(policy => policy.Name == reference.Name && RoleCallerSupported(policy.Condition)),
+        SemanticLogicalAuthorization logical => RoleCallerSupported(context, logical.Left) && RoleCallerSupported(context, logical.Right),
+        _ => false
+    };
+
+    static bool RoleCallerSupported(SemanticPolicyCondition condition) => condition switch
+    {
+        SemanticAnonymousCondition or SemanticAuthenticatedCondition or SemanticRoleCondition => true,
+        SemanticLogicalPolicyCondition logical => RoleCallerSupported(logical.Left) && RoleCallerSupported(logical.Right),
+        _ => false
+    };
 
     static string Request(AxonEmissionContext context, LocatedSemanticSlice owner, SemanticKeyedQuery query, QueryShape shape)
     {
