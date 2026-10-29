@@ -24,11 +24,11 @@ public partial class when_preparing_the_client_proof : Specification
     }
 
     [Fact]
-    void should_include_the_java_tests() => _java.Keys.Order(StringComparer.Ordinal).SequenceEqual(["ClientContractTest.java", "ClientLiveLimitsTest.java", "ClientProofSupport.java"]).ShouldBeTrue();
+    void should_include_the_java_tests() => _java.Keys.Order(StringComparer.Ordinal).SequenceEqual(["ClientContractTest.java", "ClientLiveLimitsTest.java", "ClientProofSupport.java", "GeneratedBasicIdentityTest.java"]).ShouldBeTrue();
     [Theory]
     [InlineData("ClientContractTest.java")]
     [InlineData("ClientLiveLimitsTest.java")]
-    void should_replace_the_native_identity_provider(string name) => _java[name].ShouldContain("@TestBean(name = \"inMemoryUserDetailsManager\", methodName = \"users\")");
+    void should_replace_the_native_identity_provider(string name) => _java[name].ShouldContain("@TestBean(name = \"users\", methodName = \"users\")");
 
     [Fact] void should_include_the_scenarios() => _scenarios.Keys.ShouldContain("round-trip.ts");
     [Fact] void should_resolve_the_application_package() => _javaAll.ShouldNotContain("__APPLICATION__");

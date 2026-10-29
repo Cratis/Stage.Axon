@@ -32,6 +32,16 @@ public partial class when_preparing_native_proofs : Specification
         "GeneratedPersistentUniqueConcurrencyTest.java", "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
     [Fact]
+    void should_prove_basic_identity_fails_closed_and_application_providers_win()
+    {
+        var source = ClientProofArtifacts.JavaSources()["GeneratedBasicIdentityTest.java"];
+        source.ShouldContain("bootDefaultUserCannotAuthenticateWithConfiguredOrArbitraryPassword");
+        source.ShouldContain("applicationIdentityProviderWinsWhileNativeAuthorizationStillDeniesWrongRole");
+        source.ShouldContain(".andExpect(status().isUnauthorized())");
+        source.ShouldContain(".andExpect(status().isForbidden())");
+    }
+
+    [Fact]
     void should_include_the_inline_policy_failure_and_composition_proofs()
     {
         var sources = IngressProofArtifacts.Sources("inline-java-policies");

@@ -30,7 +30,7 @@ class ClientLiveLimitsTest {
     @Value("${local.server.port}")
     private int port;
 
-    @TestBean(name = "inMemoryUserDetailsManager", methodName = "users")
+    @TestBean(name = "users", methodName = "users")
     private UserDetailsService users;
 
     static UserDetailsService users() {

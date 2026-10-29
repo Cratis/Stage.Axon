@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -24,6 +25,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             context.Degradation.Unsupported("STAGE-AXON-JWT-PROVIDER", context.Request.Model.Application.Id, "Credentials are rejected unless a native JWT decoder and nonempty spring.security.oauth2.resourceserver.jwt.audiences are configured.", "validate tokens for the configured audience", "application/authentication");
         }
         EmitConfiguration(context, bearer);
+        EmitUsers(context);
         PoliciesConfiguration.Emit(context);
     }
 
@@ -62,7 +64,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             }).Block("private static CorsConfigurationSource cors(String allowedOrigins)", method => method
                 .Line("var configuration = new CorsConfiguration();")
                 .Line("configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(\",\")).map(String::trim).filter(origin -> !origin.isEmpty()).toList());")
-                .Line("configuration.setAllowedMethods(Arrays.asList(\"GET\", \"POST\", \"PUT\", \"PATCH\", \"DELETE\", \"OPTIONS\"));")
+                .Line("configuration.setAllowedMethods(Arrays.asList(\"GET\", \"POST\", \"OPTIONS\"));")
                 .Line("configuration.setAllowedHeaders(Arrays.asList(\"Authorization\", \"Content-Type\"));")
                 .Line("configuration.setAllowCredentials(false);")
                 .Line("var source = new UrlBasedCorsConfigurationSource();")
@@ -73,6 +75,25 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             Interceptors(body, "Query", "org.axonframework.messaging.queryhandling.QueryMessage");
         });
         context.AddJava(context.BasePackage + ".infrastructure", "SecurityConfiguration", code.Build());
+    }
+
+    static void EmitUsers(AxonEmissionContext context)
+    {
+        var package = context.BasePackage + ".infrastructure";
+        var code = new JavaCodeBuilder(package)
+            .Import("org.springframework.boot.autoconfigure.AutoConfiguration")
+            .Import("org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean")
+            .Import("org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration")
+            .Import("org.springframework.context.annotation.Bean")
+            .Import("org.springframework.security.core.userdetails.UserDetailsService")
+            .Import("org.springframework.security.core.userdetails.UsernameNotFoundException");
+        code.Line("@AutoConfiguration(before = UserDetailsServiceAutoConfiguration.class)")
+            .Block("public class IdentityConfiguration", body => body.Line("@Bean").Line("@ConditionalOnMissingBean(UserDetailsService.class)")
+                .Block("UserDetailsService users()", method => method
+                    .Line("// Fail closed until an application-owned identity provider is supplied.")
+                    .Line("return username -> { throw new UsernameNotFoundException(\"Configure an identity provider\"); };")));
+        context.AddJava(package, "IdentityConfiguration", code.Build());
+        context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports", package + ".IdentityConfiguration\n"));
     }
 
     static void Decoder(JavaCodeBuilder body)

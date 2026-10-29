@@ -35,6 +35,7 @@ internal static class HandlerPolicies
     {
         SemanticRoleCondition role => [role.Role],
         SemanticAnonymousCondition => [],
+        SemanticAuthenticatedCondition or SemanticNotPolicyCondition => null,
         SemanticLogicalPolicyCondition logical => Combine(Condition(logical.Left), logical.Operator, Condition(logical.Right)),
         _ => null
     };
@@ -43,6 +44,8 @@ internal static class HandlerPolicies
     {
         if (left is null || right is null) return null;
         if (left.SequenceEqual(right)) return left;
+
+        // Native @Secured matches any listed authority, not a conjunction of distinct role sets.
         return operation == SemanticLogicalOperator.Or && left.Length > 0 && right.Length > 0 ? [.. left.Concat(right).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)] : null;
     }
 }
