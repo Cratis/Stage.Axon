@@ -29,7 +29,7 @@ public class when_emitting_scoped_views : given.a_view_request
     [Fact] void should_handle_the_child_event_through_an_event_handler() => _projector.ShouldContain("public void handle(CardAdded event, ProcessingContext context)");
     [Fact] void should_not_keep_scope_state() => _projector.ShouldNotContain("pending");
 
-        [Fact] void should_store_children_as_a_json_column() => _entity.ShouldContain("private List<Card> cards;");
+    [Fact] void should_store_children_as_a_json_column() => _entity.ShouldContain("private List<Card> cards;");
     [Fact] void should_map_the_children_column() => _entity.ShouldContain("@Column(name = \"p_cards\")");
     [Fact] void should_upsert_the_parent_row_when_a_child_arrives_first() => _projector.ShouldContain("if (current == null && !(false || Objects.equals(key, String.valueOf(event.boardId().value())))) return");
     [Fact] void should_read_the_parent_row_by_key() => _projector.ShouldContain("keys.forEach(candidate -> states.putIfAbsent(candidate, repository.findById(candidate).map(BoardEntity::toModel).orElse(null)));");
