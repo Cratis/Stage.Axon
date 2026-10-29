@@ -49,7 +49,7 @@ internal static class Degradations
         Unsupported(AxonRefusalCodes.Generation, "generate the modeled values and artifacts", "The requested generation cannot be emitted as modeled; fallback artifacts may be used.", ThrowingBody),
         Unsupported(AxonRefusalCodes.ProjectionMapping, "project into the modeled read model", "The projection target or value mapping cannot be represented.", Omitted),
         Unsupported(AxonRefusalCodes.UnwrittenReadModel, "populate the modeled read model", "No admitted writer populates this read model.", EmptyResult),
-        Unsupported(AxonRefusalCodes.ScopedProjection, "project scoped read-model state", "Scoped projection state (every, children, nested scopes, joins, join removals, parented removals) has no relational shape yet; the read model stays empty.", EmptyResult),
+        Unsupported(AxonRefusalCodes.ScopedProjection, "project scoped read-model state", "The projection scope cannot be resolved against the read model (a nested or child property that is missing or not a composite type, or a key that cannot be rendered), or a join re-applies event-context metadata to later children; the construct is skipped.", EmptyResult),
         Unsupported(AxonRefusalCodes.CompositeKey, "use the modeled composite projection key", "The projection key does not match the read model's key shape (a composite model needs every key part from the event).", Omitted),
         Unsupported(AxonRefusalCodes.KeyParts, "bind the modeled query key parts", "The query key parts cannot be bound to the read model.", ThrowingBody),
         Unsupported(AxonRefusalCodes.QueryFilter, "apply the modeled query filter", "The filter cannot be translated to the generated query.", ThrowingBody),

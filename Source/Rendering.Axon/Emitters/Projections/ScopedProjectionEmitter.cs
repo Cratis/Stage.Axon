@@ -111,7 +111,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
             .Line("var key = entry.getKey();")
             .Line($"var change = {methods.Method(_root, @event)}(event, message, key, key, entry.getValue());")
             .Line("if (!change.touched()) continue;")
-            .Line("if (change.value() == null) repository.deleteById(key);")
+            .Line($"if (change.value() == null) repository.deleteAllByIdInBatch({body.Reference("java.util.List")}.of(key));")
             .Line($"else repository.save(new {entity}(key, change.value()));"));
     }
 
