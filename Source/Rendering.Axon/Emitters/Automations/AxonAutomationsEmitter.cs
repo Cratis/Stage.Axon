@@ -38,7 +38,7 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         var triggers = reaction.Triggers.Select((trigger, index) => duplicateEvents ? null : emitter.Prepare(trigger, index)).ToArray();
         EmitProductions(context, package, reaction.Id, triggers);
         var registered = triggers.All(trigger => trigger is not null);
-        if (triggers.Length > 0 && registered && reaction.Triggers.All(trigger => trigger.Kind == SemanticReactionTriggerKind.ApplicationTrigger)) return new(reaction, emitter, triggers!);
+        if (triggers.Length > 0 && registered && reaction.Triggers.All(trigger => trigger.Kind == SemanticReactionTriggerKind.ApplicationTrigger)) return new(reaction, emitter, triggers!, located.Slice.Name);
         var code = new JavaCodeBuilder(package).Declare(name);
         ReactionJavaReferences.Claim(code, triggers.OfType<PreparedReactionTrigger>().SelectMany(trigger => new[] { trigger.Input.JavaType, trigger.Invocation, trigger.Condition ?? string.Empty }));
         if (registered) code.Line("@" + code.Reference("org.springframework.stereotype.Component"));
@@ -61,7 +61,7 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         if (registered && reaction.Triggers.Any(trigger => trigger.Kind == SemanticReactionTriggerKind.Event) && processors.Add(package)) EmitProcessor(context, package);
         if (!registered) context.Degradation.Unsupported("STAGE-AXON-0504", reaction.Id, $"Reaction '{reaction.Name}' is not registered: a trigger's effects, routing, guards or identity cannot be preserved.");
         context.AddJava(package, name, code.Build(), sources: [reaction.Id, .. reaction.Triggers.Where(trigger => trigger.Source != default).Select(trigger => trigger.Source)]);
-        return registered ? new(reaction, emitter, triggers!) : null;
+        return registered ? new(reaction, emitter, triggers!, located.Slice.Name) : null;
     }
 
     // One definition per reaction namespace: a reaction sends commands, so its processor starts at the latest token and never reacts to history.
@@ -104,4 +104,4 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
     }
 }
 
-internal sealed record RegisteredReaction(SemanticReaction Reaction, ReactionTriggerEmitter Emitter, PreparedReactionTrigger[] Triggers);
+internal sealed record RegisteredReaction(SemanticReaction Reaction, ReactionTriggerEmitter Emitter, PreparedReactionTrigger[] Triggers, string Slice);
