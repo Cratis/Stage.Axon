@@ -15,6 +15,12 @@ concept WorkItemPriority : Enum
 policy IsEditor
   require role "Editor"
 
+policy IsManager
+  require role "Manager"
+
+policy CanWork
+  require role "Editor" or role "Manager"
+
 module Work
   feature Items
     slice StateChange Create
@@ -77,6 +83,36 @@ module Work
         when RenameWorkItem
           id = "00000000-0000-0000-0000-000000000002"
           title = "Denied"
+        then denied
+
+    slice StateChange ManagerRename
+      command ManagerRenameWorkItem
+        id WorkItemId identifier
+        title String
+        authorize CanWork and IsManager
+
+        produces WorkItemRenamed
+          for id
+          title = title
+
+      specification NativeFixtureAllowsManager
+        given caller
+          authenticated
+          role "Manager"
+        when ManagerRenameWorkItem
+          id = "00000000-0000-0000-0000-000000000003"
+          title = "Manager allowed"
+        then WorkItemRenamed
+          for "00000000-0000-0000-0000-000000000003"
+          title = "Manager allowed"
+
+      specification NativeFixtureDeniesEditor
+        given caller
+          authenticated
+          role "Editor"
+        when ManagerRenameWorkItem
+          id = "00000000-0000-0000-0000-000000000004"
+          title = "Editor denied"
         then denied
 
     slice StateChange RequestWireNames
