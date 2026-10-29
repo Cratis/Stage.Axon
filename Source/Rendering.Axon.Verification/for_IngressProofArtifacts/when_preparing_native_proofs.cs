@@ -27,7 +27,7 @@ public partial class when_preparing_native_proofs : Specification
     void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
     [
         "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedJwtAudienceTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedNameOnlyMetadataTest.java",
-        "GeneratedProtectedReadTest.java", "GeneratedReactionIdentityTest.java", "GeneratedSecurityIngressTest.java"
+        "GeneratedProtectedReadTest.java", "GeneratedReactionIdentityTest.java", "GeneratedResidualHandlerSecurityTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
     [Fact]
     void should_prove_basic_identity_fails_closed_and_application_providers_win()
@@ -43,7 +43,8 @@ public partial class when_preparing_native_proofs : Specification
     void should_include_the_inline_policy_failure_and_composition_proofs()
     {
         var sources = IngressProofArtifacts.Sources("inline-java-policies");
-        sources.Count.ShouldEqual(3);
+        sources.Count.ShouldEqual(4);
+        sources["GeneratedResidualHandlerSecurityTest.java"].ShouldContain("residualQueryPoliciesGuardNonHttpDispatchUsingTheHandlerThreadContext");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("nativePolicyBeanReadsOnlyJwtAttributes");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("compositionsDenyTheWholeRealCommand");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("unsupportedPoliciesDenyWhileSingleClaimPoliciesReachTheHandler");
@@ -70,7 +71,7 @@ public partial class when_preparing_native_proofs : Specification
         var sources = IngressProofArtifacts.Sources("inline-java-policy-performers");
         sources.Count.ShouldEqual(1);
         sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("inlinePoliciesProtectPerformedQueriesOverHttp");
-        sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("nonHttpDispatchIsNotGuardedAtTheHandlerAsWarnedByStageAxonAuthorization");
+        sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("nonHttpDispatchRequiresTheHandlerThreadsInlinePolicyContext");
     }
 
     [Fact]

@@ -12,7 +12,7 @@ public class when_rendering_absorbed_role_guards : for_AxonArtifactRenderPlanner
 {
     [Fact] void should_absorb_the_module_alternatives() => Guard(And(Or(Role("Rep"), Role("Mgr")), Role("Mgr"))).ShouldEqual("@Secured({\"ROLE_Mgr\"})");
     [Fact] void should_absorb_the_command_alternatives() => Guard(And(Role("Mgr"), Or(Role("Rep"), Role("Mgr")))).ShouldEqual("@Secured({\"ROLE_Mgr\"})");
-    [Fact] void should_keep_a_residual_conjunction_at_the_endpoint() => Guard(And(Or(Role("A"), Role("B")), Or(Role("A"), Role("C")))).ShouldContain("dispatch outside HTTP is not guarded");
+    [Fact] void should_guard_a_residual_conjunction_at_the_handler() => Guard(And(Or(Role("A"), Role("B")), Or(Role("A"), Role("C")))).ShouldEqual("@PreAuthorize(\"((hasRole('A')) or (hasRole('B'))) and ((hasRole('A')) or (hasRole('C')))\")");
     [Fact] void should_deduplicate_alternatives() => Guard(Or(Or(Role("A"), Role("B")), Role("A"))).ShouldEqual("@Secured({\"ROLE_A\", \"ROLE_B\"})");
     [Fact] void should_preserve_public_absorption() => GuardPublic(SemanticLogicalOperator.Or).ShouldEqual(string.Empty);
     [Fact] void should_preserve_public_conjunction() => GuardPublic(SemanticLogicalOperator.And).ShouldEqual("@Secured({\"ROLE_Sales\"})");

@@ -42,14 +42,14 @@ public class when_a_policy_guards_a_command : Specification
     [Fact] void should_fail_closed_if_the_authored_policy_throws() => Policy().ShouldContain("// Fail closed: a policy that throws denies access.\n        catch (Exception | Error failure)");
 
     [Fact]
-    void should_leave_the_billing_fqn_policy_command_handler_unguarded_without_unsupported_diagnostics()
+    void should_guard_the_billing_fqn_policy_command_handler_without_unsupported_diagnostics()
     {
         // Same SecurityContextHolder and Map-pattern policy body as L62's model-billing-java.
         var command = ScopeSelection.Select(_context.Request).SelectMany(slice => slice.Slice.Commands).Single(command => command.Name == "RegisterAccount");
         SecurityAnnotations.For(_context, command.Authorization, command.Id).ShouldEqual("@PreAuthorize(\"isAuthenticated() and @isFinanceStaffPolicy.check(authentication)\")");
-        SecurityAnnotations.ForHandler(_context, command.Authorization, command.Id, new JavaCodeBuilder("example")).ShouldNotContain("@Secured");
+        SecurityAnnotations.ForHandler(_context, command.Authorization, command.Id, new JavaCodeBuilder("example")).ShouldEqual("@PreAuthorize(\"isAuthenticated() and @isFinanceStaffPolicy.check(authentication)\")");
         _context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
-        _context.Degradation.Warnings.Single().Code.ShouldEqual("STAGE-AXON-AUTHORIZATION");
+        _context.Degradation.Warnings.ShouldBeEmpty();
         Policy().ShouldContain("import org.springframework.security.core.context.SecurityContextHolder;");
         Policy().ShouldContain("import java.util.Map;");
     }

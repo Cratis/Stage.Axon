@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
+using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Java;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Commands;
@@ -38,7 +39,10 @@ internal sealed class CommandFixtureAssertions(AxonEmissionContext context, Sema
     {
         if (specification.ThenDenied)
         {
-            method.Line($"result.exception({Reference("org.axonframework.extension.spring.authorization.UnauthorizedMessageException")}.class).noEvents();");
+            var exception = HandlerPolicies.UsesMethodSecurity(context, command.Authorization)
+                ? "org.springframework.security.access.AccessDeniedException"
+                : "org.axonframework.extension.spring.authorization.UnauthorizedMessageException";
+            method.Line($"result.exception({Reference(exception)}.class).noEvents();");
             return;
         }
         if (!specification.ThenErrors.IsEmpty)

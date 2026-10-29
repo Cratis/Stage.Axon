@@ -41,7 +41,7 @@ internal static class CommandFixtureSecurity
 
     internal static void Proxy(JavaCodeBuilder body, string name, bool usesClock) => ProxyCore(body, name, usesClock, null);
 
-    internal static void ProxyReferences(JavaCodeBuilder body, string name, bool usesClock) => ProxyCore(body, name, usesClock, body);
+    internal static void ProxyReferences(JavaCodeBuilder body, string name, bool usesClock, bool methodSecurity = false, IEnumerable<(string Name, string Type)>? policies = null) => ProxyCore(body, name, usesClock, body, methodSecurity, policies);
 
     static string Reference(JavaCodeBuilder? code, string type) => code?.Reference(type) ?? type;
 
@@ -66,11 +66,36 @@ internal static class CommandFixtureSecurity
         method.Line($"{holder}.getContext().setAuthentication({Reference(code, "org.springframework.security.authentication.UsernamePasswordAuthenticationToken")}.authenticated({JavaCodeBuilder.StringLiteral(identity)}, null, {Reference(code, "java.util.List")}.of({string.Join(", ", roles)})));");
     }
 
-    static void ProxyCore(JavaCodeBuilder body, string name, bool usesClock, JavaCodeBuilder? code)
+    static void ProxyCore(JavaCodeBuilder body, string name, bool usesClock, JavaCodeBuilder? code, bool methodSecurity = false, IEnumerable<(string Name, string Type)>? policies = null)
     {
         var parameter = usesClock ? $"{Reference(code, "java.time.Clock")} clock" : string.Empty;
         var argument = usesClock ? ", clock" : string.Empty;
-        body.Block($"private {name}Handler handler({parameter})", method => method
-            .Line($"return new {name}Handler(new {name}Rules(validators.getValidator()){argument});"));
+        body.Block($"private {name}Handler handler({parameter})", method =>
+        {
+            var handler = $"new {name}Handler(new {name}Rules(validators.getValidator()){argument})";
+            if (!methodSecurity)
+            {
+                method.Line($"return {handler};");
+                return;
+            }
+            method.Line($"var factory = new {Reference(code, "org.springframework.aop.framework.ProxyFactory")}({handler});")
+                .Line("factory.setProxyTargetClass(true);");
+            var beans = policies?.ToArray() ?? [];
+            if (beans.Length == 0)
+            {
+                method.Line($"factory.addAdvisor({Reference(code, "org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor")}.preAuthorize());");
+            }
+            else
+            {
+                method.Line($"var beans = new {Reference(code, "org.springframework.context.support.StaticApplicationContext")}();");
+                foreach (var policy in beans) method.Line($"beans.getBeanFactory().registerSingleton({JavaCodeBuilder.StringLiteral(policy.Name)}, new {Reference(code, policy.Type)}());");
+                method.Line($"var expressions = new {Reference(code, "org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler")}();")
+                    .Line("expressions.setApplicationContext(beans);")
+                    .Line($"var authorization = new {Reference(code, "org.springframework.security.authorization.method.PreAuthorizeAuthorizationManager")}();")
+                    .Line("authorization.setExpressionHandler(expressions);")
+                    .Line($"factory.addAdvisor({Reference(code, "org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor")}.preAuthorize(authorization));");
+            }
+            method.Line($"return ({name}Handler) factory.getProxy();");
+        });
     }
 }

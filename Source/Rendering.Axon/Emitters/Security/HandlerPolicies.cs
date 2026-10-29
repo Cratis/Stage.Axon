@@ -16,11 +16,10 @@ internal static class HandlerPolicies
 
         // Axon authorizes subscriptions at opening; a denied initial result terminates before any updates.
         if (roles is not null) return "@" + code.Reference("org.springframework.security.access.annotation.Secured") + "({" + string.Join(", ", roles.Select(role => JavaCodeBuilder.StringLiteral("ROLE_" + role))) + "})";
-        if (SecurityAnnotations.EndpointExpression(context, authorization) is not null)
+        if (SecurityAnnotations.EndpointExpression(context, authorization) is { } expression)
         {
-            const string warning = "The HTTP endpoint's @PreAuthorize enforces this policy; dispatch outside HTTP is not guarded at the handler.";
-            context.Degradation.Warn("STAGE-AXON-AUTHORIZATION", owner, warning);
-            return "// Differs from Screenplay: " + warning + " (STAGE-AXON-AUTHORIZATION)";
+            // Residual policies evaluate the security context of the thread invoking the handler.
+            return "@" + code.Reference("org.springframework.security.access.prepost.PreAuthorize") + "(" + JavaCodeBuilder.StringLiteral(expression) + ")";
         }
         var annotation = "@" + code.Reference("org.springframework.security.access.annotation.Secured");
         const string intent = "authorize access with the modeled policy";
@@ -29,6 +28,9 @@ internal static class HandlerPolicies
         context.Degradation.Unsupported("STAGE-AXON-AUTHORIZATION", owner, SecurityAnnotations.SiteName(context, owner) + ": " + reason, intent, path);
         return "// Differs from Screenplay: " + reason + "\n" + JavaCodeBuilder.UnsupportedComment(intent, path, "STAGE-AXON-AUTHORIZATION") + "\n" + annotation + "({})";
     }
+
+    internal static bool UsesMethodSecurity(AxonEmissionContext context, SemanticAuthorization? authorization) =>
+        authorization is not null && Roles(context, authorization) is null && SecurityAnnotations.EndpointExpression(context, authorization) is not null;
 
     static string[]? Roles(AxonEmissionContext context, SemanticAuthorization authorization)
     {
