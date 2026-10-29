@@ -70,10 +70,6 @@ module Accounts
         by id AccountId
         authorize IsWriter
 
-      query RequiredAccountSnapshot => ActiveAccounts optional
-        by id AccountId
-        authorize IsWriter
-
       projection ActiveAccountsProjection => ActiveAccounts
         from AccountRegistered
           id = $eventSourceId

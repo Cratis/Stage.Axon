@@ -54,7 +54,7 @@ internal static class IngressProofModel
             Slices = [.. feature.Slices.Select(slice => slice with
             {
                 Commands = [.. slice.Commands.Select(Command)],
-                Queries = [.. slice.Queries.Select(HttpProofQuery)],
+                Queries = [.. slice.Queries.Select(query => query is SemanticKeyedQuery keyed ? keyed with { Delivery = SemanticQueryDelivery.Live } : query)],
                 Constraints = slice.Commands.Any(command => command.Id == register.Id) ? [constraint] : slice.Constraints,
                 ReadModels = [.. slice.ReadModels.Select(model => model with { Properties = [.. model.Properties.Select(property => property with { IsIdentifier = property.Name == "id" })] })],
                 Projections = [.. slice.Projections.Select(projection => projection with
@@ -74,13 +74,6 @@ internal static class IngressProofModel
         var scope = new ArtifactRenderScope(ArtifactRenderScopeKind.Application, application.Id);
         return new(model, SemanticExecutionPlan.Compile(model).Plan!, profile ?? AxonRendering.CreateProfile(), scope);
     }
-
-    // The source compiler admits optional and collection queries, so the exactly-one HTTP proof is completed here.
-    static SemanticKeyedQuery HttpProofQuery(SemanticKeyedQuery query) => query with
-    {
-        Delivery = SemanticQueryDelivery.Live,
-        Cardinality = query.Name == "RequiredAccountSnapshot" ? SemanticQueryCardinality.One : query.Cardinality
-    };
 
     static SemanticSlice TriggerSlice(SemanticSlice slice, SemanticReaction reaction) => slice with
     {
