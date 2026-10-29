@@ -64,7 +64,7 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
                     .Line("    .assigningHandlers(handler -> VIEW_PACKAGES.contains(handler.beanType().getPackageName()))")
                     .Line($"    .customized(configuration -> configuration.sequencingPolicy({code.Reference("org.axonframework.messaging.core.sequencing.SequentialPolicy")}.INSTANCE));")));
         context.AddJava(package, "ViewProcessingConfiguration", code.Build());
-        context.Degradation.Note($"{AxonRefusalCodes.EventuallyConsistentViews}: Views are processed by a pooled streaming processor with a sequential policy, so reads are eventually consistent: a query may not yet reflect an event that was just appended. Tests that append and then read a view wait for the result.");
+        context.Degradation.Note($"{AxonRefusalCodes.EventuallyConsistentViews}: Views are processed by a pooled streaming processor with a sequential policy, so reads are eventually consistent: a query may not yet reflect an event that was just appended. Generated tests fill views by calling the projector directly or by seeding the repository, so they do not depend on the processor; tests you write that append an event and then read a view must wait for the result.");
     }
 
     static void EmitReducers(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located)
