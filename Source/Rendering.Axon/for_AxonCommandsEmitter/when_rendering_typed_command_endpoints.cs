@@ -30,9 +30,9 @@ public class when_rendering_typed_command_endpoints : for_AxonArtifactRenderPlan
     }
 
     [Fact] void should_return_the_scalar_concept_type() => scalarCode.ShouldContain($"CompletableFuture<{expectedScalarType}>");
-    [Fact] void should_dispatch_with_the_scalar_type() => scalarCode.ShouldContain($"send(command, {expectedScalarType}.class)");
+    [Fact] void should_dispatch_with_the_scalar_type() => scalarCode.ShouldContain($"send(command, {expectedScalarType}.class, metadata, null)");
     [Fact] void should_return_the_response_record_type() => recordCode.ShouldContain("CompletableFuture<PlaceOrderResponse>");
-    [Fact] void should_dispatch_with_the_response_record_type() => recordCode.ShouldContain("send(command, PlaceOrderResponse.class)");
+    [Fact] void should_dispatch_with_the_response_record_type() => recordCode.ShouldContain("send(command, PlaceOrderResponse.class, metadata, null)");
 
     string Endpoint(LocatedSemanticSlice located, SemanticCommand command)
     {

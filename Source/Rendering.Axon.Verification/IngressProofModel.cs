@@ -52,6 +52,7 @@ internal static class IngressProofModel
             Slices = [.. feature.Slices.Select(slice => slice with
             {
                 Commands = [.. slice.Commands.Select(Command)],
+                Queries = [.. slice.Queries.Select(query => query is SemanticKeyedQuery keyed ? keyed with { Delivery = SemanticQueryDelivery.Live } : query)],
                 Constraints = slice.Commands.Any(command => command.Id == register.Id) ? [constraint] : slice.Constraints,
                 ReadModels = [.. slice.ReadModels.Select(model => model with { Properties = [.. model.Properties.Select(property => property with { IsIdentifier = property.Name == "id" })] })],
                 Projections = [.. slice.Projections.Select(projection => projection with
