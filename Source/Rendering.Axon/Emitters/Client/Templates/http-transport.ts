@@ -131,7 +131,6 @@ function typedOutcome<T>(response: Response, problem: Problem, errors: readonly 
         case problemTypes.conflict: return { status: "conflict", problem };
         case problemTypes.queryResultMissing: return { status: "notFound" };
         case problemTypes.queryCardinality: return { status: "cardinality", count };
-        case problemTypes.liveCapacity: return { status: "unavailable", retryAfterSeconds: retryAfterSeconds(response) };
         default: return undefined;
     }
 }

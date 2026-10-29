@@ -12,25 +12,9 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
 
 internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes types, LocatedSemanticSlice located, SemanticKeyedQuery query, string modelType, QueryShape shape)
 {
-    string Caller
-    {
-        get
-        {
-            var name = "authentication";
-            while (shape.Arguments.Any(argument => JavaNames.Member(argument.Name) == name)) name = "_" + name;
-            return name;
-        }
-    }
+    string Caller => Local("authentication");
 
-    string MetadataName
-    {
-        get
-        {
-            var name = "metadata";
-            while (shape.Arguments.Any(argument => JavaNames.Member(argument.Name) == name)) name = "_" + name;
-            return name;
-        }
-    }
+    string MetadataName => Local("metadata");
 
     internal static string Route(LocatedSemanticSlice owner, SemanticKeyedQuery definition) =>
         $"/api/{RouteSegment(owner.Module.Name)}/{string.Join('/', owner.Features.Select(feature => RouteSegment(feature.Name)))}/{RouteSegment(definition.Name)}";
@@ -98,6 +82,12 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
         return $", @{code.Reference("org.springframework.beans.factory.annotation.Value")}(\"${{stage.axon.live.heartbeat:15s}}\") {duration} heartbeat, @{code.Reference("org.springframework.beans.factory.annotation.Value")}(\"${{stage.axon.live.timeout:30m}}\") {duration} timeout";
     }
 
+    string Local(string name)
+    {
+        while (shape.Arguments.Any(argument => JavaNames.Member(argument.Name) == name)) name = "_" + name;
+        return name;
+    }
+
     void Snapshot(JavaCodeBuilder code, string name, string route, string modelName)
     {
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}({JavaCodeBuilder.StringLiteral(route)})");
@@ -108,22 +98,23 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
             method.Line($"var {MetadataName} = {method.Reference("org.axonframework.messaging.core.Metadata")}.emptyInstance();")
                 .Block($"if ({Caller} != null && {Caller}.isAuthenticated())", authenticated => authenticated
                     .Line($"{MetadataName} = {MetadataName}.and(\"username\", {Caller}.getName()).and(\"authorities\", {Caller}.getAuthorities().stream().map({authenticated.Reference("org.springframework.security.core.GrantedAuthority")}::getAuthority).collect({authenticated.Reference("java.util.stream.Collectors")}.joining(\",\")));"));
-            var request = $"gateway.query(new {name}({shape.Parsed(method)}), {name}.Result.class, {MetadataName}, null)";
+            var request = $"this.gateway.query(new {name}({shape.Parsed(method)}), {name}.Result.class, {MetadataName}, null)";
+            var value = Local("result");
             if (query.Cardinality == SemanticQueryCardinality.Many)
             {
-                method.Line($"return {request}.thenApply(result -> {response}.ok(result.rows()));");
+                method.Line($"return {request}.thenApply({value} -> {response}.ok({value}.rows()));");
                 return;
             }
-            method.Block($"return {request}.thenApply(result ->", mapping =>
+            method.Block($"return {request}.thenApply({value} ->", mapping =>
             {
                 var status = mapping.Reference("org.springframework.http.HttpStatus");
                 var cardinality = query.Cardinality == SemanticQueryCardinality.ZeroOrOne ? "at most one" : "exactly one";
                 var missing = query.Cardinality == SemanticQueryCardinality.One
                     ? $"{response}.of(cardinalityProblem({status}.NOT_FOUND, \"query-result-missing\", \"exactly one\", 0)).build()"
                     : $"{response}.notFound().build()";
-                mapping.Line($"if (result.rows().isEmpty()) return {missing};")
-                    .Line($"if (result.rows().size() > 1) return {response}.of(cardinalityProblem({status}.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"{cardinality}\", result.rows().size())).build();")
-                    .Line($"return {response}.ok(result.rows().getFirst());");
+                mapping.Line($"if ({value}.rows().isEmpty()) return {missing};")
+                    .Line($"if ({value}.rows().size() > 1) return {response}.of(cardinalityProblem({status}.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"{cardinality}\", {value}.rows().size())).build();")
+                    .Line($"return {response}.ok({value}.rows().getFirst());");
             }).Line(");");
         });
         if (query.Cardinality != SemanticQueryCardinality.Many) CardinalityProblem(code);
@@ -136,6 +127,14 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
         var mono = code.Reference("reactor.core.publisher.Mono");
         var sse = code.Reference("org.springframework.http.codec.ServerSentEvent");
         var objectType = code.Reference("java.lang.Object");
+        var instance = Local("query");
+        var data = Local("data");
+        var result = Local("result");
+        var payload = Local("payload");
+        var first = Local("first");
+        var values = Local("values");
+        var shared = Local("shared");
+        var tick = Local("tick");
         code.Line("// Differs from Screenplay: live stream capacity is not limited.")
             .Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}(value = {JavaCodeBuilder.StringLiteral(route)}, produces = {code.Reference("org.springframework.http.MediaType")}.TEXT_EVENT_STREAM_VALUE)")
             .Block($"public {flux}<{sse}<{objectType}>> stream({shape.Parameters(code)}{(shape.Arguments.Any() ? ", " : string.Empty)}{code.Reference("org.springframework.security.core.Authentication")} {Caller})", method =>
@@ -143,24 +142,24 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
                 method.Line($"var {MetadataName} = {method.Reference("org.axonframework.messaging.core.Metadata")}.emptyInstance();")
                     .Block($"if ({Caller} != null && {Caller}.isAuthenticated())", authenticated => authenticated
                         .Line($"{MetadataName} = {MetadataName}.and(\"username\", {Caller}.getName()).and(\"authorities\", {Caller}.getAuthorities().stream().map({authenticated.Reference("org.springframework.security.core.GrantedAuthority")}::getAuthority).collect({authenticated.Reference("java.util.stream.Collectors")}.joining(\",\")));"))
-                    .Line($"var query = new {name}({shape.Parsed(method)});")
-                    .Block($"var data = results(query, {MetadataName}).map(result ->", mapping =>
+                    .Line($"var {instance} = new {name}({shape.Parsed(method)});")
+                    .Block($"var {data} = results({instance}, {MetadataName}).map({result} ->", mapping =>
                     {
                         if (query.Cardinality != SemanticQueryCardinality.Many)
                         {
                             var status = mapping.Reference("org.springframework.http.HttpStatus");
                             var exception = mapping.Reference("org.springframework.web.ErrorResponseException");
                             var cardinality = query.Cardinality == SemanticQueryCardinality.One ? "exactly one" : "at most one";
-                            mapping.Line($"if (result.rows().size() > 1) throw new {exception}({status}.INTERNAL_SERVER_ERROR, cardinalityProblem({status}.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"{cardinality}\", result.rows().size()), null);");
+                            mapping.Line($"if ({result}.rows().size() > 1) throw new {exception}({status}.INTERNAL_SERVER_ERROR, cardinalityProblem({status}.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"{cardinality}\", {result}.rows().size()), null);");
                             if (query.Cardinality == SemanticQueryCardinality.One)
-                                mapping.Line($"if (result.rows().isEmpty()) throw new {exception}({status}.NOT_FOUND, cardinalityProblem({status}.NOT_FOUND, \"query-result-missing\", \"exactly one\", 0), null);");
+                                mapping.Line($"if ({result}.rows().isEmpty()) throw new {exception}({status}.NOT_FOUND, cardinalityProblem({status}.NOT_FOUND, \"query-result-missing\", \"exactly one\", 0), null);");
                         }
-                        mapping.Line($"{objectType} payload = result.rows(){(query.Cardinality == SemanticQueryCardinality.Many ? string.Empty : ".stream().findFirst()")};")
-                            .Line($"return {sse}.builder(payload).build();");
+                        mapping.Line($"{objectType} {payload} = {result}.rows(){(query.Cardinality == SemanticQueryCardinality.Many ? string.Empty : ".stream().findFirst()")};")
+                            .Line($"return {sse}.builder({payload}).build();");
                     }).Line(");")
-                    .Line("return data.switchOnFirst((first, values) -> first.hasValue()")
-                    .Line($"    ? values.publish(shared -> shared.mergeWith({flux}.interval(heartbeat).map(tick -> {sse}.<{objectType}>builder().comment(\"heartbeat\").build()).takeUntilOther(shared.ignoreElements())))")
-                    .Line("    : values).take(timeout).takeUntilOther(shutdown.asMono());");
+                    .Line($"return {data}.switchOnFirst(({first}, {values}) -> {first}.hasValue()")
+                    .Line($"    ? {values}.publish({shared} -> {flux}.merge(1, {shared}, {flux}.interval(this.heartbeat).onBackpressureDrop().map({tick} -> {sse}.<{objectType}>builder().comment(\"heartbeat\").build()).takeUntilOther({shared}.ignoreElements())), 1)")
+                    .Line($"    : {values}).take(this.timeout).takeUntilOther(this.shutdown.asMono());");
             })
             .Line($"@{code.Reference("org.springframework.context.event.EventListener")}")
             .Block($"void onShutdown({code.Reference("org.springframework.context.event.ContextClosedEvent")} event)", method => method.Line("shutdown.tryEmitEmpty();"));
@@ -168,10 +167,10 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
         code.Block($"public {flux}<{name}.Result> results({name} query, {metadata} metadata)", method => method.Line("return results(query, metadata, source -> source);"))
             .Block($"{flux}<{name}.Result> results({name} query, {metadata} metadata, {code.Reference("java.util.function.UnaryOperator")}<{code.Reference("org.reactivestreams.Publisher")}<{name}.Result>> observe)", method => method
                 .Line("// Keyed, filtered and performer queries use refresh-on-change with the caller's metadata.")
-                .Line($"return {flux}.defer(() -> {flux}.from(observe.apply(gateway.subscriptionQuery(query, {name}.Result.class, metadata, null, {method.Reference("reactor.util.concurrent.Queues")}.SMALL_BUFFER_SIZE))))")
+                .Line($"return {flux}.defer(() -> {flux}.from(observe.apply(this.gateway.subscriptionQuery(query, {name}.Result.class, metadata, null, {method.Reference("reactor.util.concurrent.Queues")}.SMALL_BUFFER_SIZE))))")
                 .Line("    .onBackpressureLatest()")
                 .Line($"    .publishOn({method.Reference("reactor.core.scheduler.Schedulers")}.boundedElastic(), 1)")
-                .Line($"    .concatMap(result -> result.invalidated() ? {mono}.fromFuture(() -> gateway.query(query, {name}.Result.class, metadata, null)) : {mono}.just(result), 1)")
+                .Line($"    .concatMap(result -> result.invalidated() ? {mono}.fromFuture(() -> this.gateway.query(query, {name}.Result.class, metadata, null)) : {mono}.just(result), 1)")
                 .Line("    .distinctUntilChanged();"));
     }
 

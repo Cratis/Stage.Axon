@@ -16,6 +16,7 @@ const rows = [
     ["query cardinality", () => problem(500, "query-cardinality", { count: 3 }), { status: "cardinality", count: 3 }],
     ["live capacity with Retry-After", () => problem(503, "live-capacity", {}, { "Retry-After": "7" }), { status: "unavailable", retryAfterSeconds: 7 }],
     ["live capacity without Retry-After", () => problem(503, "live-capacity"), { status: "unavailable", retryAfterSeconds: undefined }],
+    ["obsolete capacity type is not a typed outcome", () => problem(500, "live-capacity"), { status: "failed", problem: { type: "urn:cratis:stage-axon:problem:live-capacity", status: 500, detail: "d" } }],
     ["503 with Retry-After", () => new Response(null, { status: 503, headers: { "Retry-After": "30" } }), { status: "unavailable", retryAfterSeconds: 30 }],
     ["503 with an unreadable Retry-After", () => new Response(null, { status: 503, headers: { "Retry-After": "soon" } }), { status: "unavailable", retryAfterSeconds: undefined }],
     ["503 with a negative Retry-After", () => new Response(null, { status: 503, headers: { "Retry-After": "-1" } }), { status: "unavailable", retryAfterSeconds: undefined }],

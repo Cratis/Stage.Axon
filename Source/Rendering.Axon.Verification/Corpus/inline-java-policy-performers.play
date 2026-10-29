@@ -43,3 +43,17 @@ module Accounts
         from AccountRegistered
           accountId = $eventSourceId
           alias = alias
+
+      query PublicLivePerformedAccounts => observable ActiveAccounts[]
+        performer
+          ```java
+          return repository.findAll().stream().map(ActiveAccountsEntity::toModel).toList();
+          ```
+
+      specification RegisteringForPublicLivePerformer
+        given AccountRegistered
+          for "00000000-0000-0000-0000-000000000001"
+          alias = "public-live"
+        then readmodel ActiveAccounts
+          accountId = "00000000-0000-0000-0000-000000000001"
+          alias = "public-live"

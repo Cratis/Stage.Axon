@@ -22,5 +22,6 @@ public class when_describing_stream_problems : a_query_collision
         _stream = json.Split('\n').Single(line => line.Contains("find-total", StringComparison.Ordinal) && line.Contains("\"kind\":\"stream\"", StringComparison.Ordinal));
     }
 
-    [Fact] void should_list_the_live_capacity_problem() => _stream.ShouldContain("\"problems\":[{\"type\":\"urn:cratis:stage-axon:problem:live-capacity\",\"status\":503}]");
+    [Fact] void should_not_advertise_the_removed_capacity_problem() => _stream.ShouldNotContain("live-capacity");
+    [Fact] void should_describe_pre_frame_cardinality_problems() => _stream.ShouldContain("\"problems\":[{\"type\":\"urn:cratis:stage-axon:problem:query-cardinality\",\"status\":500}]");
 }

@@ -47,7 +47,10 @@ public class when_emitting_live_queries : a_view_request
     [Fact] void should_keep_the_latest_pending_update() => _endpoint.ShouldContain(".onBackpressureLatest()");
     [Fact] void should_refresh_with_the_callers_metadata() => _endpoint.ShouldContain("gateway.query(query, LiveTotals.Result.class, metadata, null)");
     [Fact] void should_start_heartbeats_after_the_first_result() => _endpoint.ShouldContain("data.switchOnFirst((first, values) -> first.hasValue()");
-    [Fact] void should_end_at_the_configured_lifetime() => _endpoint.ShouldContain(".take(timeout)");
+    [Fact] void should_end_at_the_configured_lifetime() => _endpoint.ShouldContain(".take(this.timeout)");
+    [Fact] void should_bound_the_sse_merge_prefetch() => _endpoint.ShouldContain("Flux.merge(1, shared,");
+    [Fact] void should_drop_heartbeats_without_demand() => _endpoint.ShouldContain("Flux.interval(this.heartbeat).onBackpressureDrop()");
+    [Fact] void should_bound_the_shared_data_prefetch() => _endpoint.ShouldContain(".takeUntilOther(shared.ignoreElements())), 1)");
     [Fact] void should_not_send_an_open_frame() => _endpoint.ShouldNotContain("comment(\"open\")");
     [Fact] void should_document_the_missing_capacity_limit() => _endpoint.ShouldContain("// Differs from Screenplay: live stream capacity is not limited.");
     [Fact] void should_not_generate_a_subscription_helper() => _context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/LiveTotalsSubscription.java", StringComparison.Ordinal)).ShouldBeFalse();

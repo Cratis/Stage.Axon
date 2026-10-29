@@ -3,6 +3,23 @@ package __RUNTIME__;
 import __APPLICATION__.work.items.overview.WorkItemsRepository;
 import __APPLICATION__.work.items.overview.WorkItemById;
 import __APPLICATION__.work.items.overview.WorkItemByIdEndpoint;
+import __APPLICATION__.work.items.overview.AllWorkItems;
+import __APPLICATION__.work.items.overview.AllWorkItemsEndpoint;
+import __APPLICATION__.work.items.overview.WorkItems;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Timeout;
+import org.reactivestreams.Subscription;
+import org.springframework.http.codec.ServerSentEvent;
+import reactor.core.publisher.BaseSubscriber;
+import reactor.core.publisher.Sinks;
 import org.axonframework.messaging.core.Metadata;
 import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
 import reactor.core.publisher.Flux;
@@ -12,6 +29,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -69,6 +87,61 @@ class ClientContractTest {
     @Test void cancellationStopsTheServerSide() throws Exception { scenario("cancellation"); }
     @Test void identitySwitchCutsTheOldPrincipalOff() throws Exception { scenario("identity-switch"); }
     @Test void aPausedConsumerEndsOnTheFinalState() throws Exception { scenario("slow-consumer"); }
+
+    @Test
+    @Timeout(15)
+    void pausedSseDemandKeepsOnlyABoundedTailAndReachesTheLatestRows() throws Exception {
+        var gateway = mock(QueryGateway.class);
+        var source = Sinks.many().unicast().<AllWorkItems.Result>onBackpressureBuffer();
+        var cancelled = new AtomicBoolean();
+        when(gateway.subscriptionQuery(new AllWorkItems(), AllWorkItems.Result.class, Metadata.emptyInstance(), null, Queues.SMALL_BUFFER_SIZE))
+            .thenReturn(source.asFlux().doOnCancel(() -> cancelled.set(true)));
+        var endpoint = new AllWorkItemsEndpoint(gateway, Duration.ofHours(1), Duration.ofSeconds(30));
+        var frames = new LinkedBlockingQueue<ServerSentEvent<Object>>();
+        var subscriber = new BaseSubscriber<ServerSentEvent<Object>>() {
+            @Override protected void hookOnSubscribe(Subscription subscription) { request(1); }
+            @Override protected void hookOnNext(ServerSentEvent<Object> frame) { frames.add(frame); }
+        };
+        endpoint.stream(null).subscribe(subscriber);
+        try {
+            assertTrue(source.tryEmitNext(new AllWorkItems.Result(List.of(new WorkItems(null, null, "0", null, null)))).isSuccess());
+            var initial = frames.poll(5, TimeUnit.SECONDS);
+            assertNotNull(initial);
+            assertEquals("0", ((WorkItems) ((List<?>) initial.data()).getFirst()).title());
+            for (int value = 1; value <= 1024; value++) {
+                assertTrue(source.tryEmitNext(new AllWorkItems.Result(List.of(new WorkItems(null, null, Integer.toString(value), null, null)))).isSuccess());
+            }
+            assertTrue(frames.isEmpty(), "No further data may be delivered without downstream demand");
+            String title = "0";
+            int delivered = 0;
+            while (!title.equals("1024") && delivered < 16) {
+                subscriber.request(1);
+                var frame = frames.poll(5, TimeUnit.SECONDS);
+                assertNotNull(frame);
+                title = ((WorkItems) ((List<?>) frame.data()).getFirst()).title();
+                delivered++;
+            }
+            assertEquals("1024", title, "A bounded tail must reach the latest rows without draining a buffered burst");
+        } finally {
+            subscriber.cancel();
+        }
+        assertTrue(cancelled.get());
+    }
+
+    @Test
+    @Timeout(15)
+    void liveArgumentsCannotShadowEndpointLocalsOrFields() throws Exception {
+        var query = "query=x&data=x&values=x&shared=x&gateway=x&heartbeat=x&timeout=x&shutdown=x&result=x&payload=x&first=x&tick=x";
+        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/work/items/live-endpoint-collisions?" + query))
+            .header("Accept", "text/event-stream").header("Authorization", "Basic ZWRpdG9yOnNlY3JldA==").GET().build();
+        try (var client = HttpClient.newHttpClient()) {
+            var response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            assertEquals(200, response.statusCode());
+            try (var reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
+                assertEquals("data:null", reader.readLine());
+            }
+        }
+    }
 
     @Test
     void cancellingResultsCancelsTheNativePublisher() {

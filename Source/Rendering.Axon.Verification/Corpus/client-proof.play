@@ -115,3 +115,33 @@ module Work
           priority = priority
         from WorkItemRenamed
           title = title
+
+      readmodel EndpointCollisionRows
+        query String key
+        data String key
+        values String key
+        shared String key
+        gateway String key
+        heartbeat String key
+        timeout String key
+        shutdown String key
+        result String key
+        payload String key
+        first String key
+        tick String key
+
+      query LiveEndpointCollisions => observable EndpointCollisionRows optional
+        by
+          query String
+          data String
+          values String
+          shared String
+          gateway String
+          heartbeat String
+          timeout String
+          shutdown String
+          result String
+          payload String
+          first String
+          tick String
+        authorize IsEditor

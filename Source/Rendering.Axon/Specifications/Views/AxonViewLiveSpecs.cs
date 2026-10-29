@@ -21,6 +21,7 @@ internal static class AxonViewLiveSpecs
         var given = owner.Slice.Specifications.SelectMany(specification => specification.GivenEvents)
             .FirstOrDefault(fact => ProjectionTransitions.From(projection).Any(from => from.EventContract == fact.EventContract));
         if (given is null) return;
+        var pushesRows = ProjectionUpdates.PushesRows(context, types, query, model);
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name);
         var modelType = types.Package(owner) + "." + JavaNames.Type(model.Name);
@@ -106,8 +107,8 @@ internal static class AxonViewLiveSpecs
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(2, values.size());
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertFalse(values.getLast().rows().isEmpty());
                         var fresh = gateway.query(new {{name}}(), {{name}}.Result.class).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS);
-                        {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertFalse(payload.get().invalidated());
-                        {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(fresh, payload.get(), "Update payload must equal the fresh ordered handler result");
+                        {{code.Reference("org.junit.jupiter.api.Assertions")}}.assert{{(pushesRows ? "False" : "True")}}(payload.get().invalidated());
+                        {{(pushesRows ? code.Reference("org.junit.jupiter.api.Assertions") + ".assertEquals(fresh, payload.get(), \"Update payload must equal the fresh ordered handler result\");" : string.Empty)}}
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(fresh, values.getLast());
                     } finally {
                         var active = subscription.get();

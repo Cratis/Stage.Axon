@@ -69,6 +69,10 @@ internal static class AxonViewHttpLiveSpecs
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(mapper.readTree(mapper.writeValueAsString(repository.findAll().stream().map({{entityType}}::toModel).toList())), mapper.readTree(snapshot.body()));
                                 var closing = System.nanoTime();
                                 application.close();
+                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(executor.submit(() -> {
+                                    while (reader.readLine() != null) { }
+                                    return true;
+                                }).get(5, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS), "Context close must terminate the open SSE response");
                                 var elapsed = {{code.Reference("java.time.Duration")}}.ofNanos(System.nanoTime() - closing);
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(elapsed.compareTo({{code.Reference("java.time.Duration")}}.ofSeconds(5)) < 0, "Context close took " + elapsed);
                             }

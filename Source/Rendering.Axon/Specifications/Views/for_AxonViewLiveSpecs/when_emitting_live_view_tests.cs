@@ -44,6 +44,8 @@ public class when_emitting_live_view_tests : for_NativeViewSpecifications.given.
     [Fact] void should_shorten_the_sse_mapper() => _sse.ShouldContain("var mapper = application.getBean(JsonMapper.class);");
     [Fact] void should_import_the_shutdown_duration() => _sse.ShouldContain("import java.time.Duration;");
     [Fact] void should_shorten_the_shutdown_duration() => _sse.ShouldContain("elapsed.compareTo(Duration.ofSeconds(5)) < 0");
+    [Fact] void should_await_remote_eof_after_context_shutdown() => _sse.ShouldContain("while (reader.readLine() != null)");
+    [Fact] void should_bound_the_remote_eof_wait() => _sse.ShouldContain(".get(5, TimeUnit.SECONDS), \"Context close must terminate the open SSE response\")");
     [Fact] void should_import_the_http_client() => _sse.ShouldContain("import java.net.http.HttpClient;");
     [Fact] void should_shorten_the_http_client() => _sse.ShouldContain("HttpClient.newHttpClient()");
     [Fact] void should_not_import_a_same_package_projector() => _sse.ShouldNotContain("import axonviews.views.counters.totals.TotalProjectionProjector;");

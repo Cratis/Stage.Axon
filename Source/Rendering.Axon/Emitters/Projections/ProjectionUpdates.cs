@@ -19,6 +19,9 @@ internal sealed class ProjectionUpdates(AxonEmissionContext context, ViewJavaTyp
 
     internal string DefaultArgument => Enabled ? ", null" : string.Empty;
 
+    internal static bool PushesRows(AxonEmissionContext context, ViewJavaTypes types, SemanticKeyedQuery query, SemanticReadModel model) =>
+        !QueryPerformer.Required(context, query) && !new QueryShape(query, model, types).Arguments.Any();
+
     internal string ParameterFor(JavaCodeBuilder code) => Enabled ? $", {code.Reference("org.axonframework.messaging.queryhandling.QueryUpdateEmitter")} updates" : string.Empty;
 
     internal void Claim(JavaCodeBuilder code, string package)
@@ -40,7 +43,7 @@ internal sealed class ProjectionUpdates(AxonEmissionContext context, ViewJavaTyp
                 var name = package is null ? body.Reference(types.Package(owner) + "." + JavaNames.Type(query.Name)) : QueryType(owner, query, body, package);
                 var modelOwner = ScopeSelection.Locate(context.Request.Model.Application).Single(slice => slice.Slice.ReadModels.Any(candidate => candidate.Id == model));
                 var readModel = modelOwner.Slice.ReadModels.Single(candidate => candidate.Id == model);
-                if (!QueryPerformer.Required(context, query) && !new QueryShape(query, readModel, types).Arguments.Any())
+                if (PushesRows(context, types, query, readModel))
                 {
                     var entity = ReadModelEntities.EntityName(readModel);
                     var sort = body.Reference("org.springframework.data.domain.Sort");

@@ -24,7 +24,6 @@ internal static class AxonHttpContractJson
 
     internal static IReadOnlyList<(string Type, int Status)> Problems(HttpEndpoint endpoint) => endpoint switch
     {
-        { Kind: "stream" } => [("live-capacity", 503)],
         { Kind: "command" } => [("validation", 400), ("conflict", 409), ("invalid-argument", 400), ("unsupported", 501)],
         { Cardinality: "one" } => [("query-result-missing", 404), ("query-cardinality", 500)],
         { Cardinality: "zeroOrOne" } => [("query-cardinality", 500)],
