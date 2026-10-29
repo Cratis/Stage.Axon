@@ -33,6 +33,7 @@ internal static class AxonHttpTestsContract
                     .Line();
                 EmitRoutes(body, endpoints, list, exception);
                 EmitDenials(context, body, endpoints, exception);
+                EmitPublic(context, body, endpoints, exception);
                 EmitLive(body, list, TriggerEndpoints(context));
             });
         context.AddJava(package, Name, code.Build(), test: true);
@@ -74,6 +75,19 @@ internal static class AxonHttpTestsContract
                     if (DeniesWrongRole(endpoint.Authorization!))
                         method.Line($"http.perform({call}.with(user(\"http-contract\").roles(\"HTTP_CONTRACT_NONE\"))).andExpect(status().isForbidden());");
                 }
+            })
+            .Line();
+    }
+
+    static void EmitPublic(AxonEmissionContext context, JavaCodeBuilder body, IReadOnlyList<HttpEndpoint> endpoints, string exception)
+    {
+        var permitted = endpoints.Where(endpoint => endpoint.Authorization == "permitAll()").ToArray();
+        if (permitted.Length == 0) return;
+        body.Line($"@{body.Reference("org.junit.jupiter.api.Test")}")
+            .Block($"void public_endpoints_allow_anonymous_callers() throws {exception}", method =>
+            {
+                foreach (var endpoint in permitted)
+                    method.Line($"http.perform({Call(context, method, endpoint)}.with(anonymous())).andExpect(status().isOk());");
             })
             .Line();
     }
