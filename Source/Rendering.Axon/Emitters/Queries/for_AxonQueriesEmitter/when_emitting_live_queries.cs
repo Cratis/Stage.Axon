@@ -60,6 +60,7 @@ public class when_emitting_live_queries : a_view_request
     [Fact] void should_emit_an_http_sse_probe() => Source("LiveTotalsSseTest.java").ShouldContain("shouldDeliverInitialDataAndOneUpdateOverHttpSse");
     [Fact] void should_emit_a_five_second_shutdown_assertion() => Source("LiveTotalsSseTest.java").ShouldContain("elapsed.compareTo(Duration.ofSeconds(5)) < 0");
     [Fact] void should_render_the_capacity_entry_in_the_unsupported_summary() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md")).ShouldContain("`STAGE-AXON-LIVE-CAPACITY` (1): limit concurrent live streams.");
+    [Fact] void should_refuse_live_capacity_in_strict_mode() => Assert.Contains(new AxonArtifactRenderPlanner().Plan(_request with { Profile = AxonRendering.CreateProfile(strict: true) }).Refusals, refusal => refusal.Codes.Contains("STAGE-AXON-LIVE-CAPACITY"));
     [Fact] void should_catalogue_the_dropped_capacity_limit() => _context.Degradation.UnsupportedConstructs.Single(diagnostic => diagnostic.Artifact == QueryId("LiveTotals")).Code.ShouldEqual("STAGE-AXON-LIVE-CAPACITY");
 
     string Source(string name) => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name, StringComparison.Ordinal)));

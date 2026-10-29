@@ -23,7 +23,7 @@ public class when_admitting_requests : given.an_axon_request
     [Fact]
     void should_warn_about_unmeasured_pairs_in_strict_mode()
     {
-        // Admission is independent of the Orders role policy; use a policy-free fixture.
+        // Admission is independent of the Orders role policy and live capacity gap; use a policy-free snapshot fixture.
         var application = loaded.Model.Application with
         {
             Policies = [],
@@ -109,7 +109,7 @@ public class when_admitting_requests : given.an_axon_request
         Slices = [.. feature.Slices.Select(slice => slice with
         {
             Commands = [.. slice.Commands.Select(command => command with { Authorization = null })],
-            Queries = [.. slice.Queries.Select(query => query with { Authorization = null })]
+            Queries = [.. slice.Queries.Select(query => query with { Authorization = null, Delivery = SemanticQueryDelivery.Snapshot })]
         })]
     };
 
