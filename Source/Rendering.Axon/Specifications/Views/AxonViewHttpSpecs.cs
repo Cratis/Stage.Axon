@@ -63,6 +63,11 @@ internal sealed class AxonViewHttpSpecs(AxonEmissionContext context, ViewJavaTyp
             }),
             new(code => $"var projector = application.getBean({code.Reference(projector)}.class);")
         };
+        if (ProjectionJoinEntities.Has(context, types, projection, model))
+        {
+            var joins = types.Package(located) + "." + ProjectionJoinEntities.RepositoryName(projection);
+            lines.Insert(0, new(code => $"application.getBean({code.Reference(joins)}.class).deleteAll();", code => code.Reference(joins)));
+        }
         foreach (var given in specification.GivenEvents.Where(given => root.All.Any(node => Observes(node.Scope, given.EventContract))))
             lines.Add(new(code => $"projector.on({AxonViewEvents.Expression(context, types, given, code)}{arguments});", code => new ViewSpecificationClaims(context, types).Event(given, code)));
         return [.. lines];

@@ -49,11 +49,13 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
         var code = new JavaCodeBuilder(package).Declare(name);
         DeclareModels(code, located);
         ViewRepositories.Declare(code, model);
+        var joined = ProjectionJoinEntities.Has(context, types, projection, model);
+        if (joined) ViewRepositories.DeclareJoins(code, projection);
         code.Declare(JavaNames.Type(projection.Name) + "Projector");
         var plans = specs.Select(spec =>
         {
             var native = new NativeViewSpecifications(context, types, located, model).Plan(spec);
-            return (Spec: spec, Native: native, Supported: (ViewSpecificationSupport.Legacy(spec, model, types) || native is not null) && ProjectionHandlerShape.RootOnly(context.Request.Model.Application, projection, model));
+            return (Spec: spec, Native: native, Supported: (ViewSpecificationSupport.Legacy(spec, model, types) || native is not null) && ProjectionHandlerShape.Renderable(context, types, projection, model));
         }).ToArray();
         var claims = new ViewSpecificationClaims(context, types);
         foreach (var plan in plans.Where(plan => plan.Supported)) claims.Specification(plan.Spec, model, code);
@@ -61,6 +63,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
         code.Block($"class {name}", body =>
         {
             ViewRepositories.Field(body, model);
+            if (joined) ViewRepositories.JoinField(body, projection);
             foreach (var (spec, native, supported) in plans)
             {
                 var disabledCode = supported ? null : AxonRefusalCodes.ViewSpecification;
@@ -79,7 +82,7 @@ internal sealed class AxonViewSpecsEmitter : IAxonEmitter
                             .Line("throw new UnsupportedOperationException(\"Unsupported modeled view specification\");");
                         return;
                     }
-                    method.Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(repository);");
+                    method.Line($"var projector = new {JavaNames.Type(projection.Name)}Projector(repository{(joined ? ", joins" : string.Empty)});");
                     foreach (var given in spec.GivenEvents)
                     {
                         var root = ProjectionScopeNode.Create(context.Request.Model.Application, types, projection, model, JavaNames.Type(model.Name));

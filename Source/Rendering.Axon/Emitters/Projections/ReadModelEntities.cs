@@ -59,6 +59,7 @@ internal static class ReadModelEntities
                         constructor.Line("this.rowKey = rowKey;");
                         foreach (var (_, member, column) in columns) constructor.Line($"this.{member} = {column.Write($"model.{member}()")};");
                     })
+                    .Block($"public {keyType} rowKey()", method => method.Line("return rowKey;"))
                     .Block($"public {name} toModel()", method => method.Line($"return new {name}({string.Join(", ", columns.Select(entry => entry.Column.Read(entry.Member)))});"));
             });
         ViewJavaTypes.Add(context, package, entity, code.Build(), model.Id);
@@ -71,14 +72,7 @@ internal static class ReadModelEntities
         ViewJavaTypes.Add(context, package, repository, contract.Build(), model.Id);
     }
 
-    static string Basic(string column, SemanticPrimitiveType primitive) => primitive switch
-    {
-        SemanticPrimitiveType.DecimalNumber => column + ", columnDefinition = \"DECFLOAT\")",
-        SemanticPrimitiveType.Uuid or SemanticPrimitiveType.WholeNumber or SemanticPrimitiveType.Boolean or SemanticPrimitiveType.Date or SemanticPrimitiveType.DateTime => column + ")",
-        _ => column + $", columnDefinition = \"VARCHAR({KeyLength})\")"
-    };
-
-    static string Snake(string value)
+    internal static string Snake(string value)
     {
         var text = new StringBuilder();
         for (var index = 0; index < value.Length; index++)
@@ -90,6 +84,13 @@ internal static class ReadModelEntities
         }
         return text.ToString();
     }
+
+    static string Basic(string column, SemanticPrimitiveType primitive) => primitive switch
+    {
+        SemanticPrimitiveType.DecimalNumber => column + ", columnDefinition = \"DECFLOAT\")",
+        SemanticPrimitiveType.Uuid or SemanticPrimitiveType.WholeNumber or SemanticPrimitiveType.Boolean or SemanticPrimitiveType.Date or SemanticPrimitiveType.DateTime => column + ")",
+        _ => column + $", columnDefinition = \"VARCHAR({KeyLength})\")"
+    };
 
     internal sealed class Columns(SemanticApplication application, ViewJavaTypes types, JavaCodeBuilder code)
     {
