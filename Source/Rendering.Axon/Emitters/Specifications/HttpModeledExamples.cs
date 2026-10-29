@@ -49,6 +49,8 @@ internal static class HttpModeledExamples
         return false;
     }
 
+    internal static bool Literal(AxonEmissionContext context, SemanticTypeReference type, SemanticValue literal, out object? value) => Literal(context, type, literal, 0, out value);
+
     static Dictionary<string, object?>? Properties(AxonEmissionContext context, IEnumerable<SemanticProperty> properties, IEnumerable<SemanticPropertyValue> values, int depth)
     {
         var row = new Dictionary<string, object?>();
@@ -60,8 +62,6 @@ internal static class HttpModeledExamples
         }
         return row;
     }
-
-    internal static bool Literal(AxonEmissionContext context, SemanticTypeReference type, SemanticValue literal, out object? value) => Literal(context, type, literal, 0, out value);
 
     static bool Literal(AxonEmissionContext context, SemanticTypeReference type, SemanticValue literal, int depth, out object? value)
     {
@@ -104,11 +104,14 @@ internal static class HttpModeledExamples
         if (type.Kind != SemanticTypeReferenceKind.Concept) return Primitive(types.PrimitiveOf(type), literal);
         var concept = context.Request.Model.Application.Concepts.First(item => item.Id == type.Target);
         if (!concept.Values.IsDefaultOrEmpty)
+        {
             return ConceptEnums.IsNumeric(concept)
                 ? literal is SemanticNumberValue number && concept.Numbers is { } numbers && numbers.Any(value => value == number.Value)
-                : literal is SemanticTextValue text && text.Value is not null && !text.Value.Any(char.IsSurrogate) && concept.Values.Contains(text.Value, StringComparer.Ordinal);
+                : literal is SemanticTextValue text && text.Value?.Any(char.IsSurrogate) == false && concept.Values.Contains(text.Value, StringComparer.Ordinal);
+        }
         if (concept.Compliance is { Personal: not null } or { Secret: not null }) return false;
         if (!Primitive(concept.Primitive, literal)) return false;
+
         // Only establish the predicates below. Other rules (including implementation bodies)
         // are not evidence that a modeled literal can pass the generated constructor.
         return concept.Validations.IsDefaultOrEmpty ||
@@ -117,7 +120,7 @@ internal static class HttpModeledExamples
 
     static bool Primitive(SemanticPrimitiveType primitive, SemanticValue literal) => (primitive, literal) switch
     {
-        (SemanticPrimitiveType.Text, SemanticTextValue text) => text.Value is not null && !text.Value.Any(char.IsSurrogate),
+        (SemanticPrimitiveType.Text, SemanticTextValue text) => text.Value?.Any(char.IsSurrogate) == false,
         (SemanticPrimitiveType.Boolean, SemanticBooleanValue) => true,
         (SemanticPrimitiveType.WholeNumber, SemanticNumberValue number) => number.Value == decimal.Truncate(number.Value) && number.Value >= long.MinValue && number.Value <= long.MaxValue,
         (SemanticPrimitiveType.DecimalNumber, SemanticNumberValue) => true,
@@ -132,6 +135,7 @@ internal static class HttpModeledExamples
         if (rule.Severity != SemanticValidationSeverity.Error) return false;
         if (rule.Kind == SemanticValidationRuleKind.NotEmpty) return value.Length > 0;
         if (rule.Operand is SemanticNumberValue number && number.Value == decimal.Truncate(number.Value) && number.Value >= 0 && number.Value <= int.MaxValue)
+        {
             return rule.Kind switch
             {
                 SemanticValidationRuleKind.Length => value.Length == number.Value,
@@ -139,6 +143,7 @@ internal static class HttpModeledExamples
                 SemanticValidationRuleKind.Maximum => value.Length <= number.Value,
                 _ => false
             };
+        }
         if (rule.Operand is not SemanticTextValue text) return false;
         return rule.Kind switch
         {
@@ -161,7 +166,7 @@ internal static class HttpModeledExamples
         // escapes, groups, intersections, flags or Unicode-dependent behavior.
         const string grammar = @"\A(?:(?:[A-Za-z0-9@_-]|\[(?:a-z|A-Z|0-9|[A-Za-z0-9._%+@])+-?\])(?:\+|\{[0-9]{1,3}(?:,[0-9]{0,3})?\})?)+\z";
         if (value.Length > 4096 || pattern.Length > 256 || value.Any(character => character < ' ' || character > '~')) return false;
-        var options = RegexOptions.CultureInvariant | RegexOptions.NonBacktracking;
+        const RegexOptions options = RegexOptions.CultureInvariant | RegexOptions.NonBacktracking;
         var timeout = TimeSpan.FromMilliseconds(50);
         try
         {

@@ -166,7 +166,7 @@ module Work
 
     slice StateChange RegisterContact
       command RecordContact
-        id WorkItemId identifier
+        id WorkItemEmail identifier
         email WorkItemEmail
         details WorkItemContact
         state WorkItemState
@@ -202,6 +202,7 @@ module Work
 
       specification RichContactExample
         given ContactRecorded
+          for "writer@example.test"
           email = "writer@example.test"
           details = {"email":"writer@example.test","title":"Valid"}
           state = "open"

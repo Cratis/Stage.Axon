@@ -70,7 +70,7 @@ public class when_validating_modeled_examples : a_view_request
         ChangeSpecifications(spec => spec.Name == "RichContactExample" ? spec with
         {
             GivenReadModels = spec.ThenReadModels,
-            ThenReadModels = [.. spec.ThenReadModels.Select(row => row with { Values = [.. row.Values.Select(value => value.TargetProperty == _model.Properties.Single(property => property.Name == "email").Id ? value with { Value = new SemanticTextValue("invalid") } : value)] })]
+            ThenReadModels = [.. spec.ThenReadModels.Select(row => row with { Key = new SemanticTextValue("invalid"), Values = [.. row.Values.Select(value => value.TargetProperty == _model.Properties.Single(property => property.Name == "email").Id ? value with { Value = new SemanticTextValue("invalid") } : value)] })]
         } : spec);
         HttpModeledExamples.Row(_context, _model)["email"].ShouldEqual(Email);
     }
