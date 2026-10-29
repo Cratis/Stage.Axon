@@ -1,6 +1,7 @@
 package io.cratis.stage.axon.runtime;
 
 import java.net.URI;
+import org.axonframework.extension.spring.authorization.UnauthorizedMessageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -23,6 +24,11 @@ public class ProblemDetailsAdvice extends ResponseEntityExceptionHandler {
     @ExceptionHandler(UniqueValueConflict.class)
     public ProblemDetail conflict(UniqueValueConflict exception) {
         return problem(HttpStatus.CONFLICT, "conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedMessageException.class)
+    public ProblemDetail forbidden(UnauthorizedMessageException exception) {
+        return problem(HttpStatus.FORBIDDEN, "forbidden", exception.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

@@ -46,7 +46,7 @@ public partial class when_preparing_native_proofs : Specification
         sources.Count.ShouldEqual(3);
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("nativePolicyBeanReadsOnlyJwtAttributes");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("compositionsDenyTheWholeRealCommand");
-        sources["GeneratedInlinePolicyTest.java"].ShouldContain("handlerClaimsAndUnprovenSubscriptionUpdatesFailClosed");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("unsupportedPoliciesDenyWhileSingleClaimPoliciesReachTheHandler");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("\"Finance Operations\", \"Other\", \"throw\", \"error\"");
         sources["GeneratedInlinePolicyTest.java"].ShouldContain("\"and-snapshot\", \"or-snapshot\", \"escape-and-snapshot\", \"escape-or-snapshot\"");
         sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain("stage.axon.demo.claims.department=Finance Operations");
@@ -70,7 +70,7 @@ public partial class when_preparing_native_proofs : Specification
         var sources = IngressProofArtifacts.Sources("inline-java-policy-performers");
         sources.Count.ShouldEqual(1);
         sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("inlinePoliciesProtectPerformedQueriesOverHttp");
-        sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("inlinePoliciesProtectPerformedQueriesOverSse");
+        sources["GeneratedInlinePolicyPerformerTest.java"].ShouldContain("nonHttpDispatchIsNotGuardedAtTheHandlerAsWarnedByStageAxonAuthorization");
     }
 
     [Fact]

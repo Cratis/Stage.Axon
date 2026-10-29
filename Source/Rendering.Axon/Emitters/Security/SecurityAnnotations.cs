@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Java;
+using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Security;
 
@@ -14,15 +15,25 @@ internal static class SecurityAnnotations
     {
         if (authorization is null) return string.Empty;
         var inline = PolicyPredicates.HasInline(context, authorization);
-        var expression = Expression(context, authorization, new(StringComparer.Ordinal));
-        if (inline) expression = PolicyPredicates.Failure(context, authorization) is null ? PolicyPredicates.Expression(context, authorization) : null;
+        var expression = EndpointExpression(context, authorization);
         if (expression is not null) return "@PreAuthorize(" + JavaCodeBuilder.StringLiteral(expression) + ")";
         var path = owner + "/authorization";
         const string intent = "authorize access with the modeled policy";
         var reason = "The policy requires an unconfigured identity claim or an unsupported condition; access is denied.";
-        if (inline && PolicyPredicates.Failure(context, authorization) is { } detail) reason += " " + detail;
+        if (inline && PolicyPredicates.Failure(context, authorization) is { } detail) reason += " " + SiteName(context, owner) + ": " + detail;
         context.Degradation.Unsupported(Code, owner, reason, intent, path);
         return JavaCodeBuilder.UnsupportedComment(intent, path, Code) + "\n@PreAuthorize(\"denyAll()\")";
+    }
+
+    internal static string SiteName(AxonEmissionContext context, SemanticId owner) => ScopeSelection.Select(context.Request)
+        .SelectMany(slice => slice.Slice.Commands.Select(command => (command.Id, command.Name))
+            .Concat(slice.Slice.Queries.Select(query => (query.Id, query.Name))))
+        .FirstOrDefault(site => site.Id == owner).Name ?? owner.ToString();
+
+    internal static string? EndpointExpression(AxonEmissionContext context, SemanticAuthorization authorization)
+    {
+        if (!PolicyPredicates.HasInline(context, authorization)) return Expression(context, authorization, new(StringComparer.Ordinal));
+        return PolicyPredicates.Failure(context, authorization) is null ? PolicyPredicates.Expression(context, authorization) : null;
     }
 
     internal static string ForHandler(AxonEmissionContext context, SemanticAuthorization? authorization, SemanticId owner, JavaCodeBuilder code) =>

@@ -5,6 +5,20 @@ concept AccountId : Uuid
 policy IsWriter
   require role "Writer"
 
+policy IsAuthenticated
+  require authenticated
+
+policy IsNotBlocked
+  require authenticated and not role "Blocked"
+
+policy IsWriterAndReviewer
+  require role "Writer" and role "Reviewer"
+
+policy IsNamedCaller
+  ```java
+    return "writer".equals(authentication.getName());
+    ```
+
 policy IsFinanceStaff
   ```java
     return claims.get("department") instanceof String department && department.startsWith("Finance");
@@ -42,6 +56,14 @@ module Accounts
           for id
           alias = alias
 
+      command AuthenticatedRegister
+        id AccountId identifier
+        alias String
+        authorize IsAuthenticated
+        produces AccountRegistered
+          for id
+          alias = alias
+
       event AccountRegistered
         alias String
 
@@ -49,6 +71,18 @@ module Accounts
       readmodel ActiveAccounts
         id AccountId
         alias String
+
+      query NotBlockedSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsNotBlocked
+
+      query WriterReviewerSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsWriterAndReviewer
+
+      query NamedSnapshot => ActiveAccounts optional
+        by id AccountId
+        authorize IsNamedCaller
 
       query AccountSnapshot => ActiveAccounts optional
         by id AccountId

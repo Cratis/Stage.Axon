@@ -54,6 +54,23 @@ public class when_authorization_reaches_generated_ingress : for_AxonArtifactRend
         Source("AllOrdersEndpoint").ShouldContain("@PreAuthorize(\"hasRole('Sales')\")");
 
     [Fact]
+    void should_require_authentication_for_commands_and_queries_before_request_binding()
+    {
+        var security = Source("SecurityConfiguration");
+        security.ShouldContain(".requestMatchers(HttpMethod.POST, \"/api/orders/orders/place-order\").authenticated()");
+        security.ShouldContain(".requestMatchers(HttpMethod.GET, \"/api/orders/orders/get-order\").authenticated()");
+        security.ShouldContain(".requestMatchers(HttpMethod.GET, \"/api/orders/orders/all-orders\").authenticated()");
+    }
+
+    [Fact]
+    void should_preserve_implicit_anonymous_routes_at_the_filter_level()
+    {
+        var security = Encoding.UTF8.GetString(_withoutAuthorization.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/SecurityConfiguration.java", StringComparison.Ordinal)).Bytes.AsSpan());
+        security.ShouldContain(".requestMatchers(HttpMethod.POST, \"/api/orders/orders/place-order\").permitAll()");
+        security.ShouldContain(".requestMatchers(HttpMethod.GET, \"/api/orders/orders/get-order\").permitAll()");
+    }
+
+    [Fact]
     void should_enable_spring_method_security() => Source("SecurityConfiguration").ShouldContain("@EnableMethodSecurity");
 
     [Fact]
