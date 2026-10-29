@@ -9,7 +9,7 @@ namespace Cratis.Stage.Rendering.Axon.Specifications.Views.for_SemanticSurfaceLe
 
 public class when_classifying_the_views_surface : Specification
 {
-    [Fact] void should_classify_live_queries_as_rendered() => SemanticSurfaceLedger.Entries["SemanticQueryDelivery.Live"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Rendered);
+    [Fact] void should_classify_live_capacity_as_warned() => SemanticSurfaceLedger.Entries["SemanticQueryDelivery.Live"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Warned);
     [Fact] void should_account_for_writerless_read_models() => SemanticSurfaceLedger.Entries["SemanticReadModel.Properties"].Kind.ShouldEqual(SemanticSurfaceDispositionKind.Warned);
     [Fact]
     void should_register_the_writerless_code()

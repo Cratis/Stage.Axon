@@ -25,7 +25,7 @@ internal static class AxonViewLiveSpecs
         var name = JavaNames.Type(query.Name);
         var modelType = types.Package(owner) + "." + JavaNames.Type(model.Name);
         var projector = types.Package(owner) + "." + JavaNames.Type(projection.Name) + "Projector";
-        var code = new JavaCodeBuilder(package).Declare(name + "SubscriptionTest").Declare(name).Declare(name + "Subscription");
+        var code = new JavaCodeBuilder(package).Declare(name + "SubscriptionTest").Declare(name).Declare(name + "Endpoint");
         foreach (var samePackageModel in located.Slice.ReadModels) code.Declare(JavaNames.Type(samePackageModel.Name));
         var modelName = JavaNames.Type(model.Name);
         var projectorName = JavaNames.Type(projection.Name) + "Projector";
@@ -54,6 +54,8 @@ internal static class AxonViewLiveSpecs
                 @{{code.Reference("org.springframework.beans.factory.annotation.Autowired")}}
                 private {{code.Reference("org.axonframework.messaging.queryhandling.gateway.QueryGateway")}} gateway;
                 @{{code.Reference("org.springframework.beans.factory.annotation.Autowired")}}
+                private {{name}}Endpoint endpoint;
+                @{{code.Reference("org.springframework.beans.factory.annotation.Autowired")}}
                 private {{code.Reference("org.axonframework.common.configuration.Configuration")}} configuration;
                 @{{code.Reference("org.springframework.beans.factory.annotation.Autowired")}}
                 private {{projectorName}} projector;
@@ -67,20 +69,21 @@ internal static class AxonViewLiveSpecs
                     var changed = new {{code.Reference("java.util.concurrent.CountDownLatch")}}(1);
                     var cancelled = new {{code.Reference("java.util.concurrent.CountDownLatch")}}(1);
                     var values = new {{code.Reference("java.util.concurrent.CopyOnWriteArrayList")}}<{{name}}.Result>();
-                    var subscription = new {{code.Reference("java.util.concurrent.atomic.AtomicReference")}}<{{code.Reference("java.util.concurrent.Flow")}}.Subscription>();
+                    var subscription = new {{code.Reference("java.util.concurrent.atomic.AtomicReference")}}<{{code.Reference("org.reactivestreams.Subscription")}}>();
+                    var payload = new {{code.Reference("java.util.concurrent.atomic.AtomicReference")}}<{{name}}.Result>();
                     var error = new {{code.Reference("java.util.concurrent.atomic.AtomicReference")}}<Throwable>();
-                    {{name}}Subscription.results(gateway, new {{name}}(), source -> target -> source.subscribe(new {{code.Reference("org.reactivestreams.Subscriber")}}<{{name}}.Result>() {
+                    endpoint.results(new {{name}}(), {{code.Reference("org.axonframework.messaging.core.Metadata")}}.emptyInstance(), source -> target -> source.subscribe(new {{code.Reference("org.reactivestreams.Subscriber")}}<{{name}}.Result>() {
                         @Override public void onSubscribe({{code.Reference("org.reactivestreams.Subscription")}} upstream) {
                             target.onSubscribe(new {{code.Reference("org.reactivestreams.Subscription")}}() {
                                 @Override public void request(long amount) { upstream.request(amount); }
                                 @Override public void cancel() { upstream.cancel(); cancelled.countDown(); }
                             });
                         }
-                        @Override public void onNext({{name}}.Result value) { target.onNext(value); }
+                        @Override public void onNext({{name}}.Result value) { payload.set(value); target.onNext(value); }
                         @Override public void onError(Throwable failure) { target.onError(failure); }
                         @Override public void onComplete() { target.onComplete(); }
-                    })).subscribe(new {{code.Reference("java.util.concurrent.Flow")}}.Subscriber<{{name}}.Result>() {
-                        @Override public void onSubscribe({{code.Reference("java.util.concurrent.Flow")}}.Subscription value) { subscription.set(value); value.request(2); }
+                    })).subscribe(new {{code.Reference("org.reactivestreams.Subscriber")}}<{{name}}.Result>() {
+                        @Override public void onSubscribe({{code.Reference("org.reactivestreams.Subscription")}} value) { subscription.set(value); value.request(2); }
                         @Override public void onNext({{name}}.Result value) {
                             values.add(value);
                             if (values.size() == 1) initial.countDown(); else changed.countDown();
@@ -102,6 +105,10 @@ internal static class AxonViewLiveSpecs
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertNull(error.get());
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(2, values.size());
                         {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertFalse(values.getLast().rows().isEmpty());
+                        var fresh = gateway.query(new {{name}}(), {{name}}.Result.class).get(10, {{code.Reference("java.util.concurrent.TimeUnit")}}.SECONDS);
+                        {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertFalse(payload.get().invalidated());
+                        {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(fresh, payload.get(), "Update payload must equal the fresh ordered handler result");
+                        {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(fresh, values.getLast());
                     } finally {
                         var active = subscription.get();
                         if (active != null) active.cancel();

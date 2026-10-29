@@ -17,7 +17,7 @@ internal static class AxonViewHttpLiveSpecs
     {
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name) + "SseTest";
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(JavaNames.Type(query.Name)).Declare(JavaNames.Type(query.Name) + "Streams");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(JavaNames.Type(query.Name));
         foreach (var model in located.Slice.ReadModels) code.Declare(JavaNames.Type(model.Name));
         var projectorName = projector[(projector.LastIndexOf('.') + 1)..];
         if (projector[..projector.LastIndexOf('.')] == package) code.Declare(projectorName);
@@ -38,7 +38,6 @@ internal static class AxonViewHttpLiveSpecs
                         var configuration = application.getBean({{code.Reference("org.axonframework.common.configuration.Configuration")}}.class);
                         var projector = application.getBean({{projectorName}}.class);
                         var repository = application.getBean({{repositoryType}}.class);
-                        var streams = application.getBean({{JavaNames.Type(query.Name)}}Streams.class);
                         repository.deleteAll();
                         try (var client = {{code.Reference("java.net.http.HttpClient")}}.newHttpClient();
                              var executor = {{code.Reference("java.util.concurrent.Executors")}}.newVirtualThreadPerTaskExecutor()) {
@@ -68,12 +67,10 @@ internal static class AxonViewHttpLiveSpecs
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(200, snapshot.statusCode());
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(snapshot.headers().firstValue("Content-Type").orElse("").startsWith("application/json"));
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(mapper.readTree(mapper.writeValueAsString(repository.findAll().stream().map({{entityType}}::toModel).toList())), mapper.readTree(snapshot.body()));
-                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(1, streams.activeCount());
                                 var closing = System.nanoTime();
                                 application.close();
                                 var elapsed = {{code.Reference("java.time.Duration")}}.ofNanos(System.nanoTime() - closing);
                                 {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertTrue(elapsed.compareTo({{code.Reference("java.time.Duration")}}.ofSeconds(5)) < 0, "Context close took " + elapsed);
-                                {{code.Reference("org.junit.jupiter.api.Assertions")}}.assertEquals(0, streams.activeCount());
                             }
                         }
                     } finally {

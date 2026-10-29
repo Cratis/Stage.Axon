@@ -33,8 +33,10 @@ public class when_emitting_live_view_tests : for_NativeViewSpecifications.given.
     [Fact] void should_shorten_the_spring_test_annotation() => _java.ShouldContain("@SpringBootTest(classes = Application.class)");
     [Fact] void should_import_the_native_gateway() => _java.ShouldContain("import org.axonframework.messaging.queryhandling.gateway.QueryGateway;");
     [Fact] void should_shorten_the_native_gateway() => _java.ShouldContain("private QueryGateway gateway;");
-    [Fact] void should_import_flow_as_the_nested_type_owner() => _java.ShouldContain("import java.util.concurrent.Flow;");
-    [Fact] void should_shorten_the_flow_subscription() => _java.ShouldContain("new AtomicReference<Flow.Subscription>()");
+    [Fact] void should_import_the_reactive_subscription() => _java.ShouldContain("import org.reactivestreams.Subscription;");
+    [Fact] void should_shorten_the_reactive_subscription() => _java.ShouldContain("new AtomicReference<Subscription>()");
+    [Fact] void should_use_the_endpoint_results() => _java.ShouldContain("endpoint.results(new LiveTotals(), Metadata.emptyInstance()");
+    [Fact] void should_compare_the_native_payload_with_the_handler() => _java.ShouldContain("assertEquals(fresh, payload.get(), \"Update payload must equal the fresh ordered handler result\")");
     [Fact] void should_keep_the_reactive_subscription_distinct() => _java.ShouldContain("onSubscribe(Subscription upstream)");
     [Fact] void should_import_the_native_update_emitter() => _java.ShouldContain("import org.axonframework.messaging.queryhandling.QueryUpdateEmitter;");
     [Fact] void should_import_the_sse_update_emitter() => _sse.ShouldContain("import org.axonframework.messaging.queryhandling.QueryUpdateEmitter;");

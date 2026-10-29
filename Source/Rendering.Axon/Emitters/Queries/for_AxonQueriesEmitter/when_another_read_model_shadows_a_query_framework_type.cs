@@ -10,18 +10,13 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Queries.for_AxonQueriesEmitter;
 public class when_another_read_model_shadows_a_query_framework_type : given.a_query_collision
 {
     [Theory]
-    [InlineData("Object", "LiveTotalsStreams", "Flow.Publisher<java.lang.Object>")]
-    [InlineData("Object", "LiveTotalsSubscription", "Flow.Publisher<java.lang.Object>")]
     [InlineData("Object", "FindTotalHandler", "private final TotalRepository repository;")]
     [InlineData("Object", "RankedTotalsPerformer", "List<Total> perform(RankedTotals query, TotalRepository repository)")]
-    [InlineData("Override", "LiveTotalsSubscription", "@java.lang.Override")]
-    [InlineData("Throwable", "LiveTotalsSubscription", "onError(java.lang.Throwable failure)")]
     [InlineData("String", "FindTotalEndpoint", "required = true) java.lang.String name")]
     [InlineData("QueryResults", "FindTotalHandler", "return new FindTotal.Result(rows);")]
     [InlineData("ProblemDetail", "FindTotalEndpoint", "private static org.springframework.http.ProblemDetail cardinalityProblem(")]
     [InlineData("HttpStatus", "FindTotalEndpoint", "org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR")]
     [InlineData("URI", "FindTotalEndpoint", "java.net.URI.create(")]
-    [InlineData("Flow", "LiveTotalsStreams", "java.util.concurrent.Flow.Publisher<Object>")]
     [InlineData("List", "FindTotal", "java.util.List<Total>")]
     [InlineData("QueryGateway", "FindTotalEndpoint", "org.axonframework.messaging.queryhandling.gateway.QueryGateway gateway")]
     [InlineData("ResponseEntity", "FindTotalEndpoint", "org.springframework.http.ResponseEntity<Total>")]

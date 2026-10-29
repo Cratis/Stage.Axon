@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-@SpringBootTest(classes = RuntimeTestApplication.class, properties = "stage.axon.live.max-streams=1")
+@SpringBootTest(classes = RuntimeTestApplication.class)
 class StageAxonRuntimeAutoConfigurationTest {
     @Autowired ApplicationContext context;
 
@@ -19,7 +19,6 @@ class StageAxonRuntimeAutoConfigurationTest {
 
     @Test
     void registersTheHelpersOnceWithTheDefaultProfile() {
-        assertEquals(1, context.getBeansOfType(LiveStreams.class).size());
         assertEquals(1, context.getBeansOfType(ProblemDetailsAdvice.class).size());
         var stores = context.getBeansOfType(UniqueValueStore.class);
         assertEquals(1, stores.size());

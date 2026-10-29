@@ -86,6 +86,7 @@ internal static class Degradations
         Unsupported("STAGE-AXON-EVENT-TAGS", "tag events with every modeled event source", "Axon events use one primary event-source tag.", Comment),
         Unsupported("STAGE-AXON-AUTHORIZATION", "enforce the modeled authorization policy", "Native metadata authority matching cannot express authenticated-only checks, negation, distinct-role conjunctions, or unsupported claims/custom-auth conditions; those handlers deny access.", DenyAccess),
         Unsupported("STAGE-AXON-JWT-PROVIDER", "validate tokens for the configured audience", "Credentials are rejected without a native JWT provider and explicit audience configuration.", DenyAccess),
+        Unsupported("STAGE-AXON-LIVE-CAPACITY", "limit concurrent live streams", "Live stream capacity is not limited; stage.axon.live.max-streams is not enforced.", Comment),
         Unsupported("STAGE-AXON-HTTP-SPEC", "verify the modeled HTTP behavior", "The HTTP fixture cannot establish this expectation.", Comment),
         Unsupported("STAGE-AXON-SPEC", "verify the modeled specification", "No specification renderer establishes this expectation.", Comment)
     ]);

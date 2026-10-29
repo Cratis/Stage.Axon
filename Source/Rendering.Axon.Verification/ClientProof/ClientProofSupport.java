@@ -4,7 +4,6 @@ import __APPLICATION__.work.items.overview.WorkItemById;
 import __APPLICATION__.work.items.overview.WorkItems;
 import __APPLICATION__.work.items.overview.WorkItemsEntity;
 import __APPLICATION__.work.items.overview.WorkItemsRepository;
-import __RUNTIME_MODULE__.LiveStreams;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -30,6 +29,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.axonframework.common.configuration.Configuration;
 import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
 import org.axonframework.messaging.queryhandling.QueryUpdateEmitter;
+import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -50,6 +52,7 @@ final class ClientProofSupport {
     static final String VIEW = "__APPLICATION__.work.items.overview.WorkItemsRepository";
     static final AtomicReference<Gate> GATE = new AtomicReference<>();
     static final AtomicInteger READS = new AtomicInteger();
+    static final AtomicInteger ACTIVE = new AtomicInteger();
     static final List<String> CALLERS = new CopyOnWriteArrayList<>();
     private static final long WAIT = 20;
 
@@ -66,7 +69,13 @@ final class ClientProofSupport {
             return new BeanPostProcessor() {
                 @Override
                 public Object postProcessAfterInitialization(Object bean, String name) {
-                    return VIEW.equals(name) && bean instanceof WorkItemsRepository repository ? gated(repository) : bean;
+                    if (VIEW.equals(name) && bean instanceof WorkItemsRepository repository) return gated(repository);
+                    if (bean instanceof QueryGateway gateway) return Proxy.newProxyInstance(QueryGateway.class.getClassLoader(), new Class<?>[] { QueryGateway.class }, (proxy, method, arguments) -> {
+                        var result = invoke(gateway, method, arguments);
+                        if (!method.getName().equals("subscriptionQuery")) return result;
+                        return Flux.from((Publisher<?>) result).doOnSubscribe(subscription -> ACTIVE.incrementAndGet()).doFinally(signal -> ACTIVE.decrementAndGet());
+                    });
+                    return bean;
                 }
             };
         }
@@ -104,7 +113,7 @@ final class ClientProofSupport {
         });
     }
 
-    private static Object invoke(WorkItemsRepository inner, Method method, Object[] arguments) throws Throwable {
+    private static Object invoke(Object inner, Method method, Object[] arguments) throws Throwable {
         try {
             return method.invoke(inner, arguments);
         } catch (InvocationTargetException failure) { throw failure.getCause(); }
@@ -124,14 +133,12 @@ final class ClientProofSupport {
     static final class Actions {
         private final Configuration configuration;
         private final WorkItemsRepository store;
-        private final LiveStreams live;
         private volatile Gate armed;
         private volatile CompletableFuture<Void> burst = CompletableFuture.completedFuture(null);
 
-        Actions(Configuration configuration, WorkItemsRepository store, LiveStreams live) {
+        Actions(Configuration configuration, WorkItemsRepository store) {
             this.configuration = configuration;
             this.store = store;
-            this.live = live;
         }
 
         void reset() throws InterruptedException {
@@ -208,8 +215,8 @@ final class ClientProofSupport {
 
         private void awaitActive(int expected) throws InterruptedException {
             var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-            while (live.active() != expected && System.nanoTime() < deadline) Thread.sleep(25);
-            assertEquals(expected, live.active());
+            while (ACTIVE.get() != expected && System.nanoTime() < deadline) Thread.sleep(25);
+            assertEquals(expected, ACTIVE.get());
         }
     }
 

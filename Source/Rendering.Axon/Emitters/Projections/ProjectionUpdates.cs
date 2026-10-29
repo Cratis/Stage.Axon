@@ -37,8 +37,22 @@ internal sealed class ProjectionUpdates(AxonEmissionContext context, ViewJavaTyp
         {
             foreach (var (owner, query) in _queries)
             {
-                var name = package is null ? types.Package(owner) + "." + JavaNames.Type(query.Name) : QueryType(owner, query, body, package);
-                body.Line($"updates.emit({name}.class, query -> true, {name}.Result::invalidation);");
+                var name = package is null ? body.Reference(types.Package(owner) + "." + JavaNames.Type(query.Name)) : QueryType(owner, query, body, package);
+                var modelOwner = ScopeSelection.Locate(context.Request.Model.Application).Single(slice => slice.Slice.ReadModels.Any(candidate => candidate.Id == model));
+                var readModel = modelOwner.Slice.ReadModels.Single(candidate => candidate.Id == model);
+                if (!QueryPerformer.Required(context, query) && !new QueryShape(query, readModel, types).Arguments.Any())
+                {
+                    var entity = ReadModelEntities.EntityName(readModel);
+                    var sort = body.Reference("org.springframework.data.domain.Sort");
+
+                    // Axon's context-bound emitter invokes this supplier after a successful unit-of-work commit.
+                    body.Line($"updates.emit({name}.class, query -> true, () -> new {name}.Result(repository.findAll({sort}.by(\"rowKey\")).stream().map({entity}::toModel).toList()));");
+                }
+                else
+                {
+                    body.Line("// Refresh-on-change: the endpoint re-queries with the caller's metadata.")
+                        .Line($"updates.emit({name}.class, query -> true, {name}.Result::invalidation);");
+                }
             }
         });
     }

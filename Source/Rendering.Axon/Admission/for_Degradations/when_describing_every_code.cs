@@ -30,6 +30,16 @@ public class when_describing_every_code
         });
     }
 
+    [Fact]
+    public void should_describe_the_dropped_live_capacity_limit()
+    {
+        var row = Degradations.Find("STAGE-AXON-LIVE-CAPACITY");
+        Assert.NotNull(row);
+        Assert.Equal(DegradationKind.Unsupported, row.Kind);
+        Assert.Equal(DegradationStub.Comment, row.Stub);
+        Assert.Contains("max-streams is not enforced", row.Reason, StringComparison.Ordinal);
+    }
+
     [Fact] public void should_tolerate_unknown_codes() => Assert.Null(Degradations.Find("STAGE-AXON-UNKNOWN"));
 
     [Fact]

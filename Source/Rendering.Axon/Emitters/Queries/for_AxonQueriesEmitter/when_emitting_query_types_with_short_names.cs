@@ -16,8 +16,6 @@ public partial class when_emitting_query_types_with_short_names : given.a_query_
     [InlineData("LiveTotals")]
     [InlineData("LiveTotalsHandler")]
     [InlineData("LiveTotalsEndpoint")]
-    [InlineData("LiveTotalsSubscription")]
-    [InlineData("LiveTotalsStreams")]
     [InlineData("RankedTotals")]
     [InlineData("RankedTotalsHandler")]
     [InlineData("RankedTotalsEndpoint")]
@@ -32,10 +30,6 @@ public partial class when_emitting_query_types_with_short_names : given.a_query_
     }
 
     [Theory]
-    [InlineData("Object", "LiveTotalsStreams", "Flow.Publisher<java.lang.Object>")]
-    [InlineData("Throwable", "LiveTotalsSubscription", "onError(java.lang.Throwable failure)")]
-    [InlineData("Flow", "LiveTotalsStreams", "java.util.concurrent.Flow.Publisher<Object>")]
-    [InlineData("Flow", "LiveTotalsSubscription", "java.util.concurrent.Flow.Publisher<LiveTotals.Result>")]
     [InlineData("QueryResults", "FindTotal", "List<QueryResults> rows")]
     [InlineData("ProblemDetail", "FindTotalEndpoint", "private static org.springframework.http.ProblemDetail cardinalityProblem(")]
     [InlineData("HttpStatus", "FindTotalEndpoint", "org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR")]

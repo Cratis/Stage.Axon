@@ -34,7 +34,7 @@ public partial class when_preparing_the_client_proof : Specification
     [Fact] void should_resolve_the_application_package() => _javaAll.ShouldNotContain("__APPLICATION__");
     [Fact] void should_resolve_the_runtime_package() => _javaAll.ShouldNotContain("__RUNTIME__");
     [Fact] void should_resolve_the_runtime_module_package() => _javaAll.ShouldNotContain("__RUNTIME_MODULE__");
-    [Fact] void should_import_the_module_live_streams() => _java["ClientContractTest.java"].ShouldContain("import io.cratis.stage.axon.runtime.LiveStreams;");
+    [Fact] void should_not_import_the_deleted_module_live_streams() => _javaAll.ShouldNotContain("LiveStreams");
     [Fact] void should_not_add_license_headers_to_java() => _javaAll.ShouldNotContain("Copyright (c) Cratis");
     [Fact] void should_bind_to_the_client_proof_package() => _java.Values.All(source => source.Contains("package corpusclientproof.runtime;", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_fail_when_node_cannot_start() => _java["ClientProofSupport.java"].ShouldContain("AssertionError");

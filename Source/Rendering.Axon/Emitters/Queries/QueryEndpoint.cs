@@ -40,8 +40,7 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
         var package = types.Package(located);
         var name = JavaNames.Type(query.Name);
         var code = QueryModelReference.Create(context, package).Declare(name).Declare(name + "Endpoint");
-        if (query.Delivery == SemanticQueryDelivery.Live) code.Declare(name + "Streams").Declare(name + "Subscription");
-        var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Endpoint", name + "Streams", name + "Subscription");
+        var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Endpoint");
         shape.Claim(code);
         var gateway = code.Reference("org.axonframework.messaging.queryhandling.gateway.QueryGateway");
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.RestController")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Endpoint")})")
@@ -49,11 +48,11 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
             {
                 var live = query.Delivery == SemanticQueryDelivery.Live;
                 body.Line($"private final {gateway} gateway;");
-                if (live) body.Line($"private final {name}Streams streams;");
-                body.Block($"public {name}Endpoint({gateway} gateway{(live ? $", {name}Streams streams" : string.Empty)})", constructor =>
+                var settings = live ? LiveConfiguration(body) : string.Empty;
+                body.Block($"public {name}Endpoint({gateway} gateway{settings})", constructor =>
                 {
                     constructor.Line("this.gateway = gateway;");
-                    if (live) constructor.Line("this.streams = streams;");
+                    if (live) constructor.Line("this.heartbeat = heartbeat;").Line("this.timeout = timeout;");
                 });
                 var authorization = SecurityAnnotations.For(context, query.Authorization, query.Id);
 
@@ -91,6 +90,14 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
         });
     }
 
+    static string LiveConfiguration(JavaCodeBuilder code)
+    {
+        var duration = code.Reference("java.time.Duration");
+        code.Line($"private final {duration} heartbeat;").Line($"private final {duration} timeout;")
+            .Line($"private final {code.Reference("reactor.core.publisher.Sinks")}.Empty<{code.Reference("java.lang.Void")}> shutdown = {code.Reference("reactor.core.publisher.Sinks")}.empty();");
+        return $", @{code.Reference("org.springframework.beans.factory.annotation.Value")}(\"${{stage.axon.live.heartbeat:15s}}\") {duration} heartbeat, @{code.Reference("org.springframework.beans.factory.annotation.Value")}(\"${{stage.axon.live.timeout:30m}}\") {duration} timeout";
+    }
+
     void Snapshot(JavaCodeBuilder code, string name, string route, string modelName)
     {
         code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}({JavaCodeBuilder.StringLiteral(route)})");
@@ -124,15 +131,48 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
 
     void Live(JavaCodeBuilder code, string name, string route)
     {
-        code.Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}(value = {JavaCodeBuilder.StringLiteral(route)}, produces = {code.Reference("org.springframework.http.MediaType")}.TEXT_EVENT_STREAM_VALUE)")
-            .Block($"public {code.Reference("org.springframework.web.servlet.mvc.method.annotation.SseEmitter")} stream({shape.Parameters(code)}{(shape.Arguments.Any() ? ", " : string.Empty)}{code.Reference("org.springframework.security.core.Authentication")} {Caller})", method =>
+        context.Degradation.Unsupported("STAGE-AXON-LIVE-CAPACITY", query.Id, "Live stream capacity is not limited.");
+        var flux = code.Reference("reactor.core.publisher.Flux");
+        var mono = code.Reference("reactor.core.publisher.Mono");
+        var sse = code.Reference("org.springframework.http.codec.ServerSentEvent");
+        var objectType = code.Reference("java.lang.Object");
+        code.Line("// Differs from Screenplay: live stream capacity is not limited.")
+            .Line($"@{code.Reference("org.springframework.web.bind.annotation.GetMapping")}(value = {JavaCodeBuilder.StringLiteral(route)}, produces = {code.Reference("org.springframework.http.MediaType")}.TEXT_EVENT_STREAM_VALUE)")
+            .Block($"public {flux}<{sse}<{objectType}>> stream({shape.Parameters(code)}{(shape.Arguments.Any() ? ", " : string.Empty)}{code.Reference("org.springframework.security.core.Authentication")} {Caller})", method =>
             {
                 method.Line($"var {MetadataName} = {method.Reference("org.axonframework.messaging.core.Metadata")}.emptyInstance();")
                     .Block($"if ({Caller} != null && {Caller}.isAuthenticated())", authenticated => authenticated
                         .Line($"{MetadataName} = {MetadataName}.and(\"username\", {Caller}.getName()).and(\"authorities\", {Caller}.getAuthorities().stream().map({authenticated.Reference("org.springframework.security.core.GrantedAuthority")}::getAuthority).collect({authenticated.Reference("java.util.stream.Collectors")}.joining(\",\")));"))
                     .Line($"var query = new {name}({shape.Parsed(method)});")
-                    .Line($"return streams.open({name}Subscription.values(gateway, query, {MetadataName}));");
-            });
+                    .Block($"var data = results(query, {MetadataName}).map(result ->", mapping =>
+                    {
+                        if (query.Cardinality != SemanticQueryCardinality.Many)
+                        {
+                            var status = mapping.Reference("org.springframework.http.HttpStatus");
+                            var exception = mapping.Reference("org.springframework.web.ErrorResponseException");
+                            var cardinality = query.Cardinality == SemanticQueryCardinality.One ? "exactly one" : "at most one";
+                            mapping.Line($"if (result.rows().size() > 1) throw new {exception}({status}.INTERNAL_SERVER_ERROR, cardinalityProblem({status}.INTERNAL_SERVER_ERROR, \"query-cardinality\", \"{cardinality}\", result.rows().size()), null);");
+                            if (query.Cardinality == SemanticQueryCardinality.One)
+                                mapping.Line($"if (result.rows().isEmpty()) throw new {exception}({status}.NOT_FOUND, cardinalityProblem({status}.NOT_FOUND, \"query-result-missing\", \"exactly one\", 0), null);");
+                        }
+                        mapping.Line($"{objectType} payload = result.rows(){(query.Cardinality == SemanticQueryCardinality.Many ? string.Empty : ".stream().findFirst()")};")
+                            .Line($"return {sse}.builder(payload).build();");
+                    }).Line(");")
+                    .Line("return data.switchOnFirst((first, values) -> first.hasValue()")
+                    .Line($"    ? values.publish(shared -> shared.mergeWith({flux}.interval(heartbeat).map(tick -> {sse}.<{objectType}>builder().comment(\"heartbeat\").build()).takeUntilOther(shared.ignoreElements())))")
+                    .Line("    : values).take(timeout).takeUntilOther(shutdown.asMono());");
+            })
+            .Line($"@{code.Reference("org.springframework.context.event.EventListener")}")
+            .Block($"void onShutdown({code.Reference("org.springframework.context.event.ContextClosedEvent")} event)", method => method.Line("shutdown.tryEmitEmpty();"));
+        var metadata = code.Reference("org.axonframework.messaging.core.Metadata");
+        code.Block($"public {flux}<{name}.Result> results({name} query, {metadata} metadata)", method => method.Line("return results(query, metadata, source -> source);"))
+            .Block($"{flux}<{name}.Result> results({name} query, {metadata} metadata, {code.Reference("java.util.function.UnaryOperator")}<{code.Reference("org.reactivestreams.Publisher")}<{name}.Result>> observe)", method => method
+                .Line("// Keyed, filtered and performer queries use refresh-on-change with the caller's metadata.")
+                .Line($"return {flux}.defer(() -> {flux}.from(observe.apply(gateway.subscriptionQuery(query, {name}.Result.class, metadata, null, {method.Reference("reactor.util.concurrent.Queues")}.SMALL_BUFFER_SIZE))))")
+                .Line("    .onBackpressureLatest()")
+                .Line($"    .publishOn({method.Reference("reactor.core.scheduler.Schedulers")}.boundedElastic(), 1)")
+                .Line($"    .concatMap(result -> result.invalidated() ? {mono}.fromFuture(() -> gateway.query(query, {name}.Result.class, metadata, null)) : {mono}.just(result), 1)")
+                .Line("    .distinctUntilChanged();"));
     }
 
     void Register(string? expression, string route)

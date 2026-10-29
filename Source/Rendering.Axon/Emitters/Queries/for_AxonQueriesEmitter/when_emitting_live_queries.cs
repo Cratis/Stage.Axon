@@ -14,7 +14,6 @@ public class when_emitting_live_queries : a_view_request
 {
     AxonEmissionContext _context;
     string _endpoint;
-    string _subscription;
     string _projector;
     string _securedEndpoint;
 
@@ -31,8 +30,8 @@ public class when_emitting_live_queries : a_view_request
         new QueryEndpoint(securedContext, types, located, query, types.Package(located) + "." + model.Name, new(query, model, types)).Emit();
         _securedEndpoint = Text(securedContext.Artifacts.Single());
         _endpoint = Source("LiveTotalsEndpoint.java");
-        _subscription = Source("LiveTotalsSubscription.java");
         _projector = Source("TotalProjectionProjector.java");
+        UnsupportedSummary.Emit(_context);
     }
 
     [Fact] void should_authorize_both_mappings() => _securedEndpoint.Split("@PreAuthorize(\"denyAll()\")", StringSplitOptions.None).Length.ShouldEqual(3);
@@ -42,22 +41,26 @@ public class when_emitting_live_queries : a_view_request
     [Fact] void should_dispatch_the_snapshot_over_the_query_gateway() => _endpoint.ShouldContain("gateway.query(new LiveTotals(), LiveTotals.Result.class, metadata, null)");
     [Fact] void should_return_the_raw_snapshot_rows() => _endpoint.ShouldContain("ResponseEntity.ok(result.rows())");
     [Fact] void should_probe_a_plain_get_without_an_accept_header() => Source("LiveTotalsSseTest.java").ShouldContain("HttpRequest.newBuilder(request.uri()).GET().build()");
-    [Fact] void should_return_an_sse_stream() => _endpoint.ShouldContain("streams.open(LiveTotalsSubscription.values(gateway, query, metadata))");
-    [Fact] void should_use_an_axon_subscription_query() => _subscription.ShouldContain("gateway.subscriptionQuery(query, LiveTotals.Result.class, metadata, null, Queues.SMALL_BUFFER_SIZE)");
-    [Fact] void should_delegate_to_latest_snapshot_delivery() => _subscription.ShouldContain("LiveSnapshots.of(() -> observe.apply(gateway.subscriptionQuery(query, LiveTotals.Result.class, metadata, null, Queues.SMALL_BUFFER_SIZE)), LiveTotals.Result::invalidated, () -> gateway.query(query, LiveTotals.Result.class, metadata, null))");
-    [Fact] void should_not_carry_its_own_bridge() => _subscription.ShouldNotContain("class Bridge");
-    [Fact] void should_delegate_streams_to_the_runtime_group() => Source("LiveTotalsStreams.java").ShouldContain("public LiveTotalsStreams(LiveStreams live)");
-    [Fact] void should_open_sessions_through_the_group() => Source("LiveTotalsStreams.java").ShouldContain("group.open(publisher)");
-    [Fact] void should_keep_the_active_count() => Source("LiveTotalsStreams.java").ShouldContain("int activeCount() { return group.activeCount(); }");
-    [Fact] void should_leave_shutdown_to_the_runtime() => Source("LiveTotalsStreams.java").ShouldNotContain("ApplicationListener");
-    [Fact] void should_invalidate_after_projecting_an_event() => _projector.ShouldContain("LiveTotals.Result::invalidation");
+    [Fact] void should_return_an_sse_stream() => _endpoint.ShouldContain("Flux<ServerSentEvent<Object>> stream(");
+    [Fact] void should_subscribe_through_the_native_gateway() => _endpoint.ShouldContain("gateway.subscriptionQuery(query, LiveTotals.Result.class, metadata, null, Queues.SMALL_BUFFER_SIZE)");
+    [Fact] void should_keep_the_latest_pending_update() => _endpoint.ShouldContain(".onBackpressureLatest()");
+    [Fact] void should_refresh_with_the_callers_metadata() => _endpoint.ShouldContain("gateway.query(query, LiveTotals.Result.class, metadata, null)");
+    [Fact] void should_start_heartbeats_after_the_first_result() => _endpoint.ShouldContain("data.switchOnFirst((first, values) -> first.hasValue()");
+    [Fact] void should_end_at_the_configured_lifetime() => _endpoint.ShouldContain(".take(timeout)");
+    [Fact] void should_not_send_an_open_frame() => _endpoint.ShouldNotContain("comment(\"open\")");
+    [Fact] void should_document_the_missing_capacity_limit() => _endpoint.ShouldContain("// Differs from Screenplay: live stream capacity is not limited.");
+    [Fact] void should_not_generate_a_subscription_helper() => _context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/LiveTotalsSubscription.java", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_not_generate_a_streams_helper() => _context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/LiveTotalsStreams.java", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_emit_ordered_rows_after_projecting_an_event() => Assert.True(_projector.Contains("repository.findAll(Sort.by(\"rowKey\")).stream().map(TotalEntity::toModel).toList()", StringComparison.Ordinal), _projector);
+    [Fact] void should_not_invalidate_the_argumentless_query() => _projector.ShouldNotContain("Result::invalidation");
     [Fact] void should_resolve_updates_from_the_handler_context() => _projector.ShouldContain("event, QueryUpdateEmitter updates)");
     [Fact] void should_not_require_a_global_update_emitter() => _projector.ShouldNotContain("private final QueryUpdateEmitter");
     [Fact] void should_emit_an_initial_and_update_native_test() => Source("LiveTotalsSubscriptionTest.java").ShouldContain("shouldDeliverInitialSnapshotAndUpdateAndCancelAxonPublisher");
     [Fact] void should_serialize_expected_sse_values_with_the_application_concept_mapper() => Source("LiveTotalsSseTest.java").ShouldContain("var mapper = application.getBean(JsonMapper.class);");
     [Fact] void should_emit_an_http_sse_probe() => Source("LiveTotalsSseTest.java").ShouldContain("shouldDeliverInitialDataAndOneUpdateOverHttpSse");
     [Fact] void should_emit_a_five_second_shutdown_assertion() => Source("LiveTotalsSseTest.java").ShouldContain("elapsed.compareTo(Duration.ofSeconds(5)) < 0");
-    [Fact] void should_not_degrade_live_queries_to_snapshots() => _context.Degradation.UnsupportedConstructs.Where(diagnostic => diagnostic.Artifact == QueryId("LiveTotals")).ShouldBeEmpty();
+    [Fact] void should_render_the_capacity_entry_in_the_unsupported_summary() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md")).ShouldContain("`STAGE-AXON-LIVE-CAPACITY` (1): limit concurrent live streams.");
+    [Fact] void should_catalogue_the_dropped_capacity_limit() => _context.Degradation.UnsupportedConstructs.Single(diagnostic => diagnostic.Artifact == QueryId("LiveTotals")).Code.ShouldEqual("STAGE-AXON-LIVE-CAPACITY");
 
     string Source(string name) => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name, StringComparison.Ordinal)));
 }
