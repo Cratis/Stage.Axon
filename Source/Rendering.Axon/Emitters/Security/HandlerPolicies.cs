@@ -13,14 +13,20 @@ internal static class HandlerPolicies
         if (authorization is null) return string.Empty;
         var roles = Roles(context, authorization);
         if (roles is { Length: 0 }) return string.Empty;
-        var annotation = "@" + code.Reference("org.springframework.security.access.annotation.Secured");
 
         // Axon authorizes subscriptions at opening; a denied initial result terminates before any updates.
-        if (roles is not null) return annotation + "({" + string.Join(", ", roles.Select(role => JavaCodeBuilder.StringLiteral("ROLE_" + role))) + "})";
+        if (roles is not null) return "@" + code.Reference("org.springframework.security.access.annotation.Secured") + "({" + string.Join(", ", roles.Select(role => JavaCodeBuilder.StringLiteral("ROLE_" + role))) + "})";
+        if (SecurityAnnotations.EndpointExpression(context, authorization) is not null)
+        {
+            const string warning = "The HTTP endpoint's @PreAuthorize enforces this policy; dispatch outside HTTP is not guarded at the handler.";
+            context.Degradation.Warn("STAGE-AXON-AUTHORIZATION", owner, warning);
+            return "// Differs from Screenplay: " + warning + " (STAGE-AXON-AUTHORIZATION)";
+        }
+        var annotation = "@" + code.Reference("org.springframework.security.access.annotation.Secured");
         const string intent = "authorize access with the modeled policy";
         var path = owner + "/authorization";
         const string reason = "This handler policy requires claims, custom Authentication fields, or conditions not expressible by native metadata role checks; access is denied.";
-        context.Degradation.Unsupported("STAGE-AXON-AUTHORIZATION", owner, reason, intent, path);
+        context.Degradation.Unsupported("STAGE-AXON-AUTHORIZATION", owner, SecurityAnnotations.SiteName(context, owner) + ": " + reason, intent, path);
         return "// Differs from Screenplay: " + reason + "\n" + JavaCodeBuilder.UnsupportedComment(intent, path, "STAGE-AXON-AUTHORIZATION") + "\n" + annotation + "({})";
     }
 

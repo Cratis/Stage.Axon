@@ -7,7 +7,10 @@ using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Contracts.Semantics;
+using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
+using Cratis.Stage.Rendering.Axon.Java;
+using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Security.for_SecurityAnnotations;
@@ -39,6 +42,50 @@ public class when_rendering_an_inline_java_policy : Specification
     }
 
     [Theory]
+    [InlineData("IsNamedCaller", "isNamedCallerPolicy")]
+    [InlineData("IsFinanceStaff", "isFinanceStaffPolicy")]
+    [InlineData("FinanceCheck", "financeCheckPolicy")]
+    void should_enforce_single_inline_and_jwt_claim_policies_at_the_endpoint_and_warn(string policy, string bean)
+    {
+        var authorization = new SemanticPolicyReference(policy);
+        Annotation(authorization).ShouldEqual("@PreAuthorize(\"isAuthenticated() and @" + bean + ".check(authentication)\")");
+        var handler = SecurityAnnotations.ForHandler(context, authorization, context.Request.Model.Application.Id, new JavaCodeBuilder("example"));
+        handler.ShouldNotContain("@Secured");
+        handler.ShouldContain("// Differs from Screenplay:");
+        context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
+        context.Degradation.Warnings.Single().Code.ShouldEqual("STAGE-AXON-AUTHORIZATION");
+        context.Degradation.Warnings.Single().Message.ShouldContain("dispatch outside HTTP is not guarded at the handler");
+    }
+
+    [Theory]
+    [InlineData(false, "RegisterAccount", ArtifactRenderDiagnosticSeverity.Warning)]
+    [InlineData(false, "AndSnapshot", ArtifactRenderDiagnosticSeverity.Warning)]
+    [InlineData(true, "RegisterAccount", ArtifactRenderDiagnosticSeverity.Error)]
+    [InlineData(true, "AndSnapshot", ArtifactRenderDiagnosticSeverity.Error)]
+    void should_catalog_named_composition_commands_and_queries_with_default_warning_and_strict_error(bool strict, string name, ArtifactRenderDiagnosticSeverity severity)
+    {
+        var request = context.Request with { Profile = AxonRendering.WithBearerTokens(AxonRendering.CreateProfile(strict: strict)) };
+        var fixture = new AxonEmissionContext(request, new(request.Profile));
+        var sites = ScopeSelection.Select(request).SelectMany(slice => slice.Slice.Commands.Select(command => (command.Id, command.Name, command.Authorization))
+            .Concat(slice.Slice.Queries.Select(query => (query.Id, query.Name, query.Authorization))));
+        var site = sites.Single(site => site.Name == name);
+        SecurityAnnotations.For(fixture, site.Authorization, site.Id).ShouldContain("@PreAuthorize(\"denyAll()\")");
+        SecurityAnnotations.ForHandler(fixture, site.Authorization, site.Id, new JavaCodeBuilder("example")).ShouldContain("@Secured({})");
+        foreach (var diagnostic in fixture.Degradation.UnsupportedConstructs)
+        {
+            diagnostic.Code.ShouldEqual("STAGE-AXON-AUTHORIZATION");
+            diagnostic.Severity.ShouldEqual(severity);
+            diagnostic.Message.ShouldContain(name);
+        }
+        fixture.Degradation.UnsupportedConstructs.Count.ShouldEqual(2);
+        fixture.Degradation.Warnings.ShouldBeEmpty();
+        fixture.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
+        Degradations.Find("STAGE-AXON-AUTHORIZATION")!.Reason.ShouldContain("Inline-policy compositions");
+        UnsupportedSummary.Emit(fixture);
+        Encoding.UTF8.GetString(fixture.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan()).ShouldContain(name);
+    }
+
+    [Theory]
     [InlineData(SemanticLogicalOperator.And)]
     [InlineData(SemanticLogicalOperator.Or)]
     void should_deny_whole_compositions_instead_of_broadening_on_failure(SemanticLogicalOperator operation)
@@ -62,8 +109,19 @@ public class when_rendering_an_inline_java_policy : Specification
 
     [Theory]
     [InlineData("return !claims.containsKey(\"blocked\");")]
-    [InlineData("return authentication.getDetails() != null;")]
     [InlineData("return claims.get(\"sub\") == null;")]
+    void should_accept_authored_native_jwt_claim_bodies(string body)
+    {
+        Body(body);
+        Annotation(new SemanticPolicyReference("IsFinanceStaff")).ShouldEqual("@PreAuthorize(\"isAuthenticated() and @isFinanceStaffPolicy.check(authentication)\")");
+        context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
+        new AxonSecurityEmitter().Emit(context);
+        Source("IsFinanceStaffPolicy").ShouldContain(body);
+        Source("IsFinanceStaffPolicy").ShouldContain("catch (Exception | Error failure)");
+    }
+
+    [Theory]
+    [InlineData("return authentication.getDetails() != null;")]
     [InlineData("return java.util.Collections.emptyList().isEmpty();")]
     void should_catalog_unsafe_binding_or_unimportable_bodies_as_denial(string body)
     {
@@ -80,6 +138,7 @@ public class when_rendering_an_inline_java_policy : Specification
         var request = context.Request with { Profile = AxonRendering.CreateProfile() };
         context = new(request, new(request.Profile));
         Annotation(new SemanticPolicyReference("IsFinanceStaff")).ShouldContain("denyAll()");
+        context.Degradation.UnsupportedConstructs.Single().Message.ShouldContain("Implicit claims require a native JWT authentication provider.");
     }
 
     [Fact]
@@ -90,10 +149,10 @@ public class when_rendering_an_inline_java_policy : Specification
     }
 
     [Fact]
-    void should_isolate_scope_escaping_bodies_from_siblings()
+    void should_not_emit_unused_bodies_of_denied_compositions()
     {
         new AxonSecurityEmitter().Emit(context);
-        Source("ScopeEscapePolicy").ShouldContain("private static final ForgedDecision Decision = new ForgedDecision();");
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/ScopeEscapePolicy.java", StringComparison.Ordinal)).ShouldBeFalse();
         Source("IsFinanceStaffPolicy").ShouldNotContain("ForgedDecision");
     }
 

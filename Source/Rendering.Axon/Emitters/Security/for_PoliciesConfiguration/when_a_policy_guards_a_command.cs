@@ -5,6 +5,8 @@ using System.Text;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Contracts.Semantics;
+using Cratis.Stage.Rendering.Axon.Java;
+using Cratis.Stage.Rendering.Axon.Sdk;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Security.for_PoliciesConfiguration;
@@ -37,6 +39,20 @@ public class when_a_policy_guards_a_command : Specification
     void should_authorize_through_the_bean() => SecurityAnnotations.For(_context, new Cratis.Screenplay.Semantics.SemanticPolicyReference("IsFinanceStaff"), _context.Request.Model.Application.Id)
         .ShouldEqual("@PreAuthorize(\"isAuthenticated() and @isFinanceStaffPolicy.check(authentication)\")");
     [Fact] void should_account_for_the_emitted_body() => _context.ConsumedImplementations.Count.ShouldEqual(1);
+    [Fact] void should_fail_closed_if_the_authored_policy_throws() => Policy().ShouldContain("// Fail closed: a policy that throws denies access.\n        catch (Exception | Error failure)");
+
+    [Fact]
+    void should_leave_the_billing_fqn_policy_command_handler_unguarded_without_unsupported_diagnostics()
+    {
+        // Same SecurityContextHolder and Map-pattern policy body as L62's model-billing-java.
+        var command = ScopeSelection.Select(_context.Request).SelectMany(slice => slice.Slice.Commands).Single(command => command.Name == "RegisterAccount");
+        SecurityAnnotations.For(_context, command.Authorization, command.Id).ShouldEqual("@PreAuthorize(\"isAuthenticated() and @isFinanceStaffPolicy.check(authentication)\")");
+        SecurityAnnotations.ForHandler(_context, command.Authorization, command.Id, new JavaCodeBuilder("example")).ShouldNotContain("@Secured");
+        _context.Degradation.UnsupportedConstructs.ShouldBeEmpty();
+        _context.Degradation.Warnings.Single().Code.ShouldEqual("STAGE-AXON-AUTHORIZATION");
+        Policy().ShouldContain("import org.springframework.security.core.context.SecurityContextHolder;");
+        Policy().ShouldContain("import java.util.Map;");
+    }
 
     string Policy() => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/IsFinanceStaffPolicy.java", StringComparison.Ordinal)).Bytes.AsSpan());
 }

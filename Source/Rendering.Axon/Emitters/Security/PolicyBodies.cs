@@ -17,7 +17,7 @@ internal static class PolicyBodies
     {
         var code = JavaCodeMask.Blank(body);
         if (Match(code, @"\bgetDetails\s*\(|\bdetails\b")) return "Legacy details claims have no equivalent native JWT binding.";
-        var claimsFailure = NeedsClaims(body) ? ClaimsFailure(context, body) : null;
+        var claimsFailure = NeedsClaims(body) ? ClaimsFailure(context) : null;
         return claimsFailure ?? ImportsFailure(code);
     }
 
@@ -46,14 +46,8 @@ internal static class PolicyBodies
             ? "An authored qualified type cannot be safely imported." : null;
     }
 
-    static string? ClaimsFailure(AxonEmissionContext context, string body)
-    {
-        if (!HttpAuthenticationInput.Bearer(context.Request.Profile)) return "Implicit claims require a native JWT authentication provider.";
-
-        // Only this positive presence/type/value check has established equivalence when legacy details fallbacks disappear.
-        return Match(body.Trim(), "^return claims\\.get\\(\"[A-Za-z0-9_-]+\"\\) instanceof String ([A-Za-z][A-Za-z0-9_]*) && \\1\\.startsWith\\(\"[^\"\\\\]*\"\\);$")
-            ? null : "The inline claims predicate has no established equivalence to native JWT attributes.";
-    }
+    static string? ClaimsFailure(AxonEmissionContext context) => HttpAuthenticationInput.Bearer(context.Request.Profile)
+        ? null : "Implicit claims require a native JWT authentication provider.";
 
     static bool Match(string source, string pattern) => Regex.IsMatch(source, pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 }

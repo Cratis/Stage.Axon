@@ -3,6 +3,7 @@
 
 using System.Text;
 using Cratis.Specifications;
+using Cratis.Stage.Contracts.Rendering;
 using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Security.for_AxonSecurityEmitter;
@@ -25,7 +26,18 @@ public class when_emitting_bearer_security : for_AxonArtifactRenderPlanner.given
     [Fact] void should_reject_credentials_without_a_provider() => code.ShouldContain("throw new BadJwtException(\"Configure a JWT provider and spring.security.oauth2.resourceserver.jwt.audiences\")");
     [Fact] void should_require_native_audience_configuration() => code.ShouldContain("Binder.get(environment).bind(\"spring.security.oauth2.resourceserver.jwt.audiences\", String[].class)");
     [Fact] void should_reject_when_audiences_are_absent() => code.ShouldContain("if (Arrays.stream(audiences).noneMatch(audience -> !audience.isBlank())) return unconfigured();");
-    [Fact] void should_document_the_rejecting_stub() => context.Degradation.UnsupportedConstructs.Any(item => item.Code == "STAGE-AXON-JWT-PROVIDER").ShouldBeTrue();
+    [Fact] void should_document_the_rejecting_stub_with_a_warning() => context.Degradation.Warnings.Any(item => item.Code == "STAGE-AXON-JWT-PROVIDER").ShouldBeTrue();
+
+    [Fact]
+    void should_not_refuse_strict_bearer_rendering_for_provider_configuration()
+    {
+        var strict = request with { Profile = AxonRendering.WithBearerTokens(AxonRendering.CreateProfile(strict: true)) };
+        var fixture = new AxonEmissionContext(strict, new(strict.Profile));
+        new AxonSecurityEmitter().Emit(fixture);
+        fixture.Degradation.UnsupportedConstructs.Any(item => item.Code == "STAGE-AXON-JWT-PROVIDER").ShouldBeFalse();
+        fixture.Degradation.Refusals.ShouldBeEmpty();
+        fixture.Degradation.Warnings.Single(item => item.Code == "STAGE-AXON-JWT-PROVIDER").Severity.ShouldEqual(ArtifactRenderDiagnosticSeverity.Warning);
+    }
     [Fact] void should_not_emit_a_startup_refusal() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/JwtAudienceConfiguration.java", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_be_stateless() => code.ShouldContain("session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)");
     [Fact] void should_use_native_challenges() => code.ShouldNotContain("Sec-Fetch-Mode");

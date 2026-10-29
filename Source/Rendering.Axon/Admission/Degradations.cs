@@ -84,8 +84,8 @@ internal static class Degradations
         Unsupported("STAGE-AXON-0505", "invoke commands from the modeled trigger", "The trigger cannot be represented by the generated handler.", Omitted),
         Unsupported("STAGE-AXON-SPEC-CLAIMS", "preserve all modeled caller claims", "The security fixture cannot represent every modeled caller claim.", Comment),
         Unsupported("STAGE-AXON-EVENT-TAGS", "tag events with every modeled event source", "Axon events use one primary event-source tag.", Comment),
-        Unsupported("STAGE-AXON-AUTHORIZATION", "enforce the modeled authorization policy", "Native metadata authority matching cannot express authenticated-only checks, negation, distinct-role conjunctions, or unsupported claims/custom-auth conditions; those handlers deny access.", DenyAccess),
-        Unsupported("STAGE-AXON-JWT-PROVIDER", "validate tokens for the configured audience", "Credentials are rejected without a native JWT provider and explicit audience configuration.", DenyAccess),
+        Unsupported("STAGE-AXON-AUTHORIZATION", "enforce the modeled authorization policy", "Policies expressible at the HTTP endpoint but not as native handler roles are enforced only by @PreAuthorize; non-HTTP dispatch is not guarded at the handler and records a warning. Inline-policy compositions and other unsupported endpoint policies deny at both endpoint and handler.", DenyAccess),
+        Informational("STAGE-AXON-JWT-PROVIDER", "validate tokens for the configured audience", "Credentials are rejected without a native JWT provider and explicit audience configuration; this warning does not refuse strict rendering."),
         Unsupported("STAGE-AXON-HTTP-SPEC", "verify the modeled HTTP behavior", "The HTTP fixture cannot establish this expectation.", Comment),
         Unsupported("STAGE-AXON-SPEC", "verify the modeled specification", "No specification renderer establishes this expectation.", Comment)
     ]);

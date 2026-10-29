@@ -3,6 +3,7 @@
 
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
+using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -22,7 +23,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
         var bearer = HttpAuthenticationInput.Bearer(context.Request.Profile);
         if (bearer)
         {
-            context.Degradation.Unsupported("STAGE-AXON-JWT-PROVIDER", context.Request.Model.Application.Id, "Credentials are rejected unless a native JWT decoder and nonempty spring.security.oauth2.resourceserver.jwt.audiences are configured.", "validate tokens for the configured audience", "application/authentication");
+            context.Degradation.Warn("STAGE-AXON-JWT-PROVIDER", context.Request.Model.Application.Id, "Credentials are rejected unless a native JWT decoder and nonempty spring.security.oauth2.resourceserver.jwt.audiences are configured.");
         }
         EmitConfiguration(context, bearer);
         EmitUsers(context);
@@ -59,7 +60,18 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
             {
                 method.Line("return http.csrf(csrf -> csrf.disable())").Line("    .cors(cors -> cors.configurationSource(cors(allowedOrigins)))");
                 if (bearer) method.Line("    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))");
-                method.Line("    .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())")
+                method.Line("    .authorizeHttpRequests(requests -> requests")
+                    .Line($"        .dispatcherTypeMatchers({method.Reference("jakarta.servlet.DispatcherType")}.ERROR).permitAll()");
+                foreach (var endpoint in AxonHttpTestsEndpoints.For(context)
+                    .Where(endpoint => endpoint.Authorization is null || string.Equals(endpoint.Authorization, "permitAll()", StringComparison.Ordinal))
+                    .DistinctBy(endpoint => (endpoint.Method, endpoint.Path)))
+                {
+                    method.Line($"        .requestMatchers({method.Reference("org.springframework.http.HttpMethod")}.{endpoint.Method}, {JavaCodeBuilder.StringLiteral(endpoint.Path)}).permitAll()");
+                    if (string.Equals(endpoint.Method, "GET", StringComparison.Ordinal))
+                        method.Line($"        .requestMatchers({method.Reference("org.springframework.http.HttpMethod")}.HEAD, {JavaCodeBuilder.StringLiteral(endpoint.Path)}).permitAll()");
+                }
+                method.Line("        .requestMatchers(\"/api/**\").authenticated()")
+                    .Line("        .anyRequest().permitAll())")
                     .Line(bearer ? "    .oauth2ResourceServer(server -> server.jwt(jwt -> jwt.decoder(decoder(environment, decoders)))).build();" : "    .httpBasic(Customizer.withDefaults()).build();");
             }).Block("private static CorsConfigurationSource cors(String allowedOrigins)", method => method
                 .Line("var configuration = new CorsConfiguration();")
@@ -98,7 +110,7 @@ internal sealed class AxonSecurityEmitter : IAxonEmitter
 
     static void Decoder(JavaCodeBuilder body)
     {
-        body.Line(JavaCodeBuilder.UnsupportedComment("validate tokens for the configured audience", "application/authentication", "STAGE-AXON-JWT-PROVIDER"))
+        body.Line("// STAGE-AXON-JWT-PROVIDER: configure a JWT decoder and nonempty audiences before accepting tokens.")
             .Block("private static JwtDecoder decoder(Environment environment, ObjectProvider<JwtDecoder> decoders)", method => method
                 .Line("var audiences = Binder.get(environment).bind(\"spring.security.oauth2.resourceserver.jwt.audiences\", String[].class).orElse(new String[0]);")
                 .Line("if (Arrays.stream(audiences).noneMatch(audience -> !audience.isBlank())) return unconfigured();")
