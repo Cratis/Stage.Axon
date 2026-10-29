@@ -55,7 +55,7 @@ public class when_caller_claims_are_not_representable : for_AxonArtifactRenderPl
     {
         var (context, java, _) = Render(new(true, [], []) { Claims = [new(type, "fixture-user")] }, false);
         Assert.DoesNotContain(context.Degradation.UnsupportedConstructs, diagnostic => diagnostic.Code == Code);
-        Assert.Contains("UsernamePasswordAuthenticationToken.authenticated(\"fixture-user\", null, List.of(", java, StringComparison.Ordinal);
+        Assert.Contains("Metadata.with(\"username\", \"fixture-user\")", java, StringComparison.Ordinal);
     }
 
     (AxonEmissionContext Context, string Java, SemanticSpecification Specification) Render(SemanticCaller caller, bool strict)
