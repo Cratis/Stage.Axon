@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Text;
-using System.Text.RegularExpressions;
 using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
@@ -11,13 +10,10 @@ using Xunit;
 
 namespace Cratis.Stage.Rendering.Axon.Emitters.Security.for_SecurityAnnotations;
 
-public partial class when_rendering_inline_policy_performed_queries : Specification
+public class when_rendering_inline_policy_performed_queries : Specification
 {
     ArtifactRenderRequest _request;
     IReadOnlyDictionary<string, string> _sources;
-
-    [GeneratedRegex(@"@policies\.(?<site>[A-Za-z0-9_]+)\(", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture, 1000)]
-    private static partial Regex PolicyReference { get; }
 
     async Task Establish()
     {
@@ -25,7 +21,7 @@ public partial class when_rendering_inline_policy_performed_queries : Specificat
         var compilation = await SemanticModelLoader.LoadAsync(root, ["inline-java-policy-performers.play"], null, "InlinePolicies");
         compilation.Success.ShouldBeTrue();
         var loaded = compilation.Loaded!;
-        _request = new(loaded.Model, loaded.Plan, AxonRendering.CreateProfile(), new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id))
+        _request = new(loaded.Model, loaded.Plan, AxonRendering.WithBearerTokens(AxonRendering.CreateProfile()), new(ArtifactRenderScopeKind.Application, loaded.Model.Application.Id))
         {
             ImplementationRequirements = loaded.ImplementationRequirements,
             ImplementationContents = loaded.ImplementationContents
@@ -43,13 +39,8 @@ public partial class when_rendering_inline_policy_performed_queries : Specificat
     [Fact]
     void should_generate_a_method_for_every_policy_reference_in_every_rendered_java_source()
     {
-        var policies = Source("Policies");
-        var references = _sources.Values.SelectMany(source => PolicyReference.Matches(source).Select(match => match.Groups["site"].Value)).ToArray();
-        references.ShouldNotBeEmpty();
-        foreach (var reference in references.Distinct(StringComparer.Ordinal))
-        {
-            policies.ShouldContain("public boolean " + reference + "(Authentication authentication)");
-        }
+        Source("PerformedFinancePolicy").ShouldContain("public boolean check(Authentication authentication)");
+        _sources.Keys.Any(path => path.EndsWith("/Policies.java", StringComparison.Ordinal)).ShouldBeFalse();
     }
 
     [Fact]
@@ -59,9 +50,8 @@ public partial class when_rendering_inline_policy_performed_queries : Specificat
         requirements.Length.ShouldEqual(2);
         foreach (var requirement in requirements)
         {
-            var reference = "@policies." + PolicyPredicates.SiteMember(requirement.Source.SemanticId) + "(authentication)";
-            Source(requirement.Owner.Name + "Handler").ShouldContain(reference);
-            Source(requirement.Owner.Name + "Endpoint").ShouldContain(reference);
+            Source(requirement.Owner.Name + "Handler").ShouldContain("STAGE-AXON-AUTHORIZATION");
+            Source(requirement.Owner.Name + "Endpoint").ShouldContain("@PreAuthorize");
         }
     }
 

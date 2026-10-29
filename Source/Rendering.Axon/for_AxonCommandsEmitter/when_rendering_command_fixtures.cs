@@ -30,14 +30,19 @@ public class when_rendering_command_fixtures : for_AxonArtifactRenderPlanner.giv
 
     void Because()
     {
-        denial = Render(specification with { ThenDenied = true, ThenEvents = [] });
+        denial = Render(specification with { GivenCaller = specification.GivenCaller! with { Roles = ["Viewer"] }, ThenDenied = true, ThenEvents = [] });
         rejection = Render(specification with { ThenErrors = [new(null, "Not allowed.")], ThenEvents = [] });
         replay = Render(specification with { GivenEvents = specification.ThenEvents, GivenClock = "2030-01-02T03:04:05Z" });
         coded = Render(specification with { ThenErrors = [new("Required", "Not allowed.")], ThenEvents = [] });
     }
 
-    [Fact] void should_check_denial_without_events() => denial.ShouldContain("result.exception(AccessDeniedException.class).noEvents();");
-    [Fact] void should_enforce_the_policy_during_denial_tests() => denial.ShouldContain("AuthorizationManagerBeforeMethodInterceptor.preAuthorize()");
+    [Fact] void should_check_denial_without_events() => denial.ShouldContain("result.exception(UnauthorizedMessageException.class).noEvents();");
+    [Fact] void should_enforce_the_policy_during_denial_tests() => denial.ShouldContain("HandlerEnhancerDefinitionUtils.registerToComponentRegistry(registry, components -> new SecuredMessageHandlerDefinition())");
+    [Fact] void should_register_native_dispatch_authorization() => denial.ShouldContain("registerCommandDispatchInterceptor(components -> new MessageAuthorizationDispatchInterceptor<>(components.getComponent(MessageConverter.class)))");
+    [Fact] void should_register_native_handler_authorization() => denial.ShouldContain("registerCommandHandlerInterceptor(components -> new MessageAuthorizationHandlerInterceptor<>())");
+    [Fact] void should_dispatch_denied_role_metadata() => denial.ShouldContain(".and(\"authorities\", \"ROLE_Viewer\")");
+    [Fact] void should_not_set_command_thread_context() => denial.ShouldNotContain("SecurityContextHolder.setContext");
+    [Fact] void should_not_keep_the_retired_proxy() => denial.ShouldNotContain("ProxyFactory");
     [Fact] void should_assert_the_typed_rejection() => rejection.ShouldContain("CommandValidationException.class);");
     [Fact] void should_assert_rejection_messages() => rejection.ShouldContain(".contains(\"Not allowed.\");");
     [Fact] void should_assert_no_append_on_rejection() => rejection.ShouldContain("result.noEvents();");

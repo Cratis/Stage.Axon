@@ -52,7 +52,7 @@ public class when_registering_modeled_http_queries : Emitters.Projections.for_Ax
     public void should_import_fragment_types_only_into_the_destination_test(string type)
     {
         code.ShouldContain("import " + type + ";");
-        Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RuntimeHttpExchangeTest.java", StringComparison.Ordinal))).ShouldNotContain("import " + type + ";");
+        context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/RuntimeHttpExchangeTest.java", StringComparison.Ordinal)).ShouldBeFalse();
     }
     [Fact] void should_not_replace_the_primary_view_specification() => context.Specifications[scenario.Id].TestClass.ShouldContain("TotalViewSpecificationsTest");
     [Fact] void should_keep_unsupported_reducer_expectations_out_of_http_coverage() => context.HttpScenarios.Keys.All(id => context.Specifications[id].DisabledCode is null).ShouldBeTrue();

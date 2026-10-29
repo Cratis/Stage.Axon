@@ -26,21 +26,42 @@ public partial class when_preparing_native_proofs : Specification
     [Fact]
     void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
     [
-        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedMemoryProtectedReadTest.java",
+        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedJwtAudienceTest.java", "GeneratedMemoryProtectedReadTest.java",
         "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
+    [Fact]
+    void should_prove_basic_identity_fails_closed_and_application_providers_win()
+    {
+        var source = ClientProofArtifacts.JavaSources()["GeneratedBasicIdentityTest.java"];
+        source.ShouldContain("bootDefaultUserCannotAuthenticateWithConfiguredOrArbitraryPassword");
+        source.ShouldContain("applicationIdentityProviderWinsWhileNativeAuthorizationStillDeniesWrongRole");
+        source.ShouldContain(".andExpect(status().isUnauthorized())");
+        source.ShouldContain(".andExpect(status().isForbidden())");
+    }
+
     [Fact]
     void should_include_the_inline_policy_failure_and_composition_proofs()
     {
         var sources = IngressProofArtifacts.Sources("inline-java-policies");
-        sources.Count.ShouldEqual(2);
-        sources["GeneratedInlinePolicyTest.java"].ShouldContain("inlineFailureAndAnonymousNeverGrant");
-        sources["GeneratedInlinePolicyTest.java"].ShouldContain("roleGrantOrLegitimatePolicyDenyGrants");
-        sources["GeneratedInlinePolicyTest.java"].ShouldContain("failedOperandDeniesAndAndOr");
-        sources["GeneratedInlinePolicyTest.java"].ShouldContain("scopeEscapeCannotPromoteSiblingFailure");
-        sources["GeneratedInlinePolicyTest.java"].ShouldContain("financeWithoutWriterDeniesTheConjunction");
-        sources["GeneratedInlinePolicyTest.java"].ShouldContain("inlinePoliciesProtectLiveQueries");
+        sources.Count.ShouldEqual(3);
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("nativePolicyBeanReadsOnlyJwtAttributes");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("compositionsDenyTheWholeRealCommand");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("handlerClaimsAndUnprovenSubscriptionUpdatesFailClosed");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("\"Finance Operations\", \"Other\", \"throw\", \"error\"");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain("\"and-snapshot\", \"or-snapshot\", \"escape-and-snapshot\", \"escape-or-snapshot\"");
         sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain("stage.axon.demo.claims.department=Finance Operations");
+    }
+
+    [Fact]
+    void should_prove_native_decoder_audiences_without_mocking()
+    {
+        var source = IngressProofArtifacts.Sources("inline-java-policies")["GeneratedJwtAudienceTest.java"];
+        source.ShouldContain("wrongAudienceIsRejectedByTheRealDecoderAndApplication");
+        source.ShouldContain("rightAudienceIsAuthenticatedBeforeTheNativePolicyDenial");
+        source.ShouldContain("noConfiguredAudienceRejectsAnOtherwiseValidToken");
+        source.ShouldContain("assertInstanceOf(NimbusJwtDecoder.class, decoder)");
+        source.ShouldContain("new RSASSASigner(KEY.getPrivate())");
+        source.ShouldNotContain("@Mock");
     }
 
     [Fact]
@@ -56,28 +77,28 @@ public partial class when_preparing_native_proofs : Specification
     void should_send_the_generated_inline_policy_command_field()
     {
         var sources = IngressProofArtifacts.Sources("inline-java-policies");
-        foreach (var source in sources.Values)
+        foreach (var name in new[] { "GeneratedInlinePolicyTest.java", "GeneratedInlinePolicyDemoTest.java" })
         {
+            var source = sources[name];
             source.ShouldContain("\\\"id\\\":\\\"");
             source.ShouldNotContain("\\\"accountId\\\":");
         }
     }
 
     [Fact]
-    void should_require_async_start_for_allowed_inline_policy_commands()
+    void should_require_denial_for_unproven_inline_policy_commands()
     {
         var sources = IngressProofArtifacts.Sources("inline-java-policies");
-        sources["GeneratedInlinePolicyTest.java"].ShouldContain("http.perform(command().with(authentication(caller(\"Finance Operations\"))))\n                .andExpect(request().asyncStarted()).andReturn();");
-        sources["GeneratedInlinePolicyTest.java"].ShouldContain("http.perform(command().with(authentication(caller)))\n                .andExpect(request().asyncStarted()).andReturn();");
-        sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain(".andExpect(request().asyncStarted()).andReturn();");
+        sources["GeneratedInlinePolicyTest.java"].ShouldContain(".with(jwt().jwt(token -> token.claim(\"department\", department)))).andExpect(status().isForbidden())");
+        sources["GeneratedInlinePolicyDemoTest.java"].ShouldContain(".andExpect(status().isUnauthorized())");
     }
 
     [Fact]
     void should_assert_synchronous_inline_policy_query_denials_directly()
     {
         var source = IngressProofArtifacts.Sources("inline-java-policies")["GeneratedInlinePolicyTest.java"];
-        source.ShouldContain("if (result.andReturn().getRequest().isAsyncStarted())");
-        source.ShouldContain("var response = result.andExpect(request().asyncStarted()).andReturn();\n            return http.perform(asyncDispatch(response));\n        }\n        return result;");
+        source.ShouldContain("return response.getRequest().isAsyncStarted() ? http.perform(asyncDispatch(response)) : result;");
+        source.ShouldContain(".andExpect(status().isUnauthorized())");
     }
 
     [Fact] void should_resolve_all_template_packages() => _all.ShouldNotContain("__APPLICATION__");
@@ -99,8 +120,8 @@ public partial class when_preparing_native_proofs : Specification
     [Fact] void should_wait_for_the_authorized_http_query() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain(".andExpect(request().asyncStarted()).andReturn();\n        response.getAsyncResult(10000);");
     [Fact] void should_assert_the_dispatched_http_query_body() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain("http.perform(asyncDispatch(response))\n                .andExpect(status().is2xxSuccessful()).andExpect(jsonPath(\"$.alias\").value(\"seeded\"))");
     [Fact] void should_keep_the_authorized_gateway_query_assertion() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain("assertEquals(List.of(expected), result.rows())");
-    [Fact] void should_not_define_an_unauthorized_http_status() => _all.ShouldNotContain("isUnauthorized()");
-    [Fact] void should_not_define_a_forbidden_http_status() => _all.ShouldNotContain("isForbidden()");
+    [Fact] void should_assert_native_unauthorized_http_status() => _all.ShouldContain("status().isUnauthorized()");
+    [Fact] void should_assert_native_forbidden_http_status() => _all.ShouldContain("status().isForbidden()");
     [Fact] void should_report_observed_denial_statuses() => _all.ShouldContain("response.getStatus()");
     [Fact] void should_not_activate_a_persistent_profile_in_any_proof() => _sources.Values.Any(source => source.Contains("@ActiveProfiles(\"persistent\")", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_keep_authorization_proofs_in_the_scoped_app() => _memory.ContainsKey("GeneratedSecurityIngressTest.java").ShouldBeTrue();

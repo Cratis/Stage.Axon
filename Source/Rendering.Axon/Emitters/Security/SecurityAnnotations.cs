@@ -15,8 +15,7 @@ internal static class SecurityAnnotations
         if (authorization is null) return string.Empty;
         var inline = PolicyPredicates.HasInline(context, authorization);
         var expression = Expression(context, authorization, new(StringComparer.Ordinal));
-        if (inline && PolicyPredicates.Expression(context, authorization) is not null)
-            expression = "@policies." + PolicyPredicates.SiteMember(owner) + "(authentication)";
+        if (inline) expression = PolicyPredicates.Failure(context, authorization) is null ? PolicyPredicates.Expression(context, authorization) : null;
         if (expression is not null) return "@PreAuthorize(" + JavaCodeBuilder.StringLiteral(expression) + ")";
         var path = owner + "/authorization";
         const string intent = "authorize access with the modeled policy";
@@ -25,6 +24,9 @@ internal static class SecurityAnnotations
         context.Degradation.Unsupported(Code, owner, reason, intent, path);
         return JavaCodeBuilder.UnsupportedComment(intent, path, Code) + "\n@PreAuthorize(\"denyAll()\")";
     }
+
+    internal static string ForHandler(AxonEmissionContext context, SemanticAuthorization? authorization, SemanticId owner, JavaCodeBuilder code) =>
+        HandlerPolicies.For(context, authorization, owner, code);
 
     static string? Expression(AxonEmissionContext context, SemanticAuthorization authorization, HashSet<string> visiting) => authorization switch
     {
