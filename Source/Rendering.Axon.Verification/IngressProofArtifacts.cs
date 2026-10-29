@@ -33,7 +33,6 @@ internal static class IngressProofArtifacts
             "inline-java-policies" => ["GeneratedInlinePolicyTest.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedJwtAudienceTest.java"],
             "inline-java-policy-performers" => ["GeneratedInlinePolicyPerformerTest.java"],
             IngressProofModel.Application => ["GeneratedIngressSupport.java", "GeneratedProtectedReadTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedSecurityIngressTest.java", "GeneratedDemoIdentityTest.java"],
-            IngressProofModel.PersistentApplication => ["GeneratedIngressSupport.java", "GeneratedProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java", "GeneratedPersistentUniqueConcurrencyTest.java"],
             _ => throw new NativeVerificationFailed("Unknown ingress proof application: " + application)
         };
         return Sources().Where(source => selected.Contains(source.Key, StringComparer.Ordinal))
@@ -52,7 +51,6 @@ internal static class IngressProofArtifacts
         "inline-java-policies" => "corpusinlinejavapolicies",
         "inline-java-policy-performers" => "corpusinlinejavapolicyperformers",
         IngressProofModel.Application => ApplicationPackage,
-        IngressProofModel.PersistentApplication => "corpusingresspersistent",
         _ => throw new NativeVerificationFailed("Unknown ingress proof application: " + application)
     };
 }

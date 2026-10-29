@@ -37,16 +37,6 @@ public class when_emitting_runtime : for_AxonArtifactRenderPlanner.given.an_axon
     [Fact] void should_not_emit_the_persistent_safety_helper() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/persistent/PersistentReadModelSafety.java", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_not_emit_the_persistent_safety_test() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/PersistentReadModelSafetyTest.java", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact]
-    void should_register_installed_axon_entities_in_the_test_fixture()
-    {
-        var fixture = Template("PersistentProbeSupport.java");
-        fixture.ShouldContain("@EntityScan(basePackageClasses = { UniqueClaim.class,\n            AggregateEventEntry.class,\n            TokenEntry.class })");
-        fixture.ShouldContain("import io.cratis.stage.axon.runtime.persistent.UniqueClaim;");
-        fixture.ShouldContain("import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;");
-        fixture.ShouldContain("import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;");
-    }
-
-    [Fact]
     void should_not_emit_hand_rolled_concept_types()
     {
         foreach (var name in new[] { "ConceptAs", "Generatable", "GeneratableInContext", "GenerateValue", "GenerationContext", "ValueEncoding" })

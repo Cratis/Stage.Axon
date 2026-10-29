@@ -18,5 +18,4 @@ public class when_preparing_demo_identity_proof : Specification
     [Fact] void should_not_manufacture_a_demo_identity() => source.ShouldContain("demoProfileDoesNotGrantAnonymousAccessToARealCommand");
     [Fact] void should_verify_native_anonymous_denial() => source.ShouldContain(".andExpect(status().isUnauthorized())");
     [Fact] void should_not_supply_credentials() => source.ShouldNotContain("Authorization");
-    [Fact] void should_not_add_the_memory_proof_to_persistent_apps() => IngressProofArtifacts.Sources(IngressProofModel.PersistentApplication).ContainsKey("GeneratedDemoIdentityTest.java").ShouldBeFalse();
 }

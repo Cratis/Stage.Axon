@@ -14,22 +14,20 @@ public partial class when_preparing_native_proofs : Specification
 
     IReadOnlyDictionary<string, string> _sources;
     IReadOnlyDictionary<string, string> _memory;
-    IReadOnlyDictionary<string, string> _persistent;
     string _all;
 
     void Because()
     {
         _sources = IngressProofArtifacts.Sources();
         _memory = IngressProofArtifacts.Sources(IngressProofModel.Application);
-        _persistent = IngressProofArtifacts.Sources(IngressProofModel.PersistentApplication);
         _all = string.Join('\n', _sources.Values);
     }
 
     [Fact]
     void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
     [
-        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedJwtAudienceTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedPersistentProtectedReadTest.java",
-        "GeneratedPersistentUniqueConcurrencyTest.java", "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
+        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedJwtAudienceTest.java", "GeneratedMemoryProtectedReadTest.java",
+        "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
     [Fact]
     void should_prove_basic_identity_fails_closed_and_application_providers_win()
@@ -118,9 +116,6 @@ public partial class when_preparing_native_proofs : Specification
     void should_use_imports_for_framework_types() => _all.Split('\n')
         .Any(line => !line.StartsWith("import ", StringComparison.Ordinal) && !line.StartsWith("package ", StringComparison.Ordinal) && FrameworkType.IsMatch(line)).ShouldBeFalse();
     [Fact] void should_run_the_memory_protected_read_probe() => _sources["GeneratedMemoryProtectedReadTest.java"].ShouldContain("extends GeneratedProtectedReadTest");
-    [Fact] void should_accept_persistent_sequence_conflicts_as_losing_decisions() => _sources["GeneratedProtectedReadTest.java"].ShouldContain("|| actual instanceof SQLIntegrityConstraintViolationException,");
-    [Fact] void should_run_the_persistent_protected_read_probe() => _sources["GeneratedPersistentProtectedReadTest.java"].ShouldContain("@ActiveProfiles(\"persistent\")");
-    [Fact] void should_inherit_the_persistent_unique_races() => _sources["GeneratedPersistentUniqueConcurrencyTest.java"].ShouldContain("extends PersistentUniqueConcurrencyTest");
     [Fact] void should_check_actual_recorded_caller_identity() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain("assertEquals(\"alice\", fact.actor())");
     [Fact] void should_wait_for_the_authorized_http_query() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain(".andExpect(request().asyncStarted()).andReturn();\n        response.getAsyncResult(10000);");
     [Fact] void should_assert_the_dispatched_http_query_body() => _sources["GeneratedSecurityIngressTest.java"].ShouldContain("http.perform(asyncDispatch(response))\n                .andExpect(status().is2xxSuccessful()).andExpect(jsonPath(\"$.alias\").value(\"seeded\"))");
@@ -128,13 +123,7 @@ public partial class when_preparing_native_proofs : Specification
     [Fact] void should_assert_native_unauthorized_http_status() => _all.ShouldContain("status().isUnauthorized()");
     [Fact] void should_assert_native_forbidden_http_status() => _all.ShouldContain("status().isForbidden()");
     [Fact] void should_report_observed_denial_statuses() => _all.ShouldContain("response.getStatus()");
-    [Fact] void should_not_start_the_scoped_app_with_the_persistent_profile() => _memory.Values.Any(source => source.Contains("@ActiveProfiles(\"persistent\")", StringComparison.Ordinal)).ShouldBeFalse();
-    [Fact] void should_keep_jpa_uniqueness_proofs_out_of_the_scoped_app() => _memory.ContainsKey("GeneratedPersistentUniqueConcurrencyTest.java").ShouldBeFalse();
-    [Fact] void should_keep_jpa_read_proofs_out_of_the_scoped_app() => _memory.ContainsKey("GeneratedPersistentProtectedReadTest.java").ShouldBeFalse();
-    [Fact] void should_run_jpa_uniqueness_in_the_viewless_app() => _persistent["GeneratedPersistentUniqueConcurrencyTest.java"].ShouldContain("@ActiveProfiles(\"persistent\")");
-    [Fact] void should_run_jpa_protected_reads_in_the_viewless_app() => _persistent["GeneratedPersistentProtectedReadTest.java"].ShouldContain("@ActiveProfiles(\"persistent\")");
-    [Fact] void should_bind_persistent_proofs_to_the_viewless_package() => _persistent.Values.All(source => source.Contains("package corpusingresspersistent.runtime;", StringComparison.Ordinal)).ShouldBeTrue();
-    [Fact] void should_not_require_view_types_in_the_persistent_app() => _persistent.Values.Any(source => source.Contains(".accounts.registry.active.", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_not_activate_a_persistent_profile_in_any_proof() => _sources.Values.Any(source => source.Contains("@ActiveProfiles(\"persistent\")", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_keep_authorization_proofs_in_the_scoped_app() => _memory.ContainsKey("GeneratedSecurityIngressTest.java").ShouldBeTrue();
     [Fact] void should_keep_memory_proofs_in_the_scoped_app() => _memory.ContainsKey("GeneratedMemoryProtectedReadTest.java").ShouldBeTrue();
 }

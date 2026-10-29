@@ -16,8 +16,7 @@ public partial class when_comparing_module_types_with_the_module_sources : Speci
     private static partial Regex PublicType { get; }
     static readonly IReadOnlySet<string> AutoConfigurations = new HashSet<string>(StringComparer.Ordinal)
     {
-        "StageAxonRuntimeAutoConfiguration",
-        "persistent.StageAxonPersistenceAutoConfiguration"
+        "StageAxonRuntimeAutoConfiguration"
     };
 
     string _root;

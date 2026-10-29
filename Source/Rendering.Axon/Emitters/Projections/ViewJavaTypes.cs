@@ -21,7 +21,7 @@ internal sealed class ViewJavaTypes(SemanticApplication application, string base
         [SemanticPrimitiveType.DateTime] = ("java.time.OffsetDateTime", "parse")
     };
 
-    static readonly string[] _supportPackageSuffixes = ["constraints", "infrastructure", "persistence", "runtime", "runtime.persistent", "specifications"];
+    static readonly string[] _supportPackageSuffixes = ["constraints", "infrastructure", "persistence", "runtime", "specifications"];
 
     readonly ViewConceptValues _concepts = new(application);
     internal string BasePackage { get; } = basePackage;
