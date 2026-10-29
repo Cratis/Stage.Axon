@@ -57,7 +57,7 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
                     method.Line(occurrence ? $"if (occurred) throw new IllegalStateException({message});" : $"if (claimedBy != null && !claimedBy.equals(owner)) throw new IllegalStateException({message});"));
                 foreach (var id in events) Handler(context, body, package, id, claimed: true, occurrence);
                 foreach (var id in releases) Handler(context, body, package, id, claimed: false, occurrence);
-                if (constraint.IgnoreCasing) CriteriaBuilder(body, tag, idType);
+                if (value is not null && ConstraintCoverage.Normalized(context, constraint, value.Type, "id") is { } normalized) CriteriaBuilder(body, tag, idType, normalized);
             });
         context.AddJava(package, name, code.Build(), sources: [slice]);
     }
@@ -75,11 +75,11 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
             });
     }
 
-    static void CriteriaBuilder(JavaCodeBuilder body, string tag, string idType)
+    static void CriteriaBuilder(JavaCodeBuilder body, string tag, string idType, string normalized)
     {
         var criteria = body.Reference("org.axonframework.messaging.eventstreaming.EventCriteria");
         body.Line().Line($"@{body.Reference("org.axonframework.eventsourcing.annotation.EventCriteriaBuilder")}")
             .Block($"public static {criteria} criteria({idType} id)", method =>
-                method.Line($"return {criteria}.havingTags({body.Reference("org.axonframework.messaging.eventstreaming.Tag")}.of({tag}, id.toLowerCase({body.Reference("java.util.Locale")}.ROOT)));"));
+                method.Line($"return {criteria}.havingTags({body.Reference("org.axonframework.messaging.eventstreaming.Tag")}.of({tag}, {body.ReferenceExpression(normalized)}));"));
     }
 }

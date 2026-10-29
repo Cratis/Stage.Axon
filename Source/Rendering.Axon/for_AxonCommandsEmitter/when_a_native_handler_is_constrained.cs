@@ -115,10 +115,11 @@ public abstract class when_a_native_handler_is_constrained : for_AxonArtifactRen
         var (context, code) = Emit(strict);
         code.ShouldContain("// Differs from Screenplay:");
         code.ShouldContain(intent);
-        code.ShouldContain("native-constraint-body");
-        code.ShouldNotContain("UnsupportedOperationException");
+        code.ShouldContain("throw new UnsupportedOperationException(");
+        code.ShouldContain(AxonRefusalCodes.Constraint);
+        code.ShouldNotContain("native-constraint-body");
         code.ShouldNotContain("SetValidation");
-        context.ConsumedImplementations.ShouldContain(requirementId);
+        code.ShouldNotContain("appender.append(");
         var diagnostic = context.Degradation.UnsupportedConstructs.Single(candidate => candidate.Code == AxonRefusalCodes.Constraint && candidate.Artifact == command.Id);
         diagnostic.Severity.ShouldEqual(strict ? ArtifactRenderDiagnosticSeverity.Error : ArtifactRenderDiagnosticSeverity.Warning);
         context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);

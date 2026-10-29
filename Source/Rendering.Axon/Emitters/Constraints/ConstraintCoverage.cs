@@ -11,6 +11,12 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Constraints;
 
 internal static class ConstraintCoverage
 {
+    internal static bool CommandRequiresUnsupportedConstraint(AxonEmissionContext context, SemanticCommand command) =>
+        command.Produces.Any(produced => EventRequiresUnsupportedConstraint(context, produced.EventContract));
+
+    internal static bool EventRequiresUnsupportedConstraint(AxonEmissionContext context, SemanticId contract) =>
+        All(context).Any(item => Applies(item.Constraint, contract) && !Supported(context, item.Constraint));
+
     /// <summary>The constraints that apply to the events of a command but are not enforced by it, with the reason.</summary>
     internal static IReadOnlyList<(SemanticConstraint Constraint, string Reason)> NotEnforced(AxonEmissionContext context, SemanticCommand command, IReadOnlyList<ConstraintClaim> claims) =>
         [.. All(context).Select(item => item.Constraint).Where(constraint => command.Produces.Any(produced => Applies(constraint, produced.EventContract)))
@@ -54,10 +60,17 @@ internal static class ConstraintCoverage
     }
 
     /// <summary>The supported constraints whose targets include an event the command produces, with the binding that enforces them.</summary>
-    internal static IReadOnlyList<ConstraintClaim> Claims(AxonEmissionContext context, SemanticCommand command, CommandSource? source) =>
-        [.. All(context).Where(item => Supported(context, item.Constraint)).SelectMany(item => command.Produces
+    internal static IReadOnlyList<ConstraintClaim> Claims(AxonEmissionContext context, SemanticCommand command, CommandSource? source)
+    {
+        var claims = All(context).Where(item => Supported(context, item.Constraint)).SelectMany(item => command.Produces
             .Where(produced => item.Constraint.Targets.Any(target => target.EventContract == produced.EventContract))
-            .Select(produced => new ConstraintClaim(item.Constraint, produced, Binding(context, command, source, item.Constraint, produced))))];
+            .Select(produced => new ConstraintClaim(item.Constraint, produced, Binding(context, command, source, item.Constraint, produced)))).ToArray();
+        var ambiguous = claims.Where(claim => claim.Binding is not null).GroupBy(claim => claim.Constraint.Name)
+            .Where(group => group.Select(claim => claim.Binding!.Property).Distinct(StringComparer.Ordinal).Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
+        return [.. claims.Select(claim => claim.Binding is { } binding && ambiguous.Contains(claim.Constraint.Name)
+            ? claim with { Binding = binding with { Local = binding.Local + char.ToUpperInvariant(binding.Property[0]) + binding.Property[1..] } }
+            : claim)];
+    }
 
     /// <summary>The command property, owner expression and value type that enforce a claim, or <c>null</c> when they cannot be derived.</summary>
     internal static ConstraintBinding? Binding(AxonEmissionContext context, SemanticCommand command, CommandSource? source, SemanticConstraint constraint, SemanticProducedEvent produced)
@@ -81,6 +94,14 @@ internal static class ConstraintCoverage
         All(context).Select(item => item.Constraint).Where(constraint => constraint.Kind == SemanticConstraintKind.UniquePropertyValue && Applies(constraint, contract.Id) && Supported(context, constraint))
             .Select(constraint => (Constraint: constraint, Property: ValueProperty(context, constraint, contract)))
             .Where(item => item.Property is not null).Select(item => (item.Constraint, item.Property!));
+
+    /// <summary>The Java expression that normalizes a unique value for its tag, or <c>null</c> when the value is tagged as is. Case-insensitive text is lower-cased and decimals drop trailing zeros, because Axon compares tags as strings.</summary>
+    internal static string? Normalized(AxonEmissionContext context, SemanticConstraint constraint, SemanticTypeReference type, string expression)
+    {
+        var types = new CommandJavaTypes(context.Request.Model.Application, context.BasePackage);
+        if (constraint.IgnoreCasing) return expression + ".toLowerCase(java.util.Locale.ROOT)";
+        return type.IsCollection || types.PrimitiveOf(type) != SemanticPrimitiveType.DecimalNumber ? null : types.Unwrap(expression, type) + ".stripTrailingZeros().toPlainString()";
+    }
 
     internal static SemanticProperty? ValueProperty(AxonEmissionContext context, SemanticConstraint constraint, SemanticEventContract contract)
     {

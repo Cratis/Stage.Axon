@@ -31,8 +31,10 @@ internal sealed class ReactionProductionPreparation(AxonEmissionContext context,
     {
         if (produced.Route is not null || !produced.Tags.IsEmpty) return false;
         if (produced.Condition is not null && produced.When is null) return false;
-        return true;
+        return !Constrained();
     }
+
+    bool Constrained() => ConstraintCoverage.EventRequiresUnsupportedConstraint(context, produced.EventContract);
 
     bool MatchesPrimary(string javaType) => produced.DestinationType is not { } destination || destination.Equals(CommandSource.TypeFor(context, javaType));
 

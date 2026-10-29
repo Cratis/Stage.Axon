@@ -43,7 +43,7 @@ internal sealed class EventTagsEmitter : IAxonEmitter
 
     /// <summary>The tag annotations a record component carries for the property-uniqueness constraints it claims or releases.</summary>
     internal static string ConstraintTags(AxonEmissionContext context, SemanticEventContract contract, SemanticProperty property, JavaCodeBuilder code, string package) =>
-        string.Concat(ConstraintCoverage.Tagged(context, contract).Where(item => item.Property.Id == property.Id && !item.Constraint.IgnoreCasing)
+        string.Concat(ConstraintCoverage.Tagged(context, contract).Where(item => item.Property.Id == property.Id && ConstraintCoverage.Normalized(context, item.Constraint, item.Property.Type, "x") is null)
             .Select(item => $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {Reference(Reference(context, contract, item.Constraint.Name), code, package)}) "));
 
     /// <summary>The record members that expose a normalized tag value for case-insensitive constraints.</summary>
@@ -51,12 +51,12 @@ internal sealed class EventTagsEmitter : IAxonEmitter
     {
         var members = new List<string>();
         var names = new HashSet<string>(contract.Properties.Select(property => JavaNames.Member(property.Name)), StringComparer.Ordinal);
-        foreach (var (constraint, property) in ConstraintCoverage.Tagged(context, contract).Where(item => item.Constraint.IgnoreCasing))
+        foreach (var (constraint, property) in ConstraintCoverage.Tagged(context, contract).Where(item => ConstraintCoverage.Normalized(context, item.Constraint, item.Property.Type, "x") is not null))
         {
             var name = JavaNames.Member(property.Name) + "UniqueKey";
             while (!names.Add(name)) name += "_";
             var tag = Reference(Reference(context, contract, constraint.Name), code, package);
-            members.Add($"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {tag}) public {code.Reference("java.lang.String")} {name}() {{ return {JavaNames.Member(property.Name)}.toLowerCase({code.Reference("java.util.Locale")}.ROOT); }}");
+            members.Add($"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {tag}) public {code.Reference("java.lang.String")} {name}() {{ return {code.ReferenceExpression(ConstraintCoverage.Normalized(context, constraint, property.Type, JavaNames.Member(property.Name))!)}; }}");
         }
         return members;
     }

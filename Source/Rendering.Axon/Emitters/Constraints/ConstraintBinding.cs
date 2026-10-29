@@ -27,7 +27,7 @@ internal sealed record ConstraintBinding(SemanticConstraint Constraint, string P
     internal string Assert => ConstraintEntities.Assert(Constraint, Value);
 
     /// <summary>The parameter name of the injected entity.</summary>
-    internal string Local => JavaNames.Member(Constraint.Name);
+    internal string Local { get; init; } = JavaNames.Member(Constraint.Name);
 
     internal string Call => Occurrence ? Local + "." + Assert + "();" : Local + "." + Assert + "(" + Owner + ");";
 }

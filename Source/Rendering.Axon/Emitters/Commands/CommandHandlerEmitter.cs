@@ -23,7 +23,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
 
     IReadOnlyList<ConstraintClaim> Claims { get; } = ConstraintCoverage.Claims(context, command, source);
 
-    IEnumerable<ConstraintBinding> Bindings => Claims.Select(claim => claim.Binding).OfType<ConstraintBinding>().DistinctBy(binding => binding.Constraint.Name);
+    IEnumerable<ConstraintBinding> Bindings => Claims.Select(claim => claim.Binding).OfType<ConstraintBinding>().DistinctBy(binding => (binding.Constraint.Name, binding.Property));
 
     bool MissingSource => command.Handler is null && source is null && !command.Produces.IsEmpty;
 
@@ -134,8 +134,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
 
     bool Supported(JavaCodeBuilder body, CommandResponses response)
     {
-        foreach (var (constraint, reason) in ConstraintCoverage.NotEnforced(context, command, Claims))
-            Difference(body, AxonRefusalCodes.Constraint, "enforce constraint " + constraint.Name, $"Uniqueness of {constraint.Name} is not enforced by this command: {reason}.");
+        if (ConstraintCoverage.NotEnforced(context, command, Claims) is [var (constraint, reason), ..]) return Refuse(body, constraint, reason);
         if (new CommandDecisionReads(context, command, source).Prepare() is null) return Unsupported(body, AxonRefusalCodes.ProtectedReads, "check modeled decision reads before changing state");
         if (MissingSource) return Unsupported(body, AxonRefusalCodes.CommandMapping, "resolve the command's primary event-source identity");
         return command.Handler is not null || response.Value is not null || Unsupported(body, AxonRefusalCodes.CommandMapping, "compute the complete modeled command response");
@@ -202,6 +201,17 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             Difference(body, AxonRefusalCodes.Routing, "route events through modeled source and substream partitions", "Only the primary event-source tag is used; source/substream routing metadata is not represented.");
         if (command.Produces.Any(produced => !produced.Tags.IsEmpty))
             Difference(body, AxonRefusalCodes.Append, "append the additional modeled event tags", "Only the shared primary event-source component is tagged.");
+    }
+
+    bool Refuse(JavaCodeBuilder body, SemanticConstraint constraint, string reason)
+    {
+        var intent = "enforce constraint " + constraint.Name;
+        var difference = $"Uniqueness of {constraint.Name} cannot be enforced by this command: {reason}; the handler refuses instead of appending without the check.";
+        var path = command.Id + "/produces";
+        context.Degradation.Unsupported(AxonRefusalCodes.Constraint, command.Id, difference, intent, path);
+        body.DiffersFromScreenplay(difference).UnsupportedIntent(intent, path, AxonRefusalCodes.Constraint)
+            .Line("throw new UnsupportedOperationException(" + JavaCodeBuilder.StringLiteral($"{AxonRefusalCodes.Constraint}: {constraint.Name} uniqueness cannot be enforced ({reason})") + ");");
+        return false;
     }
 
     void Difference(JavaCodeBuilder body, string code, string intent, string difference)

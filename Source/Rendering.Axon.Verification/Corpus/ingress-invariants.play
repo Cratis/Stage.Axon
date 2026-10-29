@@ -27,14 +27,17 @@ module Accounts
       command CloseAccount
         id AccountId identifier
         reason String
+        alias String
         authorize IsWriter
 
         produces AccountClosed
           for id
           reason = reason
+          alias = alias
 
       event AccountClosed
         reason String
+        alias String
 
     slice StateChange Consume
       command ConsumeAccount
@@ -54,11 +57,13 @@ module Accounts
         id AccountId identifier
         other AccountId
         reason String
+        alias String
         authorize IsWriter
 
         produces AccountClosed
           for id
           reason = reason
+          alias = alias
 
     slice StateView Active
       readmodel ActiveAccounts

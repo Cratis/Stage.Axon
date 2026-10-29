@@ -105,7 +105,7 @@ abstract class GeneratedProtectedReadTest {
         GeneratedIngressSupport.register(gateway, owner, UUID.randomUUID().toString()).get(10, TimeUnit.SECONDS);
         GeneratedIngressSupport.register(gateway, other, UUID.randomUUID().toString()).get(10, TimeUnit.SECONDS);
         var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.send(gateway,
-                new CloseOtherAccount(new AccountId(owner), new AccountId(other), "must not append")).get(10, TimeUnit.SECONDS));
+                new CloseOtherAccount(new AccountId(owner), new AccountId(other), "must not append", "unused")).get(10, TimeUnit.SECONDS));
         var actual = assertInstanceOf(UnsupportedOperationException.class, GeneratedIngressSupport.root(failure));
         assertTrue(actual.getMessage().contains("STAGE-AXON-0106"));
         assertEquals(1, GeneratedIngressSupport.facts(configuration, owner).size());

@@ -50,8 +50,8 @@ final class GeneratedIngressSupport {
         return send(gateway, new RegisterAccount(new AccountId(owner), value, "forged-body-principal"));
     }
 
-    static CompletableFuture<Void> release(CommandGateway gateway, UUID owner) {
-        return send(gateway, new CloseAccount(new AccountId(owner), "released"));
+    static CompletableFuture<Void> release(CommandGateway gateway, UUID owner, String value) {
+        return send(gateway, new CloseAccount(new AccountId(owner), "released", value));
     }
 
     static List<EventMessage> facts(Configuration configuration, UUID owner) throws Exception {

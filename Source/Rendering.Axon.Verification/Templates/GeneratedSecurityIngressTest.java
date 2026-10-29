@@ -114,6 +114,20 @@ class GeneratedSecurityIngressTest {
     }
 
     @Test
+    void aliasUniquenessRejectsADuplicateFromADifferentAccountUntilReleased() throws Exception {
+        var alias = "Dup-" + UUID.randomUUID();
+        var first = UUID.randomUUID();
+        var second = UUID.randomUUID();
+        GeneratedIngressSupport.register(commands, first, alias).get(10, TimeUnit.SECONDS);
+        var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.register(commands, second, alias.toUpperCase()).get(10, TimeUnit.SECONDS));
+        assertTrue(GeneratedIngressSupport.root(failure).getMessage().contains("Alias already claimed"));
+        assertEquals(0, GeneratedIngressSupport.facts(configuration, second).size());
+        GeneratedIngressSupport.release(commands, first, alias).get(10, TimeUnit.SECONDS);
+        GeneratedIngressSupport.register(commands, second, alias).get(10, TimeUnit.SECONDS);
+        assertEquals(1, GeneratedIngressSupport.facts(configuration, second).size());
+    }
+
+    @Test
     void gatewayWithoutMetadataDoesNotInheritTheAmbientCaller() throws Exception {
         var id = UUID.randomUUID();
         var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.as("alice", "Writer", () -> commands.send(
