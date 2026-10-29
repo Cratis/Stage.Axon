@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-__BASE_MODIFIER__class GeneratedNativeUniqueTest {
+class GeneratedNativeUniqueTest {
     private static final int CONTENDERS = 8;
     private static final int REPETITIONS = 25;
     private final ExecutorService workers = Executors.newFixedThreadPool(CONTENDERS);

@@ -12,17 +12,8 @@ namespace Cratis.Stage.Rendering.Axon.Verification;
 internal static class IngressProofModel
 {
     internal const string Application = "ingress-invariants";
-    internal const string PersistentApplication = "ingress-persistent";
 
     internal static ArtifactRenderPlan Plan(LoadedSemanticModel loaded, ArtifactRenderProfile? profile = null) => new AxonArtifactRenderPlanner().Plan(Request(loaded, profile));
-
-    internal static ArtifactRenderPlan PersistentPlan(LoadedSemanticModel loaded, ArtifactRenderProfile? profile = null)
-    {
-        var request = Request(loaded, profile);
-        var scopes = request.Model.Application.Modules.Single().Features.Single().Slices.Where(slice => !slice.Commands.IsEmpty)
-            .Select(slice => new ArtifactRenderScope(ArtifactRenderScopeKind.Slice, slice.Id)).ToArray();
-        return new AxonArtifactRenderPlanner().Plan(request with { Scope = scopes[0], AdditionalScopes = [.. scopes.Skip(1)] });
-    }
 
     static ArtifactRenderRequest Request(LoadedSemanticModel loaded, ArtifactRenderProfile? profile)
     {

@@ -21,6 +21,5 @@ public class when_wiring_profiled_stores : given.an_axon_request
     }
 
     [Fact] void should_generate_no_store_bean() => definitions.Length.ShouldEqual(0);
-    [Fact] void should_define_the_default_store_once_in_the_runtime_module() => File.ReadAllText(Path.Combine(given.blueprint_models.Root(), "Source", "Runtime", "src", "main", "java", "io", "cratis", "stage", "axon", "runtime", "InMemoryUniqueConfiguration.java")).ShouldContain("@Profile(\"!persistent\")");
-    [Fact] void should_define_the_persistent_store_once_in_the_runtime_module() => File.ReadAllText(Path.Combine(given.blueprint_models.Root(), "Source", "Runtime", "src", "main", "java", "io", "cratis", "stage", "axon", "runtime", "persistent", "PersistentConfiguration.java")).Split("UniqueValueStore uniqueValueStore(").Length.ShouldEqual(2);
+    [Fact] void should_define_the_default_store_once_in_the_runtime_module() => File.ReadAllText(Path.Combine(given.blueprint_models.Root(), "Source", "Runtime", "src", "main", "java", "io", "cratis", "stage", "axon", "runtime", "InMemoryUniqueConfiguration.java")).ShouldNotContain("@Profile");
 }
