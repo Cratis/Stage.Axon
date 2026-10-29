@@ -29,11 +29,11 @@ public class when_rendering_without_activating_demo : for_AxonArtifactRenderPlan
         var application = Encoding.UTF8.GetString(plan.Artifacts.Single(artifact => artifact.RelativePath == "src/main/resources/application.yml").Bytes.AsSpan());
         application.ShouldNotContain("profiles:");
         var readme = Encoding.UTF8.GetString(plan.Artifacts.Single(artifact => artifact.RelativePath == "README.md").Bytes.AsSpan());
-        readme.ShouldContain("-Dspring-boot.run.profiles=demo");
-        readme.ShouldContain("Never activate it in production.");
+        readme.ShouldNotContain("-Dspring-boot.run.profiles=demo");
+        readme.ShouldContain("No demo identity or claims attachment is generated.");
         readme.ShouldContain("Requires JDK 25 or later.");
         var guide = File.ReadAllText(Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Documentation", "guides", "third-party-render-target.md"));
-        guide.ShouldContain("--spring.profiles.active=demo");
-        guide.ShouldContain("Never activate it in production.");
+        guide.ShouldNotContain("--spring.profiles.active=demo");
+        guide.ShouldContain("No users, passwords, demo identity configuration or demo claims attachment are generated.");
     }
 }

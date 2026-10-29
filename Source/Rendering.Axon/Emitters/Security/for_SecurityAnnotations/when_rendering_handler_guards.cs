@@ -46,24 +46,29 @@ public class when_rendering_handler_guards : for_AxonArtifactRenderPlanner.given
         context.Degradation.Intents.Single().ModelPath.ShouldContain("/authorization");
     }
 
-    [Fact] void should_catalog_authenticated_only_policies_and_deny() => AssertDenied(new SemanticAuthenticatedCondition());
-    [Fact] void should_catalog_negated_policies_and_deny() => AssertDenied(new SemanticNotPolicyCondition(new SemanticRoleCondition("Sales")));
-    [Fact] void should_catalog_distinct_role_conjunctions_and_deny() => AssertDenied(new SemanticLogicalPolicyCondition(new SemanticRoleCondition("Sales"), SemanticLogicalOperator.And, new SemanticRoleCondition("Writer")));
+    [Fact] void should_enforce_authenticated_only_at_the_endpoint_and_warn() => AssertEndpointGuard(new SemanticAuthenticatedCondition(), "isAuthenticated()");
+    [Fact] void should_enforce_not_at_the_endpoint_and_warn() => AssertEndpointGuard(new SemanticNotPolicyCondition(new SemanticRoleCondition("Sales")), "!(hasRole('Sales'))");
+    [Fact] void should_enforce_authenticated_not_at_the_endpoint_and_warn() => AssertEndpointGuard(new SemanticLogicalPolicyCondition(new SemanticAuthenticatedCondition(), SemanticLogicalOperator.And, new SemanticNotPolicyCondition(new SemanticRoleCondition("Sales"))), "(isAuthenticated()) and (!(hasRole('Sales')))");
+    [Fact] void should_enforce_distinct_role_and_at_the_endpoint_and_warn() => AssertEndpointGuard(new SemanticLogicalPolicyCondition(new SemanticRoleCondition("Sales"), SemanticLogicalOperator.And, new SemanticRoleCondition("Writer")), "(hasRole('Sales')) and (hasRole('Writer'))");
 
     [Fact]
     void should_not_use_handler_thread_authentication() => Guard(new SemanticPolicyReference("Missing")).ShouldNotContain("PreAuthorize");
 
-    void AssertDenied(SemanticPolicyCondition condition)
+    void AssertEndpointGuard(SemanticPolicyCondition condition, string expression)
     {
         var application = request.Model.Application with { CommandReadMode = SemanticCommandReadMode.Protected, Policies = [.. request.Model.Application.Policies, new("Unsupported", condition)] };
         var model = ExecutableSemanticModel.Create(new(25, 0), SemanticVersion.V25, application);
         var fixture = new AxonEmissionContext(request with { Model = model }, new(request.Profile));
         var annotation = SecurityAnnotations.ForHandler(fixture, new SemanticPolicyReference("Unsupported"), application.Id, code);
-        annotation.ShouldContain("@Secured({})");
+        annotation.ShouldNotContain("@Secured");
+        code.Build().ShouldNotContain("import org.springframework.security.access.annotation.Secured;");
         annotation.ShouldContain("// Differs from Screenplay:");
-        fixture.Degradation.UnsupportedConstructs.Single().Code.ShouldEqual("STAGE-AXON-AUTHORIZATION");
+        SecurityAnnotations.For(fixture, new SemanticPolicyReference("Unsupported"), application.Id).ShouldEqual("@PreAuthorize(\"" + expression + "\")");
+        fixture.Degradation.UnsupportedConstructs.ShouldBeEmpty();
+        fixture.Degradation.Warnings.Single().Code.ShouldEqual("STAGE-AXON-AUTHORIZATION");
+        fixture.Degradation.Warnings.Single().Message.ShouldContain("dispatch outside HTTP is not guarded at the handler");
         UnsupportedSummary.Emit(fixture);
-        Encoding.UTF8.GetString(fixture.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan()).ShouldContain("STAGE-AXON-AUTHORIZATION");
+        Encoding.UTF8.GetString(fixture.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md").Bytes.AsSpan()).ShouldContain("No unsupported constructs.");
     }
 
     string Guard(SemanticAuthorization? authorization) => SecurityAnnotations.ForHandler(context, authorization, loaded.Model.Application.Id, code);

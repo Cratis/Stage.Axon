@@ -14,7 +14,12 @@ internal static class PoliciesConfiguration
 
     internal static void Emit(AxonEmissionContext context)
     {
-        foreach (var (policy, condition) in PolicyPredicates.Referenced(context).DistinctBy(item => JavaNames.Member(item.Policy.Name)))
+        // Denied compositions never call a bean; do not emit their unused authored bodies.
+        var endpointPolicies = PolicyPredicates.Sites(context)
+            .Where(site => SecurityAnnotations.EndpointExpression(context, site.Authorization) is not null)
+            .Select(site => site.Authorization).OfType<SemanticPolicyReference>()
+            .Select(reference => reference.Name).ToHashSet(StringComparer.Ordinal);
+        foreach (var (policy, condition) in PolicyPredicates.Referenced(context).Where(item => endpointPolicies.Contains(item.Policy.Name)).DistinctBy(item => JavaNames.Member(item.Policy.Name)))
         {
             if (PolicyPredicates.Resolve(context, policy, condition).Body is not { } body) continue;
             EmitPolicy(context, policy, body);
@@ -37,7 +42,9 @@ internal static class PoliciesConfiguration
                     method.Line($"if (!({authentication} instanceof {method.Reference("org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken")} {jwt})) return false;")
                         .Line($"var claims = {jwt}.getTokenAttributes();");
                 }
-                method.Line(lowered);
+                method.Block("try", attempt => attempt.Line(lowered))
+                    .Line("// Fail closed: a policy that throws denies access.")
+                    .Block($"catch ({method.Reference("java.lang.Exception")} | {method.Reference("java.lang.Error")} {Fresh(body, "failure")})", failure => failure.Line("return false;"));
             }));
         context.AddJava(context.BasePackage + ".infrastructure", name, code.Build(), sources: [context.Request.Model.Application.Id]);
     }
