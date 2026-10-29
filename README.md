@@ -42,9 +42,9 @@ Admission requires supported version-1 context/result contracts, matching owner 
 
 C# emitted-text assertions are not native execution proof. The Java fixtures and all generated applications still require the CI native gate below.
 
-## No persistent profile
+## Optional persistent profile
 
-There is no `persistent` profile. Event, token, uniqueness-claim and read-model data are held in memory (read models in H2 through JPA) and are lost on restart.
+By default event, token, uniqueness-claim and read-model data are held in memory (read models in H2 through JPA) and are lost on restart. Applications whose model has no modeled constraints also get an opt-in `persistent` Spring profile (`./mvnw spring-boot:run -Dspring-boot.run.profiles=persistent`). It uses plain Axon Framework 5.4.1 auto-configuration (`JpaEventStoreAutoConfiguration`, `JpaAutoConfiguration`): `AggregateBasedJpaEventStorageEngine` stores events, `JpaTokenStore` stores tokens, and read models share one H2 file database under `data/`. Axon's JPA event storage cannot hold multi-tag (DCB) events, so the profile is not generated for models with modeled constraints; the renderer reports `STAGE-AXON-PERSISTENT` (informational, never a refusal) and those applications keep in-memory event storage.
 
 ## Native proof
 
