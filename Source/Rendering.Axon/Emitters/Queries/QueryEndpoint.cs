@@ -131,7 +131,7 @@ internal sealed class QueryEndpoint(AxonEmissionContext context, ViewJavaTypes t
 
     void Live(JavaCodeBuilder code, string name, string route)
     {
-        context.Degradation.Unsupported("STAGE-AXON-LIVE-CAPACITY", query.Id, "Live stream capacity is not limited.");
+        context.Degradation.Warn("STAGE-AXON-LIVE-CAPACITY", query.Id, "Live stream capacity is not limited.");
         var flux = code.Reference("reactor.core.publisher.Flux");
         var mono = code.Reference("reactor.core.publisher.Mono");
         var sse = code.Reference("org.springframework.http.codec.ServerSentEvent");

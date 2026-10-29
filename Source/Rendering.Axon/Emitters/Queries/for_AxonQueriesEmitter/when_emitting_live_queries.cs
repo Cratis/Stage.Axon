@@ -3,6 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Specifications;
+using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections.for_AxonProjectionsEmitter.given;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -59,9 +60,16 @@ public class when_emitting_live_queries : a_view_request
     [Fact] void should_serialize_expected_sse_values_with_the_application_concept_mapper() => Source("LiveTotalsSseTest.java").ShouldContain("var mapper = application.getBean(JsonMapper.class);");
     [Fact] void should_emit_an_http_sse_probe() => Source("LiveTotalsSseTest.java").ShouldContain("shouldDeliverInitialDataAndOneUpdateOverHttpSse");
     [Fact] void should_emit_a_five_second_shutdown_assertion() => Source("LiveTotalsSseTest.java").ShouldContain("elapsed.compareTo(Duration.ofSeconds(5)) < 0");
-    [Fact] void should_render_the_capacity_entry_in_the_unsupported_summary() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md")).ShouldContain("`STAGE-AXON-LIVE-CAPACITY` (1): limit concurrent live streams.");
-    [Fact] void should_refuse_live_capacity_in_strict_mode() => Assert.Contains(new AxonArtifactRenderPlanner().Plan(_request with { Profile = AxonRendering.CreateProfile(strict: true) }).Refusals, refusal => refusal.Codes.Contains("STAGE-AXON-LIVE-CAPACITY"));
-    [Fact] void should_catalogue_the_dropped_capacity_limit() => _context.Degradation.UnsupportedConstructs.Single(diagnostic => diagnostic.Artifact == QueryId("LiveTotals")).Code.ShouldEqual("STAGE-AXON-LIVE-CAPACITY");
+    [Fact] void should_leave_the_capacity_warning_out_of_the_unsupported_summary() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md")).ShouldNotContain("STAGE-AXON-LIVE-CAPACITY");
+    [Fact] void should_report_one_capacity_warning_for_the_live_endpoint() => _context.Degradation.Warnings.Single(diagnostic => diagnostic.Artifact == QueryId("LiveTotals")).Code.ShouldEqual("STAGE-AXON-LIVE-CAPACITY");
+
+    [Fact]
+    void should_warn_without_refusing_live_capacity_in_strict_mode()
+    {
+        var plan = new AxonArtifactRenderPlanner().Plan(_request with { Profile = AxonRendering.CreateProfile(strict: true) });
+        Assert.DoesNotContain(plan.Refusals, refusal => refusal.Codes.Contains("STAGE-AXON-LIVE-CAPACITY"));
+        Assert.Contains(plan.Diagnostics, diagnostic => diagnostic.Code == "STAGE-AXON-LIVE-CAPACITY" && diagnostic.Severity == ArtifactRenderDiagnosticSeverity.Warning);
+    }
 
     string Source(string name) => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name, StringComparison.Ordinal)));
 }
