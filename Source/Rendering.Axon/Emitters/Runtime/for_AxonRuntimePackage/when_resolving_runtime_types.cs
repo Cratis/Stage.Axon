@@ -19,7 +19,7 @@ public class when_resolving_runtime_types : for_AxonArtifactRenderPlanner.given.
     [Fact] void should_resolve_a_generated_type_from_a_base_package() => AxonRuntimePackage.Type("a.b", "UnsupportedImplementations").ShouldEqual("a.b.runtime.UnsupportedImplementations");
 
     [Fact] void should_pin_the_renderer_version() => AxonRuntimePackage.Version.ShouldEqual(AxonRendering.Version);
-    [Fact] void should_name_eighteen_module_types() => AxonRuntimePackage.ModuleTypes.Count.ShouldEqual(18);
+    [Fact] void should_name_sixteen_module_types() => AxonRuntimePackage.ModuleTypes.Count.ShouldEqual(16);
     [Fact] void should_recognise_module_types_as_runtime_types() => AxonRuntimePackage.IsRuntimeType("a.b", "io.cratis.stage.axon.runtime.Caller").ShouldBeTrue();
     [Fact] void should_recognise_generated_runtime_types() => AxonRuntimePackage.IsRuntimeType("a.b", "a.b.runtime.UnsupportedImplementations").ShouldBeTrue();
     [Fact] void should_not_recognise_application_types_as_runtime_types() => AxonRuntimePackage.IsRuntimeType("a.b", "a.b.orders.X").ShouldBeFalse();
