@@ -49,7 +49,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
         var package = types.Package(located);
         var modelName = JavaNames.Type(model.Name);
         var name = modelName + "ViewSpecificationsTest";
-        var code = new JavaCodeBuilder(package).Declare(name).Declare(modelName).Declare(modelName + "Reducer").Declare(modelName + "ReducerProjector");
+        var code = new JavaCodeBuilder(package).Declare(name).Declare(modelName).Declare(modelName + "Reducer");
         ViewRepositories.Declare(code, model);
         ViewRepositories.Annotate(code);
         code.Block($"class {name}", body =>
@@ -154,7 +154,7 @@ internal sealed class ReducerViewSpecifications(AxonEmissionContext context, Vie
             CommandFixtureSecurity.CallerReferences(body, spec.GivenCaller);
             var modelName = JavaNames.Type(model.Name);
             var updates = new ProjectionUpdates(context, types, model.Id);
-            body.Line($"var projector = new {modelName}ReducerProjector(repository, new {modelName}Reducer() {{}});");
+            body.Line($"var projector = new {modelName}Reducer(repository);");
             foreach (var given in plan.Events)
             {
                 body.Block(string.Empty, block => block

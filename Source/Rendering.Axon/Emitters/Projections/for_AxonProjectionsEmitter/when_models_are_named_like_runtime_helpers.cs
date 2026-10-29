@@ -30,7 +30,7 @@ public class when_models_are_named_like_runtime_helpers : given.a_view_request
             _entities[name] = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + "Entity.java", StringComparison.Ordinal) && artifact.RelativePath.Contains("/counters/totals/", StringComparison.Ordinal)));
             _repositories[name] = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + "Repository.java", StringComparison.Ordinal) && artifact.RelativePath.Contains("/counters/totals/", StringComparison.Ordinal)));
             _projectors[name] = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/TotalProjectionProjector.java", StringComparison.Ordinal)));
-            if (name == "Repository") _reducerProjector = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RepositoryReducerProjector.java", StringComparison.Ordinal)));
+            if (name == "Repository") _reducerProjector = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/RepositoryReducer.java", StringComparison.Ordinal)));
         }
     }
 
@@ -42,6 +42,6 @@ public class when_models_are_named_like_runtime_helpers : given.a_view_request
     [Fact] void should_type_the_repository_with_the_entity_of_a_model_named_repository() => _repositories["Repository"].ShouldContain("JpaRepository<RepositoryEntity, String>");
     [Fact] void should_keep_the_jpa_interface_for_a_model_named_jpa_repository() => _repositories["JpaRepository"].ShouldContain("JpaRepository<JpaRepositoryEntity, String>");
     [Fact] void should_inject_the_repository_into_the_projector() => _projectors["Repository"].ShouldContain("private final RepositoryRepository repository;");
-    [Fact] void should_inject_the_repository_into_the_reducer_projector() => _reducerProjector.ShouldContain("RepositoryRepository repository, RepositoryReducer reducer)");
+    [Fact] void should_inject_the_repository_into_the_reducer_projector() => _reducerProjector.ShouldContain("public RepositoryReducer(RepositoryRepository repository)");
     [Fact] void should_not_reference_the_removed_runtime_store() => _projectors.Values.Append(_reducerProjector).ShouldEachConformTo(code => !code.Contains("ReadModelStore", StringComparison.Ordinal));
 }

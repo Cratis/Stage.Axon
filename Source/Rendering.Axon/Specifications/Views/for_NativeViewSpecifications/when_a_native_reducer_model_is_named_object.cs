@@ -35,13 +35,13 @@ public class when_a_native_reducer_model_is_named_object : a_view_request
         var context = new AxonEmissionContext(request, new(request.Profile));
         new AxonProjectionsEmitter().Emit(context);
         _java = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ObjectViewSpecificationsTest.java", StringComparison.Ordinal)));
-        _projector = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ObjectReducerProjector.java", StringComparison.Ordinal)));
+        _projector = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ObjectReducer.java", StringComparison.Ordinal)));
         _model = Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/Object.java", StringComparison.Ordinal)));
     }
 
     [Fact] void should_emit_an_executable_native_scenario() => _java.ShouldNotContain("@Disabled");
     [Fact] void should_keep_the_application_record_as_the_store_value() => _model.ShouldContain("public record Object(CounterId id, Long amount)");
     [Fact] void should_type_the_repository_of_the_application_record_in_the_native_specification() => _java.ShouldContain("ObjectRepository repository;");
-    [Fact] void should_inject_the_repository_in_the_projector() => _projector.ShouldContain("ObjectRepository repository, ObjectReducer reducer)");
+    [Fact] void should_inject_the_repository_in_the_projector() => _projector.ShouldContain("public ObjectReducer(ObjectRepository repository)");
     [Fact] void should_not_reference_the_removed_runtime_store() => _java.ShouldNotContain("ReadModelStore");
 }
