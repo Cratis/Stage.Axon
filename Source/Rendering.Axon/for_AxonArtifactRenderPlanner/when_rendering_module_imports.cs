@@ -52,7 +52,6 @@ public partial class when_rendering_module_imports : Specification
     [Fact] void should_exercise_an_explicit_entity_scan() => _java.Values.Any(EntityScan.IsMatch).ShouldBeTrue();
 
     [Theory]
-    [InlineData("ReadModelStore")]
     [InlineData("persistent.UniqueClaim")]
     [InlineData("persistent.PersistentConfiguration")]
     [InlineData("persistent.JpaUniqueValueStore")]

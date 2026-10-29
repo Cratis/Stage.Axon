@@ -1,15 +1,15 @@
 package __RUNTIME__;
 
 import __APPLICATION__.accounts.registry.active.ActiveAccounts;
+import __APPLICATION__.accounts.registry.active.ActiveAccountsEntity;
+import __APPLICATION__.accounts.registry.active.ActiveAccountsRepository;
 import __APPLICATION__.concepts.AccountId;
-import __RUNTIME_MODULE__.ReadModelStore;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class GeneratedInlinePolicyPerformerTest {
     private static final String ROOT = "/api/accounts/registry/";
     @Autowired private MockMvc http;
-    @Autowired @Qualifier("__APPLICATION__.accounts.registry.active.ActiveAccounts") private ReadModelStore<Object, ActiveAccounts> store;
+    @Autowired private ActiveAccountsRepository repository;
 
     @Test
     void inlinePoliciesProtectPerformedQueriesOverHttp() throws Exception {
@@ -66,7 +66,7 @@ class GeneratedInlinePolicyPerformerTest {
 
     private MockHttpServletRequestBuilder query(String name) {
         var id = new AccountId(UUID.randomUUID());
-        store.put(id, new ActiveAccounts(id, "proof"));
+        repository.save(new ActiveAccountsEntity(id.value().toString(), new ActiveAccounts(id, "proof")));
         return get(ROOT + name);
     }
 

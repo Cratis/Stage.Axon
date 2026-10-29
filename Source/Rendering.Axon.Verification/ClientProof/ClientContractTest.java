@@ -1,13 +1,11 @@
 package __RUNTIME__;
 
-import __APPLICATION__.work.items.overview.WorkItems;
+import __APPLICATION__.work.items.overview.WorkItemsRepository;
 import __RUNTIME_MODULE__.LiveStreams;
-import __RUNTIME_MODULE__.ReadModelStore;
 import org.axonframework.common.configuration.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -25,8 +23,7 @@ class ClientContractTest {
     @Autowired
     private LiveStreams live;
     @Autowired
-    @Qualifier(ClientProofSupport.VIEW)
-    private ReadModelStore<Object, WorkItems> store;
+    private WorkItemsRepository store;
     @Value("${local.server.port}")
     private int port;
 
