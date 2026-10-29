@@ -77,8 +77,19 @@ internal static class IngressProofModel
 
     static SemanticSlice TriggerSlice(SemanticSlice slice, SemanticReaction reaction) => slice with
     {
-        Id = SemanticId.Create(SemanticKind.Slice, "RegisterRequested"), Name = "RegisterRequested", Kind = SemanticSliceKind.Automation,
-        Commands = [], Events = [], Constraints = [], ReadModels = [], Projections = [], Queries = [], Specifications = [], Reducers = [], Captures = [], Reactions = [reaction]
+        Id = SemanticId.Create(SemanticKind.Slice, "RegisterRequested"),
+        Name = "RegisterRequested",
+        Kind = SemanticSliceKind.Automation,
+        Commands = [],
+        Events = [],
+        Constraints = [],
+        ReadModels = [],
+        Projections = [],
+        Queries = [],
+        Specifications = [],
+        Reducers = [],
+        Captures = [],
+        Reactions = [reaction]
     };
 
     static (SemanticApplicationTrigger Trigger, SemanticReaction Reaction) TriggerFor(SemanticCommand command, string name, SemanticReactionIdentity? identity)
@@ -97,7 +108,10 @@ internal static class IngressProofModel
         var (trigger, http) = TriggerFor(caller, "CallerRegistrationRequested", null);
         var requested = registered with
         {
-            Id = SemanticId.Create(SemanticKind.EventContract, "SystemRegistrationRequested"), ContractId = EventContractId.Parse("evt1:" + new string('1', 64)), Name = "SystemRegistrationRequested", StoredName = "SystemRegistrationRequested",
+            Id = SemanticId.Create(SemanticKind.EventContract, "SystemRegistrationRequested"),
+            ContractId = EventContractId.Parse("evt1:" + new string('1', 64)),
+            Name = "SystemRegistrationRequested",
+            StoredName = "SystemRegistrationRequested",
             Properties = [.. register.Properties.Select(property => property with { Id = SemanticId.Create(SemanticKind.Property, "SystemRegistrationRequested." + property.Name), Name = property.IsIdentifier ? "accountId" : property.Name })]
         };
         var invocation = new SemanticInvocation(system.Id, [.. system.Properties.Select(property => new SemanticPropertyMapping(property.Id, property.IsIdentifier
@@ -115,7 +129,10 @@ internal static class IngressProofModel
             : expression;
         return command with
         {
-            Id = SemanticId.Create(SemanticKind.Command, name), Name = name, Properties = [.. properties], Authorization = authorization,
+            Id = SemanticId.Create(SemanticKind.Command, name),
+            Name = name,
+            Properties = [.. properties],
+            Authorization = authorization,
             Destination = command.Destination is { } destination ? destination with { Value = Map(destination.Value)! } : null,
             Produces = [.. command.Produces.Select(produced => produced with { Destination = Map(produced.Destination), Mappings = [.. produced.Mappings.Select(mapping => mapping with { Source = Map(mapping.Source)! })] })]
         };
