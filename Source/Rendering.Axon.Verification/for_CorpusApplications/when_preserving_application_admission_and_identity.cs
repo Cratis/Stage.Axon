@@ -60,8 +60,8 @@ public class when_preserving_application_admission_and_identity : Specification
     [Fact] void should_use_the_composed_custom_package_root() => _applications.Single(application => application.Name == "sample-custom-packages").Root.ShouldEqual(_inputs.Root);
 
     [Fact] void should_bind_proof_facts_to_the_authenticated_caller() => ProofSource("RegisterAccountHandler").ShouldContain("username");
-    [Fact] void should_enlist_proof_uniqueness_in_the_append_context() => ProofSource("ModeledConstraints").ShouldContain("store.assign(context,");
-    [Fact] void should_release_proof_claims_with_the_generated_close_command() => ProofSource("ModeledConstraints").ShouldContain("store.releaseOwner(context,");
+    [Fact] void should_not_enforce_proof_uniqueness_whose_release_event_lacks_the_value() => _plans[IngressProofModel.Application].Artifacts.Any(artifact => artifact.RelativePath.EndsWith("/AccountAliasSetValidation.java", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_report_the_proof_uniqueness_as_not_enforced() => _plans[IngressProofModel.Application].Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-0801" && diagnostic.Message.Contains("a release event does not carry the unique value", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_protect_the_proof_command_handler() => ProofSource("RegisterAccountHandler").ShouldContain("@Secured({\"ROLE_Writer\"})");
     [Fact] void should_enroll_the_proof_decision_before_validation() => ProofSource("ConsumeAccountHandler").ShouldContain("if (state == null || !state.decisionRead0()) throw new IllegalArgumentException");
     [Fact] void should_refuse_the_unsupported_cross_stream_proof() => ProofSource("CloseOtherAccountHandler").ShouldContain("throw new UnsupportedOperationException(\"STAGE-AXON-0106:");

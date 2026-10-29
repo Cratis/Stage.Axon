@@ -30,7 +30,7 @@ public class when_planning_the_client_proof_application : Specification
     [Fact] void should_return_a_typed_list_snapshot() => Source("AllWorkItemsEndpoint").ShouldContain("ResponseEntity<List<WorkItems>>");
     [Fact] void should_return_the_record_from_the_create_command() => Source("CreateWorkItemHandler").ShouldContain("return new CreateWorkItemResponse(");
     [Fact] void should_return_nothing_from_the_rename_command() => Source("RenameWorkItemEndpoint").ShouldContain("CompletableFuture<Void>");
-    [Fact] void should_claim_the_unique_name() => Source("ModeledConstraints").ShouldContain("UniqueWorkItemName");
+    [Fact] void should_claim_the_unique_name() => Source("UniqueWorkItemNameSetValidation").ShouldContain("assertNameUnique");
     [Fact] void should_render_the_string_enum() => Source("WorkItemState").ShouldContain("INPROGRESS(\"inProgress\")");
     [Fact] void should_render_the_numbered_enum() => Source("WorkItemPriority").ShouldContain("HIGH(10)");
     [Fact] void should_render_the_client() => _plan.Artifacts.Any(artifact => artifact.RelativePath == "client/src/work/items/overview.ts").ShouldBeTrue();

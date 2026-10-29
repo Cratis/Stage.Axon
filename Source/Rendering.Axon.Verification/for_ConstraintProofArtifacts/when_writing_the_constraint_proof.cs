@@ -24,12 +24,12 @@ public partial class when_writing_the_constraint_proof : Specification
     [Fact] void should_find_the_native_proof() => sources.Keys.SequenceEqual(["GeneratedNativeUniqueTest.java"]).ShouldBeTrue();
     [Fact] void should_resolve_placeholders() => source.ShouldNotContain("__");
     [Fact] void should_use_the_application_package() => source.ShouldContain("package corpusconstrainedjavabodies.runtime;");
-    [Fact] void should_import_the_runtime_conflict() => source.ShouldContain("import io.cratis.stage.axon.runtime.UniqueValueConflict;");
+    [Fact] void should_not_depend_on_the_runtime_store() => source.ShouldNotContain("UniqueValueConflict");
     [Fact] void should_dispatch_through_the_gateway() => source.ShouldContain("gateway.send(command, Void.class).get(10, TimeUnit.SECONDS)");
     [Fact] void should_repeat_eight_contenders_twenty_five_times() => (source.Contains("CONTENDERS = 8", StringComparison.Ordinal) && source.Contains("REPETITIONS = 25", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_bound_the_start_gate() => source.ShouldContain("latch.await(5, TimeUnit.SECONDS)");
-    [Fact] void should_prove_swallowed_conflicts() => source.ShouldContain("void swallowedConflictStillFails()");
-    [Fact] void should_prove_swallowed_delegate_failures() => source.ShouldContain("void swallowedDelegateFailureKeepsTheOriginalClaim()");
+    [Fact] void should_prove_swallowed_conflicts() => source.ShouldContain("void aConflictIsRaisedBeforeTheBodyCanSwallowIt()");
+    [Fact] void should_prove_swallowed_delegate_failures() => source.ShouldContain("void aReleaseThatAppendsNothingKeepsTheClaim()");
     [Fact] void should_not_disable_native_tests() => source.ShouldNotContain("@Disabled");
     [Fact] void should_race_occurrences() => source.ShouldContain("exactlyOneConcurrentOpeningWins");
     [Fact] void should_convert_stored_payloads() => source.ShouldContain("event.payloadAs(type, configuration.getComponent(EventConverter.class))");

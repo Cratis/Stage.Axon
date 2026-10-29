@@ -34,9 +34,9 @@ public class when_planning_the_constraint_applications : Specification
     [InlineData(ConstraintProofArtifacts.Application)]
     public void should_enforce_occurrences_for_both_handler_paths(string application)
     {
-        Source(application, "ModeledConstraints").ShouldContain("store.occurOnce(context,");
-        Source(application, "OpenAccountHandler").ShouldContain("ModeledConstraints.enforcing(uniqueValues, unconstrainedAppender, context)");
-        Source(application, "OpenAccountModeledHandler").ShouldContain("ModeledConstraints.apply(uniqueValues, event, context)");
+        Source(application, "OneOpeningSetValidation").ShouldContain("public void assertOneOpeningUnique()");
+        Source(application, "OpenAccountHandler").ShouldContain("oneOpening.assertOneOpeningUnique();");
+        Source(application, "OpenAccountModeledHandler").ShouldContain("oneOpening.assertOneOpeningUnique();");
     }
 
     [Theory]

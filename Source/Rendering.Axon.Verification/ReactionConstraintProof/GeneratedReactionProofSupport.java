@@ -10,7 +10,6 @@ import __APPLICATION__.accounts.events.AliasAssigned;
 import __APPLICATION__.accounts.events.AliasReleased;
 import __APPLICATION__.accounts.events.EventTags;
 import __APPLICATION__.events.EventSourceId;
-import io.cratis.stage.axon.runtime.UniqueValueStore;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import org.axonframework.common.configuration.Configuration;
@@ -35,7 +34,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 abstract class GeneratedReactionProofSupport {
     @Autowired protected Configuration configuration;
     @Autowired protected CommandGateway gateway;
-    @Autowired protected UniqueValueStore claims;
     @Autowired protected AssignAliasOn0AppendHandler assignment;
     @Autowired protected ReleaseAliasOn0AppendHandler release;
     @Autowired protected AssignAliasReaction assignReaction;
@@ -50,9 +48,9 @@ abstract class GeneratedReactionProofSupport {
         return new AssignAliasOn0Append(id, new AliasAssigned(id, value));
     }
 
-    protected ReleaseAliasOn0Append release(String owner) {
+    protected ReleaseAliasOn0Append release(String owner, String value) {
         var id = new EventSourceId(owner);
-        return new ReleaseAliasOn0Append(id, new AliasReleased(id));
+        return new ReleaseAliasOn0Append(id, new AliasReleased(id, value));
     }
 
     protected long events(String owner) throws Exception {
@@ -69,12 +67,6 @@ abstract class GeneratedReactionProofSupport {
         } finally { stream.close(); }
     }
 
-    protected Object injectedStore(Object handler) throws Exception {
-        var field = handler.getClass().getDeclaredField("uniqueValues");
-        field.setAccessible(true);
-        return field.get(handler);
-    }
-
     protected void deliver(Object handler, Object payload, boolean replay) throws Exception {
         var types = configuration.getComponent(MessageTypeResolver.class);
         var component = new AnnotatedEventHandlingComponent<>(handler,
@@ -87,6 +79,12 @@ abstract class GeneratedReactionProofSupport {
             if (replay) context.putResource(TrackingToken.RESOURCE_KEY, token);
             return component.handle(message, context).asCompletableFuture();
         }).get(10, TimeUnit.SECONDS);
+    }
+
+    /** A violation is the entity assertion, or the append being rejected because another append won the contested tag. */
+    protected static boolean violation(Throwable cause) {
+        return cause instanceof IllegalStateException && String.valueOf(cause.getMessage()).startsWith("Constraint violated")
+                || cause.getClass().getSimpleName().equals("AppendEventsTransactionRejectedException");
     }
 
     protected Throwable root(Throwable failure) {
