@@ -3,8 +3,12 @@ domain Stage.ClientProof
 concept WorkItemId : Uuid
 
 concept WorkItemEmail : String
+  validate
+    matches "[a-z]+@[a-z]+[.][a-z]{2,}"
 
 concept WorkItemShortTitle : String
+  validate
+    min 3
 
 type WorkItemContact
   email WorkItemEmail
@@ -159,6 +163,20 @@ module Work
           priority = priority
         from WorkItemRenamed
           title = title
+
+    slice StateChange RegisterContact
+      command RecordContact
+        id WorkItemId identifier
+        email WorkItemEmail
+        details WorkItemContact
+        state WorkItemState
+        authorize IsEditor
+
+        produces ContactRecorded
+          for email
+          email = email
+          details = details
+          state = state
 
     slice StateView Contacts
       event ContactRecorded
