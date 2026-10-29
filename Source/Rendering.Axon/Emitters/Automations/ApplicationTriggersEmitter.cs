@@ -28,12 +28,33 @@ internal static class ApplicationTriggersEmitter
         }
     }
 
+    // Names that occur once are reserved first, then every repeated name takes its ordinal and moves on until the result is unused, so no assigned name can equal another.
+    internal static string[] Disambiguate(string[] names)
+    {
+        var used = names.Where(name => names.Count(other => other == name) == 1).ToHashSet(StringComparer.Ordinal);
+        return [.. names.Select((name, index) =>
+        {
+            if (names.Count(other => other == name) == 1) return name;
+            var ordinal = index + 1;
+            while (!used.Add(name + ordinal)) ordinal++;
+            return name + ordinal;
+        })];
+    }
+
+    static string[] RunnerNames((RegisteredReaction Registered, int Index)[] handlers)
+    {
+        // Reaction names are unique per slice only, so a name shared across slices is qualified with its slice, and any remaining clash falls back to the handler ordinal.
+        var plain = handlers.Select(handler => JavaNames.Type(handler.Registered.Reaction.Name) + (handlers.Count(other => other.Registered == handler.Registered) > 1 ? handler.Index + 1 : string.Empty)).ToArray();
+        var qualified = plain.Select((name, index) => "run" + (plain.Count(other => other == name) > 1 ? JavaNames.Type(handlers[index].Registered.Slice) : string.Empty) + name).ToArray();
+        return Disambiguate(qualified);
+    }
+
     static string Endpoint(string package, string triggerName, (RegisteredReaction Registered, int Index)[] handlers)
     {
         var name = JavaNames.Type(triggerName);
         var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Endpoint");
         ReactionJavaReferences.Claim(code, handlers.SelectMany(handler => new[] { handler.Registered.Triggers[handler.Index].Invocation, handler.Registered.Triggers[handler.Index].Condition ?? string.Empty }));
-        var methods = handlers.Select(handler => "run" + JavaNames.Type(handler.Registered.Reaction.Name) + (handlers.Count(other => other.Registered == handler.Registered) > 1 ? handler.Index + 1 : string.Empty)).ToArray();
+        var methods = RunnerNames(handlers);
         var usesClock = handlers.Any(handler => handler.Registered.Triggers[handler.Index].UsesClock);
         code.Line("@" + code.Reference("org.springframework.web.bind.annotation.RestController"))
             .Block($"public class {name}Endpoint", body =>

@@ -72,6 +72,7 @@ internal static class NativeTestResults
         ReactionCommandProofArtifacts.Application => ["GeneratedReactionCommandTest"],
         ReactionConstraintProofArtifacts.Application => ["GeneratedMemoryReactionConstraintTest"],
         ConstraintProofArtifacts.Application => ["GeneratedNativeUniqueTest"],
+        ProjectionConcurrencyProofArtifacts.Application => ["ConcurrentSharedKeyTest"],
         _ => []
     };
 

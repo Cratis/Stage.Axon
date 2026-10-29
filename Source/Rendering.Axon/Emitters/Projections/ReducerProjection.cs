@@ -63,7 +63,7 @@ internal sealed class ReducerProjection(AxonEmissionContext context, ViewJavaTyp
         foreach (var transition in reducer.Transitions) types.EventType(transition.EventContract, code);
         var values = new ProjectionValues(context, types, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Reducer")})")
-            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
+            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(AxonProjectionsEmitter.ViewNamespace)})")
             .Block($"public class {name}Reducer", body =>
             {
                 body.Line($"private final {repository} repository;")

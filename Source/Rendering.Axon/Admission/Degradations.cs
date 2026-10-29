@@ -45,6 +45,7 @@ internal static class Degradations
         Informational(AxonRefusalCodes.Scaffold, "generate an Axon application scaffold", "Scaffold admission is checked before emission."),
         Informational(AxonRefusalCodes.LocalRuntime, "use the renderer's matching runtime", "Source builds pin an unpublished runtime version."),
         Informational(AxonRefusalCodes.PersistentProfile, "offer the optional persistent event storage profile", "AggregateBasedJpaEventStorageEngine stores at most one tag per event, so modeled constraints cannot use it."),
+        Informational(AxonRefusalCodes.EventuallyConsistentViews, "read a view immediately after appending an event", "Views are applied by a pooled streaming processor, so a query may not yet reflect an event that was just appended."),
         Unsupported(AxonRefusalCodes.Names, "use the modeled Java names", "Reserved Java names must be renamed."),
         Unsupported(AxonRefusalCodes.SupportPackage, "use the modeled package name", "The package collides with a reserved support package."),
         Unsupported(AxonRefusalCodes.Generation, "generate the modeled values and artifacts", "The requested generation cannot be emitted as modeled; fallback artifacts may be used.", ThrowingBody),

@@ -18,6 +18,7 @@ public class a_reaction_model : for_AxonArtifactRenderPlanner.given.an_axon_requ
     private protected SemanticApplicationTrigger applicationTrigger;
     private protected SemanticSpecification specification;
     private protected ImmutableArray<SemanticReaction> otherReactions = [];
+    private protected ImmutableArray<SemanticReaction> otherSliceReactions = [];
 
     void Establish()
     {
@@ -68,11 +69,36 @@ public class a_reaction_model : for_AxonArtifactRenderPlanner.given.an_axon_requ
     SemanticFeature Feature(SemanticFeature feature) => feature with
     {
         Features = [.. feature.Features.Select(Feature)],
-        Slices = [.. feature.Slices.SelectMany(slice => slice.Commands.Any(candidate => candidate.Id == command.Id)
-            ? new[] { slice with { Commands = [command] }, slice with
-            {
-                Id = SemanticId.Create(SemanticKind.Slice, "SubmitOrder"), Name = "SubmitOrder", Kind = SemanticSliceKind.Automation,
-                Commands = [], Events = [], Constraints = [], ReadModels = [], Projections = [], Queries = [], Specifications = specification is null ? [] : [specification], Reducers = [], Captures = [], Reactions = [reaction, .. otherReactions]
-            } } : [slice])]
+        Slices = [.. feature.Slices.SelectMany(slice => slice.Commands.Any(candidate => candidate.Id == command.Id) ? Slices(slice) : [slice])]
     };
+
+    SemanticSlice[] Slices(SemanticSlice slice)
+    {
+        var automation = slice with
+        {
+            Id = SemanticId.Create(SemanticKind.Slice, "SubmitOrder"),
+            Name = "SubmitOrder",
+            Kind = SemanticSliceKind.Automation,
+            Commands = [],
+            Events = [],
+            Constraints = [],
+            ReadModels = [],
+            Projections = [],
+            Queries = [],
+            Specifications = specification is null ? [] : [specification],
+            Reducers = [],
+            Captures = [],
+            Reactions = [reaction, .. otherReactions]
+        };
+        SemanticSlice[] slices = [slice with { Commands = [command] }, automation];
+        if (otherSliceReactions.IsEmpty) return slices;
+        var resubmit = automation with
+        {
+            Id = SemanticId.Create(SemanticKind.Slice, "Resubmit"),
+            Name = "Resubmit",
+            Specifications = [],
+            Reactions = otherSliceReactions
+        };
+        return [.. slices, resubmit];
+    }
 }

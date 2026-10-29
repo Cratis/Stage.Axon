@@ -11,7 +11,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
     readonly ProjectionUpdates _updates = new(context, types, model.Id);
 
     /// <summary>
-    /// Emits the Axon event handler and the synchronized entry point that applies one event to the repository, then invalidates the live queries.
+    /// Emits the Axon event handler and the entry point that applies one event to the repository, then invalidates the live queries.
     /// </summary>
     /// <param name="body">The projector body.</param>
     /// <param name="eventType">The handled event type.</param>
@@ -31,7 +31,7 @@ internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, View
                 if (message) method.Line($"var message = ({eventMessage}) {body.Reference("org.axonframework.messaging.core.Message")}.fromContext(context);");
                 method.Line($"on(event{arguments});");
             })
-            .Block($"public synchronized void on({eventType} event{messageParameter}{updateParameter})", method =>
+            .Block($"public void on({eventType} event{messageParameter}{updateParameter})", method =>
             {
                 transitions(method);
                 _updates.Notify(method, package);

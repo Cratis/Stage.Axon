@@ -20,7 +20,7 @@ internal sealed class RootProjectionEmitter(AxonEmissionContext context, ViewJav
         new ProjectionUpdates(context, types, model.Id).Claim(code, package);
         foreach (var contract in Events()) types.EventType(contract, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
-            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
+            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(AxonProjectionsEmitter.ViewNamespace)})")
             .Block($"public class {name}", body =>
             {
                 Fields(body, name);

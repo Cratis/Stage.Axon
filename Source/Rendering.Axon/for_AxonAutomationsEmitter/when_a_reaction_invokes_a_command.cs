@@ -35,6 +35,7 @@ public class when_a_reaction_invokes_a_command : given.a_planned_screenplay
     [Fact] void should_be_a_spring_component() => Source("ResetAfterRecordingReaction").ShouldContain("@Component");
     [Fact] void should_handle_the_event_natively() => Source("ResetAfterRecordingReaction").ShouldContain("@EventHandler");
     [Fact] void should_not_replay_the_effects() => Source("ResetAfterRecordingReaction").ShouldContain("@DisallowReplay");
+    [Fact] void should_not_join_the_view_processor() => Source("ResetAfterRecordingReaction").ShouldNotContain("@Namespace(\"views\")");
     [Fact] void should_use_its_own_processor_namespace() => Source("ResetAfterRecordingReaction").ShouldContain("@Namespace(\"reactionplan.counters.totals.reset.reactions\")");
     [Fact] void should_name_the_handler_after_the_event() => Source("ResetAfterRecordingReaction").ShouldContain("public void onCountRecorded(CountRecorded input");
     [Fact] void should_receive_the_processing_context() => Source("ResetAfterRecordingReaction").ShouldContain("ProcessingContext context");

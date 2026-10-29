@@ -52,7 +52,7 @@ internal sealed class ScopedProjectionEmitter(AxonEmissionContext context, ViewJ
         new ProjectionUpdates(context, types, model.Id).Claim(code, package);
         foreach (var @event in Events()) types.EventType(@event.Id, code);
         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name)})")
-            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package)})")
+            .Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(AxonProjectionsEmitter.ViewNamespace)})")
             .Block($"public class {name}", body =>
             {
                 Fields(body, name, slots);
