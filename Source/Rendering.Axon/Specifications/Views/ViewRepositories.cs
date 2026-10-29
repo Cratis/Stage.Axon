@@ -14,6 +14,12 @@ internal static class ViewRepositories
     internal static void Declare(JavaCodeBuilder code, SemanticReadModel model) =>
         code.Declare(ReadModelEntities.RepositoryName(model)).Declare(ReadModelEntities.EntityName(model));
 
+    /// <summary>Declares the projection-owned join lookup repository of a scoped projection.</summary>
+    internal static void DeclareJoins(JavaCodeBuilder code, SemanticProjection projection) => code.Declare(ProjectionJoinEntities.RepositoryName(projection));
+
+    internal static JavaCodeBuilder JoinField(JavaCodeBuilder body, SemanticProjection projection) =>
+        body.Line($"@{body.Reference("org.springframework.beans.factory.annotation.Autowired")}").Line($"private {ProjectionJoinEntities.RepositoryName(projection)} joins;");
+
     internal static void Annotate(JavaCodeBuilder code) => code.Line($"@{code.Reference("org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest")}");
 
     internal static JavaCodeBuilder Field(JavaCodeBuilder body, SemanticReadModel model) =>

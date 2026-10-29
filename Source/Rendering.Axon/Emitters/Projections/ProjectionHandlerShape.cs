@@ -21,6 +21,10 @@ internal static class ProjectionHandlerShape
         scope.From.All(from => from.Key is SemanticProjectionValueKey or SemanticProjectionPartsKey or SemanticProjectionCompositeKey) &&
         scope.Removals.All(removal => removal.Key is SemanticProjectionValueKey or SemanticProjectionPartsKey or SemanticProjectionCompositeKey));
 
+    /// <summary>Whether the projection renders as a typed-repository projector: a root-only projection or a scoped projection whose scopes and keys all resolve.</summary>
+    internal static bool Renderable(AxonEmissionContext context, ViewJavaTypes types, SemanticProjection projection, SemanticReadModel model) =>
+        RootOnly(context.Request.Model.Application, projection, model) || ScopedProjectionEmitter.Supports(context, types, projection, model);
+
     internal static string Arguments(SemanticProjection projection, ProjectionUpdates updates, string emitter = "null") =>
         (Scoped(projection) ? ", null" : string.Empty) + (updates.Enabled ? ", " + emitter : string.Empty);
 }

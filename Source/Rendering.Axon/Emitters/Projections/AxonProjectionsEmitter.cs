@@ -89,7 +89,12 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
             new RootProjectionEmitter(context, types, package, projection, model).Emit();
             return;
         }
-        const string reason = "The projection uses scoped state (every, children, nested scopes, joins, join removals or parented removals) that this slice does not store relationally; the read model stays empty.";
+        if (ProjectionHandlerShape.Renderable(context, types, projection, model))
+        {
+            new ScopedProjectionEmitter(context, types, package, projection, model).Emit();
+            return;
+        }
+        const string reason = "The projection uses scoped state (every, children, nested scopes, joins, join removals or parented removals) whose scope or key cannot be resolved to a stored row; the read model stays empty.";
         const string intent = "project scoped read-model state";
         var path = projection.Id.ToString();
         context.Degradation.Unsupported(AxonRefusalCodes.ScopedProjection, projection.Id, reason, intent, path);
