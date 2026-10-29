@@ -34,8 +34,7 @@ public class when_emitting_bearer_security : for_AxonArtifactRenderPlanner.given
     [Fact] void should_keep_the_cors_filter() => code.ShouldContain(".cors(cors -> cors.configurationSource(cors(allowedOrigins)))");
     [Fact] void should_not_allow_cookies() => code.ShouldContain("setAllowCredentials(false)");
     [Fact] void should_not_enable_basic() => code.ShouldNotContain("httpBasic");
-    [Fact] void should_register_native_command_dispatch() => code.ShouldContain("MessageAuthorizationDispatchInterceptor<CommandMessage>");
-    [Fact] void should_register_native_query_dispatch() => code.ShouldContain("MessageAuthorizationDispatchInterceptor<QueryMessage>");
+    [Fact] void should_not_serialize_the_principal_at_dispatch() => code.ShouldNotContain("MessageAuthorizationDispatchInterceptor");
     [Fact] void should_register_native_command_handling() => code.ShouldContain("MessageAuthorizationHandlerInterceptor<CommandMessage>");
     [Fact] void should_register_native_query_handling() => code.ShouldContain("MessageAuthorizationHandlerInterceptor<QueryMessage>");
 }

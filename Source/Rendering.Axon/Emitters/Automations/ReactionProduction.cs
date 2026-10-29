@@ -13,6 +13,8 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
 {
     internal string Invocation => (Event.Condition is null ? string.Empty : $"if ({Event.Condition}) ") + $"commands.sendAndWait(new {Name}({Event.Source}, {Event.Expression}));";
 
+    internal string InvocationWithMetadata => (Event.Condition is null ? string.Empty : $"if ({Event.Condition}) ") + $"commands.sendAndWait(new {Name}({Event.Source}, {Event.Expression}), java.lang.Object.class, metadata, null);";
+
     internal void Emit(AxonEmissionContext context, string package, SemanticId reaction)
     {
         var command = new JavaCodeBuilder(package).Declare(Name);

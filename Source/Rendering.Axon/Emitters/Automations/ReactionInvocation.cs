@@ -24,18 +24,26 @@ internal static class ReactionInvocation
         return $"new {package}.{JavaNames.Type(command.Name)}({string.Join(", ", arguments)})";
     }
 
-    internal static string Statement(string command, bool withContext) => $"commands.sendAndWait({command}{(withContext ? ", context" : string.Empty)});";
+    internal static string Statement(string command, bool withContext, bool withMetadata = false)
+    {
+        if (withMetadata) return $"commands.sendAndWait({command}, java.lang.Object.class, metadata, {(withContext ? "context" : "null")});";
+        return $"commands.sendAndWait({command}{(withContext ? ", context" : string.Empty)});";
+    }
 
-    internal static void Dispatch(JavaCodeBuilder method, SemanticReaction reaction, string invocation)
-        => Dispatch(method, reaction, body => body.Line(invocation));
+    internal static void Dispatch(JavaCodeBuilder method, SemanticReaction reaction, string invocation, bool http = false)
+        => Dispatch(method, reaction, body => body.Line(invocation), http);
 
-    internal static void Dispatch(JavaCodeBuilder method, SemanticReaction reaction, Action<JavaCodeBuilder> effect)
+    internal static void Dispatch(JavaCodeBuilder method, SemanticReaction reaction, Action<JavaCodeBuilder> effect, bool http = false)
     {
         if (reaction.RunsAs is null)
         {
             effect(method);
             return;
         }
+        var authorities = string.Join(',', reaction.RunsAs.Roles.Select(role => "ROLE_" + role).Distinct(StringComparer.Ordinal));
+        method.Line($"{(http ? "metadata" : "var metadata")} = {method.Reference("org.axonframework.messaging.core.Metadata")}.with(\"username\", \"system\").and(\"authorities\", {JavaCodeBuilder.StringLiteral(authorities)});");
+
+        // Retained for the current actor expressions (Caller.current()), not for native handler authorization.
         var roles = reaction.RunsAs.Roles.Distinct(StringComparer.Ordinal)
             .Select(role => $"new {method.Reference("org.springframework.security.core.authority.SimpleGrantedAuthority")}(" + JavaCodeBuilder.StringLiteral("ROLE_" + role) + ")");
         var holder = method.Reference("org.springframework.security.core.context.SecurityContextHolder");

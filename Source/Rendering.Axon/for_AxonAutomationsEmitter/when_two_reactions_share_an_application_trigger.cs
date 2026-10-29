@@ -32,9 +32,9 @@ public class when_two_reactions_share_an_application_trigger : given.a_reaction_
         code = Code("SubmitOrderEndpoint");
     }
 
-    [Fact] void should_call_every_effect_from_the_endpoint() => code.ShouldContain("runSubmitOrder(input);\n        runAudit(input);");
-    [Fact] void should_keep_each_effect_in_its_own_method() => code.ShouldContain("private void runAudit(SubmitOrder input)");
+    [Fact] void should_call_every_effect_from_the_endpoint() => code.ShouldContain("runSubmitOrder(input, metadata);\n        runAudit(input, metadata);");
+    [Fact] void should_keep_each_effect_in_its_own_method() => code.ShouldContain("private void runAudit(SubmitOrder input, Metadata metadata)");
     [Fact] void should_keep_the_early_return_inside_its_own_effect() => code.ShouldContain("if (early) return;\n        }\n        finally");
-    [Fact] void should_still_send_the_other_reactions_command() => code.ShouldContain("private void runSubmitOrder(SubmitOrder input)");
+    [Fact] void should_still_send_the_other_reactions_command() => code.ShouldContain("private void runSubmitOrder(SubmitOrder input, Metadata metadata)");
     [Fact] void should_inject_the_clock_for_the_native_body() => code.ShouldContain("private final Clock clock;");
 }

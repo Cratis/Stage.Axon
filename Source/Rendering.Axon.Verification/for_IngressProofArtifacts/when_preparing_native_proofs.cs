@@ -26,8 +26,8 @@ public partial class when_preparing_native_proofs : Specification
     [Fact]
     void should_include_all_native_proof_sources() => _sources.Keys.Order(StringComparer.Ordinal).SequenceEqual(
     [
-        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedJwtAudienceTest.java", "GeneratedMemoryProtectedReadTest.java",
-        "GeneratedProtectedReadTest.java", "GeneratedSecurityIngressTest.java"
+        "GeneratedDemoIdentityTest.java", "GeneratedIngressSupport.java", "GeneratedInlinePolicyDemoTest.java", "GeneratedInlinePolicyPerformerTest.java", "GeneratedInlinePolicyTest.java", "GeneratedJwtAudienceTest.java", "GeneratedMemoryProtectedReadTest.java", "GeneratedNameOnlyMetadataTest.java",
+        "GeneratedProtectedReadTest.java", "GeneratedReactionIdentityTest.java", "GeneratedSecurityIngressTest.java"
     ]).ShouldBeTrue();
     [Fact]
     void should_prove_basic_identity_fails_closed_and_application_providers_win()
@@ -101,11 +101,18 @@ public partial class when_preparing_native_proofs : Specification
         source.ShouldContain(".andExpect(status().isUnauthorized())");
     }
 
+    [Fact] void should_wire_the_background_identity_proof() => _memory.ContainsKey("GeneratedReactionIdentityTest.java").ShouldBeTrue();
+    [Fact] void should_prove_the_background_system_identity() => _sources["GeneratedReactionIdentityTest.java"].ShouldContain("backgroundRunsAsAuthorizesTheSystemCommandAndRecordsSystemAsActor");
+    [Fact] void should_prove_the_http_identity_without_runs_as() => _sources["GeneratedReactionIdentityTest.java"].ShouldContain("httpWithoutRunsAsRecordsTheAuthenticatedCaller");
+    [Fact] void should_prove_system_trigger_authorization_and_the_declared_identity() => _sources["GeneratedNameOnlyMetadataTest.java"].ShouldContain("systemTriggerUsesTheDeclaredRunsAsInsteadOfTheHttpCaller");
+    [Fact] void should_wire_the_name_only_proof_into_the_ingress_app() => _memory.ContainsKey("GeneratedNameOnlyMetadataTest.java").ShouldBeTrue();
+    [Fact] void should_prove_real_principals_and_stored_metadata() => _sources["GeneratedNameOnlyMetadataTest.java"].ShouldContain("basicAndJwtCommandsAndStoredEventsContainOnlyNamesNotPrincipalsOrCredentials");
+    [Fact] void should_prove_denied_subscription_opening() => _sources["GeneratedNameOnlyMetadataTest.java"].ShouldContain("basicAndJwtWrongRolesDenyCommandsQueriesAndSubscriptionOpeningWithoutHandlerExecution");
     [Fact] void should_resolve_all_template_packages() => _all.ShouldNotContain("__APPLICATION__");
     [Fact] void should_resolve_the_runtime_package() => _all.ShouldNotContain("__RUNTIME__");
     [Fact] void should_resolve_the_runtime_module_package() => _all.ShouldNotContain("__RUNTIME_MODULE__");
     [Fact] void should_not_add_license_headers_to_java() => _all.ShouldNotContain("Copyright (c) Cratis");
-    [Fact] void should_drive_real_generated_commands() => _all.ShouldContain("gateway.send(command, Void.class)");
+    [Fact] void should_drive_real_generated_commands() => _all.ShouldContain("gateway.send(command, Void.class, metadata(\"alice\", \"Writer\"), null)");
     [Fact] void should_collect_event_messages_directly() => _sources["GeneratedIngressSupport.java"].ShouldContain(".collect(ArrayList<EventMessage>::new, (all, entry) -> all.add(entry))");
     [Fact] void should_filter_terminal_entries_before_collecting_messages() => _sources["GeneratedIngressSupport.java"].ShouldContain("stream.filter(entry -> !(entry.message() instanceof TerminalEventMessage))");
     [Fact] void should_never_append_directly_from_proofs() => _all.ShouldNotContain("appender.append(");

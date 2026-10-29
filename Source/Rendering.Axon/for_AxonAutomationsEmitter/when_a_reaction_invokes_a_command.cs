@@ -39,6 +39,8 @@ public class when_a_reaction_invokes_a_command : given.a_planned_screenplay
     [Fact] void should_name_the_handler_after_the_event() => Source("ResetAfterRecordingReaction").ShouldContain("public void onCountRecorded(CountRecorded input");
     [Fact] void should_receive_the_processing_context() => Source("ResetAfterRecordingReaction").ShouldContain("ProcessingContext context");
     [Fact] void should_send_the_command_in_the_handler_context() => Source("ResetAfterRecordingReaction").ShouldContain("commands.sendAndWait(new ResetCount(input.id()), context);");
+    [Fact] void should_not_use_http_authentication() => Source("ResetAfterRecordingReaction").ShouldNotContain("Authentication");
+    [Fact] void should_not_add_http_metadata() => Source("ResetAfterRecordingReaction").ShouldNotContain("Metadata");
     [Fact] void should_start_its_processor_at_the_latest_token() => Source("ReactionsProcessorConfiguration").ShouldContain("EventProcessorDefinition.pooledStreamingMatching(\"reactionplan.counters.totals.reset.reactions\").customized(config -> config.initialToken(source -> source.latestToken(null)))");
     [Fact] void should_name_the_processor_bean_after_the_namespace() => Source("ReactionsProcessorConfiguration").ShouldContain("@Bean(\"reactionplan.counters.totals.reset.reactions\")");
     [Fact] void should_not_inject_a_clock() => Source("ResetAfterRecordingReaction").ShouldNotContain("Clock");

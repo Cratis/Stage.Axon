@@ -37,11 +37,14 @@ public class when_rendering_state_changes : for_AxonArtifactRenderPlanner.given.
     [Fact] void should_mark_the_command_identity() => Code("PlaceOrder").ShouldContain("@TargetEntityId");
     [Fact] void should_emit_a_post_endpoint() => Code("PlaceOrderEndpoint").ShouldContain("@PostMapping(\"/api/orders/orders/place-order\")");
     [Fact] void should_return_a_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("CompletableFuture<Void>");
-    [Fact] void should_dispatch_with_the_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("send(command, Void.class)");
+    [Fact] void should_dispatch_with_the_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("send(command, Void.class, metadata, null)");
     [Fact] void should_not_return_an_untyped_result() => Code("PlaceOrderEndpoint").ShouldNotContain("<Object>");
     [Fact] void should_validate_requests_before_dispatch() => Code("PlaceOrderEndpoint").ShouldContain("rules.validateInput(command);");
     [Fact] void should_emit_real_axon_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("AxonTestFixture.with(configuration)");
     [Fact] void should_enforce_method_security_in_fixtures() => Code("PlaceOrderSpecificationsTest").ShouldContain("HandlerEnhancerDefinitionUtils.registerToComponentRegistry(registry, components -> new SecuredMessageHandlerDefinition())");
+    [Fact] void should_get_the_http_authentication() => Code("PlaceOrderEndpoint").ShouldContain("Authentication authentication");
+    [Fact] void should_dispatch_only_the_http_caller_name() => Code("PlaceOrderEndpoint").ShouldContain(".and(\"username\", authentication.getName())");
+    [Fact] void should_dispatch_authority_names() => Code("PlaceOrderEndpoint").ShouldContain("map(GrantedAuthority::getAuthority).collect(Collectors.joining(\",\"))");
     [Fact] void should_dispatch_native_authorization_metadata() => Code("PlaceOrderSpecificationsTest").ShouldContain("Metadata.with(\"username\", \"stage-spec-caller\").and(\"authorities\", \"ROLE_Sales\")");
     [Fact] void should_supply_metadata_to_the_fixture() => Code("PlaceOrderSpecificationsTest").ShouldContain(", metadata).then();");
     [Fact] void should_compare_the_expected_events() => Code("PlaceOrderSpecificationsTest").ShouldContain("result.events(new OrderPlaced(");

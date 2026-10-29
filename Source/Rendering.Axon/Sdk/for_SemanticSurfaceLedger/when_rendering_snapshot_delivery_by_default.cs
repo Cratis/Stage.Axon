@@ -30,7 +30,7 @@ public class when_rendering_snapshot_delivery_by_default : a_view_request
     {
         Assert.Equal(SemanticQueryDelivery.Snapshot, _query.Delivery);
         Assert.Contains("/api/views/counters/find-total", _endpoint, StringComparison.Ordinal);
-        Assert.Contains("gateway.query(new FindTotal(name), FindTotal.Result.class)", _endpoint, StringComparison.Ordinal);
+        Assert.Contains("gateway.query(new FindTotal(name), FindTotal.Result.class, metadata, null)", _endpoint, StringComparison.Ordinal);
         Assert.Contains("ResponseEntity.notFound().build()", _endpoint, StringComparison.Ordinal);
         Assert.Contains("Objects.equals(row.name(), query.name())", _handler, StringComparison.Ordinal);
         Assert.Contains("QueryResults.atMostOne(rows);", _handler, StringComparison.Ordinal);
