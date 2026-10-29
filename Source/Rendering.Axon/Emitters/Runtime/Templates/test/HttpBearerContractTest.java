@@ -75,6 +75,11 @@ class HttpBearerContractTest {
     }
 
     @Test
+    void wrongAudienceIsUnauthorized() throws Exception {
+        assertDeniedEverywhere(HttpBearerTokens.token(claims -> claims.audience(List.of("other-api"))), 401);
+    }
+
+    @Test
     void foreignSignaturesAreUnauthorized() throws Exception { assertDeniedEverywhere(HttpBearerTokens.foreign(), 401); }
 
     @Test

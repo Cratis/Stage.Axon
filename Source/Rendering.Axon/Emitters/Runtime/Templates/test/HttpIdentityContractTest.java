@@ -14,6 +14,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,18 +39,30 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(HttpIdentityContractTest.Endpoints.class)
 class HttpIdentityContractTest {
     static final AtomicInteger INVOCATIONS = new AtomicInteger();
+    private static final String BASIC = "Basic " + Base64.getEncoder().encodeToString("alice:secret".getBytes(StandardCharsets.UTF_8));
     @Autowired private MockMvc http;
+    @TestBean(name = "users", methodName = "users") private UserDetailsService users;
+
+    static UserDetailsService users() {
+        return new InMemoryUserDetailsManager(User.withUsername("alice").password("{noop}secret").roles("CONTRACT").build());
+    }
 
     @BeforeEach
     void reset() { INVOCATIONS.set(0); }
 
     @Test
+    void theSameCredentialsAreAcceptedInTheAuthorizationHeader() throws Exception {
+        http.perform(get("/_identity/json").header("Authorization", BASIC))
+            .andExpect(status().isOk()).andExpect(content().string("ok"));
+        assertEquals(1, INVOCATIONS.get());
+    }
+
+    @Test
     void urlTokensAreNeverAccepted() throws Exception {
-        var basic = "Basic " + Base64.getEncoder().encodeToString("alice:secret".getBytes(StandardCharsets.UTF_8));
         for (var route : List.of("/_identity/json", "/_identity/stream")) {
             for (var parameter : List.of("access_token", "authorization")) {
                 var result = http.perform(get(route).accept(route.endsWith("stream") ? MediaType.TEXT_EVENT_STREAM : MediaType.APPLICATION_JSON)
-                    .queryParam(parameter, parameter.equals("authorization") ? basic : "x"))
+                    .queryParam(parameter, parameter.equals("authorization") ? BASIC : "x"))
                     .andExpect(status().isUnauthorized()).andExpect(request().asyncNotStarted()).andReturn();
                 assertNotEventStream(result);
             }
