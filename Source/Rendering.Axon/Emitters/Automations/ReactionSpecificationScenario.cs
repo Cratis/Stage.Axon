@@ -25,7 +25,7 @@ internal sealed class ReactionSpecificationScenario(AxonEmissionContext context,
         Caller(test);
         test.Line($"{test.Reference("org.mockito.Mockito")}.when(clock.instant()).thenReturn({test.Reference("java.time.Instant")}.parse({JavaCodeBuilder.StringLiteral(specification.GivenClock ?? "1970-01-01T00:00:00Z")}));")
             .Line($"{test.Reference("org.mockito.Mockito")}.when(clock.getZone()).thenReturn({test.Reference("java.time.ZoneOffset")}.UTC);")
-            .Line($"endpoint.execute({ReactionJavaReferences.Expression(test, _input!)});")
+            .Line($"endpoint.execute({ReactionJavaReferences.Expression(test, _input!)}, {test.Reference("org.springframework.security.core.context.SecurityContextHolder")}.getContext().getAuthentication());")
             .Line($"var source = events.source({test.Reference("org.axonframework.eventsourcing.eventstore.SourcingCondition")}.conditionFor({test.Reference("org.axonframework.messaging.eventstreaming.EventCriteria")}.havingAnyTag()));")
             .Block("try", body => body.Line($"var actual = source.filter(entry -> !(entry.message() instanceof {body.Reference("org.axonframework.eventsourcing.eventstore.TerminalEventMessage")})).collect({body.Reference("java.util.ArrayList")}<Object>::new, (items, event) -> items.add(event.payload())).get(5, {body.Reference("java.util.concurrent.TimeUnit")}.SECONDS);")
                 .Line($"{body.Reference("org.assertj.core.api.Assertions")}.assertThat(actual).{(specification.ThenEventsInAnyOrder ? "containsExactlyInAnyOrder" : "containsExactly")}({string.Join(", ", _expected.Select(value => ReactionJavaReferences.Expression(body, value!)))});"))

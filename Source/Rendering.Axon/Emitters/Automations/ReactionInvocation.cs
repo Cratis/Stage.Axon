@@ -24,7 +24,11 @@ internal static class ReactionInvocation
         return $"new {package}.{JavaNames.Type(command.Name)}({string.Join(", ", arguments)})";
     }
 
-    internal static string Statement(string command, bool withContext) => $"commands.sendAndWait({command}{(withContext ? ", context" : string.Empty)});";
+    internal static string Statement(string command, bool withContext, bool http = false)
+    {
+        if (http) return $"commands.sendAndWait({command}, java.lang.Object.class, metadata, null);";
+        return $"commands.sendAndWait({command}{(withContext ? ", context" : string.Empty)});";
+    }
 
     internal static void Dispatch(JavaCodeBuilder method, SemanticReaction reaction, string invocation)
         => Dispatch(method, reaction, body => body.Line(invocation));

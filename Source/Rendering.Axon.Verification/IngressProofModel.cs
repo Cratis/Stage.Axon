@@ -25,6 +25,7 @@ internal static class IngressProofModel
         var consumed = slices.SelectMany(slice => slice.Events).Single(contract => contract.Name == "AccountConsumed");
         var view = slices.SelectMany(slice => slice.ReadModels).Single();
         var actor = registered.Properties.Single(property => property.Name == "actor");
+        var (trigger, reaction) = TriggerFor(register);
         var alias = registered.Properties.Single(property => property.Name == "alias");
         var constraint = new SemanticConstraint("AccountAlias", SemanticConstraintKind.UniquePropertyValue, SemanticConstraintScope.EventSequence, [new(registered.Id, [alias.Id])], [closed.Id], true, "Alias already claimed");
 
@@ -59,15 +60,31 @@ internal static class IngressProofModel
                 {
                     Scope = projection.Scope! with { Removals = [new(closed.Id, new SemanticProjectionValueKey(SemanticProjectionValue.EventSourceIdentity), null), new(consumed.Id, new SemanticProjectionValueKey(SemanticProjectionValue.EventSourceIdentity), null)] }
                 })]
-            })]
+            }), .. feature.Slices.Where(slice => slice.Commands.Any(command => command.Id == register.Id)).Select(slice => TriggerSlice(slice, reaction))]
         };
         var application = loaded.Model.Application with
         {
             CommandReadMode = SemanticCommandReadMode.Protected,
+            Triggers = [.. loaded.Model.Application.Triggers, trigger],
             Modules = [.. loaded.Model.Application.Modules.Select(module => module with { Features = [.. module.Features.Select(Feature)] })]
         };
         var model = ExecutableSemanticModel.Create(new(25, 0), SemanticVersion.V25, application);
         var scope = new ArtifactRenderScope(ArtifactRenderScopeKind.Application, application.Id);
         return new(model, SemanticExecutionPlan.Compile(model).Plan!, profile ?? AxonRendering.CreateProfile(), scope);
+    }
+
+    static SemanticSlice TriggerSlice(SemanticSlice slice, SemanticReaction reaction) => slice with
+    {
+        Id = SemanticId.Create(SemanticKind.Slice, "RegisterRequested"), Name = "RegisterRequested", Kind = SemanticSliceKind.Automation,
+        Commands = [], Events = [], Constraints = [], ReadModels = [], Projections = [], Queries = [], Specifications = [], Reducers = [], Captures = [], Reactions = [reaction]
+    };
+
+    static (SemanticApplicationTrigger Trigger, SemanticReaction Reaction) TriggerFor(SemanticCommand command)
+    {
+        var trigger = new SemanticApplicationTrigger(SemanticId.Create(SemanticKind.Trigger, "RegisterRequested"), "RegisterRequested", [.. command.Properties.Select(property => property with { Id = SemanticId.Create(SemanticKind.Property, "RegisterRequested." + property.Name) })]);
+        var invocation = new SemanticInvocation(command.Id, [.. command.Properties.Select(property => new SemanticPropertyMapping(property.Id, new SemanticResolvedExpression(SemanticExpressionRootKind.Trigger, SemanticExpressionSourceKind.Property, trigger.Properties.Single(input => input.Name == property.Name).Id)))]);
+        var source = new SemanticReactionTrigger(SemanticReactionTriggerKind.ApplicationTrigger) { Source = trigger.Id, Invokes = [invocation] };
+        var reaction = new SemanticReaction(SemanticId.Create(SemanticKind.Reaction, "RegisterRequested"), "RegisterRequested", [source]) { RunsAs = new(SemanticReactionIdentityKind.System, ["Writer"]) };
+        return (trigger, reaction);
     }
 }

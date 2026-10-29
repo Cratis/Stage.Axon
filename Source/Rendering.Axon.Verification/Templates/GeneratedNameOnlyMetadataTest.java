@@ -45,6 +45,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -100,7 +101,9 @@ class GeneratedNameOnlyMetadataTest {
         @Bean
         UserDetailsService proofUsers() {
             return new InMemoryUserDetailsManager(User.withUsername("alice").password("{noop}" + PASSWORD).roles("Writer").build(),
-                    User.withUsername("reader").password("{noop}" + PASSWORD).roles("Reader").build());
+                    User.withUsername("reader").password("{noop}" + PASSWORD).roles("Reader").build(),
+                    User.withUsername("operator").password("{noop}" + PASSWORD).roles("SYSTEM", "Writer").build(),
+                    User.withUsername("system-only").password("{noop}" + PASSWORD).roles("SYSTEM").build());
         }
 
         // Synthetic decoder only: the proof exercises principal serialization, not signature verification.
@@ -210,6 +213,37 @@ class GeneratedNameOnlyMetadataTest {
                 do { line = reader.readLine(); } while (line != null && !line.startsWith("data:"));
                 assertNotNull(line, "Authorized subscription must emit an initial value");
                 assertNoLeak(line);
+            }
+        }
+    }
+
+    @Test
+    void systemTriggerForwardsTheRealCallerThroughNativeAuthorizationAndDeniesOtherCallers() throws Exception {
+        for (var name : List.of("operator", "alice", "system-only")) {
+            clearInvocations(commands);
+            var id = UUID.randomUUID();
+            var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/triggers/register-requested"))
+                    .timeout(Duration.ofSeconds(15)).header("Content-Type", "application/json")
+                    .header("Authorization", "Basic " + Base64.getEncoder().encodeToString((name + ":" + PASSWORD).getBytes(StandardCharsets.UTF_8)))
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"id\":\"" + id + "\",\"alias\":\"" + id + "\",\"actor\":\"forged\"}")).build();
+            var response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            assertNoLeak(response.body());
+            var facts = GeneratedIngressSupport.facts(configuration, id);
+            if (name.equals("operator")) {
+                assertEquals(200, response.statusCode(), response.body());
+                var metadata = fixture.handled;
+                assertSafe(metadata, name);
+                assertEquals(Set.of("username", "authorities"), metadata.keySet());
+                var authorities = Set.copyOf(fixture.caller.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList());
+                assertEquals(authorities, Set.of(metadata.get("authorities").split(",")));
+                assertEquals(1, facts.size());
+                var fact = facts.getFirst();
+                assertSafe(fact.metadata(), name);
+                assertFalse(fact.metadata().containsKey("authorities"));
+            } else {
+                assertTrue(response.statusCode() >= 400, response.body());
+                assertEquals(0, facts.size());
+                verifyNoInteractions(commands);
             }
         }
     }

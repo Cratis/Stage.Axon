@@ -101,6 +101,7 @@ public partial class when_preparing_native_proofs : Specification
         source.ShouldContain(".andExpect(status().isUnauthorized())");
     }
 
+    [Fact] void should_prove_system_trigger_authorization_and_the_real_caller() => _sources["GeneratedNameOnlyMetadataTest.java"].ShouldContain("systemTriggerForwardsTheRealCallerThroughNativeAuthorization");
     [Fact] void should_wire_the_name_only_proof_into_the_ingress_app() => _memory.ContainsKey("GeneratedNameOnlyMetadataTest.java").ShouldBeTrue();
     [Fact] void should_prove_real_principals_and_stored_metadata() => _sources["GeneratedNameOnlyMetadataTest.java"].ShouldContain("basicAndJwtCommandsAndStoredEventsContainOnlyNamesNotPrincipalsOrCredentials");
     [Fact] void should_prove_denied_subscription_opening() => _sources["GeneratedNameOnlyMetadataTest.java"].ShouldContain("basicAndJwtWrongRolesDenyCommandsQueriesAndSubscriptionOpeningWithoutHandlerExecution");

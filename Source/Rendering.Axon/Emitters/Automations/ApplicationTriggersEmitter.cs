@@ -48,9 +48,12 @@ internal static class ApplicationTriggersEmitter
                     if (usesClock) constructor.Line("this.clock = clock;");
                 }).Line($"@{body.Reference("org.springframework.security.access.prepost.PreAuthorize")}(\"hasRole('SYSTEM')\")")
                     .Line($"@{body.Reference("org.springframework.web.bind.annotation.PostMapping")}(" + JavaCodeBuilder.StringLiteral("/api/triggers/" + CommandEndpointEmitter.Kebab(triggerName)) + ")")
-                    .Block($"public void execute(@{body.Reference("jakarta.validation.Valid")} @{body.Reference("org.springframework.web.bind.annotation.RequestBody")} {name} input)", method =>
+                    .Block($"public void execute(@{body.Reference("jakarta.validation.Valid")} @{body.Reference("org.springframework.web.bind.annotation.RequestBody")} {name} input, {body.Reference("org.springframework.security.core.Authentication")} authentication)", method =>
                     {
-                        foreach (var runner in methods) method.Line($"{runner}(input);");
+                        method.Line($"var metadata = {method.Reference("org.axonframework.messaging.core.Metadata")}.emptyInstance();")
+                            .Block("if (authentication != null && authentication.isAuthenticated())", authenticated => authenticated
+                                .Line($"metadata = metadata.and(\"username\", authentication.getName()).and(\"authorities\", authentication.getAuthorities().stream().map({authenticated.Reference("org.springframework.security.core.GrantedAuthority")}::getAuthority).collect({authenticated.Reference("java.util.stream.Collectors")}.joining(\",\")));"));
+                        foreach (var runner in methods) method.Line($"{runner}(input, metadata);");
                     });
                 for (var index = 0; index < handlers.Length; index++)
                 {
