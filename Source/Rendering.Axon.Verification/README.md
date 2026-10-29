@@ -70,4 +70,4 @@ npm ci --ignore-scripts --no-audit --no-fund && npm exec -- tsc -p . --noEmit &&
 
 CI runs this in the java job after the Maven verify. The host type-checks under TypeScript 7.0.2 with `moduleResolution: bundler`; no TypeScript 5.9 fallback was needed.
 
-There is no persistent profile: event, token and uniqueness-claim data are in memory and lost on restart.
+The optional `persistent` profile (JPA events and tokens, H2 file database) is generated only for applications without modeled constraints, and its proof is the generated `PersistentProfileTest`; constrained applications report `STAGE-AXON-PERSISTENT` and keep in-memory event, token and uniqueness-claim data, which is lost on restart.

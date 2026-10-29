@@ -76,11 +76,13 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
     }
 
     [Fact]
-    void should_keep_the_in_memory_event_storage_without_a_persistent_profile()
+    void should_keep_in_memory_storage_as_the_default_outside_the_persistent_profile()
     {
         var wiring = context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/AxonConfiguration.java", StringComparison.Ordinal));
         var code = Encoding.UTF8.GetString(wiring.Bytes.AsSpan());
-        code.ShouldNotContain("@Profile");
+        code.ShouldContain("import org.springframework.context.annotation.Profile;");
+        code.ShouldContain("@Bean\n    @Profile(\"!persistent\")\n    EventStorageEngine eventStorageEngine() { return new InMemoryEventStorageEngine(); }");
+        code.ShouldContain("@Bean\n    @Profile(\"!persistent\")\n    TokenStore tokenStore() { return new InMemoryTokenStore(); }");
         code.ShouldNotContain("uniqueValueStore(");
         code.ShouldContain("@Bean\n    Clock clock()");
         code.ShouldContain("@Bean\n    JacksonModule conceptsModule()");

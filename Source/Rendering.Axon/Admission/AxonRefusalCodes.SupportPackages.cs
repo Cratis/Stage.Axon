@@ -9,4 +9,7 @@ internal static partial class AxonRefusalCodes
 
     /// <summary>The renderer was built from source, so generated applications pin an unpublished stage-axon-runtime version; reported as a warning.</summary>
     internal const string LocalRuntime = "STAGE-AXON-LOCAL-RUNTIME";
+
+    /// <summary>The optional persistent profile is not generated for a model with modeled constraints; reported as a warning.</summary>
+    internal const string PersistentProfile = "STAGE-AXON-PERSISTENT";
 }
