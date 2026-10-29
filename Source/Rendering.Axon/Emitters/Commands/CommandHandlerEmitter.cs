@@ -20,9 +20,10 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     readonly CommandJavaTypes _types = new(context.Request.Model.Application, context.BasePackage);
 
     bool _usesClock;
-    string? _nativeBody;
 
-    bool Constrained => ConstraintCoverage.All(context).Any(item => command.Produces.Any(produced => ConstraintCoverage.Applies(item.Constraint, produced.EventContract)));
+    IReadOnlyList<ConstraintClaim> Claims { get; } = ConstraintCoverage.Claims(context, command, source);
+
+    IEnumerable<ConstraintBinding> Bindings => Claims.Select(claim => claim.Binding).OfType<ConstraintBinding>().DistinctBy(binding => binding.Constraint.Name);
 
     bool MissingSource => command.Handler is null && source is null && !command.Produces.IsEmpty;
 
@@ -40,7 +41,6 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             var authorization = SecurityAnnotations.ForHandler(context, command.Authorization, command.Id, body);
             if (authorization.Length > 0) body.Line(authorization.Replace("@PreAuthorize", "@" + body.Reference("org.springframework.security.access.prepost.PreAuthorize"), StringComparison.Ordinal));
             body.Block($"public {response.ReturnTypeFor(body)} handle({Parameters(name, body, package)})", method => Handle(method, response, package));
-            if (_nativeBody is not null) NativeBody(body, response, name);
             Dependencies(body, name);
         });
         context.AddJava(package, name + "Handler", code.Build(), sources: [command.Id]);
@@ -51,7 +51,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     {
         code.ClaimExpressions([response.ReturnType, response.Value ?? string.Empty]);
         new CommandDomainChecks(context, command, _types).Claim(code);
-        if (Constrained) code.ClaimExpressions([AxonRuntimePackage.Type(context.BasePackage, "UniqueValueStore"), AxonRuntimePackage.Type(context.BasePackage, "InMemoryUniqueValueStore"), context.BasePackage + ".infrastructure.ModeledConstraints"]);
+        code.ClaimExpressions(Bindings.SelectMany(binding => new[] { ConstraintEntities.Qualified(context, binding.Constraint), binding.ValueType }));
         foreach (var produced in command.Produces)
         {
             var contract = CommandAppends.Contract(context, produced.EventContract);
@@ -62,20 +62,11 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     void Dependencies(JavaCodeBuilder body, string name)
     {
         if (_usesClock) body.Line($"private final {body.Reference("java.time.Clock")} clock;");
-        if (Constrained) body.Line($"private final {body.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueStore"))} uniqueValues;");
         var parameters = _usesClock ? $"{body.Reference("java.time.Clock")} clock" : string.Empty;
         body.Block($"public {name}Handler({parameters})", constructor =>
         {
             if (_usesClock) constructor.Line("this.clock = clock;");
-            if (Constrained) constructor.Line($"this.uniqueValues = new {constructor.Reference(AxonRuntimePackage.Type(context.BasePackage, "InMemoryUniqueValueStore"))}();");
         });
-        if (!Constrained) return;
-        body.Line($"@{body.Reference("org.springframework.beans.factory.annotation.Autowired")}")
-            .Block($"public {name}Handler({parameters}{(_usesClock ? ", " : string.Empty)}{body.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueStore"))} uniqueValues)", constructor =>
-            {
-                if (_usesClock) constructor.Line("this.clock = clock;");
-                constructor.Line("this.uniqueValues = uniqueValues;");
-            });
     }
 
     bool UsesSubject() => command.Produces.Any(produced => produced.Mappings.Any(mapping => mapping.Source is SemanticEventContextExpression { Value: SemanticEventContextValueKind.CausedBySubject }));
@@ -84,14 +75,15 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
 
     string Parameters(string name, JavaCodeBuilder code, string package)
     {
-        var appender = command.Handler is not null && Constrained ? "unconstrainedAppender" : "appender";
-        var parameters = name + $" command, {code.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} {appender}";
-        if (Constrained && source?.Generated != true) parameters += $", {code.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
+        var parameters = name + $" command, {code.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender";
         parameters += SubjectParameter(code);
         if (source is null) return parameters;
         if (source.Generated) return parameters + $", {code.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
         var selector = source.TagKey == source.Member ? "(idProperty = " + source.ReferenceTag(code, package) + ")" : string.Empty;
-        return parameters + $", @{code.Reference("org.axonframework.modelling.annotation.InjectEntity")}{selector} @{code.Reference("org.jspecify.annotations.Nullable")} {name}Stream state";
+        parameters += $", @{code.Reference("org.axonframework.modelling.annotation.InjectEntity")}{selector} @{code.Reference("org.jspecify.annotations.Nullable")} {name}Stream state";
+        foreach (var binding in Bindings)
+            parameters += $", @{code.Reference("org.axonframework.modelling.annotation.InjectEntity")}(idProperty = {JavaCodeBuilder.StringLiteral(binding.Property)}) {code.Reference(ConstraintEntities.Qualified(context, binding.Constraint))} {binding.Local}";
+        return parameters;
     }
 
     void Handle(JavaCodeBuilder body, CommandResponses response, string package)
@@ -126,7 +118,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
         if (handler.ResultVersion != 1) return Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation with an unsupported result revision");
         if (!InlineJavaBodies.TryResolve(context, slot, out var resolved, out var reason)) return Unsupported(body, AxonRefusalCodes.Implementation, "execute the attached command implementation: " + reason);
         content = resolved;
-        if (!Constrained || !_forbiddenAppenderTokens.Any(token => resolved.Contains(token, StringComparison.Ordinal))) return true;
+        if (Claims.Count == 0 || !_forbiddenAppenderTokens.Any(token => resolved.Contains(token, StringComparison.Ordinal))) return true;
         Unsupported(body, AxonRefusalCodes.Constraint, "enforce modeled uniqueness for every event a native command body appends");
         return false;
     }
@@ -135,32 +127,15 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
     {
         if (!ResolveNative(body, handler, out var content) || !Validate(body)) return;
         foreach (var produced in command.Produces) AxonEventsEmitter.TypeFor(context, CommandAppends.Contract(context, produced.EventContract).Id, body, package);
-        if (Constrained)
-        {
-            var arguments = "command, " + body.Reference(context.BasePackage + ".infrastructure.ModeledConstraints") + ".enforcing(uniqueValues, unconstrainedAppender, context)";
-            if (source?.Generated == true) arguments += ", context";
-            else if (source is not null) arguments += ", state";
-            body.Line((response.ReturnType == "void" ? string.Empty : "return ") + "handleBody(" + arguments + ");");
-            _nativeBody = content;
-        }
-        else
-        {
-            body.RawBody(content);
-        }
+        foreach (var binding in Bindings) body.Line(binding.Call);
+        body.RawBody(content);
         context.ConsumedImplementations.Add(handler.RequirementId);
-    }
-
-    void NativeBody(JavaCodeBuilder body, CommandResponses response, string name)
-    {
-        var parameters = name + $" command, {body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender";
-        if (source?.Generated == true) parameters += $", {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context";
-        else if (source is not null) parameters += $", @{body.Reference("org.jspecify.annotations.Nullable")} {name}Stream state";
-        body.Block($"private {response.ReturnTypeFor(body)} handleBody({parameters})", method => method.RawBody(_nativeBody!));
     }
 
     bool Supported(JavaCodeBuilder body, CommandResponses response)
     {
-        if (ConstraintCoverage.CommandRequiresUnsupportedConstraint(context, command)) return Unsupported(body, AxonRefusalCodes.Constraint, "enforce or release modeled uniqueness in the append unit of work");
+        foreach (var (constraint, reason) in ConstraintCoverage.NotEnforced(context, command, Claims))
+            Difference(body, AxonRefusalCodes.Constraint, "enforce constraint " + constraint.Name, $"Uniqueness of {constraint.Name} is not enforced by this command: {reason}.");
         if (new CommandDecisionReads(context, command, source).Prepare() is null) return Unsupported(body, AxonRefusalCodes.ProtectedReads, "check modeled decision reads before changing state");
         if (MissingSource) return Unsupported(body, AxonRefusalCodes.CommandMapping, "resolve the command's primary event-source identity");
         return command.Handler is not null || response.Value is not null || Unsupported(body, AxonRefusalCodes.CommandMapping, "compute the complete modeled command response");
@@ -193,20 +168,33 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
             _usesClock = true;
             body.Line($"var occurred = {body.Reference("java.time.OffsetDateTime")}.ofInstant(clock.instant(), {body.Reference("java.time.ZoneOffset")}.UTC);");
         }
-        if (!Constrained && appends is [{ Condition: null }])
+        if (appends is [{ Condition: null }])
         {
+            foreach (var assertion in Assertions(0)) body.Line(assertion);
             body.Line($"appender.append({body.ReferenceExpression(appends[0].Event)});");
             return;
         }
         body.Line($"var events = new {body.Reference("java.util.ArrayList")}<{body.Reference("java.lang.Object")}>();");
-        foreach (var append in appends)
+        for (var index = 0; index < appends.Count; index++)
         {
-            if (append.Condition is null) body.Line($"events.add({body.ReferenceExpression(append.Event)});");
-            else body.Block($"if ({append.Condition})", conditional => conditional.Line($"events.add({conditional.ReferenceExpression(append.Event)});"));
+            var append = appends[index];
+            var current = index;
+            if (append.Condition is null)
+            {
+                foreach (var assertion in Assertions(current)) body.Line(assertion);
+                body.Line($"events.add({body.ReferenceExpression(append.Event)});");
+                continue;
+            }
+            body.Block($"if ({append.Condition})", conditional =>
+            {
+                foreach (var assertion in Assertions(current)) conditional.Line(assertion);
+                conditional.Line($"events.add({conditional.ReferenceExpression(append.Event)});");
+            });
         }
-        if (Constrained) body.Line($"for (var event : events) {body.Reference(context.BasePackage + ".infrastructure.ModeledConstraints")}.apply(uniqueValues, event, context);");
         body.Line("if (!events.isEmpty()) appender.append(events);");
     }
+
+    IEnumerable<string> Assertions(int index) => Claims.Where(claim => claim.Produced == command.Produces[index]).Select(claim => claim.Binding?.Call).OfType<string>().Distinct();
 
     void MetadataDifferences(JavaCodeBuilder body)
     {

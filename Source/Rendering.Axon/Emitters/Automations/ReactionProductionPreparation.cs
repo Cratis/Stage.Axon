@@ -24,17 +24,15 @@ internal sealed class ReactionProductionPreparation(AxonEmissionContext context,
         var condition = produced.When is null ? null : input.Condition(context, produced.When);
         if (produced.When is not null && condition is null) return null;
         var eventType = AxonEventsEmitter.TypeFor(context, contract.Id);
-        return new(name, new(eventType, $"new {eventType}({string.Join(", ", arguments)})", source, condition), primary, EventTagsEmitter.Reference(context, contract));
+        return new(name, new(eventType, $"new {eventType}({string.Join(", ", arguments)})", source, condition), primary, [.. ConstraintCoverage.EventClaims(context, contract)]);
     }
 
     bool Supported()
     {
         if (produced.Route is not null || !produced.Tags.IsEmpty) return false;
         if (produced.Condition is not null && produced.When is null) return false;
-        return !Constrained();
+        return true;
     }
-
-    bool Constrained() => ConstraintCoverage.EventRequiresUnsupportedConstraint(context, produced.EventContract);
 
     bool MatchesPrimary(string javaType) => produced.DestinationType is not { } destination || destination.Equals(CommandSource.TypeFor(context, javaType));
 

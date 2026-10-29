@@ -16,10 +16,9 @@ public class when_producing_an_event : given.a_reaction_model
     [Fact] void should_dispatch_the_append_with_the_http_metadata() => Code("SubmitOrderEndpoint").ShouldContain("Object.class, metadata, null);");
     [Fact] void should_map_event_properties() => Code("SubmitOrderEndpoint").ShouldContain("input.customer()");
     [Fact] void should_identify_the_append_boundary() => Code("SubmitOrderOn0Append").ShouldContain("@TargetEntityId");
-    [Fact] void should_load_the_current_stream_position() => Code("SubmitOrderOn0AppendHandler").ShouldContain("@InjectEntity @Nullable SubmitOrderOn0AppendStream stream");
+    [Fact] void should_not_load_a_stream() => Code("SubmitOrderOn0AppendHandler").ShouldNotContain("Stream");
     [Fact] void should_append_the_produced_event() => Code("SubmitOrderOn0AppendHandler").ShouldContain("appender.append(command.event());");
     [Fact] void should_check_the_event_identity() => Code("SubmitOrderOn0AppendHandler").ShouldContain("command.event().orderId()");
-    [Fact] void should_use_the_shared_primary_tag() => Code("SubmitOrderOn0AppendStream").ShouldContain("tagKey = EventTags.ORDER_ID");
-    [Fact] void should_preserve_position_for_other_stream_events() => Code("SubmitOrderOn0AppendStream").ShouldContain("OrderMoved event");
+    [Fact] void should_not_emit_a_stream() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/SubmitOrderOn0AppendStream.java", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_not_report_degradation() => context.Degradation.UnsupportedConstructs.Count.ShouldEqual(0);
 }

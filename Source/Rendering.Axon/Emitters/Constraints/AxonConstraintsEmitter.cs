@@ -3,9 +3,7 @@
 
 using Cratis.Screenplay.Semantics;
 using Cratis.Stage.Rendering.Axon.Admission;
-using Cratis.Stage.Rendering.Axon.Emitters.Commands;
 using Cratis.Stage.Rendering.Axon.Emitters.Events;
-using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
 
@@ -17,110 +15,71 @@ internal sealed class AxonConstraintsEmitter : IAxonEmitter
 
     public void Emit(AxonEmissionContext context)
     {
-        var constraints = ConstraintCoverage.All(context).ToArray();
-        foreach (var (slice, constraint) in constraints.Where(item => !ConstraintCoverage.Supported(context, item.Constraint)))
+        foreach (var (slice, constraint) in ConstraintCoverage.All(context))
         {
+            var reason = ConstraintCoverage.Reason(context, constraint);
+            if (reason is null)
+            {
+                EmitEntity(context, slice, constraint);
+                continue;
+            }
             var path = slice + "/constraints/" + constraint.Name;
-            var intent = "enforce constraint " + constraint.Name;
-            context.Degradation.Unsupported(AxonRefusalCodes.Constraint, slice, "Append-time uniqueness is not implemented for this constraint; affected commands fail closed.", intent, path);
-            EmitIntent(context, slice, constraint);
+            context.Degradation.Unsupported(AxonRefusalCodes.Constraint, slice, $"Uniqueness of {constraint.Name} is not enforced: {reason}.", "enforce constraint " + constraint.Name, path);
         }
-        var package = context.BasePackage + ".infrastructure";
-        var code = new JavaCodeBuilder(package).Declare("ModeledConstraints");
-        foreach (var contract in constraints.Where(item => ConstraintCoverage.Supported(context, item.Constraint))
-            .SelectMany(item => item.Constraint.Targets.Select(target => target.EventContract).Concat(item.Constraint.ReleasedBy)).Distinct())
-        {
-            code.Reference(AxonEventsEmitter.TypeFor(context, contract));
-        }
-        var store = code.Reference(AxonRuntimePackage.Type(context.BasePackage, "UniqueValueStore"));
-        code.Block("public final class ModeledConstraints", body =>
-        {
-            body.Line("private ModeledConstraints() {}")
-                .Block($"public static void apply({store} store, {body.Reference("java.lang.Object")} event, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} context)", method =>
+    }
+
+    static void EmitEntity(AxonEmissionContext context, SemanticId slice, SemanticConstraint constraint)
+    {
+        var package = ConstraintEntities.Package(context);
+        var name = ConstraintEntities.Type(constraint);
+        var occurrence = constraint.Kind == SemanticConstraintKind.UniqueEventOccurrence;
+        var first = ConstraintCoverage.Contract(context, constraint.Targets[0].EventContract)!;
+        var owner = ConstraintCoverage.Owner(context, first.Id)!.Value;
+        var value = occurrence ? null : first.Properties.Single(property => property.Id == constraint.Targets[0].Properties[0]);
+        var valueType = value is null ? owner.JavaType : new Commands.CommandJavaTypes(context.Request.Model.Application, context.BasePackage).Type(value.Type);
+        var events = constraint.Targets.Select(target => target.EventContract).Distinct().ToArray();
+        var releases = constraint.ReleasedBy.Distinct().ToArray();
+        var code = new JavaCodeBuilder(package).Declare(name);
+        code.ClaimExpressions([.. events.Concat(releases).Select(id => AxonEventsEmitter.TypeFor(context, id)), owner.JavaType, valueType]);
+        var tag = EventTagsEmitter.ConstraintReference(context, constraint, first, code, package);
+        var ownerType = code.Reference(owner.JavaType);
+        var idType = code.Reference(valueType);
+        var nullable = code.Reference("org.jspecify.annotations.Nullable");
+        var message = JavaCodeBuilder.StringLiteral(ConstraintEntities.Message(constraint));
+        code.Line($"/** DCB set validation; holds on the default in-memory event store. Not enforced on a single-tag aggregate event store such as AggregateBasedJpaEventStorageEngine, see UNSUPPORTED.md ({AxonRefusalCodes.Constraint}). */")
+            .Line($"@{code.Reference("org.axonframework.extension.spring.stereotype.EventSourced")}(tagKey = {tag}, idType = {idType}.class)")
+            .Block($"public final class {name}", body =>
             {
-                foreach (var (slice, constraint) in constraints.Where(item => ConstraintCoverage.Supported(context, item.Constraint))) EmitRule(context, method, slice, constraint);
+                body.Line(occurrence ? "private boolean occurred;" : $"private @{nullable} {ownerType} claimedBy;").Line().Line($"@{body.Reference("org.axonframework.eventsourcing.annotation.reflection.ForcedEntityCreator")}")
+                    .Block($"public {name}(@{body.Reference("org.axonframework.eventsourcing.annotation.reflection.InjectEntityId")} {idType} id)", _ => { });
+                var assert = ConstraintEntities.Assert(constraint, value is null ? string.Empty : JavaNames.Member(value.Name));
+                body.Line().Block($"public void {assert}({(occurrence ? string.Empty : ownerType + " owner")})", method =>
+                    method.Line(occurrence ? $"if (occurred) throw new IllegalStateException({message});" : $"if (claimedBy != null && !claimedBy.equals(owner)) throw new IllegalStateException({message});"));
+                foreach (var id in events) Handler(context, body, package, id, claimed: true, occurrence);
+                foreach (var id in releases) Handler(context, body, package, id, claimed: false, occurrence);
+                if (constraint.IgnoreCasing) CriteriaBuilder(body, tag, idType);
             });
-            if (constraints.Any(item => ConstraintCoverage.Supported(context, item.Constraint))) EmitEnforcing(context, body, store);
-        });
-        context.AddJava(package, "ModeledConstraints", code.Build(), sources: [.. constraints.Select(item => item.Slice)]);
+        context.AddJava(package, name, code.Build(), sources: [slice]);
     }
 
-    static void EmitEnforcing(AxonEmissionContext context, JavaCodeBuilder body, string store)
+    static void Handler(AxonEmissionContext context, JavaCodeBuilder body, string package, SemanticId id, bool claimed, bool occurrence)
     {
-        var appender = body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender");
-        var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
-        var list = body.Reference("java.util.List");
-        var metadata = body.Reference("org.axonframework.messaging.core.Metadata");
-        var message = body.Reference("org.axonframework.messaging.core.Message");
-        var completionException = body.Reference("java.util.concurrent.CompletionException");
-        var descriptor = body.Reference("org.axonframework.common.infra.ComponentDescriptor");
-        var throwable = body.Reference("java.lang.Throwable");
-        var overrideAnnotation = body.Reference("java.lang.Override");
-        body.Block($"public static {appender} enforcing({store} store, {appender} appender, {processing} context)", method => method.RawBody($$"""
-                    return new {{appender}}() {
-                        @{{overrideAnnotation}}
-                        public void append({{list}}<?> events) {
-                            append(events, {{metadata}}.emptyInstance());
-                        }
-
-                        @{{overrideAnnotation}}
-                        public void append({{list}}<?> events, {{metadata}} metadata) {
-                            try {
-                                for (var event : events) {
-                                    var payload = event instanceof {{message}} message ? message.payload() : event;
-                                    apply(store, payload, context);
-                                }
-                                appender.append(events, metadata);
-                            } catch ({{throwable}} failure) {
-                                context.runOnPrepareCommit(ignored -> { throw new {{completionException}}(failure); });
-                                throw failure;
-                            }
-                        }
-
-                        @{{overrideAnnotation}}
-                        public void describeTo({{descriptor}} descriptor) {
-                            appender.describeTo(descriptor);
-                        }
-                    };
-            """));
-    }
-
-    static void EmitRule(AxonEmissionContext context, JavaCodeBuilder body, SemanticId slice, SemanticConstraint constraint)
-    {
-        var package = context.BasePackage + ".constraints";
-        var key = JavaCodeBuilder.StringLiteral(slice + "/" + constraint.Name);
-        var message = JavaCodeBuilder.StringLiteral(constraint.Message ?? ("Constraint violated: " + constraint.Name));
-        foreach (var target in constraint.Targets)
-        {
-            var contract = CommandAppends.Contract(context, target.EventContract);
-            var owner = AxonEventSources.PrimaryTag(context, contract).ComponentName;
-            var type = AxonEventsEmitter.TypeFor(context, contract.Id, body, package);
-            if (constraint.Kind == SemanticConstraintKind.UniqueEventOccurrence)
+        var component = ConstraintCoverage.Owner(context, id)!.Value.ComponentName;
+        var type = AxonEventsEmitter.TypeFor(context, id, body, package);
+        body.Line().Line($"@{body.Reference("org.axonframework.eventsourcing.annotation.EventSourcingHandler")}")
+            .Block($"public void on({type} event)", method =>
             {
-                body.Line($"if (event instanceof {type} fact) store.occurOnce(context, {key}, fact.{owner}(), {message});");
-            }
-            else
-            {
-                var values = target.Properties.Select(id => "fact." + JavaNames.Member(contract.Properties.Single(property => property.Id == id).Name) + "()");
-                body.Line($"if (event instanceof {type} fact) store.assign(context, {key}, {body.Reference("java.util.Arrays")}.asList({string.Join(", ", values)}), fact.{owner}(), {constraint.IgnoreCasing.ToString().ToLowerInvariant()}, {message});");
-            }
-        }
-        foreach (var id in constraint.ReleasedBy)
-        {
-            var contract = CommandAppends.Contract(context, id);
-            var owner = AxonEventSources.PrimaryTag(context, contract).ComponentName;
-            body.Line($"if (event instanceof {AxonEventsEmitter.TypeFor(context, id, body, package)} fact) store.releaseOwner(context, {key}, fact.{owner}());");
-        }
+                if (occurrence) method.Line($"occurred = {(claimed ? "true" : "false")};");
+                else if (claimed) method.Line($"claimedBy = event.{component}();");
+                else method.Line($"if ({body.Reference("java.util.Objects")}.equals(claimedBy, event.{component}())) claimedBy = null;");
+            });
     }
 
-    static void EmitIntent(AxonEmissionContext context, SemanticId slice, SemanticConstraint constraint)
+    static void CriteriaBuilder(JavaCodeBuilder body, string tag, string idType)
     {
-        var package = context.BasePackage + ".constraints";
-        var name = JavaNames.Type(constraint.Name) + "ConstraintIntent";
-        var code = new JavaCodeBuilder(package).Declare(name)
-            .Block("public final class " + name, body => body.Line("private " + name + "() {}")
-                .Block("public static void enforce()", method => method.Line("throw new UnsupportedOperationException(\"Append-time uniqueness is not implemented\");")))
-            .Build();
-        context.AddJava(package, name, code, sources: [slice]);
+        var criteria = body.Reference("org.axonframework.messaging.eventstreaming.EventCriteria");
+        body.Line().Line($"@{body.Reference("org.axonframework.eventsourcing.annotation.EventCriteriaBuilder")}")
+            .Block($"public static {criteria} criteria({idType} id)", method =>
+                method.Line($"return {criteria}.havingTags({body.Reference("org.axonframework.messaging.eventstreaming.Tag")}.of({tag}, id.toLowerCase({body.Reference("java.util.Locale")}.ROOT)));"));
     }
 }

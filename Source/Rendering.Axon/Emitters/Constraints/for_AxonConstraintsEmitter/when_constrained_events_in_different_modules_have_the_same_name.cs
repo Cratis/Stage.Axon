@@ -34,16 +34,16 @@ public class when_constrained_events_in_different_modules_have_the_same_name : f
         {
             Id = SemanticId.Create(SemanticKind.Module, "Shipping"),
             Name = "Shipping",
-            Features = [released.Features[^1] with { Id = SemanticId.Create(SemanticKind.Feature, "Shipping.Events"), Features = [], Slices = [released.Slice with { Events = [release with { Name = "Changed" }], Constraints = [] }] }]
+            Features = [released.Features[^1] with { Id = SemanticId.Create(SemanticKind.Feature, "Shipping.Events"), Features = [], Slices = [released.Slice with { Specifications = [], Events = [release with { Name = "Changed", Properties = [.. release.Properties, target.Properties.Single(property => property.Name == "customer") with { Id = SemanticId.Create(SemanticKind.Property, "released-customer"), Type = target.Properties.Single(property => property.Name == "customer").Type with { IsOptional = true } }] }], Constraints = [] }] }]
         };
         var model = ExecutableSemanticModel.Create(request.Model.LanguageVersion, request.Model.SemanticVersion, application with { Modules = [.. application.Modules.Select(module => module with { Features = [.. module.Features.Select(Feature)] }), other] });
         var context = new AxonEmissionContext(request with { Model = model }, new(request.Profile));
         new AxonConstraintsEmitter().Emit(context);
-        _java = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ModeledConstraints.java", StringComparison.Ordinal)).Bytes.AsSpan());
+        _java = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/CustomerUniqueSetValidation.java", StringComparison.Ordinal)).Bytes.AsSpan());
     }
 
     [Fact] void should_import_the_first_event() => _java.ShouldContain("import sample.orders.events.Changed;");
-    [Fact] void should_use_the_first_event_for_assignment() => _java.ShouldContain("if (event instanceof Changed fact) store.assign(");
-    [Fact] void should_qualify_the_second_event_for_release() => _java.ShouldContain("if (event instanceof sample.shipping.events.Changed fact) store.releaseOwner(");
+    [Fact] void should_use_the_first_event_for_assignment() => _java.ShouldContain("public void on(Changed event)");
+    [Fact] void should_qualify_the_second_event_for_release() => _java.ShouldContain("public void on(sample.shipping.events.Changed event)");
     [Fact] void should_not_import_the_second_event() => _java.ShouldNotContain("import sample.shipping.events.Changed;");
 }

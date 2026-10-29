@@ -47,10 +47,7 @@ public class when_produced_events_share_a_name_across_modules : given.a_reaction
         new AxonAutomationsEmitter().Emit(context);
     }
 
-    [Fact] void should_import_the_first_modules_event() => Code("SubmitOrderOn0AppendStream").ShouldContain("import sample.orders.events.OrderPlaced;");
-    [Fact] void should_emit_a_handler_for_the_imported_event() => Code("SubmitOrderOn0AppendStream").ShouldContain("(OrderPlaced event)");
-    [Fact] void should_qualify_the_other_modules_event() => Code("SubmitOrderOn0AppendStream").ShouldContain("(sample.other.events.OrderPlaced event)");
-    [Fact] void should_not_import_the_other_modules_event() => Code("SubmitOrderOn0AppendStream").ShouldNotContain("import sample.other.events.OrderPlaced;");
+    [Fact] void should_not_emit_a_stream_that_would_need_every_event() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/SubmitOrderOn0AppendStream.java", StringComparison.Ordinal)).ShouldBeFalse();
 
     SemanticFeature RemoveMovedEvent(SemanticFeature feature) => feature with
     {

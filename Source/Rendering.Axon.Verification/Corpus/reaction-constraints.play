@@ -20,9 +20,12 @@ module Accounts
     slice StateChange RequestRelease
       command RequestRelease
         id OwnerId identifier
+        alias String
         produces ReleaseRequested
           for id
+          alias = alias
       event ReleaseRequested
+        alias String
 
     slice Automation Assign
       reaction AssignAlias
@@ -39,4 +42,6 @@ module Accounts
       reaction ReleaseAlias
         when ReleaseRequested
           produces AliasReleased
+            alias = alias
       event AliasReleased
+        alias String

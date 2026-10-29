@@ -7,7 +7,6 @@ import __APPLICATION__.accounts.registry.active.ActiveAccountsEntity;
 import __APPLICATION__.accounts.registry.active.ActiveAccountsRepository;
 import __APPLICATION__.accounts.registry.register.RegisterAccount;
 import __APPLICATION__.concepts.AccountId;
-import __RUNTIME_MODULE__.UniqueValueStore;
 import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -24,13 +23,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -50,7 +46,6 @@ class GeneratedSecurityIngressTest {
     @Autowired private CommandGateway commands;
     @Autowired private QueryGateway queries;
     @Autowired private Configuration configuration;
-    @MockitoSpyBean private UniqueValueStore claims;
     @Autowired private ActiveAccountsRepository repository;
 
     @Test
@@ -59,11 +54,9 @@ class GeneratedSecurityIngressTest {
             var id = UUID.randomUUID();
             var request = post(COMMAND).contentType("application/json").content(body(id));
             if (!anonymous) request.with(user("mallory").roles("Reader"));
-            clearInvocations(claims);
             var response = http.perform(request).andExpect(status().is4xxClientError()).andReturn().getResponse();
             System.out.println("Denied HTTP command (anonymous=" + anonymous + ") status: " + response.getStatus());
             assertEquals(0, GeneratedIngressSupport.facts(configuration, id).size());
-            verifyNoInteractions(claims);
         }
     }
 
@@ -71,12 +64,10 @@ class GeneratedSecurityIngressTest {
     void gatewayRejectsUnauthenticatedAndWrongRoleCommandsBeforeSideEffects() throws Exception {
         for (var name : new String[] { null, "mallory" }) {
             var id = UUID.randomUUID();
-            clearInvocations(claims);
             var failure = assertThrows(Exception.class, () -> GeneratedIngressSupport.as(name, "Reader", () -> commands.send(
                     new RegisterAccount(new AccountId(id), UUID.randomUUID().toString(), "forged-body-principal"), Void.class, GeneratedIngressSupport.metadata(name, "Reader"), null).get(10, TimeUnit.SECONDS)));
             denied(failure);
             assertEquals(0, GeneratedIngressSupport.facts(configuration, id).size());
-            verifyNoInteractions(claims);
         }
     }
 

@@ -38,6 +38,9 @@ public abstract class when_a_native_handler_is_constrained : for_AxonArtifactRen
         var slices = ScopeSelection.Select(request).ToArray();
         var contract = slices.SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Name == "OrderPlaced");
         var producedContract = Releases ? slices.SelectMany(slice => slice.Slice.Events).Single(candidate => candidate.Name == "OrderMoved") : contract;
+        var customer = contract.Properties.Single(property => property.Name == "customer");
+        var carried = customer with { Id = SemanticId.Create(SemanticKind.Property, "released-customer"), Type = customer.Type with { IsOptional = true } };
+        var release = producedContract with { Properties = [.. producedContract.Properties, carried] };
         command = slices.SelectMany(slice => slice.Slice.Commands).First(candidate => candidate.Produces.Any(produced => produced.EventContract == producedContract.Id));
         requirementId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{command.Id}|CommandHandler|0:")));
         command = command with { Handler = new(requirementId, 1) };
@@ -47,6 +50,8 @@ public abstract class when_a_native_handler_is_constrained : for_AxonArtifactRen
             Features = [.. feature.Features.Select(Feature)],
             Slices = [.. feature.Slices.Select(slice => slice with
             {
+                Events = [.. slice.Events.Select(candidate => Releases && candidate.Id == release.Id ? release : candidate)],
+                Specifications = [],
                 Commands = [.. slice.Commands.Select(candidate => candidate.Id == command.Id ? command : candidate)],
                 Constraints = slice.Events.Any(candidate => candidate.Id == contract.Id) ? [constraint] : slice.Constraints
             })]
@@ -78,7 +83,7 @@ public abstract class when_a_native_handler_is_constrained : for_AxonArtifactRen
         return (context, Text(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + command.Name + "Handler.java", StringComparison.Ordinal))));
     }
 
-    protected void AssertEnforced(bool strict)
+    protected void AssertEnforced(bool strict, bool injected = true)
     {
         var (context, code) = Emit(strict);
         ConstraintCoverage.Supported(context, constraint).ShouldBeTrue();
@@ -86,18 +91,39 @@ public abstract class when_a_native_handler_is_constrained : for_AxonArtifactRen
         code.ShouldNotContain("UnsupportedOperationException");
         context.Degradation.UnsupportedConstructs.Any(item => item.Code == AxonRefusalCodes.Constraint).ShouldBeFalse();
         context.ConsumedImplementations.ShouldContain(requirementId);
-        code.ShouldContain("ModeledConstraints.enforcing(uniqueValues, unconstrainedAppender, context)");
-        code.ShouldContain("EventAppender unconstrainedAppender");
-        code.ShouldContain("private void handleBody(" + command.Name + " command, EventAppender appender");
-        code.ShouldNotContain(", Nullable ");
-        var delegation = code.IndexOf("handleBody(command, ModeledConstraints.enforcing", StringComparison.Ordinal);
-        (code.IndexOf("rules.validate(command);", StringComparison.Ordinal) < delegation).ShouldBeTrue();
-        var privateMethod = code.IndexOf("private void handleBody(", StringComparison.Ordinal);
-        (privateMethod > delegation).ShouldBeTrue();
-        code[..privateMethod].ShouldNotContain("native-constraint-body");
-        code[privateMethod..].ShouldContain("native-constraint-body");
+        foreach (var removed in new[] { "uniqueValues", "ModeledConstraints", "handleBody", "unconstrainedAppender", "UniqueValueStore" }) code.ShouldNotContain(removed);
+        code.ShouldContain("EventAppender appender");
         code.Split("native-constraint-body", StringSplitOptions.None).Length.ShouldEqual(2);
+        const string entity = "CustomerUniqueSetValidation customerUnique";
+        if (!injected)
+        {
+            code.ShouldNotContain("SetValidation");
+            return;
+        }
+
+        code.ShouldContain("@InjectEntity(idProperty = ");
+        code.ShouldContain(entity);
+        var assertion = code.IndexOf("customerUnique.assert", StringComparison.Ordinal);
+        (assertion > 0).ShouldBeTrue();
+        (code.IndexOf("rules.validate(command);", StringComparison.Ordinal) < assertion).ShouldBeTrue();
+        (assertion < code.IndexOf("native-constraint-body", StringComparison.Ordinal)).ShouldBeTrue();
         context.Degradation.Refusals.ShouldBeEmpty();
+    }
+
+    protected void AssertDegraded(bool strict, string intent)
+    {
+        var (context, code) = Emit(strict);
+        code.ShouldContain("// Differs from Screenplay:");
+        code.ShouldContain(intent);
+        code.ShouldContain("native-constraint-body");
+        code.ShouldNotContain("UnsupportedOperationException");
+        code.ShouldNotContain("SetValidation");
+        context.ConsumedImplementations.ShouldContain(requirementId);
+        var diagnostic = context.Degradation.UnsupportedConstructs.Single(candidate => candidate.Code == AxonRefusalCodes.Constraint && candidate.Artifact == command.Id);
+        diagnostic.Severity.ShouldEqual(strict ? ArtifactRenderDiagnosticSeverity.Error : ArtifactRenderDiagnosticSeverity.Warning);
+        context.Degradation.Refusals.IsEmpty.ShouldEqual(!strict);
+        UnsupportedSummary.Emit(context);
+        Text(context.Artifacts.Single(artifact => artifact.RelativePath == "UNSUPPORTED.md")).ShouldContain(AxonRefusalCodes.Constraint);
     }
 
     protected void AssertRefused(bool strict, string intent)

@@ -12,16 +12,11 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Constraints.for_AxonConstraintsEm
 public class when_a_constrained_event_shadows_adapter_types : for_AxonArtifactRenderPlanner.given.an_axon_request
 {
     [Theory]
-    [InlineData("Throwable", "catch (java.lang.Throwable failure)")]
-    [InlineData("Override", "@java.lang.Override")]
-    [InlineData("Object", "java.lang.Object event")]
-    [InlineData("List", "void append(java.util.List<?> events)")]
-    [InlineData("EventAppender", "public static org.axonframework.messaging.eventhandling.gateway.EventAppender enforcing(")]
-    [InlineData("ProcessingContext", "org.axonframework.messaging.core.unitofwork.ProcessingContext context")]
-    [InlineData("Metadata", "org.axonframework.messaging.core.Metadata.emptyInstance()")]
-    [InlineData("Message", "event instanceof org.axonframework.messaging.core.Message message")]
-    [InlineData("CompletionException", "throw new java.util.concurrent.CompletionException(failure);")]
-    [InlineData("ComponentDescriptor", "void describeTo(org.axonframework.common.infra.ComponentDescriptor descriptor)")]
+    [InlineData("Nullable", "private @org.jspecify.annotations.Nullable ")]
+    [InlineData("EventSourced", "@org.axonframework.extension.spring.stereotype.EventSourced(tagKey = ")]
+    [InlineData("ForcedEntityCreator", "@org.axonframework.eventsourcing.annotation.reflection.ForcedEntityCreator")]
+    [InlineData("InjectEntityId", "@org.axonframework.eventsourcing.annotation.reflection.InjectEntityId ")]
+    [InlineData("EventSourcingHandler", "@org.axonframework.eventsourcing.annotation.EventSourcingHandler")]
     public void should_keep_the_event_short_and_qualify_the_framework_type(string name, string expected)
     {
         var contract = ScopeSelection.Select(request).SelectMany(slice => slice.Slice.Events).Single(contract => contract.Name == "OrderPlaced");
@@ -38,9 +33,9 @@ public class when_a_constrained_event_shadows_adapter_types : for_AxonArtifactRe
         var model = ExecutableSemanticModel.Create(request.Model.LanguageVersion, request.Model.SemanticVersion, application);
         var context = new AxonEmissionContext(request with { Model = model }, new(request.Profile));
         new AxonConstraintsEmitter().Emit(context);
-        var java = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/ModeledConstraints.java", StringComparison.Ordinal)).Bytes.AsSpan());
+        var java = Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/CustomerUniqueSetValidation.java", StringComparison.Ordinal)).Bytes.AsSpan());
         java.ShouldContain("import sample.orders.events." + name + ";");
-        java.ShouldContain("if (event instanceof " + name + " fact)");
+        java.ShouldContain("public void on(" + name + " event)");
         java.ShouldContain(expected);
     }
 }

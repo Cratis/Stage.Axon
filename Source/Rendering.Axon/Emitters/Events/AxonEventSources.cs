@@ -32,7 +32,7 @@ internal static class AxonEventSources
         var addPrimary = !contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName);
         var primaryType = addPrimary ? code.Reference(primary.JavaType) : string.Empty;
         foreach (var property in contract.Properties) JavaSemanticTypes.Claim(context, property.Type, code, package);
-        var parameters = contract.Properties.Select(property => Component(context, property, (primary.ComponentName, tag), code)).ToList();
+        var parameters = contract.Properties.Select(property => Component(context, contract, property, (primary.ComponentName, tag), code, package)).ToList();
         if (addPrimary)
             parameters.Insert(0, $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {tag}) {primaryType} {primary.ComponentName}");
         var extraTags = contract.Tags.Concat(contract.Properties.Where(property => property.IsIdentifier).Select(property => property.Name))
@@ -46,7 +46,12 @@ internal static class AxonEventSources
             code.DiffersFromScreenplay("Only the primary event-source component is tagged; extra model tags are omitted.")
                 .UnsupportedIntent(intent, path, diagnostic);
         }
-        return code.Line(annotation(code)).Line($"public record {JavaNames.Type(contract.Name)}({string.Join(", ", parameters)}) {{}}").Build();
+        var members = EventTagsEmitter.ConstraintMembers(context, contract, code, package);
+        var declaration = $"public record {JavaNames.Type(contract.Name)}({string.Join(", ", parameters)})";
+        code.Line(annotation(code));
+        if (members.Count == 0) code.Line(declaration + " {}");
+        else code.Block(declaration, body => { foreach (var member in members) body.Line(member); });
+        return code.Build();
     }
 
     static SemanticConcept? FromProducer(AxonEmissionContext context, SemanticCommand command, SemanticProducedEvent produced) =>
@@ -72,10 +77,11 @@ internal static class AxonEventSources
         return (name, context.BasePackage + ".concepts." + JavaNames.Type(concept.Name), name);
     }
 
-    static string Component(AxonEmissionContext context, SemanticProperty property, (string ComponentName, string Reference) primary, JavaCodeBuilder code)
+    static string Component(AxonEmissionContext context, SemanticEventContract contract, SemanticProperty property, (string ComponentName, string Reference) primary, JavaCodeBuilder code, string package)
     {
         var name = JavaNames.Member(property.Name);
         var tag = name == primary.ComponentName ? $"@{code.Reference("org.axonframework.eventsourcing.annotation.EventTag")}(key = {primary.Reference}) " : string.Empty;
+        tag += EventTagsEmitter.ConstraintTags(context, contract, property, code, package);
         var json = JavaJsonNames.Annotation(property.Name, code);
         return tag + $"{json}{JavaSemanticTypes.TypeFor(context, property.Type, code)} {name}";
     }

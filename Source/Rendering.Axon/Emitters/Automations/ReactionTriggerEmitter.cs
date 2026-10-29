@@ -76,7 +76,7 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
     PreparedReactionTrigger? PrepareDeclarative(SemanticReactionTrigger trigger, int index, string annotation, ReactionInput input)
     {
         var production = trigger.Produces.IsEmpty ? null : new ReactionProductionPreparation(context, trigger.Produces[0], input).Prepare(JavaNames.Type(reaction.Name) + "On" + index + "Append");
-        var invocation = trigger.Invokes.IsEmpty ? production?.Invocation : ReactionInvocation.Render(context, trigger.Invokes[0], input);
+        var invocation = trigger.Invokes.IsEmpty ? production?.Invocation(input.Event is not null) : ReactionInvocation.Render(context, trigger.Invokes[0], input);
         if (invocation is null) return null;
         return WithGuard(trigger, new(annotation, input, invocation, null) { Production = production });
     }
@@ -99,7 +99,7 @@ internal sealed class ReactionTriggerEmitter(AxonEmissionContext context, Semant
         }
 
         var withMetadata = http || reaction.RunsAs is not null;
-        var invocation = ReactionJavaReferences.Expression(method, withMetadata && trigger.Production is { } production ? production.InvocationWithMetadata : trigger.Invocation);
+        var invocation = ReactionJavaReferences.Expression(method, withMetadata && trigger.Production is { } production ? production.InvocationWithMetadata(handler) : trigger.Invocation);
         ReactionInvocation.Dispatch(method, reaction, ReactionJavaReferences.Expression(method, trigger.Production is null ? ReactionInvocation.Statement(invocation, handler, withMetadata) : invocation), http);
     }
 

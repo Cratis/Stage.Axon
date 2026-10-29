@@ -13,5 +13,5 @@ public class when_a_native_handler_has_an_unsupported_constraint : when_a_native
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void should_fail_closed_without_consuming_the_body(bool strict) => AssertRefused(strict, "enforce or release modeled uniqueness in the append unit of work");
+    public void should_render_the_body_without_the_check_and_report_the_difference(bool strict) => AssertDegraded(strict, "enforce constraint CustomerUnique");
 }

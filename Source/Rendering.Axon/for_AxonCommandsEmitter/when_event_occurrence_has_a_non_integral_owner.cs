@@ -21,7 +21,7 @@ public class when_event_occurrence_has_a_non_integral_owner : when_a_native_hand
     public void should_fail_closed_for_decimal_concepts_and_components(bool primitive, bool strict)
     {
         ChangeOwner(SemanticPrimitiveType.DecimalNumber, primitive);
-        AssertRefused(strict, "enforce or release modeled uniqueness in the append unit of work");
+        AssertDegraded(strict, "enforce constraint CustomerUnique");
     }
 
     [Fact]

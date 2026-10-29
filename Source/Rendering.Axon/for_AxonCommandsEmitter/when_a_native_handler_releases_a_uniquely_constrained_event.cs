@@ -12,5 +12,5 @@ public class when_a_native_handler_releases_a_uniquely_constrained_event : when_
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void should_enforce_release_only_appends_in_a_private_body(bool strict) => AssertEnforced(strict);
+    public void should_not_inject_the_entity_for_release_only_appends(bool strict) => AssertEnforced(strict, injected: false);
 }
