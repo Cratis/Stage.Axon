@@ -5,23 +5,25 @@ description: Check semantic coverage, deterministic output, and native specifica
 
 Preview: the conformance API may change ([conformance README](../../Source/Rendering.Conformance/README.md)).
 
-A generated application can compile while silently omitting a modeled rule or specification. Use `Cratis.Stage.Rendering.Conformance` to find those omissions without coupling your renderer to the Cratis target.
+A generated application can compile while silently omitting a modeled rule or specification. To check your first target integration, account for the model in the render plan, compare repeated plans, and correlate the generated tests with their native results. Use `Cratis.Stage.Rendering.Conformance` for these checks; it does not depend on the Cratis renderer.
 
-Start with [Build a renderer target](https://github.com/Cratis/Stage/blob/v4.197.0/Documentation/guides/build-renderer-target.md), the Stage version matching the pinned Contracts, for compilation, profiles, scopes, and publication. This guide assumes you already have an `IArtifactRenderPlanner`, an admitted `ArtifactRenderRequest`, and a native test runner for the generated application.
+This guide is for renderer authors who already have an `IArtifactRenderPlanner`, an admitted `ArtifactRenderRequest`, and a native test runner for the generated application. If you still need compilation, profiles, scopes, or publication, start with [Build a renderer target](https://github.com/Cratis/Stage/blob/348e72fd017e654f13e28d80aab06700cac316c2/Documentation/guides/build-renderer-target.md).
+
+Use an application-scoped request for the first integration: `SpecificationCoverage` checks the whole model, so a passing slice-only test run is not enough. The minimal target below shows the two planner checks before you connect your own native test results.
 
 ## Account for every semantic identity
 
-`Cratis.Stage.Rendering.Conformance` is a preview API; this repository has no package publication configured. Registry availability has not been verified. It depends directly on `Cratis.Stage.Contracts` and transitively on Screenplay, not on a particular renderer or generated runtime. Consume it from a pinned checkout:
+`Cratis.Stage.Rendering.Conformance` is a preview API; the Conformance helper is not configured for publication in this repository. Registry availability has not been verified. It depends directly on `Cratis.Stage.Contracts` and transitively on Screenplay, not on a particular renderer or generated runtime. Consume it from a pinned checkout:
 
 1. Install the .NET 10 SDK and target `net10.0` in your verification project.
 2. Add Stage.Axon as a submodule: `git submodule add https://github.com/Cratis/Stage.Axon external/Stage.Axon`. Check out a specific commit with `git -C external/Stage.Axon checkout <sha>` and commit the submodule pointer. A clone pinned to the same SHA also works. Pin a SHA, not a branch, because Conformance is a preview API.
-3. Match the Contracts version in that checkout's `Directory.Packages.props` (currently `4.197.0`). Without central package management, add:
+3. Match the Contracts version in that checkout's `Directory.Packages.props` (currently `4.205.0`). Without central package management, add:
 
    ```xml
-   <PackageReference Include="Cratis.Stage.Contracts" Version="4.197.0" />
+   <PackageReference Include="Cratis.Stage.Contracts" Version="4.205.0" />
    ```
 
-   With central package management, put `<PackageVersion Include="Cratis.Stage.Contracts" Version="4.197.0" />` in your `Directory.Packages.props` and omit the version from the package reference. Compatibility with a higher Contracts version is not verified.
+   With central package management, put `<PackageVersion Include="Cratis.Stage.Contracts" Version="4.205.0" />` in your `Directory.Packages.props` and omit the version from the package reference. Compatibility with a higher Contracts version is not verified.
 4. Reference Conformance in Release, adjusting the relative path for your project:
 
    ```xml
@@ -126,11 +128,13 @@ static void CheckApplication(
 
 `SpecificationCoverage` checks all modeled specifications, not just a selected render scope. Every enabled specification needs exactly one passing correlated result. Missing, duplicate, failed, errored, and skipped enabled tests are violations. A registered disabled entry is accounted for, **never counted as a pass**. Inspect disabled entries separately before accepting a target for your application.
 
+If you get `STAGE-CONF-005`, use the issue's semantic identity to check the manifest row first, then the corresponding native result. A missing manifest row and a missing enabled result both use this code. Do not treat a green native run as a substitute for the missing entry. The [conformance README](../../Source/Rendering.Conformance/README.md) lists the other coverage codes.
+
+For another target, this is the handoff: keep all three checks in its verification harness and inspect registered disabled entries before accepting the generated application. The Axon walkthrough below shows the same integration with Maven; its profiles and Java body rules are not requirements on your target.
+
 ## Worked example: Axon
 
 The experimental Axon target emits Java records, Spring components, Axon command handlers, and JUnit tests. Create its profile through `AxonRendering.CreateProfile()` and plan through `AxonArtifactRenderPlanner`; do not depend on its internal emitters as extension APIs.
-
-Generated files have no license header by default. To supply your own header for Java sources and tests, use `AxonRendering.CreateProfile(fileHeader: ["Copyright (c) Example", "All rights reserved."])`. Each plain-text line becomes a `//` comment, followed by a blank line. Header lines must be non-null and contain no line breaks or `\u` sequences (Java reads Unicode escapes inside comments). Resources and build files do not receive this optional header; the header is part of the hashed render profile.
 
 Hosts such as the CLI call `AxonRendering.Plan(AxonRenderRequest)` with `AxonRenderOptions`. `JavaPackage` sets the Java base package and Maven groupId, with each segment normalized and framework roots refused; `ProjectName` sets the Maven artifactId. `NewestAdmittedSemanticVersion` declares the ESM admission ceiling and `IsMeasured` identifies measured language and semantic version pairs. `Version` is the package version without build metadata.
 
@@ -138,15 +142,17 @@ Generated applications use `org.axonframework.extensions.spring:axon-spring-boot
 
 Axon uses warning-based degradation by default: unsupported constructs produce intent comments and `UNSUPPORTED.md` entries, with stubs or omitted behavior. Dependent modeled tests are explicitly disabled and listed in `stage-specifications.txt`. `AxonRendering.CreateProfile(strict: true)` makes unsupported constructs errors and refusals instead. A successful default-mode plan therefore requires inspection of its diagnostics and disabled specifications.
 
+Apps rendered by an unreleased local renderer pin a runtime version that is not on Maven Central yet. Install `Source/Runtime` first with `sh ./mvnw -Drevision=<renderer version> install` from that directory.
+
 For an emitted Maven application, run its wrapper from the output directory:
 
 ```bash
 sh mvnw -B verify
 ```
 
-Apps rendered by an unreleased local renderer pin a runtime version that is not on Maven Central yet. Install `Source/Runtime` first with `sh ./mvnw -Drevision=<renderer version> install` from that directory.
-
 Then pass `target/surefire-reports` to the native-result check. A green Maven run alone does not prove that every modeled specification ran; the manifest correlation detects missing coverage.
+
+Generated files have no license header by default. To supply your own header for Java sources and tests, use `AxonRendering.CreateProfile(fileHeader: ["Copyright (c) Example", "All rights reserved."])`. Each plain-text line becomes a `//` comment, followed by a blank line. Header lines must be non-null and contain no line breaks or `\u` sequences (Java reads Unicode escapes inside comments). Resources and build files do not receive this optional header; the header is part of the hashed render profile.
 
 ### Current profile guarantees
 
