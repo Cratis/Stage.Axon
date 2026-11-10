@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <!-- Published library: net10.0 and net11.0. Debug (inline specs) runs on net11.0 only. -->
+        <TargetFramework></TargetFramework>
+        <TargetFrameworks Condition="'$(Configuration)' == 'Release'">net10.0;net11.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(Configuration)' != 'Release'">net11.0</TargetFrameworks>
         <IsPackable>true</IsPackable>
         <!-- Override the inherited source default; a command-line -p:Version still takes precedence. -->
         <Version>0.0.0-local</Version>

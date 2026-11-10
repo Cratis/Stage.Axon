@@ -13,7 +13,7 @@ Start with [Build a renderer target](https://github.com/Cratis/Stage/blob/v4.197
 
 `Cratis.Stage.Rendering.Conformance` is a preview API; this repository has no package publication configured. Registry availability has not been verified. It depends directly on `Cratis.Stage.Contracts` and transitively on Screenplay, not on a particular renderer or generated runtime. Consume it from a pinned checkout:
 
-1. Install the .NET 10 SDK and target `net10.0` in your verification project.
+1. Install the .NET 11 SDK and target `net11.0` in your verification project.
 2. Add Stage.Axon as a submodule: `git submodule add https://github.com/Cratis/Stage.Axon external/Stage.Axon`. Check out a specific commit with `git -C external/Stage.Axon checkout <sha>` and commit the submodule pointer. A clone pinned to the same SHA also works. Pin a SHA, not a branch, because Conformance is a preview API.
 3. Match the Contracts version in that checkout's `Directory.Packages.props` (currently `4.197.0`). Without central package management, add:
 

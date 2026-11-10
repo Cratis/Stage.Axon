@@ -24,7 +24,7 @@ jobs:
         run: node .github/scripts/package-allowlist.mjs
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - name: Build Release with warnings as errors
         run: dotnet build Stage.Axon.slnx -c Release -warnaserror
       - name: Guard packable projects against Screenplay.Generation (Release graph)
@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

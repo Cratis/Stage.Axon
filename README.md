@@ -10,7 +10,7 @@ The renderer ships as the experimental NuGet package `Cratis.Stage.Rendering.Axo
 
 ## Build and specs
 
-Requires .NET 10. Run from this directory:
+Requires .NET 11. Run from this directory:
 
 ```sh
 dotnet build Stage.Axon.slnx -c Release -warnaserror
