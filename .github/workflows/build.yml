@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           for project in Rendering.Axon Rendering.Axon.Verification Rendering.Conformance.Specs Samples.MinimalTarget; do
             results="$RUNNER_TEMP/axon-results/$project"
-            dotnet test "Source/$project/$project.csproj" -c Debug --no-build --logger 'trx;LogFileName=specs.trx' --results-directory "$results"
+            dotnet test "Source/$project/$project.csproj" -c Debug --framework net11.0 --no-build --logger 'trx;LogFileName=specs.trx' --results-directory "$results"
             python3 .github/spec-shards.py require-executed "$results/specs.trx"
           done
       - name: Preserve specification reports
