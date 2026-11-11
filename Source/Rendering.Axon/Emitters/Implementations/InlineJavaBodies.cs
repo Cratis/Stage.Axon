@@ -83,6 +83,10 @@ internal static class InlineJavaBodies
     static string ForeignLanguage(string language) =>
         $"The Axon target only realizes Java bodies; language '{language}' is not supported. Supply the body in Java (or render it with a target that realizes this language) and render again.";
 
+    // Screenplay 6 stamps an observable collection query performer with result version 2 (an Rx stream); the Axon slot still takes the same list-returning Java body, re-run on every live emission.
+    static uint ExpectedResultVersion(SemanticImplementationRequirement requirement) =>
+        requirement.Role == SemanticImplementationRole.QueryPerformer && requirement.QueryShape?.Delivery == SemanticQueryDelivery.Live ? 2u : 1u;
+
     static string ContractReason(SemanticImplementationRequirement requirement, SemanticImplementationRole role, SemanticId owner, SemanticKind ownerKind)
     {
         (bool Invalid, string Reason)[] checks =
@@ -92,7 +96,7 @@ internal static class InlineJavaBodies
             (requirement.Language is null, "The implementation language is unknown. Supply the body in Java and render again."),
             (requirement.Language != "java", ForeignLanguage(requirement.Language!)),
             (requirement.File is not null, "File-backed implementations have no supported native body slot."),
-            (requirement.ContextVersion != 1 || requirement.ResultVersion != 1, "The implementation context or result contract revision is unsupported."),
+            (requirement.ContextVersion != 1 || requirement.ResultVersion != ExpectedResultVersion(requirement), "The implementation context or result contract revision is unsupported."),
             (requirement.IsAmbiguous || requirement.IsProvisional, "Ambiguous or provisional implementation identities cannot be placed."),
             (requirement.AttachmentResolution != SemanticAttachmentResolution.Resolved, "The implementation attachment has not been resolved."),
             (requirement.RequiredCapability != (role is SemanticImplementationRole.ReducerTransition or SemanticImplementationRole.PolicyPredicate ? "pure" : "provider-defined"), "The implementation capability is not supported by this native body slot.")
