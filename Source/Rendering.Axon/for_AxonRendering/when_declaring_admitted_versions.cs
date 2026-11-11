@@ -14,7 +14,7 @@ public class when_declaring_admitted_versions : Specification
 
     void Because() => _newest = AxonRendering.NewestAdmittedSemanticVersion;
 
-    [Fact] void should_declare_v34() => _newest.ShouldEqual(SemanticVersion.V34);
+    [Fact] void should_declare_v41() => _newest.ShouldEqual(SemanticVersion.V41);
 
     [Fact]
     void should_require_review_on_a_screenplay_version_bump() => _newest.ShouldEqual(typeof(SemanticVersion)

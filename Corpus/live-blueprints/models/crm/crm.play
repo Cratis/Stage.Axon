@@ -70,22 +70,22 @@ persona SalesRep
 layout AppShell
   category Shell
   topbar
-  navigation contributes Navigation
+  outlet Navigation of navigation in navigation
   content
   footer
 
-  navigation topbar
+  outlet topbar of navigation
     logo image "/assets/crm.svg" title "CRM"
-    item crm title "CRM" target Crm
-  navigation sidebar
-    item dashboard title "Dashboard" icon home target Crm.Dashboard
-    item leads title "Leads" icon user-plus target Crm.Leads
-    item contacts title "Contacts" icon users target Crm.Contacts
-    item companies title "Companies" icon building target Crm.Companies
-    item deals title "Deals" icon dollar target Crm.Deals
+    default crm title "CRM" target Crm
+  outlet sidebar of navigation
+    default dashboard title "Dashboard" icon home target Crm.Dashboard
+    default leads title "Leads" icon user-plus target Crm.Leads
+    default contacts title "Contacts" icon users target Crm.Contacts
+    default companies title "Companies" icon building target Crm.Companies
+    default deals title "Deals" icon dollar target Crm.Deals
       item pipeline title "Pipeline" target Crm.Deals
       item list title "List" target Crm.Deals.DealList
-    item activities title "Activities" icon calendar target Crm.Activities
+    default activities title "Activities" icon calendar target Crm.Activities
 
   arrangement flow
     column

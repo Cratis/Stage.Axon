@@ -50,18 +50,18 @@ persona Employee
 layout AppShell
   category Shell
   topbar
-  navigation contributes Navigation
+  outlet Navigation of navigation in navigation
   content
   footer
 
-  navigation topbar
+  outlet topbar of navigation
     logo image "/assets/approvals.svg" title "Approvals"
-    item approvals title "Approvals" target Approvals
-  navigation sidebar
-    item inbox title "Inbox" icon inbox target Approvals.Inbox
-    item requests title "My requests" icon file target Approvals.Requests
-    item all title "All requests" icon list target Approvals.All
-    item templates title "Templates" icon cog target Approvals.Templates
+    default approvals title "Approvals" target Approvals
+  outlet sidebar of navigation
+    default inbox title "Inbox" icon inbox target Approvals.Inbox
+    default requests title "My requests" icon file target Approvals.Requests
+    default all title "All requests" icon list target Approvals.All
+    default templates title "Templates" icon cog target Approvals.Templates
 
   arrangement flow
     column

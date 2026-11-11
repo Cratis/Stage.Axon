@@ -6,7 +6,7 @@ concept WorkStatus : Enum
 
 layout AppShell
   topbar
-  navigation contributes Navigation
+  outlet Navigation of navigation in navigation
   content
 
   arrangement flow

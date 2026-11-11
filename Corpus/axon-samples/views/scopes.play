@@ -133,8 +133,14 @@ module Scopes
           name = "Board"
           source = "b1"
           changes = 2
-          details = {"note":"created","count":1}
-          cards = [{"cardId":"c1","title":"Renamed","changes":2}]
+          details
+            note = "created"
+            count = 1
+          cards
+            item
+              cardId = "c1"
+              title = "Renamed"
+              changes = 2
 
       specification ChildAndJoinBeforeParent
         given CardRenamed
@@ -152,7 +158,11 @@ module Scopes
           name = "Deferred"
         then readmodel Board
           boardId = "b2"
-          cards = [{"cardId":"c2","title":"Latest","changes":1}]
+          cards
+            item
+              cardId = "c2"
+              title = "Latest"
+              changes = 1
           changes = 2
 
       specification RemovingTheChild
@@ -171,7 +181,7 @@ module Scopes
           cardId = "c3"
         then readmodel Board
           boardId = "b3"
-          cards = []
+          cards none
           changes = 3
 
       specification RemovingTheRoot
@@ -211,5 +221,5 @@ module Scopes
           cardId = "c6"
         then readmodel Board
           boardId = "b6"
-          cards = []
+          cards none
           changes = 2
