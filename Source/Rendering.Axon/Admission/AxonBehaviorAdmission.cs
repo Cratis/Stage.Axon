@@ -36,8 +36,25 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
 
     internal static bool DeclaresRefusalBranches(SemanticInvocation invocation) => !invocation.OnRefused.IsDefaultOrEmpty;
 
+    // A default (uninitialized) ImmutableArray throws when enumerated; treat it as empty.
+    internal static List<object?> Items(System.Collections.IEnumerable items)
+    {
+        var list = new List<object?>();
+        try
+        {
+            foreach (var item in items) list.Add(item);
+        }
+        catch (InvalidOperationException)
+        {
+            list.Clear();
+        }
+
+        return list;
+    }
+
     internal static IReadOnlyList<AxonBehaviorDecision> Classify(ArtifactRenderRequest request) =>
         [.. InScope(request, ConceptDecisions(request.Model.Application, AxonNamesInput.BasePackage(request)).Concat(ImplementationDecisions(request)).Concat(ScopeSelection.Select(request).SelectMany(located => SliceDecisions(Package(request, located), located.Slice))))
+            .Concat(AxonUnsupportedSemantics.Decisions(request, AxonNamesInput.BasePackage(request)))
             .DistinctBy(decision => (decision.Code, decision.Owner, decision.ModelPath))];
 
     internal static IEnumerable<AxonBehaviorDecision> ConceptDecisions(SemanticApplication application, string basePackage)
@@ -146,22 +163,6 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
         var owners = new HashSet<SemanticId>(request.Model.Application.Concepts.Select(concept => concept.Id));
         foreach (var located in ScopeSelection.Select(request)) Collect(located.Slice, owners, []);
         return decisions.Where(decision => owners.Contains(decision.Owner));
-    }
-
-    // A default (uninitialized) ImmutableArray throws when enumerated; treat it as empty.
-    static List<object?> Items(System.Collections.IEnumerable items)
-    {
-        var list = new List<object?>();
-        try
-        {
-            foreach (var item in items) list.Add(item);
-        }
-        catch (InvalidOperationException)
-        {
-            list.Clear();
-        }
-
-        return list;
     }
 
     static void Collect(object? node, HashSet<SemanticId> ids, HashSet<object> seen)

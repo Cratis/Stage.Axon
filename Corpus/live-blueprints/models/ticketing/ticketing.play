@@ -59,21 +59,21 @@ persona Agent
 layout AppShell
   category Shell
   topbar
-  navigation contributes Navigation
+  outlet Navigation of navigation in navigation
   content
   footer
 
-  navigation topbar
+  outlet topbar of navigation
     logo image "/assets/support.svg" title "Support"
-    item support title "Support" target Support
-  navigation sidebar
-    item dashboard title "Dashboard" icon home target Support.Dashboard
-    item queue title "Queue" icon inbox target Support.Queue
+    default support title "Support" target Support
+  outlet sidebar of navigation
+    default dashboard title "Dashboard" icon home target Support.Dashboard
+    default queue title "Queue" icon inbox target Support.Queue
       item list title "List" target Support.Queue
       item board title "Board" target Support.Queue.Board
-    item mine title "My tickets" icon user target Support.Mine
-    item customers title "Customers" icon users target Support.Customers
-    item knowledge title "Knowledge base" icon book target Support.Knowledge
+    default mine title "My tickets" icon user target Support.Mine
+    default customers title "Customers" icon users target Support.Customers
+    default knowledge title "Knowledge base" icon book target Support.Knowledge
 
   arrangement flow
     column

@@ -1,6 +1,6 @@
 # Corpus mapping
 
-Vendored Screenplay models for the verification corpus, and where each one comes from. `Cratis.Screenplay.CanonicalCorpus` is pinned to **4.241.0**. Version 4.250.0 adds no coverage (the only new resources, `AttachedCommandHandlers/{file,inline}.play`, match no vendored model), so the pin stays.
+Vendored Screenplay models for the verification corpus, and where each one comes from. `Cratis.Screenplay.CanonicalCorpus` is pinned to **6.0.0**, following `ScreenplayVersion`; the six Tracking documents and their pinned hashes are unchanged in 6.0.0.
 
 ## Sourced from the package
 

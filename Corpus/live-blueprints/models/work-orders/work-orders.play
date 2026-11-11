@@ -31,17 +31,17 @@ persona Technician
 layout AppShell
   category Shell
   topbar
-  navigation contributes Navigation
+  outlet Navigation of navigation in navigation
   content
   footer
 
-  navigation topbar
+  outlet topbar of navigation
     logo image "/assets/work-orders.svg" title "Work orders"
-    item workOrders title "Work orders" target WorkOrders
-  navigation sidebar
-    item workOrders title "Work orders" icon folder target WorkOrders.WorkOrders
-    item board title "Board" icon columns target WorkOrders.Board
-    item schedule title "Schedule" icon calendar target WorkOrders.Schedule
+    default workOrders title "Work orders" target WorkOrders
+  outlet sidebar of navigation
+    default workOrders title "Work orders" icon folder target WorkOrders.WorkOrders
+    default board title "Board" icon columns target WorkOrders.Board
+    default schedule title "Schedule" icon calendar target WorkOrders.Schedule
 
   arrangement flow
     column

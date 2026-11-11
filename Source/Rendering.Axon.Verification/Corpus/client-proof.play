@@ -204,9 +204,13 @@ module Work
         given ContactRecorded
           for "writer@example.test"
           email = "writer@example.test"
-          details = {"email":"writer@example.test","title":"Valid"}
+          details
+            email = "writer@example.test"
+            title = "Valid"
           state = "open"
         then readmodel WorkItemContacts
           email = "writer@example.test"
-          details = {"email":"writer@example.test","title":"Valid"}
+          details
+            email = "writer@example.test"
+            title = "Valid"
           state = "open"

@@ -97,4 +97,5 @@ module Views
           name = "global"
         then readmodel ContextTotal
           name = "global"
-          details = { "note": "increased" }
+          details
+            note = "increased"

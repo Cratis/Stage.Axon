@@ -11,7 +11,7 @@ public class when_verifying_ignored_members
     static readonly string[] Advisory =
     [
         "AffectedInstanceCardinality.Many", "AffectedInstanceCardinality.One", "AffectedInstanceCardinality.ZeroOrOne",
-        "SemanticAffectedInstance.Cardinality", "SemanticProjection.Target", "SemanticReducer.Name"
+        "SemanticAffectedInstance.Cardinality", "SemanticProjection.Target", "SemanticReadModel.PropertyOrder", "SemanticReducer.Name"
     ];
 
     [Fact]
