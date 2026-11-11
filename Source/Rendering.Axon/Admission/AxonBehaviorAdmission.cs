@@ -38,6 +38,7 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
 
     internal static IReadOnlyList<AxonBehaviorDecision> Classify(ArtifactRenderRequest request) =>
         [.. InScope(request, ConceptDecisions(request.Model.Application, AxonNamesInput.BasePackage(request)).Concat(ImplementationDecisions(request)).Concat(ScopeSelection.Select(request).SelectMany(located => SliceDecisions(Package(request, located), located.Slice))))
+            .Concat(AxonUnsupportedSemantics.Decisions(request, AxonNamesInput.BasePackage(request)))
             .DistinctBy(decision => (decision.Code, decision.Owner, decision.ModelPath))];
 
     internal static IEnumerable<AxonBehaviorDecision> ConceptDecisions(SemanticApplication application, string basePackage)
@@ -149,7 +150,7 @@ internal sealed class AxonBehaviorAdmission : IAxonEmitter
     }
 
     // A default (uninitialized) ImmutableArray throws when enumerated; treat it as empty.
-    static List<object?> Items(System.Collections.IEnumerable items)
+    internal static List<object?> Items(System.Collections.IEnumerable items)
     {
         var list = new List<object?>();
         try
