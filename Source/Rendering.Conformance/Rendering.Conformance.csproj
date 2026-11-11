@@ -9,6 +9,7 @@
         <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
     </PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="Cratis.Screenplay" VersionOverride="6.20.1" />
         <PackageReference Include="Cratis.Stage.Contracts" />
         <InternalsVisibleTo Include="Cratis.Stage.Rendering.Conformance.Specs" />
     </ItemGroup>
