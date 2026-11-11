@@ -73,7 +73,7 @@ internal static class AxonUnsupportedSemantics
             SemanticConditionOperand { DateOf: true } => "date-only operand",
             SemanticCommandCalendar => "command calendar",
             SemanticCommandHandler { PossibleEvents.IsDefaultOrEmpty: false } => "possible events",
-            SemanticSpecification { GivenTimeZone: { Length: > 0 } } => "specification time zone",
+            SemanticSpecification { GivenTimeZone.Length: > 0 } => "specification time zone",
             _ => null
         };
         if (own is not null) yield return own;
