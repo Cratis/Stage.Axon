@@ -73,4 +73,6 @@ module Metrics
         given MetricRemoved
           region = "west"
           month = 2
-        then no readmodel Metric for {"region":"west","month":2}
+        then no readmodel Metric for
+          region = "west"
+          month = 2

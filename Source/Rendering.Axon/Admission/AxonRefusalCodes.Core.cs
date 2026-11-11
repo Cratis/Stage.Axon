@@ -15,4 +15,5 @@ internal static partial class AxonRefusalCodes
     internal const string RefusalMode = "STAGE-AXON-REFUSAL-MODE";
     internal const string Implementation = "STAGE-AXON-IMPL";
     internal const string Evolution = "STAGE-AXON-EVOLUTION";
+    internal const string UnsupportedSemantics = "STAGE-AXON-UNSUPPORTED-SEMANTICS";
 }

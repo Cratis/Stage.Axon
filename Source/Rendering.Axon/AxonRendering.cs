@@ -32,7 +32,7 @@ public static class AxonRendering
     /// Gets the newest ESM semantic version Axon admits. Every semantic version up to this one is admitted.
     /// Unmeasured pairs plan with a STAGE-AXON-VERSION warning, or a refusal in strict mode.
     /// </summary>
-    public static SemanticVersion NewestAdmittedSemanticVersion => SemanticVersion.V34;
+    public static SemanticVersion NewestAdmittedSemanticVersion => SemanticVersion.V41;
 
     /// <summary>
     /// Determines whether the language and semantic version pair has been measured by Axon.

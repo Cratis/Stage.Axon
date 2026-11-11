@@ -37,7 +37,9 @@ public class when_resolving_a_java_body : a_view_request
 
     [Fact] void should_reject_a_stale_hash() => Resolve(requirement with { ContentHash = "stale" }).ShouldBeFalse();
     [Fact] void should_reject_an_unknown_context() => Resolve(requirement with { ContextVersion = 2 }).ShouldBeFalse();
-    [Fact] void should_reject_an_unknown_result() => Resolve(requirement with { ResultVersion = 2 }).ShouldBeFalse();
+    [Fact] void should_reject_an_unknown_result() => Resolve(requirement with { ResultVersion = 3 }).ShouldBeFalse();
+    [Fact] void should_reject_a_live_result_version_on_a_snapshot_query() => Resolve(requirement with { ResultVersion = 2, QueryShape = requirement.QueryShape! with { Delivery = SemanticQueryDelivery.Snapshot } }).ShouldBeFalse();
+    [Fact] void should_accept_the_live_result_version_on_an_observable_query() => Resolve(requirement with { ResultVersion = 2, QueryShape = requirement.QueryShape! with { Delivery = SemanticQueryDelivery.Live } }).ShouldBeTrue();
     [Fact] void should_reject_another_language() => Resolve(requirement with { Language = "csharp" }).ShouldBeFalse();
     [Fact] void should_require_the_exact_registered_language() => Resolve(requirement with { Language = "Java" }).ShouldBeFalse();
     [Fact] void should_reject_file_attachments() => Resolve(requirement with { File = "performer.java" }).ShouldBeFalse();
