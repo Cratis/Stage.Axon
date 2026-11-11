@@ -39,6 +39,9 @@ internal static class AxonUnsupportedSemantics
             ("graph query", application.GraphQueries)
         };
 
+        if (application.TimeZone is { } zone) yield return Decision(package, application.Id, $"{application.Id}/unsupported/time zone", $"application time zone {zone.Id}");
+        if (!application.ContextMembers.IsDefaultOrEmpty) yield return Decision(package, application.Id, $"{application.Id}/unsupported/context members", "application context members");
+
         foreach (var (label, items) in groups)
         {
             foreach (var item in AxonBehaviorAdmission.Items(items))
@@ -67,6 +70,7 @@ internal static class AxonUnsupportedSemantics
         {
             SemanticOneOfExpression => "one-of expression",
             SemanticClockOperand => "clock operand",
+            SemanticConditionOperand { DateOf: true } => "date-only operand",
             SemanticCommandCalendar => "command calendar",
             SemanticCommandHandler { PossibleEvents.IsDefaultOrEmpty: false } => "possible events",
             SemanticSpecification { GivenTimeZone: { Length: > 0 } } => "specification time zone",

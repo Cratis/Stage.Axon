@@ -40,6 +40,7 @@ module Home
         title "Welcome"
 
 module Sales
+  // Screenplay 6 needs a form and screen action for PlaceOrder; together they keep the former "New order" flow.
   form PlaceOrderForm for PlaceOrder
     field orderId
     field customer
