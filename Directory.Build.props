@@ -2,7 +2,7 @@
     <PropertyGroup>
         <ImplicitUsings>true</ImplicitUsings>
         <TargetFramework>net11.0</TargetFramework>
-        <LangVersion>14.0</LangVersion>
+        <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
 
         <!-- Projects opt in to packing; only the allowlist in .github/scripts/package-allowlist.mjs may (Stage.Axon#39). -->
