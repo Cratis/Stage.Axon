@@ -7,6 +7,7 @@ using Cratis.Stage.Rendering.Axon.Emitters;
 using Cratis.Stage.Rendering.Axon.Emitters.Projections;
 using Cratis.Stage.Rendering.Axon.Emitters.Queries;
 using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
+using Cratis.Stage.Rendering.Axon.Emitters.Security;
 using Cratis.Stage.Rendering.Axon.Emitters.Specifications;
 using Cratis.Stage.Rendering.Axon.Java;
 using Cratis.Stage.Rendering.Axon.Sdk;
@@ -19,7 +20,7 @@ internal sealed class AxonViewHttpSpecs(AxonEmissionContext context, ViewJavaTyp
     {
         if (!Supports(specification)) return;
         var candidates = ScopeSelection.Select(context.Request).SelectMany(owner => owner.Slice.Queries
-            .Where(query => query.ReadModel == model.Id && query.Delivery != SemanticQueryDelivery.Live && query.Cardinality == SemanticQueryCardinality.Many && query.Authorization is null)
+            .Where(query => query.ReadModel == model.Id && query.Delivery != SemanticQueryDelivery.Live && query.Cardinality == SemanticQueryCardinality.Many && query.Authorization is null && SecurityAnnotations.UnsupportedReason(context, query.Authorization, query.Id) is null)
             .Select(query => (Owner: owner, Query: query)));
         var candidate = candidates.FirstOrDefault(entry => !QueryPerformer.Required(context, entry.Query) && !new QueryShape(entry.Query, model, types).Arguments.Any());
         if (candidate.Query is null) return;

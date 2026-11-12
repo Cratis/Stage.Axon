@@ -1,6 +1,6 @@
 # Corpus mapping
 
-Vendored Screenplay models for the verification corpus, and where each one comes from. `Cratis.Screenplay.CanonicalCorpus` is pinned to **6.0.0**, following `ScreenplayVersion`; the six Tracking documents and their pinned hashes are unchanged in 6.0.0.
+Vendored Screenplay models for the verification corpus, and where each one comes from. `Cratis.Screenplay.CanonicalCorpus` is pinned to **6.22.0**, following `ScreenplayVersion`; the six Tracking documents and their pinned hashes are unchanged.
 
 ## Sourced from the package
 

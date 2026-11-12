@@ -64,6 +64,7 @@ internal static class AxonHttpCardinalityTests
 
     static bool Supported(AxonEmissionContext context, SemanticKeyedQuery query) =>
         query.Cardinality == SemanticQueryCardinality.ZeroOrOne && !QueryPerformer.Required(context, query) &&
+        SecurityAnnotations.UnsupportedReason(context, query.Authorization, query.Id) is null &&
         RoleCallerSupported(context, query.Authorization) &&
         ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.ReadModels)
             .Any(model => model.Id == query.ReadModel && !ReadModelKeys.IsComposite(context.Request.Model.Application, model));

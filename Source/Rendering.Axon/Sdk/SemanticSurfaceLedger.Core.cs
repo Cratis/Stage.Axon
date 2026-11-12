@@ -29,6 +29,7 @@ internal static partial class SemanticSurfaceLedger
         ClassifySecurity(rows);
         ClassifySpecifications(rows);
         ClassifyScreenplaySix(rows);
+        ClassifyStageEleven(rows);
         return rows;
     }
 

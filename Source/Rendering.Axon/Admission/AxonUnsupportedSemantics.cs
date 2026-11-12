@@ -7,7 +7,7 @@ using Cratis.Stage.Rendering.Axon.Sdk;
 
 namespace Cratis.Stage.Rendering.Axon.Admission;
 
-/// <summary>Reports Screenplay 6 constructs no Axon emitter reads (state machines, workflows, graph, clock and calendar operands, one-of expressions, possible events, time zones) so none is dropped silently.</summary>
+/// <summary>Reports Screenplay 6 constructs no Axon emitter reads (state machines, workflows, graph, clock and calendar operands, one-of expressions, possible events, time zones, screens, agents, systems/abilities, projection ordering/set-once, caller identity and text comparisons), plus policy row narrowing, so none is dropped silently.</summary>
 internal static class AxonUnsupportedSemantics
 {
     internal static IEnumerable<AxonBehaviorDecision> Decisions(ArtifactRenderRequest request, string basePackage) =>
@@ -20,6 +20,7 @@ internal static class AxonUnsupportedSemantics
         foreach (var located in selected)
         {
             var package = basePackage + "." + Java.JavaNames.PackageSegment(located.Module.Name);
+            foreach (var query in located.Slice.Queries.Where(query => query.Narrowing is not null)) yield return Narrowing(package, query);
             foreach (var label in SliceConstructs(located.Slice, []).Distinct(StringComparer.Ordinal))
             {
                 yield return Decision(package, located.Slice.Id, $"{located.Slice.Id}/unsupported/{label}", label);
@@ -36,9 +37,11 @@ internal static class AxonUnsupportedSemantics
             ("graph", application.Graphs),
             ("graph projection", application.GraphProjections),
             ("graph specification", application.GraphSpecifications),
-            ("graph query", application.GraphQueries)
+            ("graph query", application.GraphQueries),
+            ("systems", application.Systems)
         };
 
+        if (application.Agents is not null) yield return Decision(package, application.Id, $"{application.Id}/unsupported/agents", "agents");
         if (application.TimeZone is { } zone) yield return Decision(package, application.Id, $"{application.Id}/unsupported/time zone", $"application time zone {zone.Id}");
         if (!application.ContextMembers.IsDefaultOrEmpty) yield return Decision(package, application.Id, $"{application.Id}/unsupported/context members", "application context members");
 
@@ -66,22 +69,37 @@ internal static class AxonUnsupportedSemantics
         }
 
         if (!seen.Add(node)) yield break;
-        var own = node switch
-        {
-            SemanticOneOfExpression => "one-of expression",
-            SemanticClockOperand => "clock operand",
-            SemanticConditionOperand { DateOf: true } => "date-only operand",
-            SemanticCommandCalendar => "command calendar",
-            SemanticCommandHandler { PossibleEvents.IsDefaultOrEmpty: false } => "possible events",
-            SemanticSpecification { GivenTimeZone.Length: > 0 } => "specification time zone",
-            _ => null
-        };
+        var own = Construct(node) ?? NewConstruct(node);
         if (own is not null) yield return own;
         foreach (var property in node.GetType().GetProperties().Where(property => property.GetIndexParameters().Length == 0))
         {
             foreach (var found in SliceConstructs(property.GetValue(node), seen)) yield return found;
         }
     }
+
+    static string? Construct(object node) => node switch
+    {
+        SemanticOneOfExpression => "one-of expression",
+        SemanticClockOperand => "clock operand",
+        SemanticConditionOperand { DateOf: true } => "date-only operand",
+        SemanticCommandCalendar => "command calendar",
+        SemanticCommandHandler { PossibleEvents.IsDefaultOrEmpty: false } => "possible events",
+        SemanticSpecification { GivenTimeZone.Length: > 0 } => "specification time zone",
+        _ => null
+    };
+
+    static string? NewConstruct(object node) => node switch
+    {
+        SemanticSlice { Screens.IsDefaultOrEmpty: false } => "screens",
+        SemanticProjectionMapping { Operation: SemanticProjectionOperation.SetOnce } => "set once",
+        SemanticProjectionChildren { Ordering: not null } => "children ordering",
+        SemanticConditionOperand { CallerId: true } => "caller identity",
+        SemanticComparison { Operator: SemanticComparisonOperator.Contains or SemanticComparisonOperator.StartsWith } => "text or membership comparison",
+        _ => null
+    };
+
+    static AxonBehaviorDecision Narrowing(string package, SemanticKeyedQuery query) =>
+        new("STAGE-AXON-AUTHORIZATION", package, query.Id, $"{query.Id}/authorization/narrowing", "authorize query row narrowing", "Policy row narrowing is not rendered; access is denied.");
 
     static AxonBehaviorDecision Decision(string package, SemanticId owner, string modelPath, string construct) =>
         new(AxonRefusalCodes.UnsupportedSemantics, package, owner, modelPath, $"render the {construct}", $"The {construct} is not rendered; Axon has no support for this Screenplay 6 construct.");

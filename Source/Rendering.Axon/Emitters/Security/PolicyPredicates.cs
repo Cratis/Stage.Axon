@@ -47,8 +47,17 @@ internal static class PolicyPredicates
             foreach (var condition in Opaque(policy.Condition)) yield return (policy, condition);
     }
 
+    internal static bool Unsupported(AxonEmissionContext context, SemanticAuthorization? authorization) => authorization switch
+    {
+        SemanticPolicyReference { Mappings.IsDefaultOrEmpty: false } => true,
+        SemanticPolicyReference reference => context.Request.Model.Application.Policies.Any(policy => policy.Name == reference.Name && Unsupported(policy)),
+        SemanticLogicalAuthorization logical => Unsupported(context, logical.Left) || Unsupported(context, logical.Right),
+        _ => false
+    };
+
     internal static string? Failure(AxonEmissionContext context, SemanticAuthorization authorization)
     {
+        if (Unsupported(context, authorization)) return "State policies, reads, typed inputs and input mappings are not rendered; access is denied.";
         if (authorization is not SemanticPolicyReference reference || context.Request.Model.Application.Policies.FirstOrDefault(policy => policy.Name == reference.Name)?.Condition is not SemanticOpaquePolicyCondition)
             return "Inline policy composition cannot preserve eager failure-dominance with native Spring expressions; access is denied.";
         foreach (var policy in ReferencedPolicies(context, authorization))
@@ -65,6 +74,16 @@ internal static class PolicyPredicates
     internal static string? Expression(AxonEmissionContext context, SemanticAuthorization authorization) =>
         authorization is SemanticPolicyReference reference && context.Request.Model.Application.Policies.FirstOrDefault(policy => policy.Name == reference.Name) is { Condition: SemanticOpaquePolicyCondition } policy
             ? "isAuthenticated() and @" + BeanName(policy) + ".check(authentication)" : null;
+
+    static bool Unsupported(SemanticPolicy policy) => !policy.Reads.IsDefaultOrEmpty || !policy.Inputs.IsDefaultOrEmpty || HasState(policy.Condition);
+
+    static bool HasState(SemanticPolicyCondition condition) => condition switch
+    {
+        SemanticStatePolicyCondition => true,
+        SemanticNotPolicyCondition not => HasState(not.Operand),
+        SemanticLogicalPolicyCondition logical => HasState(logical.Left) || HasState(logical.Right),
+        _ => false
+    };
 
     static IEnumerable<SemanticPolicy> ReferencedPolicies(AxonEmissionContext context, SemanticAuthorization authorization)
     {
