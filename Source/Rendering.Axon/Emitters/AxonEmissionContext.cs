@@ -22,7 +22,7 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
 
     internal List<PlannedArtifact> Artifacts { get; } = [];
 
-    internal HashSet<string> ConsumedImplementations { get; } = new(StringComparer.Ordinal);
+    internal HashSet<string> ConsumedImplementations { get; } = [with(StringComparer.Ordinal)];
 
     internal Dictionary<SemanticId, AxonSpecificationEntry> Specifications { get; } = [];
 
@@ -30,7 +30,7 @@ internal sealed class AxonEmissionContext(ArtifactRenderRequest request, AxonDeg
 
     internal IReadOnlyDictionary<string, SemanticSurfaceDisposition> SemanticSurface => SemanticSurfaceLedger.Entries;
 
-    internal Dictionary<string, JavaAllocation> AllocatedTypes { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, JavaAllocation> AllocatedTypes { get; } = [with(StringComparer.Ordinal)];
 
     // Incomplete allocations must supply their downstream API; it cannot be reconstructed from a type name.
     internal void AllocateJava(string package, string name, string stub) =>

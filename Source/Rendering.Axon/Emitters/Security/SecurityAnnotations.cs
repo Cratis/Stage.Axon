@@ -38,7 +38,7 @@ internal static class SecurityAnnotations
     internal static string? EndpointExpression(AxonEmissionContext context, SemanticAuthorization authorization)
     {
         if (PolicyPredicates.Unsupported(context, authorization)) return null;
-        if (!PolicyPredicates.HasInline(context, authorization)) return Expression(context, authorization, new(StringComparer.Ordinal));
+        if (!PolicyPredicates.HasInline(context, authorization)) return Expression(context, authorization, [with(StringComparer.Ordinal)]);
         return PolicyPredicates.Failure(context, authorization) is null ? PolicyPredicates.Expression(context, authorization) : null;
     }
 

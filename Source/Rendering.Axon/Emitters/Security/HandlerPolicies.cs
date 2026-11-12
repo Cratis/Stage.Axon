@@ -55,7 +55,7 @@ internal static class HandlerPolicies
     static HashSet<string>[]? Condition(SemanticPolicyCondition condition) => condition switch
     {
         SemanticRoleCondition role => [new([role.Role], StringComparer.Ordinal)],
-        SemanticAnonymousCondition => [new(StringComparer.Ordinal)],
+        SemanticAnonymousCondition => [[with(StringComparer.Ordinal)]],
         SemanticLogicalPolicyCondition logical => Combine(Condition(logical.Left), logical.Operator, Condition(logical.Right)),
         _ => null
     };

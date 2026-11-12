@@ -20,7 +20,7 @@ public class when_accounting_for_modeled_specifications : for_RenderCoverage.giv
         first = identities[0];
         manifest = [.. identities.Select(identity => new SpecificationManifestEntry(identity, null))];
         results = [.. identities.Select(identity => new SpecificationResult(identity, true))];
-        codes = new(StringComparer.OrdinalIgnoreCase) { "KNOWN" };
+        codes = [with(StringComparer.OrdinalIgnoreCase), "KNOWN"];
     }
 
     [Fact] void should_accept_one_passing_result_per_modeled_specification() => Check(manifest, results).IsClean.ShouldBeTrue();

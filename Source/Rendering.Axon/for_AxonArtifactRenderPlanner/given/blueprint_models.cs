@@ -8,7 +8,7 @@ namespace Cratis.Stage.Rendering.Axon.for_AxonArtifactRenderPlanner.given;
 
 public static class blueprint_models
 {
-    static readonly Dictionary<string, Task<LoadedSemanticModel>> _models = new(StringComparer.Ordinal);
+    static readonly Dictionary<string, Task<LoadedSemanticModel>> _models = [with(StringComparer.Ordinal)];
 
     public static Task<LoadedSemanticModel> Load(string sample)
     {
