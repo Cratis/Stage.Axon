@@ -16,8 +16,8 @@ internal sealed partial class JavaCodeBuilder(string package)
         "org.reactivestreams.", "org.junit.", "org.mockito.", "org.assertj.", "io.cratis.", "io.axoniq."
     ];
 
-    readonly SortedSet<string> _imports = new(StringComparer.Ordinal);
-    readonly Dictionary<string, string> _simpleNames = new(StringComparer.Ordinal);
+    readonly SortedSet<string> _imports = [with(StringComparer.Ordinal)];
+    readonly Dictionary<string, string> _simpleNames = [with(StringComparer.Ordinal)];
     readonly StringBuilder _body = new();
     int _indent;
 

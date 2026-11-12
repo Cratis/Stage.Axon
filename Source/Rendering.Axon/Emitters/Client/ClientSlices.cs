@@ -16,7 +16,7 @@ internal sealed class ClientSlices
     readonly ClientTypes _types;
     readonly Dictionary<SemanticId, (LocatedSemanticSlice Located, SemanticKeyedQuery Query)> _queries = [];
     readonly Dictionary<SemanticId, (LocatedSemanticSlice Located, SemanticCommand Command)> _commands = [];
-    readonly Dictionary<string, SliceFile> _files = new(StringComparer.Ordinal);
+    readonly Dictionary<string, SliceFile> _files = [with(StringComparer.Ordinal)];
     readonly Dictionary<SemanticId, ReadModelSite> _models = [];
     readonly Dictionary<SemanticId, QuerySite> _querySites = [];
     readonly Dictionary<SemanticId, CommandSite> _commandSites = [];

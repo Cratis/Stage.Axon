@@ -9,8 +9,8 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Client;
 /// <param name="path">The module path relative to the client source directory, for example <c>concepts.ts</c> or <c>sales/orders/place.ts</c>.</param>
 internal sealed class TsFile(string path)
 {
-    readonly HashSet<string> _declared = new(StringComparer.Ordinal);
-    readonly Dictionary<string, List<(string Name, string Local, bool IsType)>> _imports = new(StringComparer.Ordinal);
+    readonly HashSet<string> _declared = [with(StringComparer.Ordinal)];
+    readonly Dictionary<string, List<(string Name, string Local, bool IsType)>> _imports = [with(StringComparer.Ordinal)];
     readonly StringBuilder _body = new();
 
     internal string Path { get; } = path;

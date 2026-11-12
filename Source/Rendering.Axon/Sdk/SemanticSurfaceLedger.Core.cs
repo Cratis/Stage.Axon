@@ -35,7 +35,7 @@ internal static partial class SemanticSurfaceLedger
 
     sealed class LedgerBuilder
     {
-        internal Dictionary<string, SemanticSurfaceDisposition> Entries { get; } = new(StringComparer.Ordinal);
+        internal Dictionary<string, SemanticSurfaceDisposition> Entries { get; } = [with(StringComparer.Ordinal)];
 
         internal List<string> Conflicts { get; } = [];
 
