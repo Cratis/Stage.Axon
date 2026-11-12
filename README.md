@@ -10,12 +10,12 @@ The renderer ships as the experimental NuGet package `Cratis.Stage.Rendering.Axo
 
 ## Build and specs
 
-Requires .NET 10. Run from this directory:
+Requires .NET 11. Run from this directory:
 
 ```sh
 dotnet build Stage.Axon.slnx -c Release -warnaserror
 dotnet build Stage.Axon.slnx -c Debug
-dotnet test Stage.Axon.slnx -c Debug --no-build
+dotnet test Stage.Axon.slnx -c Debug --framework net11.0 --no-build
 ```
 
 Specs are inline in all three projects and are compiled only in Debug. The extracted baseline is 389 planner specs, 16 verification specs, and 33 conformance specs (438 total, no skips). Repository analyzers run during both builds; Release treats warnings as errors.

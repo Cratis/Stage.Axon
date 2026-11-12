@@ -17,8 +17,8 @@ public class when_comparing_with_the_http_contract : given.a_client_request
     void Because()
     {
         Render();
-        contract = [.. JsonDocument.Parse(Text("src/main/resources/http-contract.json")).RootElement.GetProperty("endpoints").EnumerateArray()];
-        routes = [.. Text("client/src/http-routes.ts").Split('\n').Where(line => line.StartsWith("    {", StringComparison.Ordinal)).Select(line => JsonDocument.Parse(line.Trim().TrimEnd(',')).RootElement)];
+        contract = [.. JsonElement.Parse(Text("src/main/resources/http-contract.json")).GetProperty("endpoints").EnumerateArray()];
+        routes = [.. Text("client/src/http-routes.ts").Split('\n').Where(line => line.StartsWith("    {", StringComparison.Ordinal)).Select(line => JsonElement.Parse(line.Trim().TrimEnd(',')))];
     }
 
     [Fact] void should_have_the_same_count() => routes.Count.ShouldEqual(contract.Count);

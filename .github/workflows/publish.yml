@@ -12,7 +12,7 @@ concurrency:
 
 env:
   NUGET_OUTPUT: ./Artifacts/NuGet
-  DOTNET_VERSION: "10.0.x"
+  DOTNET_VERSION: "11.0.x"
 
 permissions:
   issues: write

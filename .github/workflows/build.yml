@@ -24,7 +24,7 @@ jobs:
         run: node .github/scripts/package-allowlist.mjs
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - name: Build Release with warnings as errors
         run: dotnet build Stage.Axon.slnx -c Release -warnaserror
       - name: Guard packable projects against Screenplay.Generation (Release graph)
@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           for project in Rendering.Axon Rendering.Axon.Verification Rendering.Conformance.Specs Samples.MinimalTarget; do
             results="$RUNNER_TEMP/axon-results/$project"
-            dotnet test "Source/$project/$project.csproj" -c Debug --no-build --logger 'trx;LogFileName=specs.trx' --results-directory "$results"
+            dotnet test "Source/$project/$project.csproj" -c Debug --framework net11.0 --no-build --logger 'trx;LogFileName=specs.trx' --results-directory "$results"
             python3 .github/spec-shards.py require-executed "$results/specs.trx"
           done
       - name: Preserve specification reports
@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
