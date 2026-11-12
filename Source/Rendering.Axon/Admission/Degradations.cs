@@ -76,7 +76,7 @@ internal static class Degradations
         Unsupported(AxonRefusalCodes.Implementation, "execute the modeled implementation", "An admitted implementation is required.", ThrowingBody),
         Unsupported(AxonRefusalCodes.ImplementationLanguage, "place the modeled implementation body", "Only admitted Java implementation bodies can be placed.", ThrowingBody),
         Unsupported(AxonRefusalCodes.Evolution, "read historical event revisions", "Historical revisions require an Axon upcaster implementation.", Comment),
-        Unsupported(AxonRefusalCodes.UnsupportedSemantics, "render the Screenplay 6 construct", "State machines, workflows, graph, clock and calendar operands, one-of expressions, possible events and time zones are not rendered.", Comment),
+        Unsupported(AxonRefusalCodes.UnsupportedSemantics, "render the Screenplay 6 construct", "State machines, workflows, graph, clock and calendar operands, one-of expressions, possible events, time zones, screens, agents, systems/abilities, set-once mappings, children ordering, caller identity and text comparisons are not rendered.", Comment),
         Unsupported(AxonRefusalCodes.Client, "represent the modeled client contract", "The contract shape cannot be typed by the generated TypeScript client.", Omitted),
         Informational(AxonRefusalCodes.ClientPrecision, "preserve modeled numeric precision in the client", "JSON numbers cannot carry every modeled value exactly."),
         Unsupported("STAGE-AXON-GENERATION-OPTIONS", "generate values using the declared options", "UUID value creation does not represent the declared generation options.", Comment),

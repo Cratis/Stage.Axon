@@ -41,7 +41,7 @@ public class when_auditing_the_executable_model : Specification
     [Fact]
     void should_audit_a_non_vacuous_surface()
     {
-        Assert.True(_members.Count >= 700, $"Only {_members.Count} members were reflected.");
+        Assert.Equal(1042, _members.Count);
         Assert.Equal(_members.Count, SemanticSurfaceLedger.Entries.Count);
     }
 

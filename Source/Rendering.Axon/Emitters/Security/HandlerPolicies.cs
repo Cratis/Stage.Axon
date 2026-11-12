@@ -10,6 +10,11 @@ internal static class HandlerPolicies
 {
     internal static string For(AxonEmissionContext context, SemanticAuthorization? authorization, SemanticId owner, JavaCodeBuilder code)
     {
+        if (SecurityAnnotations.UnsupportedReason(context, authorization, owner) is { } unsupported)
+        {
+            context.Degradation.Unsupported("STAGE-AXON-AUTHORIZATION", owner, unsupported, "authorize access with the modeled policy", owner + "/authorization");
+            return "@" + code.Reference("org.springframework.security.access.annotation.Secured") + "({})";
+        }
         if (authorization is null) return string.Empty;
         var roles = Roles(context, authorization);
         if (roles is { Length: 0 }) return string.Empty;

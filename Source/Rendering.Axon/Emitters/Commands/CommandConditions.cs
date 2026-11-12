@@ -76,6 +76,7 @@ internal sealed class CommandConditions(SemanticCommand command, CommandJavaType
 
     string? Operand(SemanticConditionOperand operand, SemanticTypeReference type)
     {
+        if (operand.CallerId) return null;
         var scalar = type with { Kind = SemanticTypeReferenceKind.Primitive, Primitive = types.PrimitiveOf(type) };
         if (operand.Value is { } constant) return _code is null ? types.Literal(constant, scalar) : types.Literal(constant, scalar, _code);
         if (Property(operand) is not { } property) return null;
