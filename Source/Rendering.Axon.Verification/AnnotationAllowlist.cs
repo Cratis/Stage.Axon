@@ -41,7 +41,7 @@ internal static partial class AnnotationAllowlist
 
     static void Remember(Dictionary<string, SortedSet<string>> annotations, string name, string path)
     {
-        if (!annotations.TryGetValue(name, out var paths)) annotations.Add(name, paths = new(StringComparer.Ordinal));
+        if (!annotations.TryGetValue(name, out var paths)) annotations.Add(name, paths = [with(StringComparer.Ordinal)]);
         paths.Add(path);
     }
 

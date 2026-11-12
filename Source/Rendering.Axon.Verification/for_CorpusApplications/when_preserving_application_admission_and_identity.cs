@@ -11,8 +11,8 @@ namespace Cratis.Stage.Rendering.Axon.Verification.for_CorpusApplications;
 
 public class when_preserving_application_admission_and_identity : Specification
 {
-    readonly Dictionary<string, LoadedSemanticModel> _models = new(StringComparer.Ordinal);
-    readonly Dictionary<string, ArtifactRenderPlan> _plans = new(StringComparer.Ordinal);
+    readonly Dictionary<string, LoadedSemanticModel> _models = [with(StringComparer.Ordinal)];
+    readonly Dictionary<string, ArtifactRenderPlan> _plans = [with(StringComparer.Ordinal)];
     IReadOnlyList<(string Name, string Root)> _applications;
     CanonicalCorpusInputs _inputs;
 

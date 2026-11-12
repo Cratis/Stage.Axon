@@ -12,7 +12,7 @@ namespace Cratis.Stage.Rendering.Axon.Sdk.for_SemanticSurfaceLedger;
 public class when_auditing_the_executable_model : Specification
 {
     readonly HashSet<Type> _visited = [];
-    readonly HashSet<string> _members = new(StringComparer.Ordinal);
+    readonly HashSet<string> _members = [with(StringComparer.Ordinal)];
 
     void Establish()
     {

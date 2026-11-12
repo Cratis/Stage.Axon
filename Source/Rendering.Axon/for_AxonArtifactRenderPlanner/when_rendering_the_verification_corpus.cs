@@ -12,8 +12,8 @@ namespace Cratis.Stage.Rendering.Axon.for_AxonArtifactRenderPlanner;
 
 public class when_rendering_the_verification_corpus : Specification
 {
-    readonly Dictionary<string, SemanticModelLoadResult> _compilations = new(StringComparer.Ordinal);
-    readonly Dictionary<string, ArtifactRenderPlan> _plans = new(StringComparer.Ordinal);
+    readonly Dictionary<string, SemanticModelLoadResult> _compilations = [with(StringComparer.Ordinal)];
+    readonly Dictionary<string, ArtifactRenderPlan> _plans = [with(StringComparer.Ordinal)];
     string[] blueprints;
     CanonicalCorpusInputs _inputs;
 
