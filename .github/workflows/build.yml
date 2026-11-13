@@ -55,7 +55,12 @@ jobs:
           path: ${{ runner.temp }}/axon-results/**
           if-no-files-found: error
           retention-days: 7
-  java:
+  java-shard:
+    name: java-shard (${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -90,8 +95,10 @@ jobs:
           [ -n "$version" ] && [ "$(printf '%s\n' "$version" | wc -l)" -eq 1 ] || { echo "::error::Rendered apps must pin exactly one runtime version: $version"; exit 1; }
           sh ./mvnw -B -Drevision="$version" install
       - name: Run the generated HTTP transport proofs
+        if: matrix.shard == 0
         run: node --test "Source/Rendering.Axon/Emitters/Client/Tests/*.test.mjs"
       - name: Type-check every generated TypeScript client and the client-proof scenarios
+        if: matrix.shard == 0
         working-directory: ${{ runner.temp }}/axon-corpus
         shell: bash
         run: |
@@ -107,12 +114,63 @@ jobs:
           proof=client-proof/client/test/tsconfig.json
           [ -e "$proof" ] || { echo "No client-proof scenario tsconfig.json found"; exit 1; }
           "$tsc" -p "$PWD/$proof" --noEmit
-      - name: Compile and execute every generated Maven module
-        working-directory: ${{ runner.temp }}/axon-corpus
-        run: sh ./mvnw -B -fae verify
       - name: Run the Scene proof host
+        if: matrix.shard == 0
         working-directory: Source/Rendering.Axon.Verification/ClientProof/scene
         run: npm ci --ignore-scripts --no-audit --no-fund && npm exec -- tsc -p . --noEmit && node --test "test/"*.test.ts
+      - name: Compile and execute this shard's Maven modules
+        working-directory: ${{ runner.temp }}/axon-corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          modules=$(node -e 'const m=JSON.parse(require("fs").readFileSync("applications.json","utf8"));console.log(m.filter((_,i)=>i%4===Number(process.argv[1])).join(","))' "${{ matrix.shard }}")
+          [ -n "$modules" ] || { echo "::error::Shard ${{ matrix.shard }} has no modules"; exit 1; }
+          sh ./mvnw -B -fae -pl "$modules" verify
+      - name: Pack this shard's surefire reports
+        if: always()
+        working-directory: ${{ runner.temp }}/axon-corpus
+        shell: bash
+        run: tar -czf "$RUNNER_TEMP/surefire-${{ matrix.shard }}.tgz" --ignore-failed-read ./*/target/surefire-reports
+      - name: Preserve shard reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/surefire-${{ matrix.shard }}.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  java:
+    needs: java-shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Require every shard to have passed
+        if: needs.java-shard.result != 'success'
+        run: |
+          echo "::error::java-shard result: ${{ needs.java-shard.result }}"
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+      - uses: Cratis/Workflows/.github/actions/dotnet-cache@main
+      - name: Build the standalone verification harness
+        run: dotnet build Stage.Axon.slnx -c Debug
+      - name: Render every corpus application
+        run: >-
+          dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj
+          -c Debug --no-build -- render "${{ runner.temp }}/axon-corpus"
+      - name: Download shard reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: surefire-shard-*
+          path: ${{ runner.temp }}/shard-reports
+          merge-multiple: true
+      - name: Restore shard reports into the corpus
+        shell: bash
+        run: for archive in "$RUNNER_TEMP"/shard-reports/surefire-*.tgz; do tar -xzf "$archive" -C "$RUNNER_TEMP/axon-corpus"; done
       - name: Require passing native tests and the exact disabled-test budgets
         run: >-
           dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj
