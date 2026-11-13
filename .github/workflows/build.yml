@@ -25,6 +25,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 11.0.x
+      - uses: Cratis/Workflows/.github/actions/dotnet-cache@main
       - name: Build Release with warnings as errors
         run: dotnet build Stage.Axon.slnx -c Release -warnaserror
       - name: Guard packable projects against Screenplay.Generation (Release graph)
@@ -55,7 +56,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   java:
-    needs: dotnet
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -63,6 +63,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 11.0.x
+      - uses: Cratis/Workflows/.github/actions/dotnet-cache@main
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
