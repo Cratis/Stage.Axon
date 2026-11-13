@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Test the CI guards (synthetic fixtures only)
@@ -22,7 +22,7 @@ jobs:
         run: node .github/scripts/cli-version-guard.mjs
       - name: Guard package publication against the allowlist
         run: node .github/scripts/package-allowlist.mjs
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 11.0.x
       - uses: Cratis/Workflows/.github/actions/dotnet-cache@main
@@ -49,7 +49,7 @@ jobs:
           done
       - name: Preserve specification reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dotnet-specs
           path: ${{ runner.temp }}/axon-results/**
@@ -64,12 +64,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 11.0.x
       - uses: Cratis/Workflows/.github/actions/dotnet-cache@main
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
@@ -77,7 +77,7 @@ jobs:
           cache-dependency-path: |
             Source/Rendering.Axon/Emitters/Scaffold/AxonMavenProject.cs
             Source/Runtime/pom.xml
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24.20.0'
       - name: Build the standalone verification harness
@@ -133,7 +133,7 @@ jobs:
         run: tar -czf "$RUNNER_TEMP/surefire-${{ matrix.shard }}.tgz" --ignore-failed-read ./*/target/surefire-reports
       - name: Preserve shard reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: surefire-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/surefire-${{ matrix.shard }}.tgz
@@ -151,8 +151,8 @@ jobs:
         run: |
           echo "::error::java-shard result: ${{ needs.java-shard.result }}"
           exit 1
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 11.0.x
       - uses: Cratis/Workflows/.github/actions/dotnet-cache@main
@@ -163,7 +163,7 @@ jobs:
           dotnet run --project Source/Rendering.Axon.Verification/Rendering.Axon.Verification.csproj
           -c Debug --no-build -- render "${{ runner.temp }}/axon-corpus"
       - name: Download shard reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: surefire-shard-*
           path: ${{ runner.temp }}/shard-reports
@@ -177,7 +177,7 @@ jobs:
           -c Debug --no-build -- verify "${{ runner.temp }}/axon-corpus"
       - name: Preserve native reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: axon-native-reports
           path: ${{ runner.temp }}/axon-corpus/**/target/surefire-reports/**
