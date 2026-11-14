@@ -1,0 +1,173 @@
+diff --git a/Source/Rendering.Axon/Emitters/Queries/AxonQueriesEmitter.cs b/Source/Rendering.Axon/Emitters/Queries/AxonQueriesEmitter.cs
+index 800d5447..baccba7f 100644
+--- a/Source/Rendering.Axon/Emitters/Queries/AxonQueriesEmitter.cs
++++ b/Source/Rendering.Axon/Emitters/Queries/AxonQueriesEmitter.cs
+@@ -40,8 +40,8 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
+                 EmitHandler(context, types, package, query, name, modelType, shape);
+                 new QueryEndpoint(context, types, located, query, modelType, shape).Emit();
+                 if (query.Delivery != SemanticQueryDelivery.Live) continue;
+-                LiveQuerySubscription.Emit(context, package, query);
+-                LiveQueryStreams.Emit(context, package, query);
++                LiveQuerySubscription.Emit(context, package, query, modelType, shape);
++                LiveQueryStreams.Emit(context, package, query, modelType, shape);
+                 AxonViewLiveSpecs.Emit(context, types, located, query, owner, model);
+             }
+         }
+@@ -74,6 +74,7 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
+     {
+         var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Handler").Declare(name + "Performer");
+         var modelName = QueryModelReference.Claim(code, package, modelType, name, name + "Handler", name + "Performer");
++        shape.Claim(code);
+         var store = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
+         code.Line($"@{code.Reference("org.springframework.stereotype.Component")}({JavaCodeBuilder.StringLiteral(package + "." + name + "Handler")})")
+             .Block($"public class {name}Handler", body =>
+@@ -95,9 +96,9 @@ internal sealed class AxonQueriesEmitter : IAxonEmitter
+                         ? $"var rows = {method.Reference("java.util.List")}.copyOf(performer.perform(query, store));"
+                         : $"var rows = store.all().stream(){(predicate.Length > 0 ? $".filter(row -> {predicate})" : string.Empty)}.toList();");
+                     if (query.Cardinality == SemanticQueryCardinality.One)
+-                        method.Line("if (rows.size() != 1) throw new IllegalStateException(\"Expected exactly one query result\");");
++                        method.Line($"if (rows.size() != 1) throw new {method.Reference("java.lang.IllegalStateException")}(\"Expected exactly one query result\");");
+                     if (query.Cardinality == SemanticQueryCardinality.ZeroOrOne)
+-                        method.Line("if (rows.size() > 1) throw new IllegalStateException(\"Expected at most one query result\");");
++                        method.Line($"if (rows.size() > 1) throw new {method.Reference("java.lang.IllegalStateException")}(\"Expected at most one query result\");");
+                     method.Line($"return new {name}.Result(rows);");
+                 });
+             });
+diff --git a/Source/Rendering.Axon/Emitters/Queries/LiveQueryStreams.cs b/Source/Rendering.Axon/Emitters/Queries/LiveQueryStreams.cs
+index 9f068873..6766303c 100644
+--- a/Source/Rendering.Axon/Emitters/Queries/LiveQueryStreams.cs
++++ b/Source/Rendering.Axon/Emitters/Queries/LiveQueryStreams.cs
+@@ -8,10 +8,12 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
+ 
+ internal static class LiveQueryStreams
+ {
+-    internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query)
++    internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query, string modelType, QueryShape shape)
+     {
+         var name = JavaNames.Type(query.Name) + "Streams";
+-        var code = new JavaCodeBuilder(package).Declare(name).Declare("Session");
++        var code = new JavaCodeBuilder(package).Declare(JavaNames.Type(query.Name)).Declare(name).Declare("Session");
++        QueryModelReference.Claim(code, package, modelType, JavaNames.Type(query.Name), name, "Session");
++        shape.Claim(code);
+         var flow = code.Reference("java.util.concurrent.Flow");
+         var atomicBoolean = code.Reference("java.util.concurrent.atomic.AtomicBoolean");
+         var emitter = code.Reference("org.springframework.web.servlet.mvc.method.annotation.SseEmitter");
+@@ -22,7 +24,7 @@ internal static class LiveQueryStreams
+                 private final {{code.Reference("java.util.Set")}}<Session> sessions = {{code.Reference("java.util.concurrent.ConcurrentHashMap")}}.newKeySet();
+                 private final {{atomicBoolean}} closing = new {{atomicBoolean}}();
+ 
+-                public {{emitter}} open({{flow}}.Publisher<Object> publisher) {
++                public {{emitter}} open({{flow}}.Publisher<{{code.Reference("java.lang.Object")}}> publisher) {
+                     var session = new Session();
+                     sessions.add(session);
+                     if (closing.get()) session.stop();
+@@ -44,7 +46,7 @@ internal static class LiveQueryStreams
+                     private final {{atomicBoolean}} cancelled = new {{atomicBoolean}}();
+                     private volatile {{emitter}} emitter;
+ 
+-                    private {{flow}}.Subscriber<Object> forwardTo({{flow}}.Subscriber<? super Object> downstream) {
++                    private {{flow}}.Subscriber<{{code.Reference("java.lang.Object")}}> forwardTo({{flow}}.Subscriber<? super {{code.Reference("java.lang.Object")}}> downstream) {
+                         return new {{flow}}.Subscriber<>() {
+                             @Override public void onSubscribe({{flow}}.Subscription value) {
+                                 if (!subscription.compareAndSet(null, value)) { value.cancel(); return; }
+@@ -54,8 +56,8 @@ internal static class LiveQueryStreams
+                                 });
+                                 if (cancelled.get()) value.cancel();
+                             }
+-                            @Override public void onNext(Object value) { if (!cancelled.get()) downstream.onNext(value); }
+-                            @Override public void onError(Throwable failure) { cancel(); downstream.onError(failure); }
++                            @Override public void onNext({{code.Reference("java.lang.Object")}} value) { if (!cancelled.get()) downstream.onNext(value); }
++                            @Override public void onError({{code.Reference("java.lang.Throwable")}} failure) { cancel(); downstream.onError(failure); }
+                             @Override public void onComplete() { cancel(); downstream.onComplete(); }
+                         };
+                     }
+diff --git a/Source/Rendering.Axon/Emitters/Queries/LiveQuerySubscription.cs b/Source/Rendering.Axon/Emitters/Queries/LiveQuerySubscription.cs
+index cb5ae607..086570c1 100644
+--- a/Source/Rendering.Axon/Emitters/Queries/LiveQuerySubscription.cs
++++ b/Source/Rendering.Axon/Emitters/Queries/LiveQuerySubscription.cs
+@@ -9,11 +9,13 @@ namespace Cratis.Stage.Rendering.Axon.Emitters.Queries;
+ 
+ internal static class LiveQuerySubscription
+ {
+-    internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query)
++    internal static void Emit(AxonEmissionContext context, string package, SemanticKeyedQuery query, string modelType, QueryShape shape)
+     {
+         var name = JavaNames.Type(query.Name);
+         var payload = query.Cardinality == SemanticQueryCardinality.Many ? "result.rows()" : "result.rows().stream().findFirst()";
+         var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "Subscription").Declare("Bridge");
++        QueryModelReference.Claim(code, package, modelType, name, name + "Subscription", "Bridge");
++        shape.Claim(code);
+         var flow = code.Reference("java.util.concurrent.Flow");
+         var gateway = code.Reference("org.axonframework.messaging.queryhandling.gateway.QueryGateway");
+         var source = code.Line($$"""
+@@ -30,11 +32,11 @@ internal static class LiveQuerySubscription
+                         .subscribe(new Bridge(gateway, query, subscriber));
+                 }
+ 
+-                public static {{flow}}.Publisher<Object> values({{gateway}} gateway, {{name}} query) {
++                public static {{flow}}.Publisher<{{code.Reference("java.lang.Object")}}> values({{gateway}} gateway, {{name}} query) {
+                     return subscriber -> results(gateway, query).subscribe(new {{flow}}.Subscriber<{{name}}.Result>() {
+                         @Override public void onSubscribe({{flow}}.Subscription subscription) { subscriber.onSubscribe(subscription); }
+                         @Override public void onNext({{name}}.Result result) { subscriber.onNext({{payload}}); }
+-                        @Override public void onError(Throwable failure) { subscriber.onError(failure); }
++                        @Override public void onError({{code.Reference("java.lang.Throwable")}} failure) { subscriber.onError(failure); }
+                         @Override public void onComplete() { subscriber.onComplete(); }
+                     });
+                 }
+@@ -66,8 +68,8 @@ internal static class LiveQuerySubscription
+                     @Override
+                     public synchronized void request(long count) {
+                         if (closed) return;
+-                        if (count <= 0) { onError(new IllegalArgumentException("Subscription demand must be positive")); return; }
+-                        demand = count > Long.MAX_VALUE - demand ? Long.MAX_VALUE : demand + count;
++                        if (count <= 0) { onError(new {{code.Reference("java.lang.IllegalArgumentException")}}("Subscription demand must be positive")); return; }
++                        demand = count > {{code.Reference("java.lang.Long")}}.MAX_VALUE - demand ? {{code.Reference("java.lang.Long")}}.MAX_VALUE : demand + count;
+                         pump();
+                     }
+ 
+@@ -92,7 +94,7 @@ internal static class LiveQuerySubscription
+                     private synchronized void deliver({{name}}.Result result) {
+                         if (closed) return;
+                         pending = null;
+-                        if (demand != Long.MAX_VALUE) demand--;
++                        if (demand != {{code.Reference("java.lang.Long")}}.MAX_VALUE) demand--;
+                         fetching = false;
+                         downstream.onNext(result);
+                         if (completed) { closed = true; downstream.onComplete(); }
+@@ -100,7 +102,7 @@ internal static class LiveQuerySubscription
+                     }
+ 
+                     @Override
+-                    public synchronized void onError(Throwable failure) {
++                    public synchronized void onError({{code.Reference("java.lang.Throwable")}} failure) {
+                         if (closed) return;
+                         cancel();
+                         downstream.onError(failure);
+diff --git a/Source/Rendering.Axon/Emitters/Queries/for_AxonQueriesEmitter/when_a_query_argument_concept_collides_with_a_framework_name.cs b/Source/Rendering.Axon/Emitters/Queries/for_AxonQueriesEmitter/when_a_query_argument_concept_collides_with_a_framework_name.cs
+index d03dc275..2b2379c4 100644
+--- a/Source/Rendering.Axon/Emitters/Queries/for_AxonQueriesEmitter/when_a_query_argument_concept_collides_with_a_framework_name.cs
++++ b/Source/Rendering.Axon/Emitters/Queries/for_AxonQueriesEmitter/when_a_query_argument_concept_collides_with_a_framework_name.cs
+@@ -11,16 +11,17 @@ public class when_a_query_argument_concept_collides_with_a_framework_name : give
+ {
+     void Because()
+     {
+-        var concept = new SemanticConcept(SemanticId.Create(SemanticKind.Concept, "UUID"), "UUID", SemanticPrimitiveType.Uuid, [], []);
++        var concept = new SemanticConcept(SemanticId.Create(SemanticKind.Concept, "String"), "String", SemanticPrimitiveType.Text, [], []);
+         var type = new SemanticTypeReference(SemanticTypeReferenceKind.Concept, SemanticPrimitiveType.Unknown, concept.Id, false, false);
+         _query = _query with { Argument = _query.Argument with { Type = type } };
+         _model = _model with { Properties = [.. _model.Properties.Select(property => property.Id == _query.KeyProperty ? property with { Type = type } : property)] };
+         Render(concept);
+     }
+ 
+-    [Fact] void should_import_the_argument_concept() => Code("FindTotal").ShouldContain("import axonviews.concepts.UUID;");
+-    [Fact] void should_keep_the_argument_concept_short() => Code("FindTotal").ShouldContain("public record FindTotal(UUID name)");
+-    [Fact] void should_import_the_endpoint_concept() => Code("FindTotalEndpoint").ShouldContain("import axonviews.concepts.UUID;");
+-    [Fact] void should_qualify_the_framework_parser() => Code("FindTotalEndpoint").ShouldContain("new FindTotal(new UUID(java.util.UUID.fromString(name)))");
+-    [Fact] void should_not_import_the_conflicting_framework_type() => Code("FindTotalEndpoint").ShouldNotContain("import java.util.UUID;");
++    [Fact] void should_import_the_argument_concept() => Code("FindTotal").ShouldContain("import axonviews.concepts.String;");
++    [Fact] void should_keep_the_argument_concept_short() => Code("FindTotal").ShouldContain("public record FindTotal(String name)");
++    [Fact] void should_import_the_endpoint_concept() => Code("FindTotalEndpoint").ShouldContain("import axonviews.concepts.String;");
++    [Fact] void should_qualify_the_framework_parameter() => Code("FindTotalEndpoint").ShouldContain("@RequestParam(name = \"name\", required = true) java.lang.String name");
++    [Fact] void should_construct_the_argument_concept() => Code("FindTotalEndpoint").ShouldContain("new FindTotal(new String(name))");
++    [Fact] void should_not_import_the_conflicting_framework_type() => Code("FindTotalEndpoint").ShouldNotContain("import java.lang.String;");
+ }

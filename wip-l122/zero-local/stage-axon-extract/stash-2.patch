@@ -1,0 +1,475 @@
+diff --git a/Documentation/guides/third-party-render-target.md b/Documentation/guides/third-party-render-target.md
+index 147edf52..65e2afd2 100644
+--- a/Documentation/guides/third-party-render-target.md
++++ b/Documentation/guides/third-party-render-target.md
+@@ -108,7 +108,7 @@ The default scaffold uses in-memory storage. The emitted `persistent` Spring pro
+ | Concern | Default in-memory application | Persistent profile and limits |
+ | --- | --- | --- |
+ | Event-source position | Existing-identity commands inject the per-source `@EventSourcedEntity` state with `@InjectEntity` before appending; generated identities still load through `StateManager.loadManagedEntity`. Single unconditional, unconstrained events append directly; conditional, multiple and constrained events append as a batch, including repeated commands on the same source. | The same loaded-position path uses the aggregate JPA engine; blind repeated appends are not equivalent. |
+-| Event tags | Each event has one primary event-source tag. Additional modeled tags produce an explicit degradation warning. | The aggregate-based JPA engine accepts at most one tag per event. |
++| Event tags | Each event has one primary event-source tag. Its owning module exposes the key through `events.EventTags` constants, shared by event annotations, stream state and entity injection without changing stored tag values. Additional modeled tags produce an explicit degradation warning. | The aggregate-based JPA engine accepts at most one tag per event. |
+ | Protected decisions | Required presence/removal reads can fold one admitted projection inside the command's own primary stream. Unsupported shapes fail closed with `STAGE-AXON-0106`; asynchronous snapshots are not substituted. | The protected read and append use that stream boundary. Multi-tag or cross-stream protection is not promised. |
+ | Unique constraints | Supported property-based constraints reserve claims during append and clean up reservations on rollback. Unsupported constraint shapes fail closed with `STAGE-AXON-0801`. | JPA claims, releases and event append share the transaction. Native race/rollback fixtures exercise both profiles; this is not arbitrary-query uniqueness. |
+ | Reactions | Supported reactions invoke commands or append one typed event. Delivery is at least once, not exactly once; reaction handlers disallow replay. | Storage does not provide exactly-once side effects or durable processor checkpoints. |
+diff --git a/Source/Rendering.Axon/Emitters/Automations/ReactionProduction.cs b/Source/Rendering.Axon/Emitters/Automations/ReactionProduction.cs
+index 635994cb..4f3fb63c 100644
+--- a/Source/Rendering.Axon/Emitters/Automations/ReactionProduction.cs
++++ b/Source/Rendering.Axon/Emitters/Automations/ReactionProduction.cs
+@@ -8,7 +8,7 @@ using Cratis.Stage.Rendering.Axon.Sdk;
+ 
+ namespace Cratis.Stage.Rendering.Axon.Emitters.Automations;
+ 
+-internal sealed record ReactionProduction(string Name, ReactionProducedEvent Event, (string ComponentName, string JavaType, string TagKey) Primary)
++internal sealed record ReactionProduction(string Name, ReactionProducedEvent Event, (string ComponentName, string JavaType, string TagKey) Primary, string TagReference)
+ {
+     internal string Invocation => (Event.Condition is null ? string.Empty : $"if ({Event.Condition}) ") + $"commands.sendAndWait(new {Name}({Event.Source}, {Event.Expression}));";
+ 
+@@ -39,8 +39,8 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
+     {
+         var contracts = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id);
+         var stream = new JavaCodeBuilder(package)
+-            .Line($"@org.axonframework.eventsourcing.annotation.EventSourcedEntity(tagKey = {JavaCodeBuilder.StringLiteral(Primary.TagKey)})")
+-            .Line($"@org.axonframework.extension.spring.stereotype.EventSourced(idType = {Primary.JavaType}.class, tagKey = {JavaCodeBuilder.StringLiteral(Primary.TagKey)})")
++            .Line($"@org.axonframework.eventsourcing.annotation.EventSourcedEntity(tagKey = {TagReference})")
++            .Line($"@org.axonframework.extension.spring.stereotype.EventSourced(idType = {Primary.JavaType}.class, tagKey = {TagReference})")
+             .Block($"public class {Name}Stream", body =>
+             {
+                 body.Line("@org.axonframework.eventsourcing.annotation.reflection.EntityCreator").Line($"public {Name}Stream() {{}}");
+diff --git a/Source/Rendering.Axon/Emitters/Automations/ReactionProductionPreparation.cs b/Source/Rendering.Axon/Emitters/Automations/ReactionProductionPreparation.cs
+index 7d91bffc..bde20d05 100644
+--- a/Source/Rendering.Axon/Emitters/Automations/ReactionProductionPreparation.cs
++++ b/Source/Rendering.Axon/Emitters/Automations/ReactionProductionPreparation.cs
+@@ -24,7 +24,7 @@ internal sealed class ReactionProductionPreparation(AxonEmissionContext context,
+         var condition = produced.When is null ? null : input.Condition(context, produced.When);
+         if (produced.When is not null && condition is null) return null;
+         var eventType = AxonEventsEmitter.TypeFor(context, contract.Id);
+-        return new(name, new(eventType, $"new {eventType}({string.Join(", ", arguments)})", source, condition), primary);
++        return new(name, new(eventType, $"new {eventType}({string.Join(", ", arguments)})", source, condition), primary, EventTagsEmitter.Reference(context, contract));
+     }
+ 
+     bool Supported()
+diff --git a/Source/Rendering.Axon/Emitters/AxonEmitters.cs b/Source/Rendering.Axon/Emitters/AxonEmitters.cs
+index e302a464..c8f1ea58 100644
+--- a/Source/Rendering.Axon/Emitters/AxonEmitters.cs
++++ b/Source/Rendering.Axon/Emitters/AxonEmitters.cs
+@@ -10,6 +10,7 @@ internal static class AxonEmitters
+         new Scaffold.AxonScaffoldEmitter(),
+         new Concepts.AxonConceptsEmitter(),
+         new Events.AxonEventsEmitter(),
++        new Events.EventTagsEmitter(),
+         new Commands.AxonCommandsEmitter(),
+         new Constraints.AxonConstraintsEmitter(),
+         new Decisions.AxonDecisionsEmitter(),
+diff --git a/Source/Rendering.Axon/Emitters/Commands/CommandHandlerEmitter.cs b/Source/Rendering.Axon/Emitters/Commands/CommandHandlerEmitter.cs
+index 0ad15250..2a262275 100644
+--- a/Source/Rendering.Axon/Emitters/Commands/CommandHandlerEmitter.cs
++++ b/Source/Rendering.Axon/Emitters/Commands/CommandHandlerEmitter.cs
+@@ -70,7 +70,7 @@ internal sealed class CommandHandlerEmitter(AxonEmissionContext context, Located
+         if (Constrained && source?.Generated != true) parameters += ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
+         if (source is null) return parameters;
+         if (source.Generated) return parameters + ", org.axonframework.messaging.core.unitofwork.ProcessingContext context";
+-        return parameters + $", @InjectEntity(idProperty = {JavaCodeBuilder.StringLiteral(source.Member)}) {name}Stream state";
++        return parameters + $", @InjectEntity(idProperty = {source.TagReference}) {name}Stream state";
+     }
+ 
+     void Handle(JavaCodeBuilder body, CommandResponses response)
+diff --git a/Source/Rendering.Axon/Emitters/Commands/CommandSource.cs b/Source/Rendering.Axon/Emitters/Commands/CommandSource.cs
+index a385af40..dd52e8b3 100644
+--- a/Source/Rendering.Axon/Emitters/Commands/CommandSource.cs
++++ b/Source/Rendering.Axon/Emitters/Commands/CommandSource.cs
+@@ -13,6 +13,8 @@ internal sealed record CommandSource
+ 
+     internal required SemanticTypeReference Type { get; init; }
+ 
++    internal required string TagReference { get; init; }
++
+     internal SemanticProperty? Input { get; init; }
+ 
+     internal SemanticExpression? Destination { get; init; }
+@@ -37,7 +39,7 @@ internal sealed record CommandSource
+         var destination = command.Produces.FirstOrDefault()?.Destination ?? command.Destination?.Value;
+         var input = InputProperty(command, contract, tag.ComponentName, destination);
+         if (!CanIdentify(command, destination, input)) return null;
+-        var source = new CommandSource { Primary = tag, Type = type, Input = input, Destination = destination };
++        var source = new CommandSource { Primary = tag, Type = type, TagReference = EventTagsEmitter.Reference(context, contract), Input = input, Destination = destination };
+         if (source.ConflictsWithInput(command, types)) return null;
+         return source.Value(command, types, "command") is null ? null : source;
+     }
+diff --git a/Source/Rendering.Axon/Emitters/Commands/CommandStreamEmitter.cs b/Source/Rendering.Axon/Emitters/Commands/CommandStreamEmitter.cs
+index 46f2aae6..72b41dc8 100644
+--- a/Source/Rendering.Axon/Emitters/Commands/CommandStreamEmitter.cs
++++ b/Source/Rendering.Axon/Emitters/Commands/CommandStreamEmitter.cs
+@@ -25,8 +25,8 @@ internal static class CommandStreamEmitter
+             .Import("org.axonframework.eventsourcing.annotation.reflection.EntityCreator")
+             .Import("org.axonframework.eventsourcing.annotation.EventSourcingHandler")
+             .Import("org.axonframework.eventsourcing.annotation.EventSourcedEntity")
+-            .Line($"@EventSourcedEntity(tagKey = {JavaCodeBuilder.StringLiteral(source.TagKey)})")
+-            .Line($"@EventSourced(idType = {source.JavaType}.class, tagKey = {JavaCodeBuilder.StringLiteral(source.TagKey)})")
++            .Line($"@EventSourcedEntity(tagKey = {source.TagReference})")
++            .Line($"@EventSourced(idType = {source.JavaType}.class, tagKey = {source.TagReference})")
+             .Block($"public class {name}", body =>
+             {
+                 body.Line("@EntityCreator").Line($"public {name}() {{}}")
+diff --git a/Source/Rendering.Axon/Emitters/Events/AxonEventSources.cs b/Source/Rendering.Axon/Emitters/Events/AxonEventSources.cs
+index f7401c90..cdef4d25 100644
+--- a/Source/Rendering.Axon/Emitters/Events/AxonEventSources.cs
++++ b/Source/Rendering.Axon/Emitters/Events/AxonEventSources.cs
+@@ -22,9 +22,9 @@ internal static class AxonEventSources
+     internal static string Record(AxonEmissionContext context, string package, SemanticEventContract contract, string annotation)
+     {
+         var primary = PrimaryTag(context, contract);
+-        var parameters = contract.Properties.Select(property => Component(context, property, primary)).ToList();
++        var parameters = contract.Properties.Select(property => Component(context, contract, property, primary)).ToList();
+         if (!contract.Properties.Any(property => JavaNames.Member(property.Name) == primary.ComponentName))
+-            parameters.Insert(0, $"@org.axonframework.eventsourcing.annotation.EventTag(key = {JavaCodeBuilder.StringLiteral(primary.TagKey)}) {primary.JavaType} {primary.ComponentName}");
++            parameters.Insert(0, $"@org.axonframework.eventsourcing.annotation.EventTag(key = {EventTagsEmitter.Reference(context, contract)}) {primary.JavaType} {primary.ComponentName}");
+         var code = new JavaCodeBuilder(package);
+         var extraTags = contract.Tags.Concat(contract.Properties.Where(property => property.IsIdentifier).Select(property => property.Name))
+             .Where(tag => tag != primary.TagKey).Distinct(StringComparer.Ordinal).ToArray();
+@@ -63,10 +63,10 @@ internal static class AxonEventSources
+         return (name, context.BasePackage + ".concepts." + JavaNames.Type(concept.Name), name);
+     }
+ 
+-    static string Component(AxonEmissionContext context, SemanticProperty property, (string ComponentName, string JavaType, string TagKey) primary)
++    static string Component(AxonEmissionContext context, SemanticEventContract contract, SemanticProperty property, (string ComponentName, string JavaType, string TagKey) primary)
+     {
+         var name = JavaNames.Member(property.Name);
+-        var tag = name == primary.ComponentName ? "@org.axonframework.eventsourcing.annotation.EventTag(key = " + JavaCodeBuilder.StringLiteral(primary.TagKey) + ") " : string.Empty;
++        var tag = name == primary.ComponentName ? "@org.axonframework.eventsourcing.annotation.EventTag(key = " + EventTagsEmitter.Reference(context, contract) + ") " : string.Empty;
+         return tag + $"@com.fasterxml.jackson.annotation.JsonProperty({JavaCodeBuilder.StringLiteral(property.Name)}) {JavaSemanticTypes.TypeFor(context, property.Type)} {name}";
+     }
+ }
+diff --git a/Source/Rendering.Axon/Emitters/Events/AxonEventsEmitter.cs b/Source/Rendering.Axon/Emitters/Events/AxonEventsEmitter.cs
+index 6c27ff6a..a932e99a 100644
+--- a/Source/Rendering.Axon/Emitters/Events/AxonEventsEmitter.cs
++++ b/Source/Rendering.Axon/Emitters/Events/AxonEventsEmitter.cs
+@@ -14,13 +14,17 @@ internal sealed class AxonEventsEmitter : IAxonEmitter
+     public bool IsImplemented => true;
+ 
+     public void Emit(AxonEmissionContext context)
++    {
++        foreach (var (module, contract) in Contracts(context)) Emit(context, module, contract);
++    }
++
++    internal static IEnumerable<(SemanticModule Module, SemanticEventContract Event)> Contracts(AxonEmissionContext context)
+     {
+         var selected = ScopeSelection.Select(context.Request).Select(slice => slice.Module.Id).ToHashSet();
+         var applicationScope = context.Request.Scope.Kind == ArtifactRenderScopeKind.Application;
+-        var events = ScopeSelection.Locate(context.Request.Model.Application)
++        return ScopeSelection.Locate(context.Request.Model.Application)
+             .Where(slice => applicationScope || selected.Contains(slice.Module.Id) || slice.Module.Id == context.Request.Scope.Artifact)
+             .SelectMany(slice => slice.Slice.Events.Select(@event => (slice.Module, Event: @event))).DistinctBy(pair => pair.Event.Id);
+-        foreach (var (module, contract) in events) Emit(context, module, contract);
+     }
+ 
+     internal static string Package(AxonEmissionContext context, SemanticModule module) => context.BasePackage + "." + JavaNames.PackageSegment(module.Name) + ".events";
+diff --git a/Source/Rendering.Axon/Emitters/Events/EventTagNames.cs b/Source/Rendering.Axon/Emitters/Events/EventTagNames.cs
+new file mode 100644
+index 00000000..8604ad36
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Events/EventTagNames.cs
+@@ -0,0 +1,39 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using System.Globalization;
++using System.Text.RegularExpressions;
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Events;
++
++internal static partial class EventTagNames
++{
++    [GeneratedRegex("(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", RegexOptions.CultureInvariant, 1000)]
++    private static partial Regex WordBoundary { get; }
++
++    [GeneratedRegex("[^A-Za-z0-9]+", RegexOptions.CultureInvariant, 1000)]
++    private static partial Regex NonIdentifier { get; }
++
++    internal static Dictionary<string, string> Constants(IEnumerable<string> keys)
++    {
++        var constants = new Dictionary<string, string>(StringComparer.Ordinal);
++        var used = new HashSet<string>(StringComparer.Ordinal);
++        foreach (var key in keys.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
++        {
++            var name = Name(key);
++            var candidate = name;
++            for (var suffix = 2; !used.Add(candidate); suffix++)
++                candidate = name + "_" + suffix.ToString(CultureInfo.InvariantCulture);
++            constants.Add(key, candidate);
++        }
++        return constants;
++    }
++
++    static string Name(string key)
++    {
++        var words = WordBoundary.Replace(key, "_");
++        var name = NonIdentifier.Replace(words, "_").Trim('_').ToUpperInvariant();
++        if (name.Length == 0) return "TAG";
++        return char.IsAsciiDigit(name[0]) ? "_" + name : name;
++    }
++}
+diff --git a/Source/Rendering.Axon/Emitters/Events/EventTagsEmitter.cs b/Source/Rendering.Axon/Emitters/Events/EventTagsEmitter.cs
+new file mode 100644
+index 00000000..205c7561
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Events/EventTagsEmitter.cs
+@@ -0,0 +1,43 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using Cratis.Screenplay.Semantics;
++using Cratis.Stage.Rendering.Axon.Java;
++using Cratis.Stage.Rendering.Axon.Sdk;
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Events;
++
++internal sealed class EventTagsEmitter : IAxonEmitter
++{
++    public bool IsImplemented => true;
++
++    public void Emit(AxonEmissionContext context)
++    {
++        foreach (var module in AxonEventsEmitter.Contracts(context).Select(pair => pair.Module).DistinctBy(module => module.Id))
++        {
++            var contracts = Contracts(context, module).ToArray();
++            var code = new JavaCodeBuilder(AxonEventsEmitter.Package(context, module))
++                .Block("public final class EventTags", body =>
++                {
++                    foreach (var (key, name) in Constants(context, contracts).OrderBy(pair => pair.Value, StringComparer.Ordinal))
++                        body.Line($"public static final String {name} = {JavaCodeBuilder.StringLiteral(key)};");
++                    body.Line("private EventTags() {}");
++                }).Build();
++            context.AddJava(AxonEventsEmitter.Package(context, module), "EventTags", code, sources: [.. contracts.Select(contract => contract.Id)]);
++        }
++    }
++
++    internal static string Reference(AxonEmissionContext context, SemanticEventContract contract)
++    {
++        var module = ScopeSelection.Locate(context.Request.Model.Application).First(slice => slice.Slice.Events.Any(candidate => candidate.Id == contract.Id)).Module;
++        var key = AxonEventSources.PrimaryTag(context, contract).TagKey;
++        return AxonEventsEmitter.Package(context, module) + ".EventTags." + Constants(context, Contracts(context, module))[key];
++    }
++
++    static IEnumerable<SemanticEventContract> Contracts(AxonEmissionContext context, SemanticModule module) =>
++        ScopeSelection.Locate(context.Request.Model.Application).Where(slice => slice.Module.Id == module.Id)
++            .SelectMany(slice => slice.Slice.Events).DistinctBy(contract => contract.Id);
++
++    static Dictionary<string, string> Constants(AxonEmissionContext context, IEnumerable<SemanticEventContract> contracts) =>
++        EventTagNames.Constants(contracts.Select(contract => AxonEventSources.PrimaryTag(context, contract).TagKey));
++}
+diff --git a/Source/Rendering.Axon/Emitters/Events/for_AxonEventSources/when_selecting_the_primary_tag.cs b/Source/Rendering.Axon/Emitters/Events/for_AxonEventSources/when_selecting_the_primary_tag.cs
+index 7d1b59b3..f8ce39c3 100644
+--- a/Source/Rendering.Axon/Emitters/Events/for_AxonEventSources/when_selecting_the_primary_tag.cs
++++ b/Source/Rendering.Axon/Emitters/Events/for_AxonEventSources/when_selecting_the_primary_tag.cs
+@@ -36,7 +36,7 @@ public class when_selecting_the_primary_tag : for_AxonArtifactRenderPlanner.give
+     void should_add_the_missing_primary_component()
+     {
+         var code = AxonEventSources.Record(context, "example.events", contract, "");
+-        code.ShouldContain("@org.axonframework.eventsourcing.annotation.EventTag(key = \"orderId\") " + context.BasePackage + ".concepts.OrderId orderId");
++        code.ShouldContain($"@org.axonframework.eventsourcing.annotation.EventTag(key = {context.BasePackage}.orders.events.EventTags.ORDER_ID) {context.BasePackage}.concepts.OrderId orderId");
+         TagCount(code).ShouldEqual(1);
+     }
+ 
+diff --git a/Source/Rendering.Axon/Emitters/Events/for_EventTagNames/when_naming_constants.cs b/Source/Rendering.Axon/Emitters/Events/for_EventTagNames/when_naming_constants.cs
+new file mode 100644
+index 00000000..442fce11
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Events/for_EventTagNames/when_naming_constants.cs
+@@ -0,0 +1,32 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using Cratis.Specifications;
++using Xunit;
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Events.for_EventTagNames;
++
++public class when_naming_constants
++{
++    [Theory]
++    [InlineData("orderId", "ORDER_ID")]
++    [InlineData("customerID", "CUSTOMER_ID")]
++    [InlineData("XMLDocumentId", "XML_DOCUMENT_ID")]
++    [InlineData("order-id", "ORDER_ID")]
++    [InlineData("1stSource", "_1ST_SOURCE")]
++    [InlineData("_", "TAG")]
++    public void should_create_a_java_constant_name(string key, string expected) => EventTagNames.Constants([key])[key].ShouldEqual(expected);
++
++    [Fact]
++    public void should_disambiguate_collisions_deterministically()
++    {
++        string[] keys = ["orderId", "order-id", "order_id", "orderId_2", "orderId"];
++        var constants = EventTagNames.Constants(keys);
++        constants.Count.ShouldEqual(4);
++        constants.Values.Distinct(StringComparer.Ordinal).Count().ShouldEqual(4);
++        var reversed = EventTagNames.Constants(keys.Reverse());
++        foreach (var (key, name) in constants) reversed[key].ShouldEqual(name);
++        constants["order-id"].ShouldEqual("ORDER_ID");
++        constants["orderId"].ShouldEqual("ORDER_ID_2");
++    }
++}
+diff --git a/Source/Rendering.Axon/Emitters/for_AxonEmitters/when_visiting_families.cs b/Source/Rendering.Axon/Emitters/for_AxonEmitters/when_visiting_families.cs
+index f156b6df..c2c271a5 100644
+--- a/Source/Rendering.Axon/Emitters/for_AxonEmitters/when_visiting_families.cs
++++ b/Source/Rendering.Axon/Emitters/for_AxonEmitters/when_visiting_families.cs
+@@ -15,6 +15,7 @@ public class when_visiting_families : for_AxonArtifactRenderPlanner.given.an_axo
+             "AxonScaffoldEmitter",
+             "AxonConceptsEmitter",
+             "AxonEventsEmitter",
++            "EventTagsEmitter",
+             "AxonCommandsEmitter",
+             "AxonConstraintsEmitter",
+             "AxonDecisionsEmitter",
+diff --git a/Source/Rendering.Axon/for_AxonAutomationsEmitter/when_producing_an_event.cs b/Source/Rendering.Axon/for_AxonAutomationsEmitter/when_producing_an_event.cs
+index c38579a5..82149330 100644
+--- a/Source/Rendering.Axon/for_AxonAutomationsEmitter/when_producing_an_event.cs
++++ b/Source/Rendering.Axon/for_AxonAutomationsEmitter/when_producing_an_event.cs
+@@ -18,7 +18,7 @@ public class when_producing_an_event : given.a_reaction_model
+     [Fact] void should_load_the_current_stream_position() => Code("SubmitOrderOn0AppendHandler").ShouldContain("@org.axonframework.modelling.annotation.InjectEntity(idProperty = \"eventSourceId\")");
+     [Fact] void should_append_the_produced_event() => Code("SubmitOrderOn0AppendHandler").ShouldContain("appender.append(command.event());");
+     [Fact] void should_check_the_event_identity() => Code("SubmitOrderOn0AppendHandler").ShouldContain("command.event().orderId()");
+-    [Fact] void should_use_the_shared_primary_tag() => Code("SubmitOrderOn0AppendStream").ShouldContain("tagKey = \"orderId\"");
++    [Fact] void should_use_the_shared_primary_tag() => Code("SubmitOrderOn0AppendStream").ShouldContain($"tagKey = {context.BasePackage}.orders.events.EventTags.ORDER_ID");
+     [Fact] void should_preserve_position_for_other_stream_events() => Code("SubmitOrderOn0AppendStream").ShouldContain("OrderMoved event");
+     [Fact] void should_not_report_degradation() => context.Degradation.UnsupportedConstructs.Count.ShouldEqual(0);
+ }
+diff --git a/Source/Rendering.Axon/for_AxonAutomationsEmitter/when_producing_into_another_module.cs b/Source/Rendering.Axon/for_AxonAutomationsEmitter/when_producing_into_another_module.cs
+new file mode 100644
+index 00000000..c82783a5
+--- /dev/null
++++ b/Source/Rendering.Axon/for_AxonAutomationsEmitter/when_producing_into_another_module.cs
+@@ -0,0 +1,50 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using Cratis.Screenplay.Semantics;
++using Cratis.Specifications;
++using Cratis.Stage.Rendering.Axon.Emitters;
++using Cratis.Stage.Rendering.Axon.Emitters.Automations;
++using Cratis.Stage.Rendering.Axon.Emitters.Events;
++using Cratis.Stage.Rendering.Axon.Java;
++using Cratis.Stage.Rendering.Axon.Sdk;
++using Xunit;
++
++namespace Cratis.Stage.Rendering.Axon.for_AxonAutomationsEmitter;
++
++public class when_producing_into_another_module : given.a_reaction_model
++{
++    string ownerPackage;
++
++    void Because()
++    {
++        Produce();
++        Render();
++        var application = request.Model.Application;
++        var automation = ScopeSelection.Select(request).Single(slice => slice.Slice.Reactions.Any(candidate => candidate.Id == reaction.Id));
++        var target = reaction.Triggers[0].Produces[0].EventContract;
++        ownerPackage = AxonEventsEmitter.Package(context, ScopeSelection.Select(request).First(slice => slice.Slice.Events.Any(contract => contract.Id == target)).Module);
++        var module = automation.Module with
++        {
++            Id = SemanticId.Create(SemanticKind.Module, "Automation"),
++            Name = "Automation",
++            Features = [automation.Features[^1] with { Id = SemanticId.Create(SemanticKind.Feature, "Automation.SubmitOrder"), Name = "SubmitOrder", Features = [], Slices = [automation.Slice] }]
++        };
++        var modules = application.Modules.Select(module => module with { Features = [.. module.Features.Select(RemoveAutomation)] }).Append(module);
++        request = request with { Model = ExecutableSemanticModel.Create(request.Model.LanguageVersion, request.Model.SemanticVersion, application with { Modules = [.. modules] }) };
++        context = new(request, new(request.Profile));
++        new AxonAutomationsEmitter().Emit(context);
++        new EventTagsEmitter().Emit(context);
++    }
++
++    [Fact] void should_reference_the_produced_events_module() => Code("SubmitOrderOn0AppendStream").ShouldContain($"tagKey = {ownerPackage}.EventTags.ORDER_ID");
++    [Fact] void should_not_reference_the_automation_module() => Code("SubmitOrderOn0AppendStream").ShouldNotContain($"{context.BasePackage}.{JavaNames.PackageSegment("Automation")}.events.EventTags");
++    [Fact] void should_emit_the_target_modules_constants() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/orders/events/EventTags.java", StringComparison.Ordinal)).ShouldBeTrue();
++    [Fact] void should_not_emit_constants_for_the_eventless_automation_module() => context.Artifacts.Exists(artifact => artifact.RelativePath.EndsWith("/automation/events/EventTags.java", StringComparison.Ordinal)).ShouldBeFalse();
++
++    SemanticFeature RemoveAutomation(SemanticFeature feature) => feature with
++    {
++        Features = [.. feature.Features.Select(RemoveAutomation)],
++        Slices = [.. feature.Slices.Where(slice => !slice.Reactions.Any(candidate => candidate.Id == reaction.Id))]
++    };
++}
+diff --git a/Source/Rendering.Axon/for_AxonCommandsEmitter/when_rendering_state_changes.cs b/Source/Rendering.Axon/for_AxonCommandsEmitter/when_rendering_state_changes.cs
+index 8835e9b3..f3779b30 100644
+--- a/Source/Rendering.Axon/for_AxonCommandsEmitter/when_rendering_state_changes.cs
++++ b/Source/Rendering.Axon/for_AxonCommandsEmitter/when_rendering_state_changes.cs
+@@ -25,12 +25,12 @@ public class when_rendering_state_changes : for_AxonArtifactRenderPlanner.given.
+     void Because() => new AxonCommandsEmitter().Emit(context);
+ 
+     [Fact] void should_enable_command_emission() => new AxonCommandsEmitter().IsImplemented.ShouldBeTrue();
+-    [Fact] void should_inject_the_primary_stream_state() => Code("PlaceOrderHandler").ShouldContain("@InjectEntity(idProperty = \"orderId\") PlaceOrderStream state");
++    [Fact] void should_inject_the_primary_stream_state() => Code("PlaceOrderHandler").ShouldContain($"@InjectEntity(idProperty = {context.BasePackage}.orders.events.EventTags.ORDER_ID) PlaceOrderStream state");
+     [Fact] void should_import_entity_injection() => Code("PlaceOrderHandler").ShouldContain("import org.axonframework.modelling.annotation.InjectEntity;");
+     [Fact] void should_not_wrap_the_state() => Code("PlaceOrderHandler").ShouldNotContain("ManagedEntity");
+     [Fact] void should_append_the_single_event_directly() => Code("PlaceOrderHandler").ShouldContain("appender.append(new ");
+     [Fact] void should_not_collect_a_single_event() => Code("PlaceOrderHandler").ShouldNotContain("ArrayList");
+-    [Fact] void should_use_the_shared_primary_tag() => Code("PlaceOrderStream").ShouldContain("@EventSourcedEntity(tagKey = \"orderId\")");
++    [Fact] void should_use_the_shared_primary_tag() => Code("PlaceOrderStream").ShouldContain($"@EventSourcedEntity(tagKey = {context.BasePackage}.orders.events.EventTags.ORDER_ID)");
+     [Fact] void should_mark_the_command_identity() => Code("PlaceOrder").ShouldContain("@org.axonframework.modelling.annotation.TargetEntityId");
+     [Fact] void should_emit_a_post_endpoint() => Code("PlaceOrderEndpoint").ShouldContain("@PostMapping(\"/api/orders/orders/place-order\")");
+     [Fact] void should_return_a_typed_result() => Code("PlaceOrderEndpoint").ShouldContain("CompletableFuture<Void>");
+diff --git a/Source/Rendering.Axon/for_AxonEventsEmitter/when_rendering_event_tag_constants.cs b/Source/Rendering.Axon/for_AxonEventsEmitter/when_rendering_event_tag_constants.cs
+new file mode 100644
+index 00000000..c5156f51
+--- /dev/null
++++ b/Source/Rendering.Axon/for_AxonEventsEmitter/when_rendering_event_tag_constants.cs
+@@ -0,0 +1,59 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using System.Text;
++using Cratis.Screenplay.Semantics;
++using Cratis.Specifications;
++using Cratis.Stage.Contracts.Rendering;
++using Cratis.Stage.Rendering.Axon.Emitters;
++using Cratis.Stage.Rendering.Axon.Emitters.Events;
++using Cratis.Stage.Rendering.Axon.Java;
++using Cratis.Stage.Rendering.Axon.Sdk;
++using Xunit;
++
++namespace Cratis.Stage.Rendering.Axon.for_AxonEventsEmitter;
++
++public class when_rendering_event_tag_constants : for_AxonArtifactRenderPlanner.given.an_axon_request
++{
++    AxonEmissionContext context;
++    string tags;
++    string events;
++
++    void Because()
++    {
++        context = new(request, new(request.Profile));
++        new AxonEventsEmitter().Emit(context);
++        new EventTagsEmitter().Emit(context);
++        tags = Code(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/EventTags.java", StringComparison.Ordinal)));
++        events = string.Join('\n', context.Artifacts.Where(artifact => !artifact.RelativePath.EndsWith("/EventTags.java", StringComparison.Ordinal)).Select(Code));
++    }
++
++    [Fact] void should_emit_a_final_utility_class() => tags.ShouldContain("public final class EventTags");
++    [Fact] void should_prevent_instantiation() => tags.ShouldContain("private EventTags() {}");
++    [Fact] void should_preserve_the_original_tag_value() => tags.ShouldContain("public static final String ORDER_ID = \"orderId\";");
++    [Fact] void should_deduplicate_shared_tag_keys() => (tags.Split("public static final String ORDER_ID", StringSplitOptions.None).Length - 1).ShouldEqual(1);
++    [Fact] void should_reference_the_constant_from_event_components() => events.ShouldContain($"EventTag(key = {context.BasePackage}.orders.events.EventTags.ORDER_ID)");
++    [Fact] void should_not_repeat_the_tag_literal_in_events() => events.ShouldNotContain("key = \"orderId\"");
++    [Fact] void should_keep_modeled_json_names() => events.ShouldContain("@com.fasterxml.jackson.annotation.JsonProperty(\"customer\")");
++    [Fact] void should_keep_event_metadata() => events.ShouldContain("@org.axonframework.messaging.eventhandling.annotation.Event");
++
++    [Fact]
++    void should_not_emit_constants_for_a_module_without_events()
++    {
++        var application = request.Model.Application;
++        var empty = application.Modules[0] with { Features = [] };
++        var emptyRequest = request with { Model = ExecutableSemanticModel.Create(LanguageVersion.V1, SemanticVersion.V1, application with { Modules = [empty] }) };
++        var emptyContext = new AxonEmissionContext(emptyRequest, new(request.Profile));
++        new EventTagsEmitter().Emit(emptyContext);
++        emptyContext.Artifacts.ShouldBeEmpty();
++    }
++
++    [Fact]
++    void should_emit_constants_for_each_selected_module()
++    {
++        foreach (var module in ScopeSelection.Select(request).Where(slice => !slice.Slice.Events.IsEmpty).Select(slice => slice.Module).DistinctBy(module => module.Id))
++            context.Artifacts.Count(artifact => artifact.RelativePath == $"src/main/java/{context.BasePackage}/{JavaNames.PackageSegment(module.Name)}/events/EventTags.java").ShouldEqual(1);
++    }
++
++    static string Code(PlannedArtifact artifact) => Encoding.UTF8.GetString(artifact.Bytes.AsSpan());
++}

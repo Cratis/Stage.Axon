@@ -1,0 +1,1286 @@
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/AxonPersistenceEmitter.cs b/Source/Rendering.Axon/Emitters/Persistence/AxonPersistenceEmitter.cs
+index 2d5fcab2..51c91919 100644
+--- a/Source/Rendering.Axon/Emitters/Persistence/AxonPersistenceEmitter.cs
++++ b/Source/Rendering.Axon/Emitters/Persistence/AxonPersistenceEmitter.cs
+@@ -1,6 +1,61 @@
+ // Copyright (c) Cratis. All rights reserved.
+ // Licensed under the MIT license. See LICENSE file in the project root for full license information.
+ 
++using System.Security.Cryptography;
++using System.Text;
++using Cratis.Stage.Rendering.Axon.Emitters.Projections;
++using Cratis.Stage.Rendering.Axon.Sdk;
++
+ namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
+ 
+-internal sealed class AxonPersistenceEmitter : IAxonEmitter;
++internal sealed class AxonPersistenceEmitter : IAxonEmitter
++{
++    public bool IsImplemented => true;
++
++    public void Emit(AxonEmissionContext context)
++    {
++        var models = ScopeSelection.Select(context.Request).SelectMany(owner => owner.Slice.ReadModels).ToArray();
++        if (!models.Any(model => PersistentViewAdmission.Supports(context, model.Id))) return;
++        var types = new ViewJavaTypes(context.Request.Model.Application);
++        var package = types.BasePackage + ".persistence";
++        var runtime = types.BasePackage + ".runtime";
++        var ids = models.Select(model => model.Id).ToArray();
++        // Hash the generated application contract, not filesystem bytes or a mutable runtime checkpoint.
++        var contract = string.Join('\n', context.Artifacts.Where(artifact => artifact.RelativePath.StartsWith("src/main/java/", StringComparison.Ordinal))
++            .OrderBy(artifact => artifact.RelativePath, StringComparer.Ordinal)
++            .Select(artifact => artifact.RelativePath + "\n" + Encoding.UTF8.GetString(artifact.Bytes.AsSpan())));
++        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("flat-view-json-v1\n" + contract)));
++        void Add(string name, string source) => ViewJavaTypes.Add(context, package, name,
++            source.Replace("__PACKAGE__", package, StringComparison.Ordinal).Replace("__RUNTIME__", runtime, StringComparison.Ordinal), ids);
++        Add("ViewRow", PersistentViewEntities.Row);
++        Add("ViewGeneration", PersistentViewEntities.Generation);
++        Add("JpaReadModelStore", PersistentViewStore.Source);
++        Add("PersistentViewBootstrap", PersistentViewBootstrap.Source);
++        Add("PersistentViewConfiguration", Configuration(package, runtime, types.BasePackage, fingerprint));
++        new PersistentViewTests(context, types, package).Emit();
++    }
++
++    static string Configuration(string package, string runtime, string application, string fingerprint) => $$"""
++        // Copyright (c) Cratis. All rights reserved.
++        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
++        package {{package}};
++
++        import jakarta.persistence.EntityManagerFactory;
++        import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;
++        import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;
++        import org.springframework.boot.persistence.autoconfigure.EntityScan;
++        import org.springframework.context.annotation.Configuration;
++        import org.springframework.context.annotation.Profile;
++        import {{runtime}}.persistent.UniqueClaim;
++
++        @Configuration(proxyBeanMethods = false)
++        @Profile("persistent")
++        @EntityScan(basePackageClasses = { ViewRow.class, ViewGeneration.class, UniqueClaim.class, AggregateEventEntry.class, TokenEntry.class })
++        public class PersistentViewConfiguration {
++            public static final String FINGERPRINT = "{{fingerprint}}";
++            public PersistentViewConfiguration(EntityManagerFactory factory) {
++                PersistentViewBootstrap.verify(factory, "{{application}}", FINGERPRINT);
++            }
++        }
++        """;
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/PersistentViewAdmission.cs b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewAdmission.cs
+new file mode 100644
+index 00000000..242ad214
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewAdmission.cs
+@@ -0,0 +1,42 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using Cratis.Screenplay.Semantics;
++using Cratis.Stage.Rendering.Axon.Emitters.Projections;
++using Cratis.Stage.Rendering.Axon.Sdk;
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++
++internal static class PersistentViewAdmission
++{
++    internal static bool Supports(AxonEmissionContext context, SemanticId model)
++    {
++        var slices = ScopeSelection.Select(context.Request).Select(owner => owner.Slice).ToArray();
++        var projections = slices.SelectMany(slice => slice.Projections).Where(projection => projection.ReadModel == model).ToArray();
++        var readModel = slices.SelectMany(slice => slice.ReadModels).FirstOrDefault(candidate => candidate.Id == model);
++        if (readModel is null || projections.Length == 0) return false;
++        return projections.All(projection => Flat(context, readModel, projection)) &&
++            !slices.SelectMany(slice => slice.Reducers).Any(reducer => reducer.ReadModel == model);
++    }
++
++    static bool Flat(AxonEmissionContext context, SemanticReadModel model, SemanticProjection projection)
++    {
++        if (ProjectionHandlerShape.Scoped(projection) || !ProjectionTransitions.From(projection).Any()) return false;
++        return ProjectionTransitions.From(projection).All(from => From(context, model, from));
++    }
++
++    static bool From(AxonEmissionContext context, SemanticReadModel model, SemanticProjectionFrom from)
++    {
++        var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(owner => owner.Slice.Events).First(candidate => candidate.Id == from.EventContract);
++        var values = new ProjectionValues(context, new ViewJavaTypes(context.Request.Model.Application));
++        return values.Key(from.Key, @event) is not null && from.Mappings.All(mapping => Mapping(values, model, @event, mapping));
++    }
++
++    static bool Mapping(ProjectionValues values, SemanticReadModel model, SemanticEventContract @event, SemanticProjectionMapping mapping)
++    {
++        var target = mapping.Target.Length == 1 ? model.Properties.FirstOrDefault(property => property.Id == mapping.Target[0]) : null;
++        if (target is null) return false;
++        if (mapping.Source is SemanticProjectionEventContextValue || mapping.Factor is SemanticProjectionEventContextValue) return false;
++        return values.Mapping(mapping, target, @event) is not null;
++    }
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/PersistentViewBootstrap.cs b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewBootstrap.cs
+new file mode 100644
+index 00000000..7c8a2434
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewBootstrap.cs
+@@ -0,0 +1,53 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++
++internal static class PersistentViewBootstrap
++{
++    internal const string Source = """
++        // Copyright (c) Cratis. All rights reserved.
++        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
++        package __PACKAGE__;
++
++        import jakarta.persistence.EntityManager;
++        import jakarta.persistence.EntityManagerFactory;
++        import org.axonframework.eventsourcing.eventstore.jpa.AggregateEventEntry;
++        import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.TokenEntry;
++
++        /** Validate before constructing any persistent view store or its projector. No replay or reset. */
++        public final class PersistentViewBootstrap {
++            private PersistentViewBootstrap() {}
++            public static void verify(EntityManagerFactory factory, String application, String fingerprint) {
++                try (var manager = factory.createEntityManager()) {
++                    var transaction = manager.getTransaction();
++                    transaction.begin();
++                    try {
++                        var id = JpaReadModelStore.digest(application);
++                        var existing = manager.find(ViewGeneration.class, id);
++                        if (existing == null) {
++                            if (hasRetainedData(manager))
++                                throw refusal(application);
++                            manager.persist(new ViewGeneration(id, fingerprint));
++                        } else if (!existing.fingerprint().equals(fingerprint)) throw refusal(application);
++                        transaction.commit();
++                    } catch (RuntimeException failure) {
++                        if (transaction.isActive()) transaction.rollback();
++                        throw failure;
++                    }
++                }
++            }
++            private static boolean hasRetainedData(EntityManager manager) {
++                return java.util.stream.Stream.of(AggregateEventEntry.class, TokenEntry.class, ViewRow.class)
++                        .anyMatch(type -> count(manager, type) != 0);
++            }
++            private static long count(EntityManager manager, Class<?> type) {
++                var name = manager.getMetamodel().entity(type).getName();
++                return manager.createQuery("select count(e) from " + name + " e", Long.class).getSingleResult();
++            }
++            private static IllegalStateException refusal(String application) {
++                return new IllegalStateException("STAGE-AXON-0308: " + application + ": Missing or incompatible persistent view generation. Retained events/checkpoints cannot be adopted. Use a separately migrated/rebuilt database or a new empty database; no automatic replay or reset is performed.");
++            }
++        }
++        """;
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/PersistentViewContractTests.cs b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewContractTests.cs
+new file mode 100644
+index 00000000..47cd6292
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewContractTests.cs
+@@ -0,0 +1,91 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++
++internal static class PersistentViewContractTests
++{
++    internal const string Source = """
++        // Copyright (c) Cratis. All rights reserved.
++        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
++        package __PACKAGE__;
++
++        import __PERSISTENCE__.JpaReadModelStore;
++        import __PERSISTENCE__.PersistentViewBootstrap;
++        import __RUNTIME__.ReadModelStore;
++        import jakarta.persistence.EntityManagerFactory;
++        import java.util.ArrayList;
++        import java.util.List;
++        import java.util.UUID;
++        import java.util.concurrent.CompletableFuture;
++        import java.util.concurrent.TimeUnit;
++        import java.util.function.Consumer;
++        import org.axonframework.messaging.core.unitofwork.ProcessingContext;
++        import org.junit.jupiter.api.Test;
++        import org.springframework.context.ConfigurableApplicationContext;
++        import tools.jackson.databind.json.JsonMapper;
++        import static org.junit.jupiter.api.Assertions.*;
++        import static __PACKAGE__.__NAME__Support.*;
++
++        public class __NAME__StoreTest {
++            public record Key(String value) {}
++            public record Snapshot(List<String> values) {}
++
++            @Test
++            void durableStoreContractIsIsolatedAtomicAndFailsClosed() throws Exception {
++                try (var application = start(database())) {
++                    var factory = application.getBean(EntityManagerFactory.class);
++                    var mapper = application.getBean(JsonMapper.class);
++                    var left = new JpaReadModelStore<Snapshot>(factory, mapper, "contract-left", Snapshot.class);
++                    var right = new JpaReadModelStore<Snapshot>(factory, mapper, "contract-right", Snapshot.class);
++                    var key = new Key("same");
++                    var value = new Snapshot(new ArrayList<>(List.of("original")));
++                    assertTrue(left.get(key).isEmpty());
++                    assertTrue(left.all().isEmpty());
++                    assertThrows(IllegalStateException.class, () -> left.put(key, value));
++                    assertThrows(IllegalStateException.class, () -> left.remove(key));
++                    assertThrows(IllegalStateException.class, left::clear);
++                    assertThrows(IllegalStateException.class, () -> left.update(key, ignored -> value));
++                    var missing = JpaReadModelStore.bind(left, org.mockito.Mockito.mock(ProcessingContext.class));
++                    assertThrows(IllegalStateException.class, () -> missing.put(key, value));
++                    write(application, left, bound -> {
++                        assertEquals(value, bound.update(key, current -> { assertNull(current); return value; }));
++                    });
++                    value.values().add("outside");
++                    assertEquals(List.of("original"), left.get(new Key("same")).orElseThrow().values());
++                    var returned = left.get(key).orElseThrow();
++                    returned.values().add("detached");
++                    assertEquals(List.of("original"), left.get(key).orElseThrow().values());
++                    assertTrue(right.all().isEmpty(), "Namespaces must not leak");
++                    assertThrows(Exception.class, () -> write(application, left, bound -> bound.update(key, current -> {
++                        current.values().add("failed");
++                        throw new IllegalArgumentException("callback failed");
++                    })));
++                    assertEquals(List.of("original"), left.get(key).orElseThrow().values());
++                    var uuid = UUID.randomUUID();
++                    write(application, left, bound -> bound.put(uuid, new Snapshot(List.of("uuid"))));
++                    assertEquals(List.of("uuid"), left.get(UUID.fromString(uuid.toString())).orElseThrow().values());
++                    write(application, right, bound -> bound.put(key, new Snapshot(List.of("right"))));
++                    write(application, left, bound -> assertNull(bound.update(key, current -> null)));
++                    assertTrue(left.get(key).isEmpty());
++                    write(application, left, bound -> bound.remove(uuid));
++                    assertTrue(left.all().isEmpty());
++                    write(application, left, bound -> bound.put(key, new Snapshot(List.of("again"))));
++                    write(application, left, ReadModelStore::clear);
++                    assertTrue(left.all().isEmpty());
++                    assertEquals(List.of("right"), right.get(key).orElseThrow().values());
++                    var before = right.all();
++                    assertThrows(IllegalStateException.class, () -> PersistentViewBootstrap.verify(factory, "__APPLICATION__", "incompatible"));
++                    assertEquals(before, right.all(), "Incompatible generation must not rebuild or clear rows");
++                }
++            }
++            private static void write(ConfigurableApplicationContext application, ReadModelStore<Object, Snapshot> store,
++                    Consumer<ReadModelStore<Object, Snapshot>> action) throws Exception {
++                units(application).create().executeWithResult(context -> {
++                    action.accept(JpaReadModelStore.bind(store, context));
++                    return CompletableFuture.<Void>completedFuture(null);
++                }).get(10, TimeUnit.SECONDS);
++            }
++        }
++        """;
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/PersistentViewEntities.cs b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewEntities.cs
+new file mode 100644
+index 00000000..500ee0a5
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewEntities.cs
+@@ -0,0 +1,59 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++
++internal static class PersistentViewEntities
++{
++    internal const string Row = """
++        // Copyright (c) Cratis. All rights reserved.
++        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
++        package __PACKAGE__;
++
++        import jakarta.persistence.Column;
++        import jakarta.persistence.Entity;
++        import jakarta.persistence.Id;
++        import jakarta.persistence.Lob;
++        import jakarta.persistence.Table;
++
++        @Entity(name = "StageViewRow")
++        @Table(name = "stage_view_row")
++        public class ViewRow {
++            @Id @Column(length = 64) private String id;
++            @Column(nullable = false, length = 1024) private String namespace;
++            @Lob @Column(nullable = false) private String identity;
++            @Lob @Column(nullable = false) private String payload;
++            protected ViewRow() {}
++            ViewRow(String id, String namespace, String identity, String payload) {
++                this.id = id;
++                this.namespace = namespace;
++                this.identity = identity;
++                this.payload = payload;
++            }
++            String identity() { return identity; }
++            String payload() { return payload; }
++            void payload(String value) { payload = value; }
++        }
++        """;
++
++    internal const string Generation = """
++        // Copyright (c) Cratis. All rights reserved.
++        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
++        package __PACKAGE__;
++
++        import jakarta.persistence.Column;
++        import jakarta.persistence.Entity;
++        import jakarta.persistence.Id;
++        import jakarta.persistence.Table;
++
++        @Entity(name = "StageViewGeneration")
++        @Table(name = "stage_view_generation")
++        public class ViewGeneration {
++            @Id @Column(length = 64) private String id;
++            @Column(nullable = false, length = 64) private String fingerprint;
++            protected ViewGeneration() {}
++            ViewGeneration(String id, String fingerprint) { this.id = id; this.fingerprint = fingerprint; }
++            String fingerprint() { return fingerprint; }
++        }
++        """;
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/PersistentViewLegacyProof.cs b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewLegacyProof.cs
+new file mode 100644
+index 00000000..9bff4868
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewLegacyProof.cs
+@@ -0,0 +1,88 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++
++internal static class PersistentViewLegacyProof
++{
++    internal const string Source = """
++        // Copyright (c) Cratis. All rights reserved.
++        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
++        package __PACKAGE__;
++
++        import java.nio.file.Path;
++        import java.sql.Blob;
++        import java.sql.Clob;
++        import java.sql.DriverManager;
++        import java.util.ArrayList;
++        import java.util.Base64;
++        import java.util.List;
++        import java.util.Map;
++        import java.util.TreeMap;
++        import org.junit.jupiter.api.Test;
++        import static org.junit.jupiter.api.Assertions.*;
++        import static __PACKAGE__.__NAME__Support.*;
++
++        class __NAME__LegacyTest {
++            @Test
++            void retainedDataWithoutMatchingGenerationIsNeverAdoptedOrReset() throws Exception {
++                for (var missing : List.of(true, false)) {
++                    var path = database();
++                    try (var application = start(path)) {
++        __APPENDS__
++                        await(() -> !store(application).all().isEmpty() && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
++                    }
++                    // Deliberately construct isolated legacy/incompatible test databases, never a live application database.
++                    try (var connection = DriverManager.getConnection(url(path), "sa", ""); var statement = connection.createStatement()) {
++                        assertEquals(1, statement.executeUpdate(missing ? "delete from stage_view_generation" :
++                                "update stage_view_generation set fingerprint = 'incompatible'"));
++                    }
++                    var before = snapshot(path);
++                    assertFalse(before.getOrDefault("AGGREGATE_EVENT_ENTRY", List.of()).isEmpty());
++                    assertFalse(before.getOrDefault("TOKEN_ENTRY", List.of()).isEmpty());
++                    assertFalse(before.getOrDefault("STAGE_VIEW_ROW", List.of()).isEmpty());
++                    var failure = assertThrows(Exception.class, () -> { try (var unexpected = start(path)) { assertTrue(unexpected.isActive()); fail("Legacy startup must refuse"); } });
++                    Throwable root = failure;
++                    while (root.getCause() != null) root = root.getCause();
++                    assertTrue(root.getMessage().contains("STAGE-AXON-0308"), root.toString());
++                    assertEquals(before, snapshot(path), "Refusal must retain event, claim, token and view values exactly");
++                }
++            }
++            private static String url(Path path) { return "jdbc:h2:file:" + path + ";IFEXISTS=TRUE"; }
++            private static Map<String, List<String>> snapshot(Path path) throws Exception {
++                var tables = new TreeMap<String, List<String>>();
++                try (var connection = DriverManager.getConnection(url(path), "sa", "")) {
++                    connection.setReadOnly(true);
++                    try (var metadata = connection.getMetaData().getTables(null, "PUBLIC", "%", new String[] { "TABLE", "BASE TABLE" })) {
++                        while (metadata.next()) {
++                            var table = metadata.getString("TABLE_NAME");
++                            var rows = new ArrayList<String>();
++                            try (var statement = connection.createStatement();
++                                 var values = statement.executeQuery("SELECT * FROM \"PUBLIC\".\"" + table.replace("\"", "\"\"") + "\"")) {
++                                while (values.next()) {
++                                    var row = new ArrayList<String>();
++                                    for (var column = 1; column <= values.getMetaData().getColumnCount(); column++) {
++                                        var value = normalize(values.getObject(column));
++                                        row.add(values.getMetaData().getColumnName(column) + "=" + value.length() + ":" + value);
++                                    }
++                                    rows.add(row.toString());
++                                }
++                            }
++                            rows.sort(String::compareTo);
++                            tables.put(table, List.copyOf(rows));
++                        }
++                    }
++                }
++                assertFalse(tables.isEmpty());
++                return tables;
++            }
++            private static String normalize(Object value) throws Exception {
++                if (value == null) return "<null>";
++                if (value instanceof byte[] bytes) return Base64.getEncoder().encodeToString(bytes);
++                if (value instanceof Blob blob) return Base64.getEncoder().encodeToString(blob.getBytes(1, Math.toIntExact(blob.length())));
++                if (value instanceof Clob clob) return clob.getSubString(1, Math.toIntExact(clob.length()));
++                return value.getClass().getName() + ":" + value;
++            }
++        }
++        """;
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/PersistentViewProof.cs b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewProof.cs
+new file mode 100644
+index 00000000..aaf01de9
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewProof.cs
+@@ -0,0 +1,100 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++
++internal static class PersistentViewProof
++{
++    internal const string Source = """
++        // Copyright (c) Cratis. All rights reserved.
++        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
++        package __PACKAGE__;
++
++        import __PERSISTENCE__.JpaReadModelStore;
++        import java.net.URI;
++        import java.net.http.HttpClient;
++        import java.net.http.HttpRequest;
++        import java.net.http.HttpResponse;
++        import java.util.HashSet;
++        import java.util.concurrent.TimeUnit;
++        import org.junit.jupiter.api.Test;
++        import org.springframework.boot.web.server.context.WebServerApplicationContext;
++        import tools.jackson.databind.json.JsonMapper;
++        import static org.junit.jupiter.api.Assertions.*;
++        import static __PACKAGE__.__NAME__Support.*;
++
++        /** Default Surefire test: real emitted projector, pooled processor, durable token and two boots. */
++        class __NAME__Test {
++            @Test
++            void recoveredRowsAreQueryableBeforeAnyNewAppend() throws Exception {
++                var path = database();
++                var initial = expected();
++                java.util.Map<Integer, String> checkpoint;
++                try (var application = start(path)) {
++        __APPENDS__
++                    await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
++                    checkpoint = tokens(application);
++                    assertFalse(checkpoint.isEmpty());
++                }
++                try (var application = start(path)) {
++                    assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()));
++                    assertEquals(checkpoint, tokens(application), "Retain the real checkpoint; no reset/replay adoption");
++                    assertQuery(application, initial);
++                    var subsequent = next(initial);
++                    assertNotEquals(new HashSet<>(initial), new HashSet<>(subsequent));
++                    append(application, __EVENT__);
++                    await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(subsequent)) && !tokens(application).equals(checkpoint));
++                    assertQuery(application, subsequent);
++                }
++            }
++            @Test
++            void durableRowsAndRealCheckpointCommitAndRollbackTogether() throws Exception {
++                var path = database();
++                var initial = expected();
++                var afterRetry = next(initial);
++                assertNotEquals(new HashSet<>(initial), new HashSet<>(afterRetry), "Proof event must change modeled state");
++                fail.set(false);
++                try {
++                    try (var application = start(path)) {
++                        assertInstanceOf(JpaReadModelStore.class, store(application));
++        __APPENDS__
++                        await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(initial)) && tokens(application).values().stream().anyMatch(value -> !value.equals("<null>")));
++                        var checkpoint = tokens(application);
++                        assertFalse(checkpoint.isEmpty(), "Real processor checkpoint rows must exist");
++                        assertQuery(application, initial);
++                        rolledBack = new java.util.concurrent.CountDownLatch(1);
++                        fail.set(true);
++                        append(application, __EVENT__);
++                        assertTrue(rolledBack.await(20, TimeUnit.SECONDS), "Failure must occur in actual processor prepare-commit");
++                        assertEquals(new HashSet<>(initial), new HashSet<>(store(application).all()), "No independently committed projection write");
++                        assertEquals(checkpoint, tokens(application), "Failed processing must not advance the actual checkpoint");
++                    }
++                    fail.set(false);
++                    try (var application = start(path)) {
++                        // The failed event must resume from the retained checkpoint exactly once.
++                        await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(afterRetry)));
++                        var checkpoint = tokens(application);
++                        assertFalse(checkpoint.isEmpty());
++                        assertQuery(application, afterRetry);
++                        var subsequent = next(afterRetry);
++                        assertNotEquals(new HashSet<>(afterRetry), new HashSet<>(subsequent));
++                        append(application, __EVENT__);
++                        await(() -> new HashSet<>(store(application).all()).equals(new HashSet<>(subsequent)) && !tokens(application).equals(checkpoint));
++                        assertQuery(application, subsequent);
++                    }
++                } finally { fail.set(false); }
++            }
++            private void assertQuery(org.springframework.context.ConfigurableApplicationContext application, java.util.List<__MODEL__> rows) throws Exception {
++                var port = ((WebServerApplicationContext) application).getWebServer().getPort();
++                var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "__ROUTE__")).GET().build();
++                try (var client = HttpClient.newHttpClient()) {
++                    var response = client.send(request, HttpResponse.BodyHandlers.ofString());
++                    assertEquals(200, response.statusCode());
++                    var mapper = application.getBean(JsonMapper.class);
++                    var actual = mapper.readValue(response.body(), new tools.jackson.core.type.TypeReference<java.util.List<__MODEL__>>() {});
++                    assertEquals(new HashSet<>(rows), new HashSet<>(actual), "HTTP query must read recovered durable rows");
++                }
++            }
++        }
++        """;
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/PersistentViewProofSupport.cs b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewProofSupport.cs
+new file mode 100644
+index 00000000..e099f641
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewProofSupport.cs
+@@ -0,0 +1,117 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++
++internal static class PersistentViewProofSupport
++{
++    internal const string Source = """
++        // Copyright (c) Cratis. All rights reserved.
++        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
++        package __PACKAGE__;
++
++        import __RUNTIME__.ReadModelStore;
++        import __RUNTIME__.InMemoryReadModelStore;
++        import jakarta.persistence.EntityManagerFactory;
++        import java.nio.file.Files;
++        import java.nio.file.Path;
++        import java.util.Base64;
++        import java.util.List;
++        import java.util.Map;
++        import java.util.TreeMap;
++        import java.util.UUID;
++        import java.util.concurrent.CompletableFuture;
++        import java.util.concurrent.CountDownLatch;
++        import java.util.concurrent.TimeUnit;
++        import java.util.concurrent.atomic.AtomicBoolean;
++        import java.util.function.BooleanSupplier;
++        import org.axonframework.common.configuration.Configuration;
++        import org.axonframework.eventsourcing.eventstore.EventAppender;
++        import org.axonframework.messaging.core.unitofwork.ProcessingContext;
++        import org.axonframework.messaging.core.unitofwork.UnitOfWorkFactory;
++        import org.axonframework.messaging.eventhandling.annotation.EventHandler;
++        import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
++        import org.springframework.boot.builder.SpringApplicationBuilder;
++        import org.springframework.boot.test.context.TestConfiguration;
++        import org.springframework.context.ConfigurableApplicationContext;
++        import org.springframework.context.annotation.Bean;
++        import org.springframework.context.annotation.Import;
++        import tools.jackson.databind.json.JsonMapper;
++        import static org.junit.jupiter.api.Assertions.*;
++
++        public final class __NAME__Support {
++            private __NAME__Support() {}
++            static Path database() throws Exception {
++                var path = Path.of("target", "persistent-views", UUID.randomUUID().toString(), "events").toAbsolutePath();
++                Files.createDirectories(path.getParent());
++                return path;
++            }
++            static ConfigurableApplicationContext start(Path path) {
++                return new SpringApplicationBuilder(FlatFixture.class).profiles("persistent").run(
++                        "--server.port=0", "--spring.datasource.url=jdbc:h2:file:" + path,
++                        "--spring.jpa.hibernate.ddl-auto=update", "--spring.main.banner-mode=off");
++            }
++            @SuppressWarnings("unchecked")
++            static ReadModelStore<Object, __MODEL__> store(ConfigurableApplicationContext application) {
++                return (ReadModelStore<Object, __MODEL__>) application.getBean("__QUALIFIER__", ReadModelStore.class);
++            }
++            static UnitOfWorkFactory units(ConfigurableApplicationContext application) {
++                return application.getBean(Configuration.class).getComponent(UnitOfWorkFactory.class);
++            }
++            static void append(ConfigurableApplicationContext application, Object event) throws Exception {
++                units(application).create().executeWithResult(context -> {
++                    EventAppender.forContext(context).append(event);
++                    return CompletableFuture.<Void>completedFuture(null);
++                }).get(10, TimeUnit.SECONDS);
++            }
++            static List<__MODEL__> expected() {
++                var store = new InMemoryReadModelStore<Object, __MODEL__>();
++                var projector = new __PROJECTOR__(store);
++        __EXPECTED__
++                assertFalse(store.all().isEmpty(), "Proof must construct nonempty modeled rows");
++                return store.all();
++            }
++            static List<__MODEL__> next(List<__MODEL__> previous) {
++                var store = new InMemoryReadModelStore<Object, __MODEL__>();
++                var projector = new __PROJECTOR__(store);
++                // Reconstruct the same key by replaying the modeled arrangement, not by guessing a row property.
++        __EXPECTED__
++                projector.on(__EVENT____ARGUMENT__);
++                if (!new java.util.HashSet<>(store.all()).equals(new java.util.HashSet<>(previous))) return store.all();
++                projector.on(__EVENT____ARGUMENT__);
++                return store.all();
++            }
++            static Map<Integer, String> tokens(ConfigurableApplicationContext application) {
++                try (var manager = application.getBean(EntityManagerFactory.class).createEntityManager()) {
++                    var tokens = new TreeMap<Integer, String>();
++                    for (var row : manager.createQuery("select e.segment, e.token from TokenEntry e where e.processorName = :name", Object[].class)
++                            .setParameter("name", "__PACKAGE__").getResultList())
++                        tokens.put((Integer) row[0], row[1] == null ? "<null>" : Base64.getEncoder().encodeToString((byte[]) row[1]));
++                    return tokens;
++                }
++            }
++            static void await(BooleanSupplier condition) throws Exception {
++                var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
++                while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(25);
++                assertTrue(condition.getAsBoolean(), "Persistent processor/query condition timed out");
++            }
++            static final AtomicBoolean fail = new AtomicBoolean();
++            static volatile CountDownLatch rolledBack = new CountDownLatch(1);
++            public static class RollbackWitness {
++                @EventHandler
++                public void handle(Object event, ProcessingContext context) {
++                    if (!fail.get()) return;
++                    context.runOnPrepareCommit((java.util.function.Consumer<ProcessingContext>) ignored -> { throw new IllegalStateException("deliberate processor rollback"); });
++                    context.onError((ignored, phase, failure) -> rolledBack.countDown());
++                }
++            }
++            /** Scan-free imports of the real emitted flat projector, query and persistence infrastructure. */
++            @TestConfiguration(proxyBeanMethods = false)
++            @EnableAutoConfiguration
++            @Import({ __IMPORTS__ })
++            static class FlatFixture {
++                @Bean RollbackWitness rollbackWitness() { return new RollbackWitness(); }
++            }
++        }
++        """;
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/PersistentViewStore.cs b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewStore.cs
+new file mode 100644
+index 00000000..d1f6f9ad
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewStore.cs
+@@ -0,0 +1,128 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++
++internal static class PersistentViewStore
++{
++    internal const string Source = """
++        // Copyright (c) Cratis. All rights reserved.
++        // Licensed under the MIT license. See LICENSE file in the project root for full license information.
++        package __PACKAGE__;
++
++        import __RUNTIME__.ReadModelStore;
++        import jakarta.persistence.EntityManager;
++        import jakarta.persistence.EntityManagerFactory;
++        import jakarta.persistence.LockModeType;
++        import java.nio.charset.StandardCharsets;
++        import java.security.MessageDigest;
++        import java.security.NoSuchAlgorithmException;
++        import java.util.HexFormat;
++        import java.util.List;
++        import java.util.Objects;
++        import java.util.Optional;
++        import java.util.function.Function;
++        import java.util.function.UnaryOperator;
++        import org.axonframework.messaging.core.unitofwork.ProcessingContext;
++        import org.axonframework.messaging.core.unitofwork.transaction.jpa.JpaTransactionalExecutorProvider;
++        import tools.jackson.databind.json.JsonMapper;
++
++        /** Detached JSON rows; writes require the processor's enlisted JPA executor. */
++        public final class JpaReadModelStore<V> implements ReadModelStore<Object, V> {
++            private final EntityManagerFactory factory;
++            private final JsonMapper mapper;
++            private final String namespace;
++            private final Class<V> type;
++            private final ProcessingContext context;
++
++            public JpaReadModelStore(EntityManagerFactory factory, JsonMapper mapper, String namespace, Class<V> type) {
++                this(factory, mapper, namespace, type, null);
++            }
++            private JpaReadModelStore(EntityManagerFactory factory, JsonMapper mapper, String namespace, Class<V> type, ProcessingContext context) {
++                this.factory = factory;
++                this.mapper = mapper;
++                this.namespace = namespace;
++                this.type = type;
++                this.context = context;
++            }
++            public static <V> ReadModelStore<Object, V> bind(ReadModelStore<Object, V> store, ProcessingContext context) {
++                if (store instanceof JpaReadModelStore<V> persistent) {
++                    Objects.requireNonNull(context, "Persistent views require the processor ProcessingContext");
++                    return new JpaReadModelStore<>(persistent.factory, persistent.mapper, persistent.namespace, persistent.type, context);
++                }
++                return store;
++            }
++            @Override public Optional<V> get(Object key) {
++                return key == null ? Optional.empty() : read(manager -> Optional.ofNullable(decode(find(manager, key, false))));
++            }
++            @Override public List<V> all() {
++                return read(manager -> manager.createQuery("select r from StageViewRow r where r.namespace = :namespace", ViewRow.class)
++                        .setParameter("namespace", namespace).getResultList().stream().map(this::decode).toList());
++            }
++            @Override public void put(Object key, V value) {
++                Objects.requireNonNull(value);
++                update(key, ignored -> value);
++            }
++            @Override public void remove(Object key) {
++                if (key == null) write(manager -> null);
++                else update(key, ignored -> null);
++            }
++            @Override public void clear() {
++                write(manager -> {
++                    manager.createQuery("select r from StageViewRow r where r.namespace = :namespace", ViewRow.class)
++                            .setParameter("namespace", namespace).setLockMode(LockModeType.PESSIMISTIC_WRITE)
++                            .getResultList().forEach(manager::remove);
++                    manager.flush();
++                    return null;
++                });
++            }
++            @Override public V update(Object key, UnaryOperator<V> update) {
++                return write(manager -> {
++                    var row = find(manager, key, true);
++                    // Decode first: a failing/mutating callback cannot modify a managed row.
++                    var next = update.apply(decode(row));
++                    if (next == null) {
++                        if (row != null) manager.remove(row);
++                    } else {
++                        var payload = mapper.writeValueAsString(next);
++                        if (row == null) manager.persist(new ViewRow(id(key), namespace, identity(key), payload));
++                        else row.payload(payload);
++                    }
++                    manager.flush();
++                    return next;
++                });
++            }
++            private V decode(ViewRow row) { return row == null ? null : mapper.readValue(row.payload(), type); }
++            private ViewRow find(EntityManager manager, Object key, boolean lock) {
++                var row = manager.find(ViewRow.class, id(key), lock ? LockModeType.PESSIMISTIC_WRITE : LockModeType.NONE);
++                if (row != null && !row.identity().equals(identity(key))) throw new IllegalStateException("Persistent view key digest collision");
++                return row;
++            }
++            private String identity(Object key) {
++                Objects.requireNonNull(key);
++                return namespace + ":" + key.getClass().getName() + ":" + mapper.writeValueAsString(key);
++            }
++            private String id(Object key) { return digest(identity(key)); }
++            static String digest(String value) {
++                try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
++                catch (NoSuchAlgorithmException failure) { throw new IllegalStateException(failure); }
++            }
++            private <T> T write(Function<EntityManager, T> action) {
++                if (context == null) throw new IllegalStateException("Persistent view writes require the processor ProcessingContext");
++                var executor = new JpaTransactionalExecutorProvider(factory).findTransactionalExecutor(context);
++                if (executor == null) throw new IllegalStateException("No JPA transaction enlisted in the processor ProcessingContext");
++                return executor.apply(manager -> {
++                    if (!manager.isJoinedToTransaction() || !manager.getEntityManagerFactory().unwrap(EntityManagerFactory.class)
++                            .equals(factory.unwrap(EntityManagerFactory.class)))
++                        throw new IllegalStateException("Persistent views require the processor's active transaction on the configured database");
++                    return action.apply(manager);
++                }).join();
++            }
++            private <T> T read(Function<EntityManager, T> action) {
++                if (context != null) return write(action);
++                // Contextless query reads never create a write transaction.
++                try (var manager = factory.createEntityManager()) { return action.apply(manager); }
++            }
++        }
++        """;
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/PersistentViewTests.cs b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewTests.cs
+new file mode 100644
+index 00000000..8ea105b5
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/PersistentViewTests.cs
+@@ -0,0 +1,76 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using Cratis.Screenplay.Semantics;
++using Cratis.Stage.Contracts.Rendering;
++using Cratis.Stage.Rendering.Axon.Emitters.Projections;
++using Cratis.Stage.Rendering.Axon.Emitters.Queries;
++using Cratis.Stage.Rendering.Axon.Java;
++using Cratis.Stage.Rendering.Axon.Sdk;
++using Cratis.Stage.Rendering.Axon.Specifications.Views;
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++
++internal sealed class PersistentViewTests(AxonEmissionContext context, ViewJavaTypes types, string persistence)
++{
++    internal void Emit()
++    {
++        foreach (var owner in ScopeSelection.Select(context.Request))
++        {
++            foreach (var model in owner.Slice.ReadModels.Where(model => PersistentViewAdmission.Supports(context, model.Id)))
++                EmitModel(owner, model);
++        }
++    }
++
++    void EmitModel(LocatedSemanticSlice owner, SemanticReadModel model)
++    {
++        var projection = owner.Slice.Projections.First(candidate => candidate.ReadModel == model.Id);
++        var spec = Specification(owner, model, projection);
++        var query = Query(owner, model);
++        if (spec is null || query is null) return;
++        var package = types.Package(owner);
++        var modelName = JavaNames.Type(model.Name);
++        var name = modelName + "Persistent";
++        var updates = new ProjectionUpdates(context, types, model.Id);
++        var events = spec.GivenEvents.Select(given => AxonViewEvents.Expression(context, types, given)).ToArray();
++        string Render(string source) => source.Replace("__PACKAGE__", package, StringComparison.Ordinal)
++            .Replace("__RUNTIME__", types.BasePackage + ".runtime", StringComparison.Ordinal)
++            .Replace("__PERSISTENCE__", persistence, StringComparison.Ordinal)
++            .Replace("__APPLICATION__", types.BasePackage, StringComparison.Ordinal)
++            .Replace("__MODEL__", package + "." + modelName, StringComparison.Ordinal).Replace("__NAME__", name, StringComparison.Ordinal)
++            .Replace("__QUALIFIER__", package + "." + modelName, StringComparison.Ordinal)
++            .Replace("__PROJECTOR__", package + "." + JavaNames.Type(projection.Name) + "Projector", StringComparison.Ordinal)
++            .Replace("__IMPORTS__", Imports(model, projection, query), StringComparison.Ordinal)
++            .Replace("__ROUTE__", QueryEndpoint.Route(owner, query), StringComparison.Ordinal)
++            .Replace("__EVENT__", events[0], StringComparison.Ordinal)
++            .Replace("__APPENDS__", string.Join('\n', events.Select(expression => $"            append(application, {expression});")), StringComparison.Ordinal)
++            .Replace("__EXPECTED__", string.Join('\n', events.Select(expression => $"        projector.on({expression}{updates.DefaultArgument});")), StringComparison.Ordinal)
++            .Replace("__ARGUMENT__", updates.DefaultArgument, StringComparison.Ordinal);
++        void Add(string suffix, string source) => context.Artifacts.Add(PlannedArtifact.CreateText(
++            $"src/test/java/{package.Replace('.', '/')}/{name}{suffix}.java", Render(source), [model.Id, spec.Id]));
++        Add("Support", PersistentViewProofSupport.Source);
++        Add("Test", PersistentViewProof.Source);
++        Add("StoreTest", PersistentViewContractTests.Source);
++        Add("LegacyTest", PersistentViewLegacyProof.Source);
++    }
++
++    SemanticSpecification? Specification(LocatedSemanticSlice owner, SemanticReadModel model, SemanticProjection projection)
++    {
++        var observed = projection.From.Select(from => from.EventContract).ToHashSet();
++        return owner.Slice.Specifications.FirstOrDefault(spec => ViewSpecificationSupport.Legacy(spec, model, types) &&
++            !spec.GivenEvents.IsEmpty && spec.ThenReadModels.Any(expected => expected.ReadModel == model.Id) &&
++            spec.GivenEvents.All(given => observed.Contains(given.EventContract)));
++    }
++
++    SemanticKeyedQuery? Query(LocatedSemanticSlice owner, SemanticReadModel model) => owner.Slice.Queries.FirstOrDefault(query =>
++        query.ReadModel == model.Id && query.Cardinality == SemanticQueryCardinality.Many && query.Delivery != SemanticQueryDelivery.Live &&
++        !QueryPerformer.Required(context, query) && !new QueryShape(query, model, types).Arguments.Any());
++
++    string Imports(SemanticReadModel model, SemanticProjection projection, SemanticKeyedQuery query) => string.Join(", ", new[]
++    {
++        types.BasePackage + ".infrastructure.AxonConfiguration.class", types.BasePackage + ".infrastructure.SecurityConfiguration.class",
++        types.BasePackage + ".runtime.persistent.PersistentConfiguration.class", persistence + ".PersistentViewConfiguration.class",
++        JavaNames.Type(model.Name) + "StoreConfiguration.class", JavaNames.Type(projection.Name) + "Projector.class",
++        JavaNames.Type(query.Name) + "Handler.class", JavaNames.Type(query.Name) + "Endpoint.class"
++    });
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/for_AxonPersistenceEmitter/when_emitting_guarded_flat_views.cs b/Source/Rendering.Axon/Emitters/Persistence/for_AxonPersistenceEmitter/when_emitting_guarded_flat_views.cs
+new file mode 100644
+index 00000000..3cab024d
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/for_AxonPersistenceEmitter/when_emitting_guarded_flat_views.cs
+@@ -0,0 +1,50 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using System.Text;
++using Cratis.Specifications;
++using Cratis.Stage.Rendering.Axon.Emitters.Projections;
++using Cratis.Stage.Rendering.Axon.Emitters.Queries;
++using Xunit;
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence.for_AxonPersistenceEmitter;
++
++public class when_emitting_guarded_flat_views : Projections.for_AxonProjectionsEmitter.given.a_view_request
++{
++    AxonEmissionContext _context;
++
++    void Because()
++    {
++        _context = new(_request, new(_request.Profile));
++        new AxonProjectionsEmitter().Emit(_context);
++        new AxonQueriesEmitter().Emit(_context);
++        new AxonPersistenceEmitter().Emit(_context);
++    }
++
++    [Fact] void should_admit_the_flat_projection() => PersistentViewAdmission.Supports(_context, ReadModelId("Total")).ShouldBeTrue();
++    [Fact] void should_refuse_scoped_projections() => PersistentViewAdmission.Supports(_context, ReadModelId("Board")).ShouldBeFalse();
++    [Fact] void should_refuse_reducers() => PersistentViewAdmission.Supports(_context, ReadModelId("RebuiltTotal")).ShouldBeFalse();
++    [Fact] void should_preserve_early_scoped_refusal() => Code("BoardStoreConfiguration").ShouldContain("public static PersistentReadModelSafety persistentReadModelSafety()");
++    [Fact] void should_preserve_early_reducer_refusal() => Code("RebuiltTotalStoreConfiguration").ShouldContain("public static PersistentReadModelSafety persistentReadModelSafety()");
++    [Fact] void should_remove_only_the_flat_guard() => Code("TotalStoreConfiguration").ShouldNotContain("persistentReadModelSafety");
++    [Fact] void should_keep_the_direct_call_signature() => Code("TotalProjectionProjector").ShouldContain("public void on(Increased event, QueryUpdateEmitter updates)");
++    [Fact] void should_bind_the_actual_handler_context() => Code("TotalProjectionProjector").ShouldContain("JpaReadModelStore.bind(store, context)");
++    [Fact] void should_request_the_handler_context() => Code("TotalProjectionProjector").ShouldContain("QueryUpdateEmitter updates, ProcessingContext context)");
++    [Fact] void should_defer_live_notifications_until_commit() => Code("TotalProjectionProjector").ShouldContain("context.runOnAfterCommit");
++    [Fact] void should_provide_only_qualified_persistent_stores() => Code("TotalStoreConfiguration").ShouldContain("return new JpaReadModelStore<>(factory, mapper, \"axonviews.views.counters.totals.Total\", Total.class)");
++    [Fact] void should_depend_on_generation_admission() => Code("TotalStoreConfiguration").ShouldContain("PersistentViewConfiguration generation");
++    [Fact] void should_refuse_contextless_writes() => Code("JpaReadModelStore").ShouldContain("if (context == null) throw new IllegalStateException");
++    [Fact] void should_never_create_an_independent_write_executor() => Code("JpaReadModelStore").ShouldContain("findTransactionalExecutor(context)");
++    [Fact] void should_never_fall_back_to_an_executor() => Code("JpaReadModelStore").ShouldNotContain("getTransactionalExecutor(");
++    [Fact] void should_serialize_row_payloads() => Code("JpaReadModelStore").ShouldContain("mapper.writeValueAsString(next)");
++    [Fact] void should_guard_both_retained_events_and_checkpoints() => Code("PersistentViewBootstrap").ShouldContain("Stream.of(AggregateEventEntry.class, TokenEntry.class, ViewRow.class)");
++    [Fact] void should_refuse_generation_changes() => Code("PersistentViewBootstrap").ShouldContain("!existing.fingerprint().equals(fingerprint)");
++    [Fact] void should_emit_a_default_native_two_boot_test() => Code("TotalPersistentTest").ShouldContain("void durableRowsAndRealCheckpointCommitAndRollbackTogether()");
++    [Fact] void should_exercise_actual_processor_failure() => Code("TotalPersistentSupport").ShouldContain("context.runOnPrepareCommit((java.util.function.Consumer<ProcessingContext>) ignored -> { throw new IllegalStateException");
++    [Fact] void should_compare_real_checkpoints_after_rollback() => Code("TotalPersistentTest").ShouldContain("assertEquals(checkpoint, tokens(application)");
++    [Fact] void should_test_retained_database_refusal() => Code("TotalPersistentLegacyTest").ShouldContain("assertEquals(before, snapshot(path)");
++    [Fact] void should_test_store_contracts() => Code("TotalPersistentStoreTest").ShouldContain("void durableStoreContractIsIsolatedAtomicAndFailsClosed()");
++    [Fact] void should_not_hide_native_proof_behind_a_property() => Code("TotalPersistentTest").ShouldNotContain("EnabledIfSystemProperty");
++
++    string Code(string name) => Encoding.UTF8.GetString(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith('/' + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());
++}
+diff --git a/Source/Rendering.Axon/Emitters/Persistence/for_AxonPersistenceEmitter/when_fingerprinting_view_generations.cs b/Source/Rendering.Axon/Emitters/Persistence/for_AxonPersistenceEmitter/when_fingerprinting_view_generations.cs
+new file mode 100644
+index 00000000..fea41bea
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Persistence/for_AxonPersistenceEmitter/when_fingerprinting_view_generations.cs
+@@ -0,0 +1,37 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using System.Text;
++using Cratis.Specifications;
++using Cratis.Stage.Contracts.Rendering;
++using Xunit;
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Persistence.for_AxonPersistenceEmitter;
++
++public class when_fingerprinting_view_generations : Projections.for_AxonProjectionsEmitter.given.a_view_request
++{
++    string _original;
++    string _reordered;
++    string _changed;
++
++    void Because()
++    {
++        var eventSource = PlannedArtifact.CreateText("src/main/java/sample/Event.java", "record Event(long value) {}", [ReadModelId("Total")]);
++        var modelSource = PlannedArtifact.CreateText("src/main/java/sample/Model.java", "record Model(long value) {}", [ReadModelId("Total")]);
++        _original = Fingerprint(eventSource, modelSource);
++        _reordered = Fingerprint(modelSource, eventSource);
++        _changed = Fingerprint(modelSource, PlannedArtifact.CreateText(eventSource.RelativePath, "record Event(String value) {}", [ReadModelId("Total")]));
++    }
++
++    [Fact] void should_be_independent_of_artifact_iteration_order() => _original.ShouldEqual(_reordered);
++    [Fact] void should_change_with_the_generated_contract() => _original.ShouldNotEqual(_changed);
++    [Fact] void should_emit_a_nonempty_format_versioned_fingerprint() => Assert.Matches("FINGERPRINT = \"[0-9A-F]{64}\";", _original);
++
++    string Fingerprint(params PlannedArtifact[] sources)
++    {
++        var context = new AxonEmissionContext(_request, new(_request.Profile));
++        context.Artifacts.AddRange(sources);
++        new AxonPersistenceEmitter().Emit(context);
++        return Encoding.UTF8.GetString(context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/PersistentViewConfiguration.java", StringComparison.Ordinal)).Bytes.AsSpan());
++    }
++}
+diff --git a/Source/Rendering.Axon/Emitters/Projections/AxonProjectionsEmitter.cs b/Source/Rendering.Axon/Emitters/Projections/AxonProjectionsEmitter.cs
+index d3d37d8a..44c68382 100644
+--- a/Source/Rendering.Axon/Emitters/Projections/AxonProjectionsEmitter.cs
++++ b/Source/Rendering.Axon/Emitters/Projections/AxonProjectionsEmitter.cs
+@@ -4,6 +4,7 @@
+ using Cratis.Screenplay.Semantics;
+ using Cratis.Stage.Contracts.Rendering;
+ using Cratis.Stage.Rendering.Axon.Admission;
++using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
+ using Cratis.Stage.Rendering.Axon.Java;
+ using Cratis.Stage.Rendering.Axon.Sdk;
+ using Cratis.Stage.Rendering.Axon.Specifications.Views;
+@@ -38,13 +39,19 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
+         }
+         new AxonViewSpecsEmitter().Emit(context);
+         if (ScopeSelection.Select(context.Request).Any(owner => !owner.Slice.ReadModels.IsEmpty))
+-            context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/axon-views.properties", string.Join('\n', namespaces.Select(name => $"axon.eventhandling.processors.{name}.mode=subscribing")) + "\n", []));
++            context.Artifacts.Add(PlannedArtifact.CreateText("src/main/resources/axon-views.properties", string.Join('\n', namespaces.Select(name => $"axon.eventhandling.processors.{name}.mode=${{stage.axon.view-processor-mode:subscribing}}")) + "\n", []));
+     }
+ 
+     static void EmitModel(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticReadModel model)
+     {
+         var name = JavaNames.Type(model.Name);
+         ViewJavaTypes.Add(context, package, name, ReadModelRecords.Code(types, package, model), model.Id);
++        if (PersistentViewAdmission.Supports(context, model.Id))
++        {
++            context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Default read-model rows are volatile; durable checkpoints may skip prior events. The persistent profile supports guarded flat projections only, with generation checks and processor-bound transactions; scoped/reducer recovery remains refused.");
++            PersistentProjectionStore.Emit(context, types, package, model);
++            return;
++        }
+         context.Degradation.Unsupported(AxonRefusalCodes.ReadModelPersistence, model.Id, "Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused.");
+         var configuration = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration");
+         var storeType = configuration.Reference(types.BasePackage + ".runtime.ReadModelStore");
+@@ -87,10 +94,9 @@ internal sealed class AxonProjectionsEmitter : IAxonEmitter
+             foreach (var group in ProjectionTransitions.From(projection).GroupBy(from => from.EventContract))
+             {
+                 var @event = ScopeSelection.Locate(context.Request.Model.Application).SelectMany(slice => slice.Slice.Events).First(candidate => candidate.Id == group.Key);
+-                body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}").Block($"public void on({types.EventType(group.Key, body)} event{updates.Parameter})", method =>
++                new ProjectionHandlerBinding(context, types, model, package).Emit(body, types.EventType(group.Key, body), method =>
+                 {
+                     foreach (var from in group) EmitFrom(context, types, method, projection, model, @event, from);
+-                    updates.Notify(method, package);
+                 });
+             }
+         });
+diff --git a/Source/Rendering.Axon/Emitters/Projections/PersistentProjectionStore.cs b/Source/Rendering.Axon/Emitters/Projections/PersistentProjectionStore.cs
+new file mode 100644
+index 00000000..5bf94cf6
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Projections/PersistentProjectionStore.cs
+@@ -0,0 +1,33 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using Cratis.Screenplay.Semantics;
++using Cratis.Stage.Rendering.Axon.Java;
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
++
++internal static class PersistentProjectionStore
++{
++    internal static void Emit(AxonEmissionContext context, ViewJavaTypes types, string package, SemanticReadModel model)
++    {
++        var name = JavaNames.Type(model.Name);
++        var code = new JavaCodeBuilder(package).Declare(name).Declare(name + "StoreConfiguration");
++        var store = code.Reference(types.BasePackage + ".runtime.ReadModelStore");
++        var memory = code.Reference(types.BasePackage + ".runtime.InMemoryReadModelStore");
++        var persistent = code.Reference(types.BasePackage + ".persistence.JpaReadModelStore");
++        var bootstrap = code.Reference(types.BasePackage + ".persistence.PersistentViewConfiguration");
++        var qualifier = JavaCodeBuilder.StringLiteral(package + "." + name);
++        code.DiffersFromScreenplay("Default read-model rows are volatile. The persistent profile supports guarded flat projections only; scoped/reducer state is not recovered (STAGE-AXON-0308).")
++            .Line($"@{code.Reference("org.springframework.context.annotation.Configuration")}({JavaCodeBuilder.StringLiteral(package + "." + name + "StoreConfiguration")})")
++            .Line($"@{code.Reference("org.springframework.context.annotation.PropertySource")}(\"classpath:axon-views.properties\")")
++            .Block($"public class {name}StoreConfiguration", body => body
++                .Line($"@{body.Reference("org.springframework.context.annotation.Profile")}(\"!persistent\")")
++                .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({qualifier})")
++                .Block($"public {store}<{body.Reference("java.lang.Object")}, {name}> store()", method => method.Line($"return new {memory}<>();"))
++                .Line($"@{body.Reference("org.springframework.context.annotation.Profile")}(\"persistent\")")
++                .Line($"@{body.Reference("org.springframework.context.annotation.Bean")}({qualifier})")
++                .Block($"public {store}<Object, {name}> persistentStore({bootstrap} generation, {body.Reference("jakarta.persistence.EntityManagerFactory")} factory, {body.Reference("tools.jackson.databind.json.JsonMapper")} mapper)", method =>
++                    method.Line($"return new {persistent}<>(factory, mapper, {qualifier}, {name}.class);")));
++        ViewJavaTypes.Add(context, package, name + "StoreConfiguration", code.Build(), model.Id);
++    }
++}
+diff --git a/Source/Rendering.Axon/Emitters/Projections/ProjectionHandlerBinding.cs b/Source/Rendering.Axon/Emitters/Projections/ProjectionHandlerBinding.cs
+new file mode 100644
+index 00000000..58204409
+--- /dev/null
++++ b/Source/Rendering.Axon/Emitters/Projections/ProjectionHandlerBinding.cs
+@@ -0,0 +1,47 @@
++// Copyright (c) Cratis. All rights reserved.
++// Licensed under the MIT license. See LICENSE file in the project root for full license information.
++
++using Cratis.Screenplay.Semantics;
++using Cratis.Stage.Rendering.Axon.Emitters.Persistence;
++using Cratis.Stage.Rendering.Axon.Java;
++
++namespace Cratis.Stage.Rendering.Axon.Emitters.Projections;
++
++internal sealed class ProjectionHandlerBinding(AxonEmissionContext context, ViewJavaTypes types, SemanticReadModel model, string package)
++{
++    readonly ProjectionUpdates _updates = new(context, types, model.Id);
++
++    internal void Emit(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions)
++    {
++        if (PersistentViewAdmission.Supports(context, model.Id))
++        {
++            EmitContextual(body, eventType, transitions);
++            return;
++        }
++        body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
++            .Block($"public void on({eventType} event{_updates.Parameter})", method => Apply(method, transitions));
++    }
++
++    void EmitContextual(JavaCodeBuilder body, string eventType, Action<JavaCodeBuilder> transitions)
++    {
++        var adapter = body.Reference(types.BasePackage + ".persistence.JpaReadModelStore");
++        var processing = body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext");
++        var store = body.Reference(types.BasePackage + ".runtime.ReadModelStore");
++        var arguments = _updates.Enabled ? ", updates" : string.Empty;
++        body.Line($"@{body.Reference("org.axonframework.messaging.eventhandling.annotation.EventHandler")}")
++            .Block($"public void handle({eventType} event{_updates.Parameter}, {processing} context)", method =>
++            {
++                method.Line($"apply(event{_updates.DefaultArgument}, {adapter}.bind(store, context));");
++                if (_updates.Enabled)
++                    method.Block("context.runOnAfterCommit(ignored ->", callback => _updates.Notify(callback, package)).Line(");");
++            })
++            .Block($"public void on({eventType} event{_updates.Parameter})", method => method.Line($"apply(event{arguments}, store);"))
++            .Block($"private void apply({eventType} event{_updates.Parameter}, {store}<Object, {JavaNames.Type(model.Name)}> store)", method => Apply(method, transitions));
++    }
++
++    void Apply(JavaCodeBuilder method, Action<JavaCodeBuilder> transitions)
++    {
++        transitions(method);
++        _updates.Notify(method, package);
++    }
++}
+diff --git a/Source/Rendering.Axon/Emitters/Projections/for_AxonProjectionsEmitter/when_emitting_flat_views.cs b/Source/Rendering.Axon/Emitters/Projections/for_AxonProjectionsEmitter/when_emitting_flat_views.cs
+index 86c2a14c..22ff67d8 100644
+--- a/Source/Rendering.Axon/Emitters/Projections/for_AxonProjectionsEmitter/when_emitting_flat_views.cs
++++ b/Source/Rendering.Axon/Emitters/Projections/for_AxonProjectionsEmitter/when_emitting_flat_views.cs
+@@ -27,10 +27,10 @@ public class when_emitting_flat_views : given.a_view_request
+     [Fact] void should_clear_the_optional_property() => _projector.ShouldContain("state.withNote(null)");
+     [Fact] void should_update_the_model_fluently() => _projector.ShouldContain("state.withCount(");
+     [Fact] void should_emit_copy_methods() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/Total.java", StringComparison.Ordinal))).ShouldContain("public Total withCount(Long value)");
+-    [Fact] void should_configure_subscribing_processing() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath == "src/main/resources/axon-views.properties")).ShouldContain(".mode=subscribing");
++    [Fact] void should_configure_subscribing_processing() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath == "src/main/resources/axon-views.properties")).ShouldContain(".mode=${stage.axon.view-processor-mode:subscribing}");
+     [Fact] void should_use_a_model_specific_store_qualifier() => _projector.ShouldContain("@Qualifier(\"axonviews.views.counters.totals.Total\")");
+     [Fact] void should_keep_the_qualified_in_memory_store_unchanged() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/TotalStoreConfiguration.java", StringComparison.Ordinal))).ShouldContain("@Bean(\"axonviews.views.counters.totals.Total\")\n    public ReadModelStore<Object, Total> store() {\n        return new InMemoryReadModelStore<>();\n    }");
+-    [Fact] void should_preserve_the_persistence_difference_in_source() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/TotalStoreConfiguration.java", StringComparison.Ordinal))).ShouldContain("// Differs from Screenplay: Read-model rows and projector indexes are volatile; durable checkpoints may skip prior events after restart. Automatic replay is not established recovery; persistent startup with generated views is refused (STAGE-AXON-0308).");
++    [Fact] void should_preserve_the_persistence_difference_in_source() => Text(_context.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/TotalStoreConfiguration.java", StringComparison.Ordinal))).ShouldContain("// Differs from Screenplay: Default read-model rows are volatile. The persistent profile supports guarded flat projections only; scoped/reducer state is not recovered (STAGE-AXON-0308).");
+     [Fact] void should_warn_about_volatile_read_models() => _context.Degradation.UnsupportedConstructs.Single(diagnostic => diagnostic.Artifact == ReadModelId("Total")).Code.ShouldEqual("STAGE-AXON-0308");
+     [Fact] void should_explain_the_checkpoint_risk() => _context.Degradation.UnsupportedConstructs.Single(diagnostic => diagnostic.Artifact == ReadModelId("Total")).Message.ShouldContain("durable checkpoints may skip prior events");
+     [Fact] void should_not_promote_the_difference_to_an_error_in_default_mode() => _context.Degradation.UnsupportedConstructs.Single(diagnostic => diagnostic.Artifact == ReadModelId("Total")).Severity.ShouldEqual(ArtifactRenderDiagnosticSeverity.Warning);
+diff --git a/Source/Rendering.Axon/Emitters/Projections/for_AxonProjectionsEmitter/when_emitting_persistent_view_safety.cs b/Source/Rendering.Axon/Emitters/Projections/for_AxonProjectionsEmitter/when_emitting_persistent_view_safety.cs
+index 6ed6c9c6..4dac11ee 100644
+--- a/Source/Rendering.Axon/Emitters/Projections/for_AxonProjectionsEmitter/when_emitting_persistent_view_safety.cs
++++ b/Source/Rendering.Axon/Emitters/Projections/for_AxonProjectionsEmitter/when_emitting_persistent_view_safety.cs
+@@ -24,9 +24,11 @@ public class when_emitting_persistent_view_safety : for_AxonArtifactRenderPlanne
+     }
+ 
+     [Fact] void should_have_multiple_views_to_protect() => Configurations(_application).Count().ShouldBeGreaterThan(1);
+-    [Fact] void should_emit_one_static_guard_for_each_view() => Configurations(_application).ShouldEachConformTo(code => code.Contains("public static PersistentReadModelSafety persistentReadModelSafety()", StringComparison.Ordinal));
+-    [Fact] void should_name_every_guard_uniquely() => Configurations(_application).Select(code => code.Split('\n').Single(line => line.Contains(".persistentReadModelSafety\")", StringComparison.Ordinal))).Distinct().Count().ShouldEqual(Configurations(_application).Count());
+-    [Fact] void should_profile_only_the_guard() => Configurations(_application).ShouldEachConformTo(code => code.Contains("@Profile(\"persistent\")\n    public static", StringComparison.Ordinal));
++    [Fact] void should_guard_or_persist_every_selected_view() => Configurations(_application).ShouldEachConformTo(code =>
++        code.Contains("public static PersistentReadModelSafety persistentReadModelSafety()", StringComparison.Ordinal) ||
++        code.Contains("return new JpaReadModelStore<>", StringComparison.Ordinal));
++    [Fact] void should_name_every_guard_uniquely() => Guards(_application).Select(code => code.Split('\n').Single(line => line.Contains(".persistentReadModelSafety\")", StringComparison.Ordinal))).Distinct().Count().ShouldEqual(Guards(_application).Count());
++    [Fact] void should_profile_every_configuration() => Configurations(_application).ShouldEachConformTo(code => code.Contains("@Profile(\"persistent\")", StringComparison.Ordinal));
+     [Fact] void should_guard_a_selected_view() => Configurations(_view).ShouldNotBeEmpty();
+     [Fact] void should_not_emit_view_configurations_for_a_viewless_selected_slice() => Configurations(_viewless).ShouldBeEmpty();
+     [Fact] void should_not_emit_a_guard_for_unselected_views() => _viewless.Artifacts.Select(Text).Any(code => code.Contains("persistentReadModelSafety", StringComparison.Ordinal)).ShouldBeFalse();
+@@ -40,5 +42,7 @@ public class when_emitting_persistent_view_safety : for_AxonArtifactRenderPlanne
+ 
+     static IEnumerable<string> Configurations(AxonEmissionContext context) => context.Artifacts.Where(artifact => artifact.RelativePath.EndsWith("StoreConfiguration.java", StringComparison.Ordinal)).Select(Text);
+ 
++    static IEnumerable<string> Guards(AxonEmissionContext context) => Configurations(context).Where(code => code.Contains("persistentReadModelSafety()", StringComparison.Ordinal));
++
+     static string Text(PlannedArtifact artifact) => Encoding.UTF8.GetString(artifact.Bytes.AsSpan());
+ }
+diff --git a/Source/Rendering.Axon/Emitters/Runtime/Templates/test/PersistentProbeSupport.java b/Source/Rendering.Axon/Emitters/Runtime/Templates/test/PersistentProbeSupport.java
+index 6b354293..1fde565a 100644
+--- a/Source/Rendering.Axon/Emitters/Runtime/Templates/test/PersistentProbeSupport.java
++++ b/Source/Rendering.Axon/Emitters/Runtime/Templates/test/PersistentProbeSupport.java
+@@ -73,7 +73,22 @@ final class PersistentProbeSupport {
+                 "--spring.jpa.hibernate.ddl-auto=update", "--spring.main.banner-mode=off");
+     }
+ 
+-    static void refuses(String database) throws Exception {
++    static boolean unsupportedViews() {
++        var scanner = new org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider(false);
++        scanner.addIncludeFilter(new org.springframework.core.type.filter.AnnotationTypeFilter(org.springframework.context.annotation.Configuration.class));
++        return scanner.findCandidateComponents(PersistentProbeSupport.class.getPackageName().replaceFirst("\\.runtime$", "")).stream()
++                .anyMatch(definition -> {
++                    try {
++                        return java.util.Arrays.stream(Class.forName(definition.getBeanClassName()).getDeclaredMethods())
++                                .anyMatch(method -> method.getReturnType() == PersistentReadModelSafety.class);
++                    } catch (ClassNotFoundException failure) { throw new IllegalStateException(failure); }
++                });
++    }
++
++    static void refuses(String database) throws Exception { refuses(database, true); }
++    static void refusesLegacy(String database) throws Exception { refuses(database, false); }
++
++    private static void refuses(String database, boolean early) throws Exception {
+         var witness = new Witness();
+         var builder = new SpringApplicationBuilder(application())
+                 .listeners((ApplicationListener<ApplicationEvent>) event -> {
+@@ -81,9 +96,9 @@ final class PersistentProbeSupport {
+                 })
+                 .initializers(context -> {
+                     context.getBeanFactory().addBeanPostProcessor(witness);
+-                    context.addBeanFactoryPostProcessor(factory -> {
++                    if (early) context.addBeanFactoryPostProcessor(factory -> {
+                         witness.factory = true;
+-                        // Deliberately dangerous late factory work must never execute.
++                        // Deliberately dangerous late factory work must never execute for unsupported shapes.
+                         factory.getBean(DataSource.class);
+                         factory.getBean(EntityManagerFactory.class);
+                     });
+@@ -91,13 +106,15 @@ final class PersistentProbeSupport {
+         var failure = assertThrows(Exception.class, () -> start(builder, database));
+         var root = failure;
+         while (root.getCause() != null) root = (Exception) root.getCause();
+-        assertInstanceOf(BeanDefinitionStoreException.class, root);
++        assertInstanceOf(early ? BeanDefinitionStoreException.class : IllegalStateException.class, root);
+         assertTrue(root.getMessage().contains("STAGE-AXON-0308"), root.getMessage());
+-        assertTrue(root.getMessage().contains(application().getPackageName() + "."), root.getMessage());
++        assertTrue(root.getMessage().contains(application().getPackageName()), root.getMessage());
+         assertFalse(witness.ready, "No HTTP initialization or application readiness");
+-        assertFalse(witness.factory, "Registry refusal must precede ordinary factory processing");
+-        assertTrue(witness.resources.isEmpty(), "No resource or lifecycle creation: " + witness.resources);
+-        System.out.println("Persistent-view refusal: 0308; no readiness, factory, resources or lifecycle creation");
++        if (early) {
++            assertFalse(witness.factory, "Registry refusal must precede ordinary factory processing");
++            assertTrue(witness.resources.isEmpty(), "No resource or lifecycle creation: " + witness.resources);
++        }
++        System.out.println("Persistent-view refusal: 0308; no readiness; early unsupported-shape guard=" + early);
+     }
+ 
+     @TestConfiguration(proxyBeanMethods = false)
+diff --git a/Source/Rendering.Axon/Emitters/Runtime/Templates/test/PersistentRestartProbe.java b/Source/Rendering.Axon/Emitters/Runtime/Templates/test/PersistentRestartProbe.java
+index 5a54471b..7bc3a680 100644
+--- a/Source/Rendering.Axon/Emitters/Runtime/Templates/test/PersistentRestartProbe.java
++++ b/Source/Rendering.Axon/Emitters/Runtime/Templates/test/PersistentRestartProbe.java
+@@ -66,13 +66,24 @@ class PersistentRestartProbe {
+         var before = PersistentDatabaseSnapshot.read(database);
+         before.assertSeeded(owner, checkpoint);
+         for (var attempt = 1; attempt <= 2; attempt++) {
+-            PersistentProbeSupport.refuses(database);
++            if (PersistentProbeSupport.unsupportedViews()) PersistentProbeSupport.refuses(database);
++            else PersistentProbeSupport.refusesLegacy(database);
+             assertEquals(before, PersistentDatabaseSnapshot.read(database), "All event/claim/token values unchanged after refusal " + attempt);
+         }
+         var fresh = PersistentProbeSupport.freshPath();
+-        PersistentProbeSupport.refuses(PersistentProbeSupport.database(fresh));
+-        try (var files = Files.list(fresh.getParent())) {
+-            assertEquals(0, files.count(), "Refusal must not create any fresh database files");
++        if (PersistentProbeSupport.unsupportedViews()) {
++            PersistentProbeSupport.refuses(PersistentProbeSupport.database(fresh));
++            try (var files = Files.list(fresh.getParent())) {
++                assertEquals(0, files.count(), "Unsupported-shape refusal must not create any fresh database files");
++            }
++        } else {
++            try (var application = PersistentProbeSupport.start(new SpringApplicationBuilder(PersistentProbeSupport.application()), PersistentProbeSupport.database(fresh))) {
++                assertPersistentStores(application);
++                assertFalse(application.getBeansOfType(ReadModelStore.class).isEmpty(), "Supported flat application must provide durable views");
++            }
++            try (var files = Files.list(fresh.getParent())) {
++                assertTrue(files.count() > 0, "Supported flat startup must establish generation metadata");
++            }
+         }
+     }
+ 
+@@ -104,7 +115,10 @@ class PersistentRestartProbe {
+     private void assertPersistentStores(ConfigurableApplicationContext application) {
+         assertInstanceOf(AggregateBasedJpaEventStorageEngine.class, application.getBean(EventStorageEngine.class));
+         assertInstanceOf(JpaUniqueValueStore.class, application.getBean(UniqueValueStore.class));
+-        assertTrue(application.getBeansOfType(ReadModelStore.class).isEmpty(), "Successful persistent boot must be viewless");
++        var views = application.getBeansOfType(ReadModelStore.class);
++        if (!Boolean.getBoolean("stage.expectViews")) assertTrue(views.isEmpty(), "Viewless fixture must remain viewless");
++        views.forEach((name, store) -> assertTrue(store.getClass().getName().endsWith(".persistence.JpaReadModelStore"),
++                "Persistent view must not fall back to memory: " + name));
+         assertTrue(application.getBeansOfType(PersistentReadModelSafety.class).isEmpty());
+     }
+ 
+diff --git a/Source/Rendering.Axon/Emitters/Scaffold/AxonPersistentScaffold.cs b/Source/Rendering.Axon/Emitters/Scaffold/AxonPersistentScaffold.cs
+index 1e729b82..459de2cd 100644
+--- a/Source/Rendering.Axon/Emitters/Scaffold/AxonPersistentScaffold.cs
++++ b/Source/Rendering.Axon/Emitters/Scaffold/AxonPersistentScaffold.cs
+@@ -12,5 +12,6 @@ internal static class AxonPersistentScaffold
+         spring.datasource.password=
+         spring.jpa.hibernate.ddl-auto=update
+         spring.jpa.open-in-view=false
++        stage.axon.view-processor-mode=pooled
+         """ + "\n";
+ }
+diff --git a/Source/Rendering.Axon/Emitters/Scaffold/for_AxonScaffoldEmitter/when_emitting_a_scaffold.cs b/Source/Rendering.Axon/Emitters/Scaffold/for_AxonScaffoldEmitter/when_emitting_a_scaffold.cs
+index b106d7a7..9c778396 100644
+--- a/Source/Rendering.Axon/Emitters/Scaffold/for_AxonScaffoldEmitter/when_emitting_a_scaffold.cs
++++ b/Source/Rendering.Axon/Emitters/Scaffold/for_AxonScaffoldEmitter/when_emitting_a_scaffold.cs
+@@ -55,6 +55,9 @@ public class when_emitting_a_scaffold : for_AxonArtifactRenderPlanner.given.an_a
+         yaml.ShouldContain("mode: subscribing");
+     }
+ 
++    [Fact]
++    void should_use_checkpointed_processors_for_persistent_views() => Content("src/main/resources/application-persistent.properties").ShouldContain("stage.axon.view-processor-mode=pooled");
++
+     [Fact]
+     void should_wire_standard_time_and_the_runtime_json_module()
+     {
