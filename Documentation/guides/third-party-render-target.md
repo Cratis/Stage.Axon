@@ -136,7 +136,19 @@ For another target, this is the handoff: keep all three checks in its verificati
 
 The Axon target emits Java records, Spring components, Axon command handlers, and JUnit tests. Create its profile through `AxonRendering.CreateProfile()` and plan through `AxonArtifactRenderPlanner`; do not depend on its internal emitters as extension APIs.
 
-Hosts such as the CLI call `AxonRendering.Plan(AxonRenderRequest)` with `AxonRenderOptions`. `JavaPackage` sets the Java base package and Maven groupId, with each segment normalized and framework roots refused; `ProjectName` sets the Maven artifactId. `NewestAdmittedSemanticVersion` declares the ESM admission ceiling and `IsMeasured` identifies measured language and semantic version pairs. `Version` is the package version without build metadata.
+Hosts such as the CLI call `AxonRendering.Plan(AxonRenderRequest)` with `AxonRenderOptions`. Every option defaults to the existing output:
+
+| Option | Render behavior |
+| --- | --- |
+| `ProjectName` | Maven artifactId, used verbatim. Unset keeps the base package plus `-application`. |
+| `JavaPackage` | Java base package and Maven groupId, normalized per segment. Framework package roots and segments that are not valid after normalization are refused with `STAGE-AXON-NAMES`. Unset keeps the model-derived package. |
+| `FileHeader` | Lines placed as `//` comments at the top of Java sources and tests (see the license header below). Empty adds no header. |
+| `Strict` | Unsupported constructs become errors and refusals instead of warnings. |
+| `AllowedApproximations` | Approximation codes that strict mode does not refuse. Approximations always render with a warning. |
+| `TypeScriptClient` | Also generates the [TypeScript client](#generated-typescript-client-experimental). Off by default. |
+| `HttpAuthentication` | `Basic` (default) or `BearerTokens`, which renders the OAuth2 JWT resource server described under [Generated HTTP contract](#generated-http-contract). |
+
+`NewestAdmittedSemanticVersion` declares the ESM admission ceiling and `IsMeasured` identifies measured language and semantic version pairs. `Version` is the package version without build metadata.
 
 Generated applications use `org.axonframework.extensions.spring:axon-spring-boot-starter`, managed by `org.axonframework:axon-framework-bom:5.4.1`, with `axon-spring-boot-starter-test` from the same Spring extension group for tests. Generated configuration disables Axon Server; generated applications do not require it.
 
@@ -167,7 +179,7 @@ By default events, read models and uniqueness claims are kept in memory and lost
 | Reactions | Supported reactions invoke commands or append one typed event. Reaction handlers disallow replay but do not make side effects exactly once. | Storage does not establish coordinated view/reaction recovery or exactly-once side effects. |
 | Time | Injected `java.time.Clock`; UTC calendar guards and process-local Spring scheduling. Interval alignment/durability differs explicitly with `STAGE-AXON-0507`. | No durable scheduler guarantee. |
 | Restart | By default events, read models and uniqueness claims do not survive process restart. The optional `persistent` profile stores events, tokens and read models in an H2 file database; it is not offered for models with constraints, so claims are never durable. | Restart durability is not proven by a restart test. No automatic reset, replay or migration is performed. |
-| Read models | Projections and reducers write Spring Data JPA entities through typed repositories on in-memory H2 by default. | Projections whose scope cannot be resolved degrade with `STAGE-AXON-0310`. No migration or exactly-once reaction guarantee is supplied. |
+| Read models | Projections and reducers write Spring Data JPA entities through typed repositories on in-memory H2 by default. | Joins, `every` mappings, children, nested scopes and flat composite keys are supported. Scoped projections whose scope or keys cannot be resolved, and scoped projections into a composite-key read model, degrade with `STAGE-AXON-0310`. No migration or exactly-once reaction guarantee is supplied. |
 
 Protected decision support currently covers required **presence**, not arbitrary field-value reads. Reaction JUnit lowering currently covers unambiguous application-trigger scenarios without prior state, with event assertions and a pinned clock. Other fixtures stay explicitly disabled rather than succeeding without exercising their behavior. Captures and translations remain unsupported with `STAGE-AXON-0601`; an unauthenticated collection endpoint is not a substitute for source subscription and checkpoint semantics.
 
@@ -230,7 +242,7 @@ Unplaced transitions emit `STAGE-AXON-0306` and return `current`: **events are i
 
 ### Target-native Java body contracts
 
-`ArtifactRenderRequest.ImplementationContents` supplies bodies by stable requirement ID. The renderer resolves that exact ID and checks semantic owner/role, context/result revision 1, resolved attachment, ambiguity/provisional flags, supported capability and UTF-8 SHA-256 revision. The compiler dependency is explicitly `Cratis.Screenplay` 4.251.0; this does not migrate Contracts or the canonical corpus.
+`ArtifactRenderRequest.ImplementationContents` supplies bodies by stable requirement ID. The renderer resolves that exact ID and checks semantic owner/role, context/result revision 1, resolved attachment, ambiguity/provisional flags, supported capability and UTF-8 SHA-256 revision. The compiler dependency is explicitly `Cratis.Screenplay` 6.22.0, the `ScreenplayVersion` pin that the canonical corpus package shares.
 
 | Role | Existing native method contract |
 | --- | --- |
@@ -310,9 +322,7 @@ Browsers. Credentials travel in the `Authorization` header, so the event stream 
 
 Live queries deliver latest-state snapshots, not every transition. Consecutive equal snapshots are suppressed, and keyed subscribers re-query only their own key. Streams carry no SSE ids and ignore `Last-Event-ID`; a reconnect starts with a fresh full snapshot. Streams send `:heartbeat` comment lines (fetch-based clients must skip lines starting with `:`), end after a configurable lifetime, and are capped: when the cap is reached, a new stream receives a 503 `live-capacity` problem with `Retry-After: 5`. Configure them with `stage.axon.live.max-streams` (default 1024, 0 means unlimited), `stage.axon.live.heartbeat` (default 15s) and `stage.axon.live.timeout` (default 30m). A cardinality violation for a `One` or `ZeroOrOne` query ends the stream with an error. In the in-memory profile, generated event handlers stage row and index changes until commit; rollback discards them without a live invalidation. Direct test helpers remain immediate ([#32](https://github.com/Cratis/Stage.Axon/issues/32)). Every stream starts with a `:open` comment line. Errors raised while the subscription starts terminate the stream; they are not sent as SSE error payloads or an HTTP problem status after the 200 response.
 
-<a id="generated-typescript-client-experimental"></a>
-
-### Generated TypeScript client
+### Generated TypeScript client (experimental)
 
 The Axon renderer can also emit a typed TypeScript client for the generated HTTP contract. It is opt-in: `AxonRendering.WithTypeScriptClient(profile)` adds the client input to a profile (applying it again changes nothing, and other inputs are kept). Without it no client is rendered, and `CreateProfile` is unchanged. The client is generated from the endpoint registry and the semantic model, not from `http-contract.json`, which carries no payload types; a specification cross-checks the two. Each slice gets a module with command and query descriptors, and the client ships a neutral `transport.ts` interface plus a fetch-based HTTP implementation. The generated files carry no license header.
 
@@ -323,5 +333,11 @@ The Axon renderer can also emit a typed TypeScript client for the generated HTTP
 - **Identity epoch.** `changeIdentity()` aborts in-flight requests as `cancelled("identity")`, clears every watch, and reopens it under the new identity. Callbacks carry the epoch, and callbacks of an older epoch are never made.
 - **Precision.** Each WholeNumber or DecimalNumber member raises one `STAGE-AXON-CLIENT-PRECISION` warning. The WholeNumber decoder rejects values beyond the safe integer range. The warning never refuses a render, even in strict mode, and is not listed in `UNSUPPORTED.md`.
 - **Degradation.** A shape the client cannot type becomes `unknown` with a `// Not typed:` comment and a `STAGE-AXON-CLIENT` warning, and strict mode refuses it like any other unsupported construct. A registry entry without semantic information is skipped with a comment and a warning.
+
+The generated HTTP transport has its own proofs. CI runs them from the repository root in java shard 0:
+
+```bash
+node --test "Source/Rendering.Axon/Emitters/Client/Tests/*.test.mjs"
+```
 
 `Source/Rendering.Axon.Verification/ClientProof/scene` shows the transport under React and Scene. It is proof-local, not generated output: a command dispatcher for Scene's `executeCommand` and a hook that feeds a live query to `queryResults`. See the Verification README.
