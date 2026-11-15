@@ -94,7 +94,7 @@ export function withoutComments(text) {
 export function compare(localText, cliText) {
     const [local, cli] = [withoutComments(localText), withoutComments(cliText)];
     const pairs = PAIRS.map(pair => comparePair(local, cli, pair));
-    return { ok: pairs.every(pair => ['equal', 'behind'].includes(pair.status)), pairs };
+    return { ok: pairs.every(pair => pair.status === 'equal'), pairs };
 }
 
 async function readProps(source) {
@@ -113,8 +113,8 @@ function reportPair(pair) {
     const target = `Cratis/cli main ${pair.cliVersion}`;
     if (pair.status === 'equal') console.log(`${prefix} matches ${target}`);
     else if (pair.status === 'behind') {
-        console.log(`::warning::${prefix} is behind ${target}`);
-        console.log(`One-line bump: bump ${pair.property} in Directory.Packages.props to ${pair.cliVersion}`);
+        console.error(`${prefix} is behind ${target}`);
+        console.error(`One-line bump: bump ${pair.property} in Directory.Packages.props to ${pair.cliVersion}`);
     } else {
         const reason = pair.status === 'ahead' ? 'ahead of' : 'incompatible with';
         console.error(`${prefix} is ${reason} ${target}${pair.status === 'major-mismatch' ? ' (major versions differ)' : ''}`);

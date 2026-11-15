@@ -39,12 +39,14 @@ for (const [name, stage, screenplay, packageName] of [
     ['StageVersion', '4.197.0', '4.250.0', 'Cratis.Stage.Contracts'],
     ['ScreenplayVersion', '4.203.0', '4.249.0', 'Cratis.Screenplay']
 ]) {
-    test(`lower ${name} warns without failing and names the one-line bump`, t => {
+    test(`lower ${name} fails and names the one-line bump`, t => {
         const result = cli(t, local(stage, screenplay));
-        assert.equal(result.status, 0, result.stderr);
-        assert.ok(result.stdout.includes(`::warning::${packageName}`));
-        assert.match(result.stdout, new RegExp(`One-line bump: bump ${name} in Directory.Packages.props`));
-        assert.equal(compare(local(stage, screenplay), props()).ok, true);
+        assert.equal(result.status, 1);
+        assert.ok(result.stderr.includes(`${packageName}: Stage.Axon ${name}`));
+        assert.match(result.stderr, /is behind Cratis\/cli main/);
+        assert.match(result.stderr, new RegExp(`One-line bump: bump ${name} in Directory.Packages.props`));
+        assert.match(result.stdout, /matches Cratis\/cli main/);
+        assert.equal(compare(local(stage, screenplay), props()).ok, false);
     });
 }
 
@@ -104,7 +106,8 @@ for (let index = 1; index < prereleases.length; index++) {
     test(`semver orders ${lower} before ${higher}`, t => {
         assert.equal(compareVersions(lower, higher), -1);
         assert.equal(compareVersions(higher, lower), 1);
-        assert.equal(cli(t, local(lower), props(higher)).status, 0);
+        assert.equal(cli(t, local(lower), props(higher)).status, 1);
+        assert.equal(cli(t, local(higher), props(higher)).status, 0);
         assert.equal(cli(t, local(higher), props(lower)).status, 1);
     });
 }
