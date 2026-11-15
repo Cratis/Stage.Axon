@@ -10,6 +10,10 @@ The renderer ships as the experimental NuGet package `Cratis.Stage.Rendering.Axo
 
 Screenplay 6.22.0 / Contracts 5.11.0 admits ESM through V50; admission is not complete rendering support. Screens, agents, external systems/abilities, projection child ordering, set-once mappings, caller identity and text comparisons report `STAGE-AXON-UNSUPPORTED-SEMANTICS` (warnings normally, refusals in strict mode). State-backed policies, policy reads/typed inputs/input mappings and query row narrowing report `STAGE-AXON-AUTHORIZATION` and deny endpoint and handler access; narrowing denies even without explicit authorization. The ledger classifies all 1,042 reachable members, with no new Ignored rows. The six canonical Tracking document hashes are unchanged.
 
+## Build with it from Studio
+
+The packaged Axon builder runs this renderer for a Cratis Studio application, at the Screenplay, Code or Code and AI level, on your machine or in Docker: `cratis build run --level code --target axon`. The Cratis CLI bundles the renderer (`cratis render --target axon`), and Studio's `axon` build kit says how to verify the result with Maven. See [The Axon builder](https://docs.cratis.studio/developers/builders/local/axon/).
+
 ## Build and specs
 
 Requires .NET 11. Run from this directory:
