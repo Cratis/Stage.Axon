@@ -242,7 +242,7 @@ Unplaced transitions emit `STAGE-AXON-0306` and return `current`: **events are i
 
 ### Target-native Java body contracts
 
-`ArtifactRenderRequest.ImplementationContents` supplies bodies by stable requirement ID. The renderer resolves that exact ID and checks semantic owner/role, context/result revision 1, resolved attachment, ambiguity/provisional flags, supported capability and UTF-8 SHA-256 revision. The compiler dependency is explicitly `Cratis.Screenplay` 6.22.0, the `ScreenplayVersion` pin that the canonical corpus package shares.
+`ArtifactRenderRequest.ImplementationContents` supplies bodies by stable requirement ID. The renderer resolves that exact ID and checks semantic owner/role, context revision 1 and result revision 1 (live query performers require result revision 2, and their list-returning body re-runs on every live emission), resolved attachment, ambiguity/provisional flags, supported capability and UTF-8 SHA-256 revision. The compiler dependency is explicitly `Cratis.Screenplay` 6.22.0, the `ScreenplayVersion` pin that the canonical corpus package shares.
 
 | Role | Existing native method contract |
 | --- | --- |
