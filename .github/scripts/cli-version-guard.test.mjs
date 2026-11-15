@@ -44,7 +44,7 @@ for (const [name, stage, screenplay, packageName] of [
         assert.equal(result.status, 1);
         assert.ok(result.stderr.includes(`${packageName}: Stage.Axon ${name}`));
         assert.match(result.stderr, /is behind Cratis\/cli main/);
-        assert.match(result.stderr, new RegExp(`One-line bump: bump ${name} in Directory.Packages.props`));
+        assert.match(result.stderr, new RegExp(`One-line bump: bump ${name} in Directory.Packages.props to ${name === 'StageVersion' ? '4\\.203\\.0' : '4\\.250\\.0'}`));
         assert.match(result.stdout, /matches Cratis\/cli main/);
         assert.equal(compare(local(stage, screenplay), props()).ok, false);
     });
