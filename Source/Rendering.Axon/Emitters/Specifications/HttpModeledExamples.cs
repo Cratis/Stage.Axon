@@ -114,8 +114,25 @@ internal static class HttpModeledExamples
 
         // Only establish the predicates below. Other rules (including implementation bodies)
         // are not evidence that a modeled literal can pass the generated constructor.
-        return concept.Validations.IsDefaultOrEmpty ||
-            (concept.Primitive == SemanticPrimitiveType.Text && literal is SemanticTextValue textValue && concept.Validations.All(rule => TextRule(textValue.Value, rule)));
+        return concept.Validations.IsDefaultOrEmpty || concept.Validations.All(rule => (concept.Primitive, literal) switch
+        {
+            (SemanticPrimitiveType.Text, SemanticTextValue text) => TextRule(text.Value, rule),
+            (SemanticPrimitiveType.WholeNumber or SemanticPrimitiveType.DecimalNumber, SemanticNumberValue number) => NumberRule(number.Value, rule),
+            _ => false
+        });
+    }
+
+    // Mirrors the generated constructor: BigDecimal.compareTo is exact and scale-insensitive, as is decimal comparison.
+    static bool NumberRule(decimal value, SemanticValidationRule rule)
+    {
+        if (rule.Severity != SemanticValidationSeverity.Error || rule.Operand is not SemanticNumberValue operand) return false;
+        return rule.Kind switch
+        {
+            SemanticValidationRuleKind.Minimum => value >= operand.Value,
+            SemanticValidationRuleKind.Maximum => value <= operand.Value,
+            SemanticValidationRuleKind.Equal => value == operand.Value,
+            _ => false
+        };
     }
 
     static bool Primitive(SemanticPrimitiveType primitive, SemanticValue literal) => (primitive, literal) switch

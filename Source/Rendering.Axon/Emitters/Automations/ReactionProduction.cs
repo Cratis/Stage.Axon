@@ -27,16 +27,22 @@ internal sealed record ReactionProduction(string Name, ReactionProducedEvent Eve
         var inMemoryUniqueValues = handler.Reference(AxonRuntimePackage.Type(context.BasePackage, "InMemoryUniqueValueStore"));
         var constraints = handler.Reference(context.BasePackage + ".infrastructure.ModeledConstraints");
         handler.Line("@" + handler.Reference("org.springframework.stereotype.Component"))
-            .Block($"public class {Name}Handler", body => body
+            .Block($"public class {Name}Handler", body =>
+            {
+                body
                 .Line($"private final {uniqueValues} uniqueValues;")
                 .Line($"public {Name}Handler() {{ uniqueValues = new {inMemoryUniqueValues}(); }}")
                 .Line("@" + body.Reference("org.springframework.beans.factory.annotation.Autowired"))
                 .Line($"public {Name}Handler({uniqueValues} uniqueValues) {{ this.uniqueValues = uniqueValues; }}")
-                .Line("@" + body.Reference("org.axonframework.messaging.commandhandling.annotation.CommandHandler"))
+                .Line("@" + body.Reference("org.axonframework.messaging.commandhandling.annotation.CommandHandler"));
+                var authorization = Security.SecurityAnnotations.ForHandler(context, null, reaction, body);
+                if (authorization.Length > 0) body.Line(authorization);
+                body
                 .Block($"public void handle({Name} command, {body.Reference("org.axonframework.messaging.eventhandling.gateway.EventAppender")} appender, {body.Reference("org.axonframework.messaging.core.unitofwork.ProcessingContext")} processingContext, @{body.Reference("org.axonframework.modelling.annotation.InjectEntity")}{selector} @{body.Reference("org.jspecify.annotations.Nullable")} {Name}Stream stream)", method => method
                     .Line($"if (!{method.Reference("java.util.Objects")}.equals(command.eventSourceId(), command.event().{Primary.ComponentName}())) throw new IllegalArgumentException(\"Event source does not match append boundary\");")
                     .Line($"{constraints}.apply(uniqueValues, command.event(), processingContext);")
-                    .Line("appender.append(command.event());")));
+                    .Line("appender.append(command.event());"));
+            });
         context.AddJava(package, Name + "Handler", handler.Build(), sources: [reaction]);
         EmitStream(context, package, reaction);
     }

@@ -3,6 +3,7 @@
 
 using System.Text.RegularExpressions;
 using Cratis.Screenplay.Semantics;
+using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Rendering.Axon.Admission;
 using Cratis.Stage.Rendering.Axon.Emitters.Implementations;
 using Cratis.Stage.Rendering.Axon.Emitters.Runtime;
@@ -26,8 +27,10 @@ internal static partial class QueryPerformer
 
     internal static bool Required(AxonEmissionContext context, SemanticKeyedQuery query) => Requirement(context, query) is not null;
 
-    internal static IEnumerable<SemanticKeyedQuery> Queries(AxonEmissionContext context, LocatedSemanticSlice located) =>
-        (context.Request.ImplementationRequirements.IsDefault ? [] : context.Request.ImplementationRequirements)
+    internal static IEnumerable<SemanticKeyedQuery> Queries(AxonEmissionContext context, LocatedSemanticSlice located) => Queries(context.Request, located);
+
+    internal static IEnumerable<SemanticKeyedQuery> Queries(ArtifactRenderRequest request, LocatedSemanticSlice located) =>
+        (request.ImplementationRequirements.IsDefault ? [] : request.ImplementationRequirements)
             .Where(requirement => requirement.Role == SemanticImplementationRole.QueryPerformer && requirement.QueryShape?.ReadModel is { } id && located.Slice.ReadModels.Any(model => model.Id == id))
             .Select(requirement => new SemanticKeyedQuery(requirement.Source.SemanticId, requirement.Owner.Name, null, requirement.QueryShape!.ReadModel!.Value, null, requirement.QueryShape.Cardinality, requirement.QueryShape.Delivery)
             {

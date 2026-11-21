@@ -9,4 +9,8 @@ internal sealed record LocatedSemanticSlice(
     SemanticModule Module,
     IReadOnlyList<SemanticFeature> Features,
     SemanticSlice Slice,
-    IReadOnlyList<string> Path);
+    IReadOnlyList<string> Path)
+{
+    /// <summary>Gets a value indicating whether the module, a containing feature or the slice declares an availability gate.</summary>
+    internal bool HasAvailabilityGate => !Module.Available.IsDefaultOrEmpty || Features.Any(feature => !feature.Available.IsDefaultOrEmpty) || !Slice.Available.IsDefaultOrEmpty;
+}

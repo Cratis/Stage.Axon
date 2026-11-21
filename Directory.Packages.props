@@ -1,8 +1,8 @@
 <Project>
   <PropertyGroup>
     <!-- Keep these pins on the same major and equal to Cratis/cli main; cli-version-guard.mjs fails any difference (ahead, behind or another major) in build and publish. -->
-    <StageVersion Condition="'$(StageVersion)' == ''">5.11.0</StageVersion>
-    <ScreenplayVersion Condition="'$(ScreenplayVersion)' == ''">6.22.0</ScreenplayVersion>
+    <StageVersion Condition="'$(StageVersion)' == ''">6.2.4</StageVersion>
+    <ScreenplayVersion Condition="'$(ScreenplayVersion)' == ''">6.32.0</ScreenplayVersion>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageVersionOverrideEnabled>false</CentralPackageVersionOverrideEnabled>
   </PropertyGroup>

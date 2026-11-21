@@ -10,7 +10,12 @@ internal static class ledger_contract
 {
     internal static IReadOnlyDictionary<string, Type> Types { get; } = new[] { typeof(ExecutableSemanticModel).Assembly, typeof(SemanticImplementationRequirement).Assembly }
         .Distinct().SelectMany(assembly => assembly.GetTypes()).Where(type => !type.IsNested && type.Namespace?.StartsWith("Cratis.Screenplay", StringComparison.Ordinal) == true)
-        .ToDictionary(type => type.Name, type => type, StringComparer.Ordinal);
+        .GroupBy(type => type.Name, StringComparer.Ordinal)
+        .ToDictionary(group => group.Key, ModelType, StringComparer.Ordinal);
+
+    // Some simple names exist in several namespaces (for example the execution availability enum); the ledger audits the model type.
+    static Type ModelType(IGrouping<string, Type> group) =>
+        group.Count() == 1 ? group.Single() : group.Single(type => type.Namespace == "Cratis.Screenplay.Semantics");
 
     internal static IEnumerable<KeyValuePair<string, SemanticSurfaceDisposition>> StrictEntries => SemanticSurfaceLedger.Entries;
 
