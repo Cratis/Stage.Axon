@@ -31,6 +31,11 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
 
     static RegisteredReaction? EmitReaction(AxonEmissionContext context, LocatedSemanticSlice located, SemanticReaction reaction, HashSet<string> processors)
     {
+        if (AvailabilityGates.IsGated(context.Request, reaction.Id))
+        {
+            context.Degradation.Unsupported("STAGE-AXON-AUTHORIZATION", reaction.Id, "Availability gates are not rendered; reaction is not run");
+            return null;
+        }
         var package = CommandContractsEmitter.Package(new(context.Request.Model.Application, context.BasePackage), located);
         var name = JavaNames.Type(reaction.Name) + "Reaction";
         var emitter = new ReactionTriggerEmitter(context, reaction);
@@ -38,30 +43,38 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         var triggers = reaction.Triggers.Select((trigger, index) => duplicateEvents ? null : emitter.Prepare(trigger, index)).ToArray();
         EmitProductions(context, package, reaction.Id, triggers);
         var registered = triggers.All(trigger => trigger is not null);
-        if (triggers.Length > 0 && registered && reaction.Triggers.All(trigger => trigger.Kind == SemanticReactionTriggerKind.ApplicationTrigger)) return new(reaction, emitter, triggers!, located.Slice.Name);
+        if (IsApplicationTriggerOnly(reaction, registered)) return new(reaction, emitter, triggers!, located.Slice.Name);
         var code = new JavaCodeBuilder(package).Declare(name);
         ReactionJavaReferences.Claim(code, triggers.OfType<PreparedReactionTrigger>().SelectMany(trigger => new[] { trigger.Input.JavaType, trigger.Invocation, trigger.Condition ?? string.Empty }));
         if (registered) code.Line("@" + code.Reference("org.springframework.stereotype.Component"));
         code.Line($"@{code.Reference("org.axonframework.messaging.core.annotation.Namespace")}({JavaCodeBuilder.StringLiteral(package + ".reactions")})")
             .Line("@" + code.Reference("org.axonframework.messaging.eventhandling.replay.annotation.DisallowReplay"))
-            .Block($"public class {name}", body =>
-            {
-                var commands = body.Reference("org.axonframework.messaging.commandhandling.gateway.CommandGateway");
-                var usesClock = triggers.Select((trigger, index) => (trigger, index)).Any(entry => entry.trigger is { UsesClock: true } && reaction.Triggers[entry.index].Kind != SemanticReactionTriggerKind.ApplicationTrigger);
-                var clock = usesClock ? body.Reference("java.time.Clock") : string.Empty;
-                body.Line($"private final {commands} commands;");
-                if (usesClock) body.Line($"private final {clock} clock;");
-                body.Block($"public {name}({commands} commands{(usesClock ? $", {clock} clock" : string.Empty)})", constructor =>
-                {
-                    constructor.Line("this.commands = commands;");
-                    if (usesClock) constructor.Line("this.clock = clock;");
-                });
-                EmitMethods(reaction, emitter, triggers, body);
-            });
-        if (registered && reaction.Triggers.Any(trigger => trigger.Kind == SemanticReactionTriggerKind.Event) && processors.Add(package)) EmitProcessor(context, package);
+            .Block($"public class {name}", body => EmitClassBody(name, reaction, emitter, triggers, body));
+        if (NeedsProcessor(reaction, registered, processors, package)) EmitProcessor(context, package);
         if (!registered) context.Degradation.Unsupported("STAGE-AXON-0504", reaction.Id, $"Reaction '{reaction.Name}' is not registered: a trigger's effects, routing, guards or identity cannot be preserved.");
         context.AddJava(package, name, code.Build(), sources: [reaction.Id, .. reaction.Triggers.Where(trigger => trigger.Source != default).Select(trigger => trigger.Source)]);
         return registered ? new(reaction, emitter, triggers!, located.Slice.Name) : null;
+    }
+
+    static bool IsApplicationTriggerOnly(SemanticReaction reaction, bool registered) =>
+        reaction.Triggers.Length > 0 && registered && reaction.Triggers.All(trigger => trigger.Kind == SemanticReactionTriggerKind.ApplicationTrigger);
+
+    static bool NeedsProcessor(SemanticReaction reaction, bool registered, HashSet<string> processors, string package) =>
+        registered && reaction.Triggers.Any(trigger => trigger.Kind == SemanticReactionTriggerKind.Event) && processors.Add(package);
+
+    static void EmitClassBody(string name, SemanticReaction reaction, ReactionTriggerEmitter emitter, PreparedReactionTrigger?[] triggers, JavaCodeBuilder body)
+    {
+        var commands = body.Reference("org.axonframework.messaging.commandhandling.gateway.CommandGateway");
+        var usesClock = triggers.Select((trigger, index) => (trigger, index)).Any(entry => entry.trigger is { UsesClock: true } && reaction.Triggers[entry.index].Kind != SemanticReactionTriggerKind.ApplicationTrigger);
+        var clock = usesClock ? body.Reference("java.time.Clock") : string.Empty;
+        body.Line($"private final {commands} commands;");
+        if (usesClock) body.Line($"private final {clock} clock;");
+        body.Block($"public {name}({commands} commands{(usesClock ? $", {clock} clock" : string.Empty)})", constructor =>
+        {
+            constructor.Line("this.commands = commands;");
+            if (usesClock) constructor.Line("this.clock = clock;");
+        });
+        EmitMethods(reaction, emitter, triggers, body);
     }
 
     // One definition per reaction namespace: a reaction sends commands, so its processor starts at the latest token and never reacts to history.
@@ -82,13 +95,14 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
         var names = new HashSet<string>(StringComparer.Ordinal);
         for (var index = 0; index < triggers.Length; index++)
         {
-            if (triggers[index] is not { } trigger || (unregistered && trigger.Production is not null))
+            if (!CanEmit(triggers[index], unregistered))
             {
                 body.UnsupportedIntent($"execute reaction {reaction.Name} trigger {index + 1} with its original guards, identity, mappings and effects", reaction.Id.ToString(), "STAGE-AXON-0504")
                     .DiffersFromScreenplay($"Reaction {reaction.Name} trigger {index + 1} is not rendered because its effects, routing, guards or identity cannot be preserved.")
                     .Block($"private void unsupportedTrigger{index + 1}()", method => method.Line("throw new UnsupportedOperationException(" + JavaCodeBuilder.StringLiteral($"Reaction {reaction.Name} trigger {index + 1} is not supported") + ");"));
                 continue;
             }
+            var trigger = triggers[index]!;
             var model = reaction.Triggers[index];
             if (model.Kind == SemanticReactionTriggerKind.ApplicationTrigger) continue;
             var name = emitter.MethodName(model, trigger, index);
@@ -96,6 +110,8 @@ internal sealed class AxonAutomationsEmitter : IAxonEmitter
             emitter.Emit(model, trigger, index, name, body);
         }
     }
+
+    static bool CanEmit(PreparedReactionTrigger? trigger, bool unregistered) => trigger is not null && (!unregistered || trigger.Production is null);
 
     static void EmitProductions(AxonEmissionContext context, string package, SemanticId reaction, PreparedReactionTrigger?[] triggers)
     {

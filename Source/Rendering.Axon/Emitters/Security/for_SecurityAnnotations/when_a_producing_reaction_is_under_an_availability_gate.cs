@@ -22,7 +22,7 @@ public class when_a_producing_reaction_is_under_an_availability_gate : Specifica
     [InlineData("module")]
     [InlineData("feature")]
     [InlineData("slice")]
-    public async Task should_deny_the_synthesized_append_handler_through_the_production_planner(string owner)
+    public async Task should_omit_the_synthesized_append_handler_through_the_production_planner(string owner)
     {
         var root = Path.Combine(for_AxonArtifactRenderPlanner.given.blueprint_models.Root(), "Source/Rendering.Axon.Verification/Corpus");
         var compilation = await SemanticModelLoader.LoadAsync(root, ["reaction-constraints.play"], null, "ReactionConstraints");
@@ -53,9 +53,8 @@ public class when_a_producing_reaction_is_under_an_availability_gate : Specifica
 
         plan.Refusals.ShouldBeEmpty();
         var handlers = plan.Artifacts.Select(artifact => Encoding.UTF8.GetString(artifact.Bytes.AsSpan())).Where(source => source.Contains(Marker, StringComparison.Ordinal)).ToArray();
-        handlers.Length.ShouldEqual(2);
-        var denied = handlers.Count(source => source.Contains("@Secured({})", StringComparison.Ordinal));
-        denied.ShouldEqual(owner == "slice" ? 1 : 2);
+        handlers.Length.ShouldEqual(owner == "slice" ? 1 : 0);
+        handlers.Any(source => source.Contains("@Secured({})", StringComparison.Ordinal)).ShouldBeFalse();
         plan.Diagnostics.Any(diagnostic => diagnostic.Code == "STAGE-AXON-AUTHORIZATION" && diagnostic.Message.Contains("Availability gates", StringComparison.Ordinal)).ShouldBeTrue();
     }
 }
