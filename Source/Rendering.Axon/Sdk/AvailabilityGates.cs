@@ -10,7 +10,7 @@ namespace Cratis.Stage.Rendering.Axon.Sdk;
 
 /// <summary>
 /// Resolves which emitted operations sit under an availability gate (module, feature, slice or their own). Every operation source
-/// (commands, declarative queries and synthesized performed queries) is enumerated here so emission and admission cannot disagree.
+/// (commands, declarative queries, synthesized performed queries and the append handlers synthesized for producing reactions) is enumerated here so emission and admission cannot disagree.
 /// </summary>
 internal static class AvailabilityGates
 {
@@ -21,13 +21,11 @@ internal static class AvailabilityGates
     internal static IEnumerable<SemanticId> Gated(ArtifactRenderRequest request, LocatedSemanticSlice located) =>
         Operations(request, located).Where(operation => located.HasAvailabilityGate || !operation.Available.IsDefaultOrEmpty).Select(operation => operation.Id);
 
-    /// <summary>Gets the ids of the commands and declarative queries in the slice that are under an availability gate (no performed queries; for callers without a request).</summary>
+    /// <summary>Gets the ids of the commands, declarative queries and producing reactions in the slice that are under an availability gate (no performed queries; for callers without a request).</summary>
     /// <param name="located">The located slice.</param>
     /// <returns>The gated operation ids.</returns>
     internal static IEnumerable<SemanticId> Gated(LocatedSemanticSlice located) =>
-        located.Slice.Commands.Select(command => (command.Id, command.Available))
-            .Concat(located.Slice.Queries.Select(query => (query.Id, query.Available)))
-            .Where(operation => located.HasAvailabilityGate || !operation.Available.IsDefaultOrEmpty).Select(operation => operation.Id);
+        DeclaredOperations(located).Where(operation => located.HasAvailabilityGate || !operation.Available.IsDefaultOrEmpty).Select(operation => operation.Id);
 
     /// <summary>Gets a value indicating whether the operation is under an availability gate.</summary>
     /// <param name="request">The render request.</param>
@@ -36,8 +34,14 @@ internal static class AvailabilityGates
     internal static bool IsGated(ArtifactRenderRequest request, SemanticId owner) =>
         ScopeSelection.Select(request).Any(located => Gated(request, located).Contains(owner));
 
-    static IEnumerable<(SemanticId Id, ImmutableArray<SemanticAvailabilityRequirement> Available)> Operations(ArtifactRenderRequest request, LocatedSemanticSlice located) =>
+    static IEnumerable<(SemanticId Id, ImmutableArray<SemanticAvailabilityRequirement> Available)> DeclaredOperations(LocatedSemanticSlice located) =>
         located.Slice.Commands.Select(command => (command.Id, command.Available))
             .Concat(located.Slice.Queries.Select(query => (query.Id, query.Available)))
+
+            // A producing reaction synthesizes an append command handler owned by the reaction; it inherits the scope gates and has none of its own.
+            .Concat(located.Slice.Reactions.Where(reaction => reaction.Triggers.Any(trigger => !trigger.Produces.IsDefaultOrEmpty)).Select(reaction => (reaction.Id, default(ImmutableArray<SemanticAvailabilityRequirement>))));
+
+    static IEnumerable<(SemanticId Id, ImmutableArray<SemanticAvailabilityRequirement> Available)> Operations(ArtifactRenderRequest request, LocatedSemanticSlice located) =>
+        DeclaredOperations(located)
             .Concat(QueryPerformer.Queries(request, located).Select(query => (query.Id, query.Available)));
 }

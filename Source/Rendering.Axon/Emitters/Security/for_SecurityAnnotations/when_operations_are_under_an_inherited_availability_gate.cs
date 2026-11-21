@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.Text;
 using Cratis.Screenplay.Semantics;
+using Cratis.Screenplay.Semantics.Execution;
 using Cratis.Specifications;
 using Cratis.Stage.Contracts.Rendering;
 using Cratis.Stage.Contracts.Semantics;
@@ -68,5 +69,15 @@ public class when_operations_are_under_an_inherited_availability_gate : Specific
         decisions.Select(decision => decision.Owner).ShouldContainOnly(gated);
         var reported = context.Degradation.UnsupportedConstructs.Concat(context.Degradation.Warnings).Where(diagnostic => diagnostic.Code == "STAGE-AXON-AUTHORIZATION").Select(diagnostic => diagnostic.Artifact.ToString()).ToArray();
         foreach (var id in gated) reported.ShouldContain(id.ToString());
+
+        var productionRequest = request with { ExecutionPlan = SemanticExecutionPlan.Compile(model).Plan! };
+        var plan = new AxonArtifactRenderPlanner().Plan(productionRequest);
+        plan.Refusals.ShouldBeEmpty();
+        string Produced(string name) => Encoding.UTF8.GetString(plan.Artifacts.Single(artifact => artifact.RelativePath.EndsWith("/" + name + ".java", StringComparison.Ordinal)).Bytes.AsSpan());
+        foreach (var operation in _operations)
+        {
+            Produced(operation + "Endpoint").ShouldContain("@PreAuthorize(\"denyAll()\")");
+            Produced(operation + "Handler").ShouldContain("@Secured({})");
+        }
     }
 }
