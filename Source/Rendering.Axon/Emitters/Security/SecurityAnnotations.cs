@@ -48,8 +48,15 @@ internal static class SecurityAnnotations
     internal static string? UnsupportedReason(AxonEmissionContext context, SemanticAuthorization? authorization, SemanticId owner)
     {
         if (HasNarrowing(context, owner)) return "Policy row narrowing is not rendered; access is denied.";
+        if (IsAvailabilityGated(context, owner)) return "Availability gates are not rendered; access is denied.";
         return PolicyPredicates.Unsupported(context, authorization) ? "State policies, reads, typed inputs and input mappings are not rendered; access is denied." : null;
     }
+
+    static bool IsAvailabilityGated(AxonEmissionContext context, SemanticId owner) =>
+        ScopeSelection.Select(context.Request).Any(located =>
+            (located.HasAvailabilityGate && (located.Slice.Commands.Any(command => command.Id == owner) || located.Slice.Queries.Any(query => query.Id == owner))) ||
+            located.Slice.Commands.Any(command => command.Id == owner && !command.Available.IsDefaultOrEmpty) ||
+            located.Slice.Queries.Any(query => query.Id == owner && !query.Available.IsDefaultOrEmpty));
 
     static bool HasNarrowing(AxonEmissionContext context, SemanticId owner) =>
         ScopeSelection.Select(context.Request).SelectMany(located => located.Slice.Queries).Any(query => query.Id == owner && query.Narrowing is not null);

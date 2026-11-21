@@ -17,14 +17,30 @@ internal static class AxonUnsupportedSemantics
     {
         foreach (var decision in ApplicationDecisions(application, basePackage)) yield return decision;
 
+        var reported = new HashSet<SemanticId>();
         foreach (var located in selected)
         {
             var package = basePackage + "." + Java.JavaNames.PackageSegment(located.Module.Name);
             foreach (var query in located.Slice.Queries.Where(query => query.Narrowing is not null)) yield return Narrowing(package, query);
+            foreach (var gated in AvailabilityGated(located)) yield return AvailabilityGate(package, gated);
+            foreach (var decision in ScopeProvides(located, package, reported)) yield return decision;
             foreach (var label in SliceConstructs(located.Slice, []).Distinct(StringComparer.Ordinal))
             {
                 yield return Decision(package, located.Slice.Id, $"{located.Slice.Id}/unsupported/{label}", label);
             }
+        }
+    }
+
+    static IEnumerable<SemanticId> AvailabilityGated(LocatedSemanticSlice located) =>
+        located.Slice.Commands.Where(command => located.HasAvailabilityGate || !command.Available.IsDefaultOrEmpty).Select(command => command.Id)
+            .Concat(located.Slice.Queries.Where(query => located.HasAvailabilityGate || !query.Available.IsDefaultOrEmpty).Select(query => query.Id));
+
+    static IEnumerable<AxonBehaviorDecision> ScopeProvides(LocatedSemanticSlice located, string package, HashSet<SemanticId> reported)
+    {
+        if (!located.Module.Provides.IsDefaultOrEmpty && reported.Add(located.Module.Id)) yield return Decision(package, located.Module.Id, $"{located.Module.Id}/unsupported/provides", "provided context values");
+        foreach (var feature in located.Features.Where(feature => !feature.Provides.IsDefaultOrEmpty && reported.Add(feature.Id)))
+        {
+            yield return Decision(package, feature.Id, $"{feature.Id}/unsupported/provides", "provided context values");
         }
     }
 
@@ -41,6 +57,10 @@ internal static class AxonUnsupportedSemantics
             ("systems", application.Systems)
         };
 
+        if (!application.Audiences.IsDefaultOrEmpty) yield return Decision(package, application.Id, $"{application.Id}/unsupported/audiences", "audiences");
+        if (!application.Availabilities.IsDefaultOrEmpty) yield return Decision(package, application.Id, $"{application.Id}/unsupported/availabilities", "availabilities");
+        if (!application.Provides.IsDefaultOrEmpty) yield return Decision(package, application.Id, $"{application.Id}/unsupported/provides", "provided context values");
+        if (!application.Screens.IsDefaultOrEmpty) yield return Decision(package, application.Id, $"{application.Id}/unsupported/screens", "screens");
         if (application.Agents is not null) yield return Decision(package, application.Id, $"{application.Id}/unsupported/agents", "agents");
         if (application.TimeZone is { } zone) yield return Decision(package, application.Id, $"{application.Id}/unsupported/time zone", $"application time zone {zone.Id}");
         if (!application.ContextMembers.IsDefaultOrEmpty) yield return Decision(package, application.Id, $"{application.Id}/unsupported/context members", "application context members");
@@ -91,6 +111,9 @@ internal static class AxonUnsupportedSemantics
     static string? NewConstruct(object node) => node switch
     {
         SemanticSlice { Screens.IsDefaultOrEmpty: false } => "screens",
+        SemanticSlice { Provides.IsDefaultOrEmpty: false } => "provided context values",
+        SemanticSlice { Adoptions.IsDefaultOrEmpty: false } => "screen adoptions",
+        SemanticInvocation { Ability: not null } => "ability invocation",
         SemanticProjectionMapping { Operation: SemanticProjectionOperation.SetOnce } => "set once",
         SemanticProjectionChildren { Ordering: not null } => "children ordering",
         SemanticConditionOperand { CallerId: true } => "caller identity",
@@ -100,6 +123,9 @@ internal static class AxonUnsupportedSemantics
 
     static AxonBehaviorDecision Narrowing(string package, SemanticKeyedQuery query) =>
         new("STAGE-AXON-AUTHORIZATION", package, query.Id, $"{query.Id}/authorization/narrowing", "authorize query row narrowing", "Policy row narrowing is not rendered; access is denied.");
+
+    static AxonBehaviorDecision AvailabilityGate(string package, SemanticId owner) =>
+        new("STAGE-AXON-AUTHORIZATION", package, owner, $"{owner}/authorization/availability", "authorize availability-gated access", "Availability gates are not rendered; access is denied.");
 
     static AxonBehaviorDecision Decision(string package, SemanticId owner, string modelPath, string construct) =>
         new(AxonRefusalCodes.UnsupportedSemantics, package, owner, modelPath, $"render the {construct}", $"The {construct} is not rendered; Axon has no support for this Screenplay 6 construct.");
